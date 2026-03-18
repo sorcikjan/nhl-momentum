@@ -298,8 +298,8 @@ export async function GET(req: NextRequest) {
           away_energy_bar: awaySnap.team_energy_bar,
           home_sos_multiplier: homeSnap.sos_multiplier,
           away_sos_multiplier: awaySnap.sos_multiplier,
-          home_offensive_potential: homeOff,
-          away_offensive_potential: awayOff,
+          home_offensive_potential: Math.round(homeOff * GOAL_SCALE * 10) / 10,
+          away_offensive_potential: Math.round(awayOff * GOAL_SCALE * 10) / 10,
           home_defensive_filter: homeDef,
           away_defensive_filter: awayDef,
           input_snapshot: {

@@ -142,8 +142,8 @@ function runModelV1_1(homeSnap: TeamSnap, awaySnap: TeamSnap) {
     homeWin: Math.round(homeWin * 1000) / 1000,
     awayWin: Math.round((remaining - homeWin) * 1000) / 1000,
     ot: Math.round(otProb * 1000) / 1000,
-    homeOff: Math.round(homeOff * 10000) / 10000,
-    awayOff: Math.round(awayOff * 10000) / 10000,
+    homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
+    awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
     homeDef: Math.round(homeDef * 10) / 10,
     awayDef: Math.round(awayDef * 10) / 10,
   };
