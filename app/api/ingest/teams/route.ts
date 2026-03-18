@@ -12,14 +12,20 @@ export async function GET() {
     if (!res.ok) throw new Error(`NHL API error: ${res.status}`);
     const json = await res.json();
 
-    const teams = (json.data as {
-      id: number;
-      fullName: string;
-      triCode: string;
-    }[]).map(t => ({
-      id:       t.id,
-      name:     t.fullName,
-      abbrev:   t.triCode,
+    const raw = json.data as { id: number; fullName: string; triCode: string }[];
+
+    // Deduplicate by abbrev — keep highest id (most recent franchise name)
+    const byAbbrev = new Map<string, { id: number; fullName: string; triCode: string }>();
+    for (const t of raw) {
+      if (!t.triCode) continue;
+      const existing = byAbbrev.get(t.triCode);
+      if (!existing || t.id > existing.id) byAbbrev.set(t.triCode, t);
+    }
+
+    const teams = [...byAbbrev.values()].map(t => ({
+      id:     t.id,
+      name:   t.fullName,
+      abbrev: t.triCode,
     }));
 
     const { error } = await supabaseAdmin

@@ -17,7 +17,7 @@ export async function GET() {
       `)
       .order('calculated_at', { ascending: false })
       // Latest snapshot per player only
-      .limit(500);
+      .limit(1000);
 
     if (error) throw error;
 
@@ -34,7 +34,7 @@ export async function GET() {
     );
 
     const top100 = skaters
-      .sort((a, b) => (b.momentum_rank ?? 999) - (a.momentum_rank ?? 999))
+      .sort((a, b) => (a.momentum_rank ?? 999) - (b.momentum_rank ?? 999))
       .slice(0, 100);
 
     const breakoutWatch = [...skaters]
