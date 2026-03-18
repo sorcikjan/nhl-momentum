@@ -1,24 +1,22 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-function getClient(key: 'anon' | 'service'): SupabaseClient {
+function getClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   if (!url || !anonKey) {
     throw new Error('Missing Supabase env vars: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
 
-  return createClient(url, key === 'service' ? (serviceKey ?? anonKey) : anonKey);
+  return createClient(url, anonKey);
 }
 
-// Public client — safe for browser use
+// Single client — tables have no RLS so anon key has full access
 export const supabase = {
-  get client() { return getClient('anon'); },
-  from: (...args: Parameters<SupabaseClient['from']>) => getClient('anon').from(...args),
+  get client() { return getClient(); },
+  from: (...args: Parameters<SupabaseClient['from']>) => getClient().from(...args),
 };
 
-// Service client — server-side only, bypasses RLS
 export const supabaseAdmin = {
-  from: (...args: Parameters<SupabaseClient['from']>) => getClient('service').from(...args),
+  from: (...args: Parameters<SupabaseClient['from']>) => getClient().from(...args),
 };
