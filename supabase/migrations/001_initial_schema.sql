@@ -180,12 +180,8 @@ create table prediction_outcomes (
   game_id             integer references games(id),
   actual_home_score   integer not null,
   actual_away_score   integer not null,
-  home_score_error    numeric(4,2) generated always as (abs(actual_home_score - (
-                        select predicted_home_score from predictions where id = prediction_id
-                      ))) stored,
-  away_score_error    numeric(4,2) generated always as (abs(actual_away_score - (
-                        select predicted_away_score from predictions where id = prediction_id
-                      ))) stored,
+  home_score_error    numeric(4,2) not null,  -- populated by app: abs(actual - predicted)
+  away_score_error    numeric(4,2) not null,
   correct_winner      boolean,
   recorded_at         timestamptz default now(),
   unique(game_id)
