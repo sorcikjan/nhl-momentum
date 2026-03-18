@@ -35,9 +35,13 @@ export async function fetchRankings() {
   });
 
   const skaters = latest.filter(r => r.players?.position_code !== 'G');
-  const top100 = skaters
-    .sort((a, b) => (a.momentum_rank ?? 999) - (b.momentum_rank ?? 999))
-    .slice(0, 100);
+
+  // Rank globally by composite_ppm at query time — stored momentum_rank is only
+  // valid within each ingest batch and cannot be trusted for cross-batch ordering.
+  const sortedSkaters = [...skaters].sort((a, b) => (b.composite_ppm ?? 0) - (a.composite_ppm ?? 0));
+  sortedSkaters.forEach((s, i) => { s.momentum_rank = i + 1; });
+
+  const top100 = sortedSkaters.slice(0, 100);
   const breakoutWatch = [...skaters]
     .sort((a, b) => (b.breakout_delta ?? 0) - (a.breakout_delta ?? 0))
     .slice(0, 10);
