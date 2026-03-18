@@ -19,7 +19,7 @@ export async function fetchRankings() {
       players (
         id, first_name, last_name, position_code, team_id,
         headshot_url, injury_status,
-        teams ( abbrev, name )
+        teams ( id, abbrev, name )
       )
     `)
     .order('calculated_at', { ascending: false })
@@ -73,7 +73,7 @@ export async function fetchGames(date: string) {
 export async function fetchPlayer(id: string) {
   const { data: player, error: pErr } = await supabaseAdmin
     .from('players')
-    .select('*, teams(abbrev, name, logo_url)')
+    .select('*, teams(id, abbrev, name, logo_url)')
     .eq('id', id)
     .single();
 

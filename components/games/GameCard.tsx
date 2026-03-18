@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { gameUrl } from '@/lib/urls';
 
 interface Prediction {
   predicted_home_score: number;
@@ -18,6 +19,7 @@ interface Prediction {
 interface Game {
   id: number;
   startTimeUTC: string;
+  gameDate?: string;
   gameState: string;
   venue: { default: string };
   homeTeam: { id: number; abbrev: string; score?: number; logo?: string };
@@ -56,8 +58,10 @@ export default function GameCard({ game, prediction }: { game: Game; prediction?
   const isFinal = game.gameState === 'FINAL' || game.gameState === 'OFF';
   const outcome = prediction?.prediction_outcomes?.[0];
 
+  const date = game.gameDate ?? game.startTimeUTC?.slice(0, 10);
+
   return (
-    <Link href={`/games/${game.id}`} className="block">
+    <Link href={gameUrl(game.id, game.awayTeam.abbrev, game.homeTeam.abbrev, date)} className="block">
     <div className="rounded-xl border p-4 flex flex-col gap-3 transition-all hover:border-opacity-80 cursor-pointer"
       style={{
         background: 'var(--bg-card)',

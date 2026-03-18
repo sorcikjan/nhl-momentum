@@ -1,5 +1,7 @@
 'use client';
 import { useState } from 'react';
+import Link from 'next/link';
+import { playerUrl, teamUrl } from '@/lib/urls';
 
 interface Player {
   player_id: number;
@@ -20,7 +22,7 @@ interface Player {
     headshot_url: string | null;
     position_code: string;
     injury_status: string | null;
-    teams: { abbrev: string };
+    teams: { id: number; abbrev: string; name: string };
   };
 }
 
@@ -98,7 +100,7 @@ export default function RankingsTable({ players }: { players: Player[] }) {
 
                 return (
                   <tr key={p.player_id}
-                    className="border-t transition-colors cursor-pointer"
+                    className="border-t transition-colors"
                     style={{
                       borderColor: 'var(--border)',
                       background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)',
@@ -110,7 +112,8 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                       {p.momentum_rank}
                     </td>
                     <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-2">
+                      <Link href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
+                        className="flex items-center gap-2 hover:opacity-80">
                         <div className="w-7 h-7 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
                           {p.players.headshot_url
                             ? <img src={p.players.headshot_url} alt={name} className="w-full h-full object-cover" />
@@ -128,10 +131,15 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                             )}
                           </div>
                           <div className="text-xs" style={{ color: 'var(--text)' }}>
-                            {p.players.teams.abbrev} · {p.players.position_code}
+                            <Link href={teamUrl(p.players.teams.id, p.players.teams.name)}
+                              className="hover:opacity-80" style={{ color: 'var(--neon)' }}
+                              onClick={e => e.stopPropagation()}>
+                              {p.players.teams.abbrev}
+                            </Link>
+                            {' · '}{p.players.position_code}
                           </div>
                         </div>
-                      </div>
+                      </Link>
                     </td>
                     <td className="px-3 py-2.5 font-mono text-sm font-semibold" style={{ color: 'var(--neon)' }}>
                       {(p.momentum_ppm ?? 0).toFixed(4)}

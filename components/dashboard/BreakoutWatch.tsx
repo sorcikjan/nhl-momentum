@@ -1,3 +1,6 @@
+import Link from 'next/link';
+import { playerUrl } from '@/lib/urls';
+
 interface Player {
   player_id: number;
   breakout_delta: number;
@@ -30,8 +33,9 @@ export default function BreakoutWatch({ players }: { players: Player[] }) {
           const delta = p.breakout_delta ?? 0;
           const pct = Math.min(100, Math.abs(delta) * 500);
           return (
-            <div key={p.player_id}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg"
+            <Link key={p.player_id}
+              href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:opacity-80"
               style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
               <div className="w-7 h-7 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
                 {p.players.headshot_url
@@ -60,7 +64,7 @@ export default function BreakoutWatch({ players }: { players: Player[] }) {
                   </span>
                 </div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>

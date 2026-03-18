@@ -1,3 +1,6 @@
+import Link from 'next/link';
+import { playerUrl } from '@/lib/urls';
+
 interface Player {
   player_id: number;
   momentum_ppm: number;
@@ -28,8 +31,9 @@ export default function MomentumLeaders({ players }: { players: Player[] }) {
           const name = `${p.players.first_name} ${p.players.last_name}`;
           const ppm = p.momentum_ppm?.toFixed(4) ?? '—';
           return (
-            <div key={p.player_id}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors cursor-pointer"
+            <Link key={p.player_id}
+              href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors hover:opacity-80"
               style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
               <span className="text-xs w-5 text-center font-mono" style={{ color: 'var(--text)' }}>
                 {i + 1}
@@ -52,7 +56,7 @@ export default function MomentumLeaders({ players }: { players: Player[] }) {
                 <div className="text-sm font-mono font-semibold" style={{ color: 'var(--neon)' }}>{ppm}</div>
                 <div className="text-xs" style={{ color: 'var(--text)' }}>PPM</div>
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>

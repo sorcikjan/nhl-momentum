@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabase';
 import { teamLogoUrl } from '@/lib/data';
+import { teamUrl } from '@/lib/urls';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,7 +58,7 @@ export default async function TeamsPage() {
 
 function TeamTile({ team }: { team: { id: number; name: string; abbrev: string } }) {
   return (
-    <Link href={`/teams/${team.id}`}
+    <Link href={teamUrl(team.id, team.name)}
       className="rounded-xl border p-4 flex flex-col items-center gap-2 transition-all hover:border-opacity-60"
       style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
       <img src={teamLogoUrl(team.abbrev)} alt={team.abbrev} className="w-12 h-12 object-contain" />

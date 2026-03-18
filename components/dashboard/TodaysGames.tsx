@@ -1,7 +1,11 @@
+import Link from 'next/link';
+import { gameUrl } from '@/lib/urls';
+
 interface Game {
   id: number;
   startTimeUTC: string;
   gameState: string;
+  gameDate?: string;
   homeTeam: { abbrev: string; score?: number; logo?: string };
   awayTeam: { abbrev: string; score?: number; logo?: string };
   venue: { default: string };
@@ -30,7 +34,7 @@ export default function TodaysGames({ games }: { games: Game[] }) {
   return (
     <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
       <h2 className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--silver)' }}>
-        🏒 Today's Games
+        🏒 Today&apos;s Games
       </h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {games.map((g) => {
@@ -40,9 +44,12 @@ export default function TodaysGames({ games }: { games: Game[] }) {
           const { label, color } = stateLabel(g.gameState);
           const isFinal = g.gameState === 'FINAL' || g.gameState === 'OFF';
           const isLive  = g.gameState === 'LIVE'  || g.gameState === 'CRIT';
+          const date = g.gameDate ?? g.startTimeUTC?.slice(0, 10);
 
           return (
-            <div key={g.id} className="rounded-lg p-3 flex items-center gap-3"
+            <Link key={g.id}
+              href={gameUrl(g.id, g.awayTeam.abbrev, g.homeTeam.abbrev, date)}
+              className="rounded-lg p-3 flex items-center gap-3 hover:opacity-80 transition-opacity"
               style={{ background: 'var(--bg)', border: `1px solid ${isLive ? 'var(--red)' : 'var(--border)'}` }}>
 
               {/* Status */}
@@ -67,7 +74,7 @@ export default function TodaysGames({ games }: { games: Game[] }) {
                   </div>
                 ))}
               </div>
-            </div>
+            </Link>
           );
         })}
       </div>
