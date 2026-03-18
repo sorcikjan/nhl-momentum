@@ -22,6 +22,13 @@ function energyMultiplierFromBar(energyBar: number): number {
   return 0.6 + (energyBar / 70) * 0.4;
 }
 
+interface ModelResult {
+  homeXG: number; awayXG: number;
+  homeWin: number; awayWin: number; ot: number;
+  homeOff?: number; awayOff?: number;
+  homeDef?: number; awayDef?: number;
+}
+
 interface SkaterSnap {
   compositePpm: number;
   injuryStatus: string | null;
@@ -91,16 +98,17 @@ function runModelV1(homeSnap: TeamSnap, awaySnap: TeamSnap) {
 function runModelV1_1(homeSnap: TeamSnap, awaySnap: TeamSnap) {
   const GOAL_SCALE = 90;        // calibration: maps PPM sum → expected goals
   const DISCIPLINE_THRESHOLD = 0.9;
-  const MAX_SPG = 40;           // cap shots-per-goal so 0-goal streaks don't explode
+  const MIN_SPG = 12;           // floor: even a bad goalie yields a goal every 12 shots
+  const MAX_SPG = 40;           // cap: a hot goalie shouldn't suppress to near-zero
 
   function offPotential(snap: TeamSnap) {
     const activeSkaters = snap.skaters.filter(s => !s.injuryStatus);
-    const totalPPM = activeSkaters.reduce((sum, s) => sum + s.compositePpm, 0);
+    const totalPPM = activeSkaters.reduce((sum, s) => sum + Math.max(0, s.compositePpm), 0);
     return totalPPM * snap.sosMultiplier * energyMultiplierFromBar(snap.energyBar);
   }
 
   function defFilter(snap: TeamSnap) {
-    const spg = Math.min(MAX_SPG, snap.goalie.momentumShotsPerGoal || 22);
+    const spg = Math.min(MAX_SPG, Math.max(MIN_SPG, snap.goalie.momentumShotsPerGoal || 22));
     const disciplinePenalty = snap.shToiPercentile >= DISCIPLINE_THRESHOLD ? 0.075 : 0;
     return spg * (1 - disciplinePenalty);
   }
@@ -114,7 +122,10 @@ function runModelV1_1(homeSnap: TeamSnap, awaySnap: TeamSnap) {
   const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
 
   const total = homeXG + awayXG;
-  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.33, awayWin: 0.33, ot: 0.34 };
+  if (total === 0) return {
+    homeXG: 0, awayXG: 0, homeWin: 0.33, awayWin: 0.33, ot: 0.34,
+    homeOff, awayOff, homeDef, awayDef,
+  };
 
   const homeBase = homeXG / total;
   const awayBase = awayXG / total;
@@ -131,6 +142,10 @@ function runModelV1_1(homeSnap: TeamSnap, awaySnap: TeamSnap) {
     homeWin: Math.round(homeWin * 1000) / 1000,
     awayWin: Math.round((remaining - homeWin) * 1000) / 1000,
     ot: Math.round(otProb * 1000) / 1000,
+    homeOff: Math.round(homeOff * 10000) / 10000,
+    awayOff: Math.round(awayOff * 10000) / 10000,
+    homeDef: Math.round(homeDef * 10) / 10,
+    awayDef: Math.round(awayDef * 10) / 10,
   };
 }
 
@@ -142,7 +157,7 @@ const MODEL_FORMULAS: Record<string, (
   awaySnap: TeamSnap,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   formulaSpec?: Record<string, any>
-) => ReturnType<typeof runModelV1>> = {
+) => ModelResult> = {
   'v1.0': (h, a) => runModelV1(h, a),
   'v1.1': (h, a) => runModelV1_1(h, a),
 };
@@ -255,13 +270,7 @@ export async function POST(req: NextRequest) {
 
     if (snapErr) throw snapErr;
 
-    // Find games that already have this model version predicted
-    const { data: existingPreds } = await supabaseAdmin
-      .from('predictions')
-      .select('game_id')
-      .eq('model_version', model_version);
-
-    const alreadyPredicted = new Set((existingPreds ?? []).map(p => p.game_id));
+    const alreadyPredicted = new Set<number>(); // upsert handles re-runs
 
     // Group snapshots by game_id
     const byGame = new Map<number, { home?: typeof snapshots[0]; away?: typeof snapshots[0] }>();
@@ -313,6 +322,10 @@ export async function POST(req: NextRequest) {
         away_energy_bar: awaySnap.energyBar,
         home_sos_multiplier: homeSnap.sosMultiplier,
         away_sos_multiplier: awaySnap.sosMultiplier,
+        home_offensive_potential: result.homeOff,
+        away_offensive_potential: result.awayOff,
+        home_defensive_filter: result.homeDef,
+        away_defensive_filter: result.awayDef,
         input_snapshot: { retroactive: true, model_version, home: homeSnap, away: awaySnap },
       });
     }
@@ -320,7 +333,7 @@ export async function POST(req: NextRequest) {
     if (toInsert.length > 0) {
       const { error: insertErr } = await supabaseAdmin
         .from('predictions')
-        .insert(toInsert);
+        .upsert(toInsert, { onConflict: 'game_id,model_version' });
       if (insertErr) throw insertErr;
     }
 

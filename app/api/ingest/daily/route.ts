@@ -244,22 +244,23 @@ export async function GET(req: NextRequest) {
       const aGoalie = (awaySnap.goalie_snapshot as any) ?? {};
 
       const GOAL_SCALE = 90; // calibration: PPM sum × GOAL_SCALE / SPG ≈ goals per game
-      const MAX_SPG = 40;    // cap to avoid explosion on perfect-goalie streaks
+      const MIN_SPG = 12;    // floor: prevents extreme predictions from hot-streak goalies
+      const MAX_SPG = 40;    // cap: prevents near-zero from terrible-streak goalies
 
       const homeOff = hSkaters
         .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
-        .reduce((sum: number, s: { compositePpm: number }) => sum + s.compositePpm, 0)
+        .reduce((sum: number, s: { compositePpm: number }) => sum + Math.max(0, s.compositePpm), 0)
         * Number(homeSnap.sos_multiplier)
         * (homeSnap.team_energy_bar >= 70 ? 1.0 : 0.6 + (homeSnap.team_energy_bar / 70) * 0.4);
 
       const awayOff = aSkaters
         .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
-        .reduce((sum: number, s: { compositePpm: number }) => sum + s.compositePpm, 0)
+        .reduce((sum: number, s: { compositePpm: number }) => sum + Math.max(0, s.compositePpm), 0)
         * Number(awaySnap.sos_multiplier)
         * (awaySnap.team_energy_bar >= 70 ? 1.0 : 0.6 + (awaySnap.team_energy_bar / 70) * 0.4);
 
-      const homeDef = Math.min(MAX_SPG, hGoalie.momentumShotsPerGoal || 22);
-      const awayDef = Math.min(MAX_SPG, aGoalie.momentumShotsPerGoal || 22);
+      const homeDef = Math.min(MAX_SPG, Math.max(MIN_SPG, hGoalie.momentumShotsPerGoal || 22));
+      const awayDef = Math.min(MAX_SPG, Math.max(MIN_SPG, aGoalie.momentumShotsPerGoal || 22));
 
       const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
       const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
