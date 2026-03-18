@@ -88,7 +88,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
           </div>
           <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-          {skaters.slice(0, 8).map((p: any) => (
+          {skaters.slice(0, 8).map((p: any, i: number) => (
               <Link key={p.player_id}
                 href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
                 className="flex items-center gap-3 px-4 py-2.5 hover:opacity-80 transition-opacity"
@@ -108,7 +108,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                     )}
                   </div>
                   <div className="text-xs" style={{ color: 'var(--text)' }}>
-                    #{p.momentum_rank} · {p.players.position_code}
+                    #{i + 1} on team · {p.players.position_code}
                   </div>
                 </div>
                 <div className="text-right">

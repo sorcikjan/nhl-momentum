@@ -213,7 +213,7 @@ export async function fetchTeam(id: string) {
     if (seen.has(p.player_id)) return false;
     seen.add(p.player_id);
     return true;
-  }).sort((a, b) => (a.momentum_rank ?? 999) - (b.momentum_rank ?? 999));
+  }).sort((a, b) => (b.composite_ppm ?? 0) - (a.composite_ppm ?? 0));
 
   // Recent completed games for this team
   const { data: recentGames } = await supabaseAdmin
