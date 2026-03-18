@@ -2,20 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { currentSeason, toiToSeconds } from '@/lib/nhl-api';
 
-// GET /api/ingest/gamelogs?limit=50
-// Pulls game logs for all active players and upserts into game_player_stats / game_goalie_stats
-// limit: max players to process per run (use for incremental syncs)
+// GET /api/ingest/gamelogs?limit=30&offset=0
+// Pulls game logs for active players and upserts into game_player_stats / game_goalie_stats
+// Use offset to paginate: run with offset=0, 30, 60, ... until exhausted
 
 export async function GET(req: NextRequest) {
-  const limit = Number(req.nextUrl.searchParams.get('limit') ?? '100');
+  const limit  = Number(req.nextUrl.searchParams.get('limit')  ?? '30');
+  const offset = Number(req.nextUrl.searchParams.get('offset') ?? '0');
   const season = currentSeason();
 
-  // Fetch active players from DB
+  // Fetch active players from DB with pagination
   const { data: players, error: playerErr } = await supabaseAdmin
     .from('players')
     .select('id, position_code, team_id')
     .eq('is_active', true)
-    .limit(limit);
+    .order('id')
+    .range(offset, offset + limit - 1);
 
   if (playerErr) {
     return NextResponse.json({ data: null, error: playerErr.message }, { status: 500 });

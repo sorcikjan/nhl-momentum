@@ -96,12 +96,12 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Rank all players by momentum rank score
+    // Rank by composite_ppm (weighted blend: 50% momentum + 35% season + 15% career)
+    // This is stable and correct. The old calcMomentumRankScore was broken because
+    // sosCoefficient=1.0 for everyone (adds a constant) and raw shootingPct (0-1)
+    // dwarfs PPM (0.01-0.15), causing fluke small-sample shooting to dominate.
     const ranked = snapshots
-      .sort((a, b) =>
-        calcMomentumRankScore(b.momentum_ppm, b.momentum_shooting_pct, b.sos_coefficient) -
-        calcMomentumRankScore(a.momentum_ppm, a.momentum_shooting_pct, a.sos_coefficient)
-      )
+      .sort((a, b) => b.composite_ppm - a.composite_ppm)
       .map((s, i) => ({ ...s, momentum_rank: i + 1 }));
 
     // Batch upsert snapshots
