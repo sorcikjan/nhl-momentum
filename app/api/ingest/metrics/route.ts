@@ -14,15 +14,17 @@ import { calcSOSCoefficient } from '@/lib/sos';
 // Reads game_player_stats from DB, computes 3-layer metrics, writes snapshots
 
 export async function GET(req: NextRequest) {
-  const limit = Number(req.nextUrl.searchParams.get('limit') ?? '200');
+  const limit  = Number(req.nextUrl.searchParams.get('limit')  ?? '100');
+  const offset = Number(req.nextUrl.searchParams.get('offset') ?? '0');
 
   try {
-    // Fetch all active skaters with their stats
+    // Fetch active skaters with pagination
     const { data: players, error: pErr } = await supabaseAdmin
       .from('players')
       .select('id, position_code, team_id, injury_status')
       .eq('is_active', true)
-      .limit(limit);
+      .order('id')
+      .range(offset, offset + limit - 1);
 
     if (pErr) throw pErr;
 
