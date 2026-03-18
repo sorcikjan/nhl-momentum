@@ -127,68 +127,77 @@ export async function GET(req: NextRequest) {
 
         if (!players?.length) continue;
 
-        const skaterIds = players.filter(p => p.position_code !== 'G').map(p => p.id);
-        const goalieIds = players.filter(p => p.position_code === 'G').map(p => p.id);
+        const skaterIds = players.filter(p => p.position_code !== 'G').map(p => p.id).slice(0, 20);
+        const goalieIds = players.filter(p => p.position_code === 'G').map(p => p.id).slice(0, 3);
 
-        // Get most recent metric snapshot per skater (subquery approach)
+        // Batch fetch all skater snapshots in one query, then deduplicate to latest per player
+        const { data: allSkaterSnaps } = await supabaseAdmin
+          .from('player_metric_snapshots')
+          .select(`
+            player_id, momentum_ppm, season_ppm, career_ppm, composite_ppm,
+            energy_bar, sos_coefficient,
+            players!inner(first_name, last_name, position_code, injury_status)
+          `)
+          .in('player_id', skaterIds)
+          .order('calculated_at', { ascending: false });
+
+        const seenSkaters = new Set<number>();
         const skaterSnaps = [];
-        for (const pid of skaterIds.slice(0, 20)) {  // top 20 skaters max
-          const { data } = await supabaseAdmin
-            .from('player_metric_snapshots')
-            .select(`
-              player_id, momentum_ppm, season_ppm, career_ppm, composite_ppm,
-              energy_bar, sos_coefficient,
-              players!inner(first_name, last_name, position_code, injury_status)
-            `)
-            .eq('player_id', pid)
-            .order('calculated_at', { ascending: false })
-            .limit(1)
-            .single();
-
-          if (data) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const p = data.players as any;
-            skaterSnaps.push({
-              playerId: data.player_id,
-              playerName: `${p.first_name} ${p.last_name}`,
-              position: p.position_code,
-              compositePpm: Number(data.composite_ppm ?? 0),
-              momentumPpm: Number(data.momentum_ppm ?? 0),
-              seasonPpm: Number(data.season_ppm ?? 0),
-              careerPpm: Number(data.career_ppm ?? 0),
-              energyBar: data.energy_bar ?? 100,
-              injuryStatus: p.injury_status ?? null,
-            });
-          }
+        for (const data of allSkaterSnaps ?? []) {
+          if (seenSkaters.has(data.player_id)) continue;
+          seenSkaters.add(data.player_id);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const p = data.players as any;
+          skaterSnaps.push({
+            playerId: data.player_id,
+            playerName: `${p.first_name} ${p.last_name}`,
+            position: p.position_code,
+            compositePpm: Number(data.composite_ppm ?? 0),
+            momentumPpm: Number(data.momentum_ppm ?? 0),
+            seasonPpm: Number(data.season_ppm ?? 0),
+            careerPpm: Number(data.career_ppm ?? 0),
+            energyBar: data.energy_bar ?? 100,
+            injuryStatus: p.injury_status ?? null,
+          });
         }
 
-        // Build goalie snapshot (pick first active goalie)
-        let goalieSnap = { playerId: 0, playerName: 'Unknown', momentumShotsPerGoal: 20, seasonShotsPerGoal: 20, momentumSavePct: 0.9, seasonSavePct: 0.9 };
-        for (const gid of goalieIds.slice(0, 2)) {
-          const { data } = await supabaseAdmin
-            .from('game_goalie_stats')
-            .select('shots_against, goals_against, save_pct, toi_seconds')
-            .eq('player_id', gid)
-            .order('recorded_at', { ascending: false })
-            .limit(5);
+        // Batch fetch last 5 games for all goalies + their names in one query each
+        const { data: allGoalieStats } = await supabaseAdmin
+          .from('game_goalie_stats')
+          .select('player_id, shots_against, goals_against, save_pct, toi_seconds')
+          .in('player_id', goalieIds)
+          .order('recorded_at', { ascending: false })
+          .limit(goalieIds.length * 5);
 
+        const { data: goalieNames } = await supabaseAdmin
+          .from('players')
+          .select('id, first_name, last_name')
+          .in('id', goalieIds);
+
+        const goalieNameMap = new Map((goalieNames ?? []).map(g => [g.id, g]));
+        const goalieStatsMap = new Map<number, typeof allGoalieStats>();
+        for (const row of allGoalieStats ?? []) {
+          if (!goalieStatsMap.has(row.player_id)) goalieStatsMap.set(row.player_id, []);
+          goalieStatsMap.get(row.player_id)!.push(row);
+        }
+
+        // Build goalie snapshot from first goalie with sufficient data
+        let goalieSnap = { playerId: 0, playerName: 'Unknown', momentumShotsPerGoal: 22, seasonShotsPerGoal: 22, momentumSavePct: 0.905, seasonSavePct: 0.905 };
+        for (const gid of goalieIds) {
+          const data = goalieStatsMap.get(gid);
           if (data?.length) {
             const totalShots = data.reduce((s, r) => s + r.shots_against, 0);
             const totalGoals = data.reduce((s, r) => s + r.goals_against, 0);
             // Cap SPG at 40 to avoid extreme values when a goalie hasn't conceded recently
             const spg = totalGoals > 0 ? Math.min(40, totalShots / totalGoals) : 22;
-            const { data: gp } = await supabaseAdmin
-              .from('players')
-              .select('first_name, last_name')
-              .eq('id', gid)
-              .single();
+            const gp = goalieNameMap.get(gid);
             goalieSnap = {
               playerId: gid,
               playerName: gp ? `${gp.first_name} ${gp.last_name}` : 'Unknown',
               momentumShotsPerGoal: Math.round(spg * 10) / 10,
               seasonShotsPerGoal: Math.round(spg * 10) / 10,
-              momentumSavePct: data.reduce((s, r) => s + r.save_pct, 0) / data.length,
-              seasonSavePct: data.reduce((s, r) => s + r.save_pct, 0) / data.length,
+              momentumSavePct: data.reduce((s, r) => s + (r.save_pct ?? 0), 0) / data.length,
+              seasonSavePct: data.reduce((s, r) => s + (r.save_pct ?? 0), 0) / data.length,
             };
             break;
           }
