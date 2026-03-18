@@ -1,9 +1,19 @@
+import type { Metadata } from 'next';
 import MomentumLeaders from '@/components/dashboard/MomentumLeaders';
 import BreakoutWatch from '@/components/dashboard/BreakoutWatch';
 import TodaysGames from '@/components/dashboard/TodaysGames';
 import { fetchRankings, fetchGames } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Dashboard',
+  description: 'Today\'s NHL momentum leaders, breakout watch, and scheduled games at a glance.',
+  openGraph: {
+    title: 'Dashboard — NHL Momentum',
+    description: 'Today\'s NHL momentum leaders, breakout watch, and scheduled games at a glance.',
+  },
+};
 
 export default async function DashboardPage() {
   const today = new Date().toISOString().slice(0, 10);

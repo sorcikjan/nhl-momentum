@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import PlayerRadarChart from '@/components/players/RadarChart';
 import PPMTimeline from '@/components/players/PPMTimeline';
 import EnergyBar from '@/components/players/EnergyBar';
@@ -7,6 +8,25 @@ import { teamUrl } from '@/lib/urls';
 import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string; slug: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const data = await fetchPlayer(id).catch(() => null);
+  if (!data?.player) return { title: 'Player' };
+  const { player } = data;
+  const name = `${player.first_name} ${player.last_name}`;
+  const team = player.teams?.abbrev ?? '';
+  const pos  = player.position_code ?? '';
+  return {
+    title: name,
+    description: `${name} (${team} · ${pos}) — momentum PPM, energy bar, radar chart, and recent game log on NHL Momentum.`,
+    openGraph: {
+      title: `${name} — NHL Momentum`,
+      description: `${name} (${team} · ${pos}) — momentum analytics, PPM trend, and recent NHL game log.`,
+      images: player.headshot_url ? [{ url: player.headshot_url, width: 160, height: 160, alt: name }] : [],
+    },
+  };
+}
 
 function buildLayerData(snapshot: Record<string, number>, prefix: string) {
   return {

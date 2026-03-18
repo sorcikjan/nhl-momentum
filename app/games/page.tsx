@@ -1,9 +1,19 @@
+import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import DateNav from '@/components/games/DateNav';
 import GameCard from '@/components/games/GameCard';
 import { fetchGames } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Games',
+  description: 'NHL game schedule with momentum-based predictions, win probabilities, and live scores.',
+  openGraph: {
+    title: 'Games — NHL Momentum',
+    description: 'NHL game schedule with momentum-based predictions, win probabilities, and live scores.',
+  },
+};
 
 export default async function GamesPage({
   searchParams,

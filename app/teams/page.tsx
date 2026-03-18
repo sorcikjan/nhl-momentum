@@ -1,7 +1,17 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabase';
 import { teamLogoUrl } from '@/lib/data';
 import { teamUrl } from '@/lib/urls';
+
+export const metadata: Metadata = {
+  title: 'Teams',
+  description: 'All 32 NHL teams — click any team for roster energy, top skaters by momentum, and upcoming schedule.',
+  openGraph: {
+    title: 'Teams — NHL Momentum',
+    description: 'All 32 NHL teams — click any team for roster energy, top skaters by momentum, and upcoming schedule.',
+  },
+};
 
 export const dynamic = 'force-dynamic';
 

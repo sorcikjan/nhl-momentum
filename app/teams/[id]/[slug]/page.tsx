@@ -1,8 +1,25 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { fetchTeam, teamLogoUrl } from '@/lib/data';
 import { playerUrl, gameUrl } from '@/lib/urls';
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string; slug: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const { team, standing } = await fetchTeam(id).catch(() => ({ team: null, roster: [], recentGames: null, upcoming: null, seasonStats: null, standing: null }));
+  if (!team) return { title: 'Team' };
+  const record = standing ? `${standing.wins}–${standing.losses}–${standing.otLosses}` : '';
+  return {
+    title: team.name,
+    description: `${team.name} (${team.conference} · ${team.division} Division${record ? ' · ' + record : ''}) — roster momentum, energy bar, and schedule on NHL Momentum.`,
+    openGraph: {
+      title: `${team.name} — NHL Momentum`,
+      description: `${team.name} team profile — top skaters by momentum, roster energy, recent results, and upcoming games.`,
+      images: [{ url: teamLogoUrl(team.abbrev), width: 80, height: 80, alt: team.name }],
+    },
+  };
+}
 
 export default async function TeamPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
   const { id } = await params;

@@ -6,9 +6,28 @@ import Sidebar from '@/components/layout/Sidebar';
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 
+const siteUrl = 'https://nhl-momentum.netlify.app';
+
 export const metadata: Metadata = {
-  title: 'NHL Momentum',
-  description: 'Real-time NHL momentum analytics and predictions',
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: 'NHL Momentum',
+    template: '%s — NHL Momentum',
+  },
+  description: 'Real-time NHL momentum analytics, game predictions, and player rankings powered by a rolling 5-game model.',
+  openGraph: {
+    siteName: 'NHL Momentum',
+    type: 'website',
+    url: siteUrl,
+    title: 'NHL Momentum',
+    description: 'Real-time NHL momentum analytics, game predictions, and player rankings powered by a rolling 5-game model.',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'NHL Momentum',
+    description: 'Real-time NHL momentum analytics and game predictions.',
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

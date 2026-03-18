@@ -1,8 +1,33 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { fetchMatch, teamLogoUrl } from '@/lib/data';
 import { teamUrl, playerUrl } from '@/lib/urls';
 
 export const dynamic = 'force-dynamic';
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string; slug: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const { game } = await fetchMatch(id).catch(() => ({ game: null, liveData: null, predictions: null, snapshots: null, playerStats: null, goalieStats: null }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const away = (game?.away_team as any)?.abbrev ?? 'Away';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const home = (game?.home_team as any)?.abbrev ?? 'Home';
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const awayName = (game?.away_team as any)?.name ?? away;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const homeName = (game?.home_team as any)?.name ?? home;
+  const date = game?.game_date ? ` · ${game.game_date.slice(5)}` : '';
+  const title = `${away} at ${home}${date}`;
+  return {
+    title,
+    description: `${awayName} at ${homeName}${date} — momentum-based prediction, win probability, and lineup analysis on NHL Momentum.`,
+    openGraph: {
+      title: `${title} — NHL Momentum`,
+      description: `${awayName} at ${homeName} — game prediction, expected goals, win probability, and player momentum inputs.`,
+      images: [{ url: teamLogoUrl(home), width: 80, height: 80, alt: home }],
+    },
+  };
+}
 
 export default async function MatchPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
   const { id } = await params;

@@ -1,9 +1,19 @@
+import type { Metadata } from 'next';
 import ModelStatsCard from '@/components/accuracy/ModelStatsCard';
 import PredictionHistory from '@/components/accuracy/PredictionHistory';
 import { ComparisonExample } from '@/components/accuracy/ModelComparison';
 import { fetchAccuracy } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Prediction Accuracy',
+  description: 'Track NHL Momentum model performance — winner prediction accuracy, score error by version, and per-game history.',
+  openGraph: {
+    title: 'Prediction Accuracy — NHL Momentum',
+    description: 'Track NHL Momentum model performance — winner prediction accuracy, score error by version, and per-game history.',
+  },
+};
 
 export default async function AccuracyPage() {
   const data = await fetchAccuracy().catch(() => null);

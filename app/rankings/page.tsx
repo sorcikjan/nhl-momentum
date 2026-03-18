@@ -1,7 +1,17 @@
+import type { Metadata } from 'next';
 import RankingsTable from '@/components/rankings/RankingsTable';
 import { fetchRankings } from '@/lib/data';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Player Rankings',
+  description: 'Top 100 NHL skaters ranked by momentum score — rolling 5-game PPM, breakout delta, and strength of schedule.',
+  openGraph: {
+    title: 'Player Rankings — NHL Momentum',
+    description: 'Top 100 NHL skaters ranked by momentum score — rolling 5-game PPM, breakout delta, and strength of schedule.',
+  },
+};
 
 export default async function RankingsPage() {
   const data = await fetchRankings().catch(() => null);
