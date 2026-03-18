@@ -6,6 +6,7 @@ const NAV = [
   { href: '/',           label: 'Dashboard',   icon: '◈' },
   { href: '/games',      label: 'Games',       icon: '🏒' },
   { href: '/rankings',   label: 'Rankings',    icon: '⚡' },
+  { href: '/teams',      label: 'Teams',       icon: '🛡' },
   { href: '/accuracy',   label: 'Accuracy',    icon: '🎯' },
 ];
 

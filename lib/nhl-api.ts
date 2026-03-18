@@ -70,6 +70,16 @@ export async function getGameLanding(gameId: number) {
   return get<Record<string, unknown>>(`/gamecenter/${gameId}/landing`);
 }
 
+// ─── Team Info ────────────────────────────────────────────────────────────────
+
+export async function getTeamSeasonStats(teamAbbrev: string) {
+  return get<Record<string, unknown>>(`/club-stats/${teamAbbrev}/now`);
+}
+
+export async function getTeamScheduleNow(teamAbbrev: string) {
+  return get<Record<string, unknown>>(`/club-schedule-season/${teamAbbrev}/now`);
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Convert "MM:SS" string to total seconds */

@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 interface Prediction {
   predicted_home_score: number;
   predicted_away_score: number;
@@ -18,8 +20,8 @@ interface Game {
   startTimeUTC: string;
   gameState: string;
   venue: { default: string };
-  homeTeam: { id: number; abbrev: string; score?: number };
-  awayTeam: { id: number; abbrev: string; score?: number };
+  homeTeam: { id: number; abbrev: string; score?: number; logo?: string };
+  awayTeam: { id: number; abbrev: string; score?: number; logo?: string };
 }
 
 function WinBar({ home, away, ot }: { home: number; away: number; ot: number }) {
@@ -42,6 +44,9 @@ function WinBar({ home, away, ot }: { home: number; away: number; ot: number }) 
   );
 }
 
+const logoUrl = (abbrev: string, logo?: string) =>
+  logo || `https://assets.nhle.com/logos/nhl/svg/${abbrev}_light.svg`;
+
 export default function GameCard({ game, prediction }: { game: Game; prediction?: Prediction }) {
   const time = new Date(game.startTimeUTC).toLocaleTimeString('en-GB', {
     hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London',
@@ -52,7 +57,8 @@ export default function GameCard({ game, prediction }: { game: Game; prediction?
   const outcome = prediction?.prediction_outcomes?.[0];
 
   return (
-    <div className="rounded-xl border p-4 flex flex-col gap-3 transition-all hover:border-blue-900"
+    <Link href={`/games/${game.id}`} className="block">
+    <div className="rounded-xl border p-4 flex flex-col gap-3 transition-all hover:border-opacity-80 cursor-pointer"
       style={{
         background: 'var(--bg-card)',
         borderColor: isLive ? 'var(--red)' : 'var(--border)',
@@ -74,11 +80,13 @@ export default function GameCard({ game, prediction }: { game: Game; prediction?
           return (
             <div key={team.id} className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-xs px-1.5 py-0.5 rounded font-mono"
-                  style={{ background: 'var(--bg)', color: 'var(--text)', border: '1px solid var(--border)' }}>
+                <img src={logoUrl(team.abbrev, team.logo)} alt={team.abbrev}
+                  className="w-7 h-7 object-contain" />
+                <span className="font-bold text-base" style={{ color: 'var(--text-bright)' }}>{team.abbrev}</span>
+                <span className="text-xs px-1 rounded font-mono"
+                  style={{ background: 'var(--border)', color: 'var(--text)' }}>
                   {isHome ? 'H' : 'A'}
                 </span>
-                <span className="font-bold text-base" style={{ color: 'var(--text-bright)' }}>{team.abbrev}</span>
               </div>
               <div className="flex items-center gap-3">
                 {prediction && !isFinal && (
@@ -130,5 +138,6 @@ export default function GameCard({ game, prediction }: { game: Game; prediction?
         </div>
       )}
     </div>
+    </Link>
   );
 }

@@ -2,7 +2,12 @@
 // Pages should call these directly — never fetch their own API over HTTP.
 
 import { supabaseAdmin } from '@/lib/supabase';
-import { getGamesByDate } from '@/lib/nhl-api';
+import { getGamesByDate, getGameBoxscore, getStandings, getTeamSeasonStats } from '@/lib/nhl-api';
+
+// NHL CDN logo URL — works for all 32 teams
+export function teamLogoUrl(abbrev: string) {
+  return `https://assets.nhle.com/logos/nhl/svg/${abbrev}_light.svg`;
+}
 
 // ─── Rankings ─────────────────────────────────────────────────────────────────
 
@@ -156,4 +161,130 @@ export async function fetchAccuracy() {
   }));
 
   return { modelVersions: accuracy, predictions, modelStats };
+}
+
+// ─── Team ─────────────────────────────────────────────────────────────────────
+
+export async function fetchTeam(id: string) {
+  const { data: team, error } = await supabaseAdmin
+    .from('teams')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) throw error;
+
+  // Top players on this team by momentum rank
+  const { data: players } = await supabaseAdmin
+    .from('player_metric_snapshots')
+    .select(`
+      player_id, momentum_rank, momentum_ppm, season_ppm, breakout_delta,
+      energy_bar, momentum_goals, momentum_assists, momentum_points,
+      players!inner ( id, first_name, last_name, position_code, headshot_url, injury_status, team_id )
+    `)
+    .eq('players.team_id', team.id)
+    .order('calculated_at', { ascending: false })
+    .limit(500);
+
+  // Deduplicate — latest snapshot per player
+  const seen = new Set<number>();
+  const roster = (players ?? []).filter(p => {
+    if (seen.has(p.player_id)) return false;
+    seen.add(p.player_id);
+    return true;
+  }).sort((a, b) => (a.momentum_rank ?? 999) - (b.momentum_rank ?? 999));
+
+  // Recent completed games for this team
+  const { data: recentGames } = await supabaseAdmin
+    .from('games')
+    .select(`
+      id, game_date, home_score, away_score, game_state,
+      home_team:teams!games_home_team_id_fkey ( id, abbrev ),
+      away_team:teams!games_away_team_id_fkey ( id, abbrev )
+    `)
+    .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
+    .in('game_state', ['FINAL', 'OFF'])
+    .order('game_date', { ascending: false })
+    .limit(10);
+
+  // Upcoming games
+  const { data: upcoming } = await supabaseAdmin
+    .from('games')
+    .select(`
+      id, game_date, start_time_utc, game_state,
+      home_team:teams!games_home_team_id_fkey ( id, abbrev ),
+      away_team:teams!games_away_team_id_fkey ( id, abbrev )
+    `)
+    .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
+    .in('game_state', ['FUT', 'PRE', 'LIVE', 'CRIT'])
+    .order('game_date', { ascending: true })
+    .limit(5);
+
+  // Season stats from NHL API
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let seasonStats: any = null;
+  try {
+    seasonStats = await getTeamSeasonStats(team.abbrev);
+  } catch { /* optional */ }
+
+  // Standings for W/L record
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let standing: any = null;
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const standings = await getStandings(today);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    standing = (standings.standings as any[])?.find((s: any) => s.teamAbbrev?.default === team.abbrev);
+  } catch { /* optional */ }
+
+  return { team, roster, recentGames, upcoming, seasonStats, standing };
+}
+
+// ─── Match ────────────────────────────────────────────────────────────────────
+
+export async function fetchMatch(id: string) {
+  // Game from our DB
+  const { data: game } = await supabaseAdmin
+    .from('games')
+    .select(`
+      *,
+      home_team:teams!games_home_team_id_fkey ( id, abbrev, name ),
+      away_team:teams!games_away_team_id_fkey ( id, abbrev, name )
+    `)
+    .eq('id', id)
+    .single();
+
+  // Live data from NHL API
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let liveData: any = null;
+  try {
+    liveData = await getGameBoxscore(Number(id));
+  } catch { /* game may not exist in NHL API yet */ }
+
+  // Our prediction
+  const { data: predictions } = await supabaseAdmin
+    .from('predictions')
+    .select('*, prediction_outcomes(*)')
+    .eq('game_id', id)
+    .order('created_at', { ascending: false });
+
+  // Team snapshots (player-level inputs)
+  const { data: snapshots } = await supabaseAdmin
+    .from('game_team_snapshots')
+    .select('*')
+    .eq('game_id', id);
+
+  // Player stats if game is complete
+  const { data: playerStats } = await supabaseAdmin
+    .from('game_player_stats')
+    .select('*, players(first_name, last_name, position_code, headshot_url)')
+    .eq('game_id', id)
+    .order('goals', { ascending: false });
+
+  const { data: goalieStats } = await supabaseAdmin
+    .from('game_goalie_stats')
+    .select('*, players(first_name, last_name)')
+    .eq('game_id', id);
+
+  return { game, liveData, predictions, snapshots, playerStats, goalieStats };
 }
