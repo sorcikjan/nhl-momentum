@@ -86,18 +86,29 @@ export async function fetchPlayer(id: string) {
     .order('calculated_at', { ascending: true })
     .limit(30);
 
-  const { data: recentGames } = await supabaseAdmin
+  // Fetch raw game stats first (no join — game_player_stats may not have FK to games)
+  const { data: rawGameStats } = await supabaseAdmin
     .from('game_player_stats')
-    .select(`
-      *, games!left(
-        game_date, home_score, away_score, home_team_id, away_team_id,
-        home_team:teams!games_home_team_id_fkey(abbrev),
-        away_team:teams!games_away_team_id_fkey(abbrev)
-      )
-    `)
+    .select('*')
     .eq('player_id', id)
     .order('recorded_at', { ascending: false })
     .limit(10);
+
+  // Enrich with game metadata if game_ids exist in our games table
+  let recentGames = rawGameStats ?? [];
+  if (recentGames.length > 0) {
+    const gameIds = recentGames.map((g: { game_id: number }) => g.game_id);
+    const { data: gameRows } = await supabaseAdmin
+      .from('games')
+      .select(`
+        id, game_date, home_score, away_score, home_team_id, away_team_id,
+        home_team:teams!games_home_team_id_fkey(abbrev),
+        away_team:teams!games_away_team_id_fkey(abbrev)
+      `)
+      .in('id', gameIds);
+    const gameMap = new Map((gameRows ?? []).map((g: { id: number }) => [g.id, g]));
+    recentGames = recentGames.map((g: { game_id: number }) => ({ ...g, games: gameMap.get(g.game_id) ?? null }));
+  }
 
   return { player, metricTimeline, recentGames };
 }
