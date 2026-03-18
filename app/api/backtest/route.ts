@@ -15,11 +15,10 @@ import { supabaseAdmin } from '@/lib/supabase';
 //     plus the actual outcome.
 // ─────────────────────────────────────────────────────────────────────────────
 
-// ─── Model v1.0 formula (reproduced here so it can be applied to snapshots) ──
+// ─── Shared helpers ────────────────────────────────────────────────────────────
 
 function energyMultiplierFromBar(energyBar: number): number {
   if (energyBar >= 70) return 1.0;
-  // Linear penalty: 0 energy = 0.6, 70 = 1.0
   return 0.6 + (energyBar / 70) * 0.4;
 }
 
@@ -40,6 +39,7 @@ interface TeamSnap {
   goalie: GoalieSnap;
 }
 
+// v1.0 — original formula (kept for historical comparison; xG outputs were ~0.03 due to unit mismatch)
 function runModelV1(homeSnap: TeamSnap, awaySnap: TeamSnap) {
   const DISCIPLINE_THRESHOLD = 0.9;
   const LEAGUE_AVG_BLOCK = 1.0;
@@ -84,6 +84,56 @@ function runModelV1(homeSnap: TeamSnap, awaySnap: TeamSnap) {
   };
 }
 
+// v1.1 — same structure as v1.0 but adds GOAL_SCALE to fix the unit mismatch.
+// compositePpm sums to ~0.5–1.5 for a team roster; momentumShotsPerGoal is ~15–35.
+// Without scaling, homeXG ≈ 0.03 instead of ~3. GOAL_SCALE = 90 calibrates the
+// output to realistic NHL scoring (avg ~3 goals per team per game).
+function runModelV1_1(homeSnap: TeamSnap, awaySnap: TeamSnap) {
+  const GOAL_SCALE = 90;        // calibration: maps PPM sum → expected goals
+  const DISCIPLINE_THRESHOLD = 0.9;
+  const MAX_SPG = 40;           // cap shots-per-goal so 0-goal streaks don't explode
+
+  function offPotential(snap: TeamSnap) {
+    const activeSkaters = snap.skaters.filter(s => !s.injuryStatus);
+    const totalPPM = activeSkaters.reduce((sum, s) => sum + s.compositePpm, 0);
+    return totalPPM * snap.sosMultiplier * energyMultiplierFromBar(snap.energyBar);
+  }
+
+  function defFilter(snap: TeamSnap) {
+    const spg = Math.min(MAX_SPG, snap.goalie.momentumShotsPerGoal || 22);
+    const disciplinePenalty = snap.shToiPercentile >= DISCIPLINE_THRESHOLD ? 0.075 : 0;
+    return spg * (1 - disciplinePenalty);
+  }
+
+  const homeOff = offPotential(homeSnap);
+  const awayOff = offPotential(awaySnap);
+  const homeDef = defFilter(homeSnap);
+  const awayDef = defFilter(awaySnap);
+
+  const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
+  const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
+
+  const total = homeXG + awayXG;
+  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.33, awayWin: 0.33, ot: 0.34 };
+
+  const homeBase = homeXG / total;
+  const awayBase = awayXG / total;
+  const homeAdj = Math.min(0.85, homeBase * 1.05);
+  const awayAdj = Math.min(0.85, awayBase * 0.95);
+  const convergence = 1 - Math.abs(homeXG - awayXG) / Math.max(homeXG, awayXG, 0.01);
+  const otProb = Math.min(0.25, convergence * 0.2);
+  const remaining = 1 - otProb;
+  const homeWin = (homeAdj / (homeAdj + awayAdj)) * remaining;
+
+  return {
+    homeXG: Math.round(homeXG * 10) / 10,
+    awayXG: Math.round(awayXG * 10) / 10,
+    homeWin: Math.round(homeWin * 1000) / 1000,
+    awayWin: Math.round((remaining - homeWin) * 1000) / 1000,
+    ot: Math.round(otProb * 1000) / 1000,
+  };
+}
+
 // Registry of available model formulas.
 // When you create v1.1 with a modified formula, add it here.
 // The formula_spec from model_versions can override default params.
@@ -94,8 +144,7 @@ const MODEL_FORMULAS: Record<string, (
   formulaSpec?: Record<string, any>
 ) => ReturnType<typeof runModelV1>> = {
   'v1.0': (h, a) => runModelV1(h, a),
-  // v1.1 will be registered here when built, using the same raw snapshots
-  // e.g. 'v1.1': (h, a, spec) => runModelV1WithSosAdjustment(h, a, spec),
+  'v1.1': (h, a) => runModelV1_1(h, a),
 };
 
 // ─── GET — compare model versions for a specific game ─────────────────────────

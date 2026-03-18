@@ -175,7 +175,8 @@ export async function GET(req: NextRequest) {
           if (data?.length) {
             const totalShots = data.reduce((s, r) => s + r.shots_against, 0);
             const totalGoals = data.reduce((s, r) => s + r.goals_against, 0);
-            const spg = totalGoals > 0 ? totalShots / totalGoals : totalShots;
+            // Cap SPG at 40 to avoid extreme values when a goalie hasn't conceded recently
+            const spg = totalGoals > 0 ? Math.min(40, totalShots / totalGoals) : 22;
             const { data: gp } = await supabaseAdmin
               .from('players')
               .select('first_name, last_name')
@@ -232,7 +233,7 @@ export async function GET(req: NextRequest) {
 
       if (!homeSnap || !awaySnap) continue;
 
-      // Run v1.0 formula
+      // Run v1.1 formula — fixes the unit mismatch from v1.0 via GOAL_SCALE
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hSkaters = (homeSnap.skater_snapshots as any[]) ?? [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -241,6 +242,9 @@ export async function GET(req: NextRequest) {
       const hGoalie = (homeSnap.goalie_snapshot as any) ?? {};
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const aGoalie = (awaySnap.goalie_snapshot as any) ?? {};
+
+      const GOAL_SCALE = 90; // calibration: PPM sum × GOAL_SCALE / SPG ≈ goals per game
+      const MAX_SPG = 40;    // cap to avoid explosion on perfect-goalie streaks
 
       const homeOff = hSkaters
         .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
@@ -254,11 +258,11 @@ export async function GET(req: NextRequest) {
         * Number(awaySnap.sos_multiplier)
         * (awaySnap.team_energy_bar >= 70 ? 1.0 : 0.6 + (awaySnap.team_energy_bar / 70) * 0.4);
 
-      const homeDef = (hGoalie.momentumShotsPerGoal ?? 20) * 1.0;
-      const awayDef = (aGoalie.momentumShotsPerGoal ?? 20) * 1.0;
+      const homeDef = Math.min(MAX_SPG, hGoalie.momentumShotsPerGoal || 22);
+      const awayDef = Math.min(MAX_SPG, aGoalie.momentumShotsPerGoal || 22);
 
-      const homeXG = awayDef > 0 ? homeOff / awayDef : 0;
-      const awayXG = homeDef > 0 ? awayOff / homeDef : 0;
+      const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
+      const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
       const total = homeXG + awayXG;
       const convergence = total > 0 ? 1 - Math.abs(homeXG - awayXG) / Math.max(homeXG, awayXG, 0.01) : 0;
       const ot = Math.min(0.25, convergence * 0.2);
@@ -274,7 +278,7 @@ export async function GET(req: NextRequest) {
         .from('predictions')
         .upsert({
           game_id: game.id,
-          model_version: 'v1.0',
+          model_version: 'v1.1',
           predicted_home_score: Math.round(homeXG * 10) / 10,
           predicted_away_score: Math.round(awayXG * 10) / 10,
           home_win_probability: Math.round(homeWin * 1000) / 1000,
