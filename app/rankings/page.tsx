@@ -1,13 +1,8 @@
 import RankingsTable from '@/components/rankings/RankingsTable';
-
-async function getRankings() {
-  const res = await fetch('http://localhost:3000/api/rankings', { cache: 'no-store' });
-  const json = await res.json();
-  return json.data;
-}
+import { fetchRankings } from '@/lib/data';
 
 export default async function RankingsPage() {
-  const data = await getRankings();
+  const data = await fetchRankings().catch(() => null);
   const players = data?.top100 ?? [];
 
   return (
@@ -19,7 +14,6 @@ export default async function RankingsPage() {
         </p>
       </div>
 
-      {/* Legend */}
       <div className="flex flex-wrap gap-4 mb-5 text-xs" style={{ color: 'var(--text)' }}>
         <span><span style={{ color: 'var(--neon)' }}>M.PPM</span> — Momentum PPM (last 5 games)</span>
         <span><span style={{ color: 'var(--silver)' }}>S.PPM</span> — Season PPM</span>

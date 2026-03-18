@@ -1,16 +1,10 @@
 import ModelStatsCard from '@/components/accuracy/ModelStatsCard';
 import PredictionHistory from '@/components/accuracy/PredictionHistory';
 import { ComparisonExample } from '@/components/accuracy/ModelComparison';
-
-async function getAccuracy() {
-  const res = await fetch('http://localhost:3000/api/accuracy', { cache: 'no-store' });
-  const json = await res.json();
-  return json.data;
-}
+import { fetchAccuracy } from '@/lib/data';
 
 export default async function AccuracyPage() {
-  const data = await getAccuracy();
-
+  const data = await fetchAccuracy().catch(() => null);
   const { modelVersions, predictions, modelStats } = data ?? {};
 
   const totalPredictions = modelStats?.reduce((sum: number, s: { totalPredictions: number }) => sum + s.totalPredictions, 0) ?? 0;
@@ -26,7 +20,6 @@ export default async function AccuracyPage() {
         </p>
       </div>
 
-      {/* Summary KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         {[
           { label: 'Total Predictions', value: String(totalPredictions) },
@@ -41,14 +34,13 @@ export default async function AccuracyPage() {
         ))}
       </div>
 
-      {/* Per-model stats */}
-      {modelStats?.length > 0 && (
+      {(modelStats?.length ?? 0) > 0 && (
         <div className="mb-6">
           <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text)' }}>
             Model Performance
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {modelStats.map((stat: {
+            {(modelStats ?? []).map((stat: {
               version: string; totalPredictions: number; withOutcome: number;
               winnerAccuracyPct: number | null; avgHomeError: number | null; avgAwayError: number | null;
             }) => (
@@ -58,8 +50,7 @@ export default async function AccuracyPage() {
         </div>
       )}
 
-      {/* Model versions log */}
-      {modelVersions?.length > 0 && (
+      {(modelVersions?.length ?? 0) > 0 && (
         <div className="mb-6 rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
           <div className="px-4 py-3 border-b" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
             <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
@@ -67,7 +58,7 @@ export default async function AccuracyPage() {
             </h2>
           </div>
           <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-            {modelVersions.map((v: { version: string; description: string; is_active: boolean; created_at: string }) => (
+            {(modelVersions ?? []).map((v: { version: string; description: string; is_active: boolean; created_at: string }) => (
               <div key={v.version} className="px-4 py-3 flex items-center justify-between"
                 style={{ background: 'var(--bg)' }}>
                 <div className="flex items-center gap-3">
@@ -89,7 +80,6 @@ export default async function AccuracyPage() {
         </div>
       )}
 
-      {/* Cross-model comparison tool */}
       <div className="mb-6">
         <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text)' }}>
           Per-Game Model Comparison
@@ -97,7 +87,6 @@ export default async function AccuracyPage() {
         <ComparisonExample />
       </div>
 
-      {/* Prediction history */}
       <div>
         <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text)' }}>
           Prediction History

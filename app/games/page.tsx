@@ -1,12 +1,7 @@
 import { Suspense } from 'react';
 import DateNav from '@/components/games/DateNav';
 import GameCard from '@/components/games/GameCard';
-
-async function getGames(date: string) {
-  const res = await fetch(`http://localhost:3000/api/games?date=${date}`, { cache: 'no-store' });
-  const json = await res.json();
-  return json.data ?? { games: [], predictions: [] };
-}
+import { fetchGames } from '@/lib/data';
 
 export default async function GamesPage({
   searchParams,
@@ -15,7 +10,7 @@ export default async function GamesPage({
 }) {
   const { date } = await searchParams;
   const selected = date ?? new Date().toISOString().slice(0, 10);
-  const { games, predictions } = await getGames(selected);
+  const { games, predictions } = await fetchGames(selected).catch(() => ({ games: [], predictions: [] }));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const predMap = new Map<number, any>((predictions ?? []).map((p: { game_id: number }) => [p.game_id, p]));
@@ -57,7 +52,8 @@ export default async function GamesPage({
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {games.map((game: { id: number; startTimeUTC: string; gameState: string; venue: { default: string }; homeTeam: { id: number; abbrev: string; score?: number }; awayTeam: { id: number; abbrev: string; score?: number } }) => (
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+          {(games as any[]).map((game) => (
             <GameCard
               key={game.id}
               game={game}

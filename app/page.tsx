@@ -1,24 +1,14 @@
 import MomentumLeaders from '@/components/dashboard/MomentumLeaders';
 import BreakoutWatch from '@/components/dashboard/BreakoutWatch';
 import TodaysGames from '@/components/dashboard/TodaysGames';
-
-async function getRankings() {
-  const res = await fetch('http://localhost:3000/api/rankings', { cache: 'no-store' });
-  if (!res.ok) return null;
-  const json = await res.json();
-  return json.data;
-}
-
-async function getTodaysGames() {
-  const today = new Date().toISOString().slice(0, 10);
-  const res = await fetch(`http://localhost:3000/api/games?date=${today}`, { cache: 'no-store' });
-  if (!res.ok) return [];
-  const json = await res.json();
-  return json.data?.games ?? [];
-}
+import { fetchRankings, fetchGames } from '@/lib/data';
 
 export default async function DashboardPage() {
-  const [rankings, games] = await Promise.all([getRankings(), getTodaysGames()]);
+  const today = new Date().toISOString().slice(0, 10);
+  const [rankings, { games }] = await Promise.all([
+    fetchRankings().catch(() => null),
+    fetchGames(today).catch(() => ({ games: [], predictions: [] })),
+  ]);
 
   const leaders = rankings?.momentumLeaders?.skaters ?? [];
   const breakout = rankings?.breakoutWatch ?? [];
@@ -51,22 +41,15 @@ export default async function DashboardPage() {
 
       {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-        {/* Left col: Momentum Leaders */}
         <div className="lg:col-span-1">
           <MomentumLeaders players={leaders} />
         </div>
-
-        {/* Mid col: Breakout Watch */}
         <div className="lg:col-span-1">
           <BreakoutWatch players={breakout} />
         </div>
-
-        {/* Right col: Today's Games */}
         <div className="lg:col-span-1">
-          <TodaysGames games={games} />
+          <TodaysGames games={games as never[]} />
         </div>
-
       </div>
     </div>
   );

@@ -2,18 +2,7 @@ import PlayerRadarChart from '@/components/players/RadarChart';
 import PPMTimeline from '@/components/players/PPMTimeline';
 import EnergyBar from '@/components/players/EnergyBar';
 import MetricLayers from '@/components/players/MetricLayers';
-
-async function getPlayer(id: string) {
-  const res = await fetch(`http://localhost:3000/api/players/${id}`, { cache: 'no-store' });
-  const json = await res.json();
-  return json.data;
-}
-
-async function getRankings() {
-  const res = await fetch('http://localhost:3000/api/rankings', { cache: 'no-store' });
-  const json = await res.json();
-  return json.data;
-}
+import { fetchPlayer, fetchRankings } from '@/lib/data';
 
 function buildLayerData(snapshot: Record<string, number>, prefix: string) {
   return {
@@ -23,7 +12,7 @@ function buildLayerData(snapshot: Record<string, number>, prefix: string) {
     points:       snapshot[`${prefix}_points`]         ?? 0,
     ppm:          snapshot[`${prefix}_ppm`]            ?? 0,
     shootingPct:  snapshot[`${prefix}_shooting_pct`]   ?? 0,
-    hits:         0, // not stored per-layer in snapshot yet
+    hits:         0,
     blockedShots: 0,
     plusMinus:    0,
   };
@@ -31,7 +20,10 @@ function buildLayerData(snapshot: Record<string, number>, prefix: string) {
 
 export default async function PlayerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [data, rankings] = await Promise.all([getPlayer(id), getRankings()]);
+  const [data, rankings] = await Promise.all([
+    fetchPlayer(id).catch(() => null),
+    fetchRankings().catch(() => null),
+  ]);
 
   if (!data?.player) {
     return (
@@ -45,15 +37,12 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const latestSnapshot = metricTimeline?.[metricTimeline.length - 1] ?? {};
   const name = `${player.first_name} ${player.last_name}`;
 
-  // Find this player in rankings for their rank
   const ranked = rankings?.top100?.find((p: { player_id: number }) => p.player_id === Number(id));
 
-  // Build layer data from snapshot
   const momentum = buildLayerData(latestSnapshot, 'momentum');
   const season   = buildLayerData(latestSnapshot, 'season');
   const career   = { ...season, gamesPlayed: latestSnapshot.career_games ?? season.gamesPlayed, ppm: latestSnapshot.career_ppm ?? season.ppm };
 
-  // League max values for radar normalisation (use rough estimates for now)
   const leagueMax = {
     ppm:             0.15,
     shootingPct:     0.25,
@@ -68,7 +57,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   return (
     <div className="max-w-5xl mx-auto pb-20 md:pb-0">
 
-      {/* Player header */}
       <div className="flex items-center gap-4 mb-6">
         {player.headshot_url && (
           <img src={player.headshot_url} alt={name}
@@ -99,12 +87,10 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      {/* Energy bar */}
       <div className="mb-4">
         <EnergyBar value={energyBar} />
       </div>
 
-      {/* Radar + Timeline */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <PlayerRadarChart
           momentum={{ ppm: momentum.ppm, shootingPct: momentum.shootingPct, hits: momentum.hits, blockedShots: momentum.blockedShots, plusMinus: momentum.plusMinus, powerPlayPoints: 0 }}
@@ -114,7 +100,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         <PPMTimeline snapshots={metricTimeline ?? []} />
       </div>
 
-      {/* 3-layer metric breakdown */}
       <div className="mb-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text)' }}>
           3-Layer Metric Breakdown
@@ -122,8 +107,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         <MetricLayers momentum={momentum} season={season} career={career} />
       </div>
 
-      {/* Recent games table */}
-      {recentGames?.length > 0 && (
+      {(recentGames?.length ?? 0) > 0 && (
         <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
           <div className="px-4 py-3 border-b" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
             <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
@@ -142,11 +126,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
               </thead>
               <tbody>
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                {recentGames.slice(0, 10).map((g: any, i: number) => (
+                {(recentGames ?? []).slice(0, 10).map((g: any, i: number) => (
                   <tr key={i} className="border-t"
                     style={{ borderColor: 'var(--border)', background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)' }}>
                     <td className="px-3 py-2 text-xs font-mono" style={{ color: 'var(--text)' }}>
-                      {g.games ? String((g.games as Record<string, unknown>).game_date ?? '').slice(5) : '—'}
+                      {g.games ? String(g.games.game_date ?? '').slice(5) : '—'}
                     </td>
                     <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-bright)' }}>{String(g.goals ?? 0)}</td>
                     <td className="px-3 py-2 font-mono" style={{ color: 'var(--text-bright)' }}>{String(g.assists ?? 0)}</td>

@@ -20,11 +20,8 @@ interface Prediction {
   away_energy_bar: number;
   created_at: string;
   prediction_outcomes: PredictionOutcome[] | null;
-  games: {
-    game_date: string;
-    home_team: { abbrev: string } | null;
-    away_team: { abbrev: string } | null;
-  } | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  games: any;
 }
 
 function WinBar({ home, away, ot }: { home: number; away: number; ot: number }) {
@@ -61,9 +58,10 @@ export default function PredictionHistory({ predictions }: { predictions: Predic
           <tbody>
             {predictions.map((p, i) => {
               const outcome = p.prediction_outcomes?.[0] ?? null;
-              const home = p.games?.home_team?.abbrev ?? '?';
-              const away = p.games?.away_team?.abbrev ?? '?';
-              const date = p.games?.game_date?.slice(5) ?? '—';
+              const g = Array.isArray(p.games) ? p.games[0] : p.games;
+              const home = g?.home_team?.[0]?.abbrev ?? g?.home_team?.abbrev ?? '?';
+              const away = g?.away_team?.[0]?.abbrev ?? g?.away_team?.abbrev ?? '?';
+              const date = g?.game_date?.slice(5) ?? '—';
 
               return (
                 <tr key={p.id} className="border-t"
