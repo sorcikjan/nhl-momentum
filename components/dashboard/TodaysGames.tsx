@@ -63,9 +63,14 @@ export default function TodaysGames({ games }: { games: Game[] }) {
               <div className="flex-1 flex flex-col gap-1">
                 {[g.awayTeam, g.homeTeam].map((team, idx) => (
                   <div key={idx} className="flex items-center justify-between">
-                    <span className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
-                      {team.abbrev}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <img
+                        src={team.logo || `https://assets.nhle.com/logos/nhl/svg/${team.abbrev}_light.svg`}
+                        alt={team.abbrev} className="w-5 h-5 object-contain flex-shrink-0" />
+                      <span className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
+                        {team.abbrev}
+                      </span>
+                    </div>
                     {(isFinal || isLive) && team.score !== undefined && (
                       <span className="text-sm font-mono font-bold" style={{ color: 'var(--text-bright)' }}>
                         {team.score}

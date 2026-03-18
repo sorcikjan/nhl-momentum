@@ -39,9 +39,9 @@ export default async function DashboardPage() {
       {/* Stat bar */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         {[
-          { label: 'Players Tracked', value: rankings?.top100?.length ? '733' : '—' },
+          { label: 'Players Tracked', value: rankings ? `${rankings.top100.length}+` : '—' },
           { label: 'Momentum Window', value: 'Last 5 G' },
-          { label: 'Model Version',   value: 'v1.0' },
+          { label: 'Model Version',   value: 'v1.1' },
         ].map(s => (
           <div key={s.label} className="rounded-lg border p-3 text-center"
             style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
