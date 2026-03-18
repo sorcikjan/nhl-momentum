@@ -1,5 +1,6 @@
 import ModelStatsCard from '@/components/accuracy/ModelStatsCard';
 import PredictionHistory from '@/components/accuracy/PredictionHistory';
+import { ComparisonExample } from '@/components/accuracy/ModelComparison';
 
 async function getAccuracy() {
   const res = await fetch('http://localhost:3000/api/accuracy', { cache: 'no-store' });
@@ -87,6 +88,14 @@ export default async function AccuracyPage() {
           </div>
         </div>
       )}
+
+      {/* Cross-model comparison tool */}
+      <div className="mb-6">
+        <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text)' }}>
+          Per-Game Model Comparison
+        </h2>
+        <ComparisonExample />
+      </div>
 
       {/* Prediction history */}
       <div>
