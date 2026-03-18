@@ -89,7 +89,7 @@ export async function fetchPlayer(id: string) {
   const { data: recentGames } = await supabaseAdmin
     .from('game_player_stats')
     .select(`
-      *, games(
+      *, games!left(
         game_date, home_score, away_score, home_team_id, away_team_id,
         home_team:teams!games_home_team_id_fkey(abbrev),
         away_team:teams!games_away_team_id_fkey(abbrev)
