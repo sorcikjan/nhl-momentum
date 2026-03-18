@@ -3,6 +3,8 @@ import BreakoutWatch from '@/components/dashboard/BreakoutWatch';
 import TodaysGames from '@/components/dashboard/TodaysGames';
 import { fetchRankings, fetchGames } from '@/lib/data';
 
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardPage() {
   const today = new Date().toISOString().slice(0, 10);
   const [rankings, { games }] = await Promise.all([

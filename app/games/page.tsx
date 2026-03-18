@@ -3,6 +3,8 @@ import DateNav from '@/components/games/DateNav';
 import GameCard from '@/components/games/GameCard';
 import { fetchGames } from '@/lib/data';
 
+export const dynamic = 'force-dynamic';
+
 export default async function GamesPage({
   searchParams,
 }: {

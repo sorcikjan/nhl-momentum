@@ -4,6 +4,8 @@ import EnergyBar from '@/components/players/EnergyBar';
 import MetricLayers from '@/components/players/MetricLayers';
 import { fetchPlayer, fetchRankings } from '@/lib/data';
 
+export const dynamic = 'force-dynamic';
+
 function buildLayerData(snapshot: Record<string, number>, prefix: string) {
   return {
     gamesPlayed:  snapshot[`${prefix}_games`]        ?? 0,

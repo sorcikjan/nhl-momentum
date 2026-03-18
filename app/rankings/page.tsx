@@ -1,6 +1,8 @@
 import RankingsTable from '@/components/rankings/RankingsTable';
 import { fetchRankings } from '@/lib/data';
 
+export const dynamic = 'force-dynamic';
+
 export default async function RankingsPage() {
   const data = await fetchRankings().catch(() => null);
   const players = data?.top100 ?? [];

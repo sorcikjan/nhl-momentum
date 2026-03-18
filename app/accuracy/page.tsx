@@ -3,6 +3,8 @@ import PredictionHistory from '@/components/accuracy/PredictionHistory';
 import { ComparisonExample } from '@/components/accuracy/ModelComparison';
 import { fetchAccuracy } from '@/lib/data';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AccuracyPage() {
   const data = await fetchAccuracy().catch(() => null);
   const { modelVersions, predictions, modelStats } = data ?? {};
