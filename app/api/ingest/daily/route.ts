@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getGamesByDate } from '@/lib/nhl-api';
+import { energyMultiplier, goalieEnergyPenalty } from '@/lib/energy';
 import type { NHLScheduledGame } from '@/types';
 
 // ─── Daily Pipeline ────────────────────────────────────────────────────────────
@@ -181,8 +182,19 @@ export async function GET(req: NextRequest) {
           goalieStatsMap.get(row.player_id)!.push(row);
         }
 
+        // Fetch goalie energy from their latest snapshot
+        const { data: goalieEnergySnaps } = await supabaseAdmin
+          .from('player_metric_snapshots')
+          .select('player_id, energy_bar')
+          .in('player_id', goalieIds)
+          .order('calculated_at', { ascending: false });
+        const goalieEnergyMap = new Map<number, number>();
+        for (const snap of goalieEnergySnaps ?? []) {
+          if (!goalieEnergyMap.has(snap.player_id)) goalieEnergyMap.set(snap.player_id, snap.energy_bar ?? 100);
+        }
+
         // Build goalie snapshot from first goalie with sufficient data
-        let goalieSnap = { playerId: 0, playerName: 'Unknown', momentumShotsPerGoal: 22, seasonShotsPerGoal: 22, momentumSavePct: 0.905, seasonSavePct: 0.905 };
+        let goalieSnap = { playerId: 0, playerName: 'Unknown', momentumShotsPerGoal: 22, seasonShotsPerGoal: 22, momentumSavePct: 0.905, seasonSavePct: 0.905, energyBar: 100 };
         for (const gid of goalieIds) {
           const data = goalieStatsMap.get(gid);
           if (data?.length) {
@@ -198,6 +210,7 @@ export async function GET(req: NextRequest) {
               seasonShotsPerGoal: Math.round(spg * 10) / 10,
               momentumSavePct: data.reduce((s, r) => s + (r.save_pct ?? 0), 0) / data.length,
               seasonSavePct: data.reduce((s, r) => s + (r.save_pct ?? 0), 0) / data.length,
+              energyBar: goalieEnergyMap.get(gid) ?? 100,
             };
             break;
           }
@@ -260,16 +273,19 @@ export async function GET(req: NextRequest) {
         .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
         .reduce((sum: number, s: { compositePpm: number }) => sum + Math.max(0, s.compositePpm), 0)
         * Number(homeSnap.sos_multiplier)
-        * (homeSnap.team_energy_bar >= 70 ? 1.0 : 0.6 + (homeSnap.team_energy_bar / 70) * 0.4);
+        * energyMultiplier(homeSnap.team_energy_bar ?? 100);
 
       const awayOff = aSkaters
         .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
         .reduce((sum: number, s: { compositePpm: number }) => sum + Math.max(0, s.compositePpm), 0)
         * Number(awaySnap.sos_multiplier)
-        * (awaySnap.team_energy_bar >= 70 ? 1.0 : 0.6 + (awaySnap.team_energy_bar / 70) * 0.4);
+        * energyMultiplier(awaySnap.team_energy_bar ?? 100);
 
-      const homeDef = Math.min(MAX_SPG, Math.max(MIN_SPG, hGoalie.momentumShotsPerGoal || 22));
-      const awayDef = Math.min(MAX_SPG, Math.max(MIN_SPG, aGoalie.momentumShotsPerGoal || 22));
+      // Goalie defensive filter: SPG × energy penalty (fatigue → lower SPG → more goals allowed)
+      const homeDef = Math.min(MAX_SPG, Math.max(MIN_SPG, hGoalie.momentumShotsPerGoal || 22))
+        * goalieEnergyPenalty(hGoalie.energyBar ?? 100);
+      const awayDef = Math.min(MAX_SPG, Math.max(MIN_SPG, aGoalie.momentumShotsPerGoal || 22))
+        * goalieEnergyPenalty(aGoalie.energyBar ?? 100);
 
       const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
       const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;

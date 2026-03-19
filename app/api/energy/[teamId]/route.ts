@@ -1,72 +1,70 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { calcEnergyBar } from '@/lib/energy';
+import { calculatePlayerEnergy, type GameRecord } from '@/lib/energy';
 
-// GET /api/energy/[teamId]?opponentTeamId=XXX
+// GET /api/energy/[teamId]
+// Returns real-time energy bars for all active players on a team.
+// Uses the same calculatePlayerEnergy algorithm as the ingest route.
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ teamId: string }> }
 ) {
   const { teamId } = await params;
-  const opponentId = req.nextUrl.searchParams.get('opponentTeamId');
 
   try {
-    const now = new Date();
-    const since72h = new Date(now.getTime() - 72 * 60 * 60 * 1000).toISOString();
+    const now       = new Date();
+    const since     = new Date(now.getTime() - 72 * 3_600_000);
+    const sinceDate = since.toISOString().slice(0, 10);
 
-    // TOI of all players for this team over last 72 hours
+    // Recent completed games (last 72h)
+    const { data: recentGames } = await supabaseAdmin
+      .from('games')
+      .select('id, game_date, start_time_utc')
+      .gte('game_date', sinceDate)
+      .in('game_state', ['FINAL', 'OFF']);
+
+    const gameMap = new Map((recentGames ?? []).map(g => [g.id, g]));
+    const recentGameIds = Array.from(gameMap.keys());
+
+    // Skater stats for this team
     const { data: recentStats, error } = await supabaseAdmin
       .from('game_player_stats')
-      .select('player_id, toi_seconds, games(start_time_utc, home_team_id, away_team_id)')
+      .select('player_id, game_id, toi_seconds')
       .eq('team_id', Number(teamId))
-      .gte('games.start_time_utc', since72h);
+      .in('game_id', recentGameIds.length ? recentGameIds : [-1]);
 
     if (error) throw error;
 
-    // Aggregate TOI per player
-    const playerToi: Record<number, number> = {};
+    // Group by player
+    const recordsByPlayer = new Map<number, GameRecord[]>();
     for (const row of recentStats ?? []) {
-      playerToi[row.player_id] = (playerToi[row.player_id] ?? 0) + row.toi_seconds;
+      const game = gameMap.get(row.game_id);
+      if (!game) continue;
+      const startUtc = game.start_time_utc
+        ? new Date(game.start_time_utc)
+        : new Date(`${game.game_date}T20:00:00Z`);
+      const gameEnd = new Date(startUtc.getTime() + 2.5 * 3_600_000);
+      if (!recordsByPlayer.has(row.player_id)) recordsByPlayer.set(row.player_id, []);
+      recordsByPlayer.get(row.player_id)!.push({ game_end_utc: gameEnd, toi_seconds: row.toi_seconds ?? 0 });
     }
 
-    // Get opponent defensive filter (from latest metric snapshot)
-    let opponentDefFilter = 1.0;
-    let leagueAvgDefFilter = 1.0;
-
-    if (opponentId) {
-      const { data: opponentMetrics } = await supabaseAdmin
-        .from('player_metric_snapshots')
-        .select('momentum_ppm, players(team_id, position_code)')
-        .eq('players.team_id', Number(opponentId))
-        .eq('players.position_code', 'G')
-        .order('calculated_at', { ascending: false })
-        .limit(1);
-
-      if (opponentMetrics?.[0]) {
-        opponentDefFilter = opponentMetrics[0].momentum_ppm ?? 1.0;
-      }
-    }
-
-    // Calculate energy bar per player
-    const energyBars = Object.entries(playerToi).map(([playerId, toi]) => ({
-      playerId: Number(playerId),
-      toiLast72h: toi,
-      energyBar: calcEnergyBar(toi, opponentDefFilter, leagueAvgDefFilter),
+    const players = Array.from(recordsByPlayer.entries()).map(([playerId, records]) => ({
+      playerId,
+      energyBar: calculatePlayerEnergy(records, now),
     }));
 
-    // Team-level energy = average of all active players
-    const teamEnergy = energyBars.length > 0
-      ? Math.round(energyBars.reduce((s, p) => s + p.energyBar, 0) / energyBars.length)
+    const teamEnergy = players.length
+      ? Math.round(players.reduce((s, p) => s + p.energyBar, 0) / players.length)
       : 100;
 
     return NextResponse.json({
-      data: { teamId: Number(teamId), teamEnergy, players: energyBars },
+      data: { teamId: Number(teamId), teamEnergy, players },
       error: null,
     });
   } catch (err) {
     return NextResponse.json(
       { data: null, error: (err as Error).message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
