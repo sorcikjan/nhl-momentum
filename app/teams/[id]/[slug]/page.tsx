@@ -108,7 +108,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                     )}
                   </div>
                   <div className="text-xs" style={{ color: 'var(--text)' }}>
-                    #{i + 1} on team · {p.players.position_code}
+                    #{i + 1} on team &middot; {p.players.position_code}
                   </div>
                 </div>
                 <div className="text-right">
