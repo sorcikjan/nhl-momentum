@@ -199,7 +199,7 @@ export async function fetchTeam(id: string) {
   const { data: players } = await supabaseAdmin
     .from('player_metric_snapshots')
     .select(`
-      player_id, momentum_rank, momentum_ppm, season_ppm, breakout_delta,
+      player_id, momentum_rank, composite_ppm, momentum_ppm, season_ppm, breakout_delta,
       energy_bar, momentum_goals, momentum_assists, momentum_points,
       players!inner ( id, first_name, last_name, position_code, headshot_url, injury_status, team_id )
     `)
