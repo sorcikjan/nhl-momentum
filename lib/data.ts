@@ -83,12 +83,14 @@ export async function fetchPlayer(id: string) {
 
   if (pErr) throw pErr;
 
-  const { data: metricTimeline } = await supabaseAdmin
+  // Fetch newest 30 snapshots (for current metrics), then reverse for timeline chart
+  const { data: metricTimelineDesc } = await supabaseAdmin
     .from('player_metric_snapshots')
     .select('*')
     .eq('player_id', id)
-    .order('calculated_at', { ascending: true })
+    .order('calculated_at', { ascending: false })
     .limit(30);
+  const metricTimeline = (metricTimelineDesc ?? []).slice().reverse();
 
   // Fetch raw game stats first (no join — game_player_stats may not have FK to games)
   const { data: rawGameStats } = await supabaseAdmin
