@@ -1,4 +1,5 @@
 export default function EnergyBar({ value }: { value: number }) {
+  const hex   = value >= 70 ? '#22c55e' : value >= 40 ? '#f59e0b' : '#ef4444';
   const color = value >= 70 ? 'var(--green)' : value >= 40 ? 'var(--amber)' : 'var(--red)';
   const label = value >= 70 ? 'Fresh' : value >= 40 ? 'Fatigued' : 'Drained';
 
@@ -16,7 +17,7 @@ export default function EnergyBar({ value }: { value: number }) {
       <div className="flex items-center gap-3">
         <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
           <div className="h-3 rounded-full transition-all duration-700"
-            style={{ width: `${value}%`, background: `linear-gradient(90deg, ${color}, ${color}88)` }} />
+            style={{ width: `${value}%`, background: `linear-gradient(90deg, ${hex}, ${hex}88)` }} />
         </div>
         <span className="text-xl font-bold font-mono w-12 text-right" style={{ color }}>{value}</span>
       </div>

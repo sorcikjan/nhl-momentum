@@ -37,6 +37,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
     ? Math.round(roster.reduce((s: number, p: { energy_bar: number }) => s + (p.energy_bar ?? 100), 0) / roster.length)
     : 100;
 
+  const energyHex   = avgEnergy >= 70 ? '#22c55e' : avgEnergy >= 40 ? '#f59e0b' : '#ef4444';
   const energyColor = avgEnergy >= 70 ? 'var(--green)' : avgEnergy >= 40 ? 'var(--amber)' : 'var(--red)';
 
   return (
@@ -73,7 +74,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
           <span className="text-xs font-mono font-bold" style={{ color: energyColor }}>{avgEnergy}/100</span>
         </div>
         <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-          <div className="h-2 rounded-full" style={{ width: `${avgEnergy}%`, background: `linear-gradient(90deg, ${energyColor}, ${energyColor}88)` }} />
+          <div className="h-2 rounded-full" style={{ width: `${avgEnergy}%`, background: `linear-gradient(90deg, ${energyHex}, ${energyHex}88)` }} />
         </div>
       </div>
 
