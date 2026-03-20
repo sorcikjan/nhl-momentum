@@ -10,12 +10,12 @@ interface Props {
 }
 
 const METRICS = [
-  { key: 'ppm',             label: 'PPM' },
-  { key: 'shootingPct',     label: 'S%' },
-  { key: 'hits',            label: 'Hits' },
-  { key: 'blockedShots',    label: 'Blocks' },
-  { key: 'plusMinus',       label: '+/-' },
-  { key: 'powerPlayPoints', label: 'PP Pts' },
+  { key: 'ppm',           label: 'PPM' },
+  { key: 'shootingPct',   label: 'S%' },
+  { key: 'goalsPerGame',  label: 'G/G' },
+  { key: 'assistsPerGame',label: 'A/G' },
+  { key: 'trend',         label: 'Trend' },
+  { key: 'energy',        label: 'Energy' },
 ];
 
 export default function PlayerRadarChart({ momentum, season, leagueMax }: Props) {

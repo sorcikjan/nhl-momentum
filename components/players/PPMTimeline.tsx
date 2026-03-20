@@ -19,8 +19,15 @@ export default function PPMTimeline({ snapshots }: { snapshots: Snapshot[] }) {
     );
   }
 
-  const data = snapshots.map((s, i) => ({
-    idx: i + 1,
+  // One snapshot per calendar day (latest wins) — avoids same-date duplicates from multiple ingests
+  const byDate = new Map<string, Snapshot>();
+  for (const s of snapshots) {
+    const day = s.calculated_at.slice(0, 10);
+    byDate.set(day, s);
+  }
+  const deduped = Array.from(byDate.values());
+
+  const data = deduped.map(s => ({
     label: new Date(s.calculated_at).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }),
     momentum: Math.round((s.momentum_ppm ?? 0) * 10000) / 10000,
     season:   Math.round((s.season_ppm   ?? 0) * 10000) / 10000,

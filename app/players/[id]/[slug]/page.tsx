@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import PlayerRadarChart from '@/components/players/RadarChart';
 import PPMTimeline from '@/components/players/PPMTimeline';
+import EnergyBar from '@/components/players/EnergyBar';
 import { fetchPlayer, fetchRankings } from '@/lib/data';
 import { teamUrl } from '@/lib/urls';
 import Link from 'next/link';
@@ -119,10 +120,30 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     },
   ];
 
-  // Radar data (keep existing interface)
-  const leagueMax = { ppm: 0.15, shootingPct: 0.25, hits: 15, blockedShots: 12, plusMinus: 10, powerPlayPoints: 5 };
-  const momentumRadar = { ppm: momPpm, shootingPct: momShootPct, hits: 0, blockedShots: 0, plusMinus: 0, powerPlayPoints: 0 };
-  const seasonRadar   = { ppm: seaPpm, shootingPct: seaShootPct, hits: 0, blockedShots: 0, plusMinus: 0, powerPlayPoints: 0 };
+  // Radar data — all 6 dimensions from snapshot data
+  const breakoutDelta = Number(latestSnapshot.breakout_delta ?? 0);
+  const leagueMax = {
+    ppm: 0.15, shootingPct: 0.25,
+    goalsPerGame: 0.7, assistsPerGame: 1.0,
+    trend: 0.06,  // breakout_delta scale: +0.06 = strong positive trend
+    energy: 100,
+  };
+  const momentumRadar = {
+    ppm: momPpm,
+    shootingPct: momShootPct,
+    goalsPerGame: momGoals / Math.max(1, momGames),
+    assistsPerGame: momAssists / Math.max(1, momGames),
+    trend: Math.max(0, breakoutDelta),  // only positive trend shown; negative = below season baseline
+    energy: energyBar,
+  };
+  const seasonRadar = {
+    ppm: seaPpm,
+    shootingPct: seaShootPct,
+    goalsPerGame: seaGoals / Math.max(1, seaGames),
+    assistsPerGame: seaAssists / Math.max(1, seaGames),
+    trend: 0,
+    energy: energyBar,
+  };
 
   return (
     <div className="max-w-5xl mx-auto pb-20 md:pb-0 space-y-4">
@@ -178,27 +199,19 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
               {rankBadge(ranked?.momentum_rank)}
             </div>
 
-            {/* Energy capacity */}
-            <div className="rounded-lg p-3" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-                  Energy Capacity
-                </span>
-                <span className="text-lg font-bold font-mono" style={{ color: energyColor }}>
-                  {energyBar}%
-                </span>
-              </div>
-              <div className="h-2 rounded-full overflow-hidden mb-1" style={{ background: 'var(--border)' }}>
-                <div className="h-2 rounded-full transition-all duration-700"
-                  style={{ width: `${energyBar}%`, background: `linear-gradient(90deg, ${energyColor}, ${energyColor}88)` }} />
-              </div>
-              <div className="flex items-center gap-1.5 mt-1">
-                <span className="text-xs font-mono" style={{ color: energyColor }}>⚡ STATUS: {energyLabel}</span>
-              </div>
+            {/* Energy — compact status badge in hero, full bar below */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs px-2 py-1 rounded font-semibold"
+                style={{ background: `${energyColor}22`, color: energyColor, border: `1px solid ${energyColor}44` }}>
+                ⚡ {energyLabel} · {energyBar}%
+              </span>
             </div>
           </div>
         </div>
       </div>
+
+      {/* ── Energy Bar ──────────────────────────────────────────────────────────── */}
+      <EnergyBar value={energyBar} />
 
       {/* ── Radar + PPM timeline ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
