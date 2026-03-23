@@ -155,12 +155,16 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           <div className="mb-2">
             <div className="flex justify-between text-xs mb-1" style={{ color: 'var(--text)' }}>
               <span style={{ color: 'var(--silver)' }}>{awayAbbrev} {Math.round(prediction.away_win_probability * 100)}%</span>
-              <span>OT {Math.round(prediction.ot_probability * 100)}%</span>
+              {prediction.ot_probability > 0 && (
+                <span>OT {Math.round(prediction.ot_probability * 100)}%</span>
+              )}
               <span style={{ color: 'var(--neon)' }}>{homeAbbrev} {Math.round(prediction.home_win_probability * 100)}%</span>
             </div>
             <div className="flex h-3 rounded-full overflow-hidden">
               <div style={{ width: `${prediction.away_win_probability * 100}%`, background: 'var(--silver)' }} />
-              <div style={{ width: `${prediction.ot_probability * 100}%`, background: 'var(--amber)' }} />
+              {prediction.ot_probability > 0 && (
+                <div style={{ width: `${prediction.ot_probability * 100}%`, background: 'var(--amber)' }} />
+              )}
               <div style={{ width: `${prediction.home_win_probability * 100}%`, background: 'var(--neon)' }} />
             </div>
           </div>

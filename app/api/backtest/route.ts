@@ -149,6 +149,61 @@ function runModelV1_1(homeSnap: TeamSnap, awaySnap: TeamSnap) {
   };
 }
 
+// v1.2 — binary winner prediction. Removes OT as a possible outcome.
+// Every game has a winner; OT just extends regulation. homeWin + awayWin = 1.0 always.
+// Same xG formula as v1.1 (GOAL_SCALE=90); only the probability mapping changes.
+function runModelV1_2(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
+  const GOAL_SCALE = 90;
+  const DISCIPLINE_THRESHOLD = 0.9;
+  const MIN_SPG = 12;
+  const MAX_SPG = 40;
+
+  function offPotential(snap: TeamSnap) {
+    const activeSkaters = snap.skaters.filter(s => !s.injuryStatus);
+    const totalPPM = activeSkaters.reduce((sum, s) => sum + Math.max(0, s.compositePpm), 0);
+    return totalPPM * snap.sosMultiplier * energyMultiplierFromBar(snap.energyBar);
+  }
+
+  function defFilter(snap: TeamSnap) {
+    const spg = Math.min(MAX_SPG, Math.max(MIN_SPG, snap.goalie.momentumShotsPerGoal || 22));
+    const disciplinePenalty = snap.shToiPercentile >= DISCIPLINE_THRESHOLD ? 0.075 : 0;
+    return spg * (1 - disciplinePenalty);
+  }
+
+  const homeOff = offPotential(homeSnap);
+  const awayOff = offPotential(awaySnap);
+  const homeDef = defFilter(homeSnap);
+  const awayDef = defFilter(awaySnap);
+
+  const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
+  const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
+
+  const total = homeXG + awayXG;
+  if (total === 0) return {
+    homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5, ot: 0,
+    homeOff, awayOff, homeDef, awayDef,
+  };
+
+  // Apply home-ice advantage and normalize to 1.0 (no OT bucket)
+  const homeBase = homeXG / total;
+  const awayBase = awayXG / total;
+  const homeAdj = Math.min(0.9, homeBase * 1.05);
+  const awayAdj = Math.min(0.9, awayBase * 0.95);
+  const homeWin = homeAdj / (homeAdj + awayAdj);
+
+  return {
+    homeXG: Math.round(homeXG * 10) / 10,
+    awayXG: Math.round(awayXG * 10) / 10,
+    homeWin: Math.round(homeWin * 1000) / 1000,
+    awayWin: Math.round((1 - homeWin) * 1000) / 1000,
+    ot: 0,
+    homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
+    awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
+    homeDef: Math.round(homeDef * 10) / 10,
+    awayDef: Math.round(awayDef * 10) / 10,
+  };
+}
+
 // Registry of available model formulas.
 // When you create v1.1 with a modified formula, add it here.
 // The formula_spec from model_versions can override default params.
@@ -160,6 +215,7 @@ const MODEL_FORMULAS: Record<string, (
 ) => ModelResult> = {
   'v1.0': (h, a) => runModelV1(h, a),
   'v1.1': (h, a) => runModelV1_1(h, a),
+  'v1.2': (h, a) => runModelV1_2(h, a),
 };
 
 // ─── GET — compare model versions for a specific game ─────────────────────────

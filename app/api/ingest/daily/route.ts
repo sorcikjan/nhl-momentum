@@ -255,7 +255,7 @@ export async function GET(req: NextRequest) {
 
       if (!homeSnap || !awaySnap) continue;
 
-      // Run v1.1 formula — fixes the unit mismatch from v1.0 via GOAL_SCALE
+      // Run v1.2 formula — binary winner prediction (homeWin + awayWin = 1.0, no OT)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hSkaters = (homeSnap.skater_snapshots as any[]) ?? [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -265,9 +265,9 @@ export async function GET(req: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const aGoalie = (awaySnap.goalie_snapshot as any) ?? {};
 
-      const GOAL_SCALE = 90; // calibration: PPM sum × GOAL_SCALE / SPG ≈ goals per game
-      const MIN_SPG = 12;    // floor: prevents extreme predictions from hot-streak goalies
-      const MAX_SPG = 40;    // cap: prevents near-zero from terrible-streak goalies
+      const GOAL_SCALE = 90;
+      const MIN_SPG = 12;
+      const MAX_SPG = 40;
 
       const homeOff = hSkaters
         .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
@@ -281,7 +281,6 @@ export async function GET(req: NextRequest) {
         * Number(awaySnap.sos_multiplier)
         * energyMultiplier(awaySnap.team_energy_bar ?? 100);
 
-      // Goalie defensive filter: SPG × energy penalty (fatigue → lower SPG → more goals allowed)
       const homeDef = Math.min(MAX_SPG, Math.max(MIN_SPG, hGoalie.momentumShotsPerGoal || 22))
         * goalieEnergyPenalty(hGoalie.energyBar ?? 100);
       const awayDef = Math.min(MAX_SPG, Math.max(MIN_SPG, aGoalie.momentumShotsPerGoal || 22))
@@ -290,26 +289,24 @@ export async function GET(req: NextRequest) {
       const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
       const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
       const total = homeXG + awayXG;
-      const convergence = total > 0 ? 1 - Math.abs(homeXG - awayXG) / Math.max(homeXG, awayXG, 0.01) : 0;
-      const ot = Math.min(0.25, convergence * 0.2);
-      const remaining = 1 - ot;
+      // Binary: no OT bucket, normalize directly to 1.0
       const homeBase = total > 0 ? homeXG / total : 0.5;
       const awayBase = total > 0 ? awayXG / total : 0.5;
-      const homeAdj = Math.min(0.85, homeBase * 1.05);
-      const awayAdj = Math.min(0.85, awayBase * 0.95);
-      const homeWin = (homeAdj / (homeAdj + awayAdj)) * remaining;
-      const awayWin = remaining - homeWin;
+      const homeAdj = Math.min(0.9, homeBase * 1.05);
+      const awayAdj = Math.min(0.9, awayBase * 0.95);
+      const homeWin = homeAdj / (homeAdj + awayAdj);
+      const awayWin = 1 - homeWin;
 
       const { error: predErr } = await supabaseAdmin
         .from('predictions')
         .upsert({
           game_id: game.id,
-          model_version: 'v1.1',
+          model_version: 'v1.2',
           predicted_home_score: Math.round(homeXG * 10) / 10,
           predicted_away_score: Math.round(awayXG * 10) / 10,
           home_win_probability: Math.round(homeWin * 1000) / 1000,
           away_win_probability: Math.round(awayWin * 1000) / 1000,
-          ot_probability: Math.round(ot * 1000) / 1000,
+          ot_probability: 0,
           home_energy_bar: homeSnap.team_energy_bar,
           away_energy_bar: awaySnap.team_energy_bar,
           home_sos_multiplier: homeSnap.sos_multiplier,
