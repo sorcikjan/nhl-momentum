@@ -221,6 +221,28 @@ export async function GET(req: NextRequest) {
           ? Math.round(skaterSnaps.reduce((s, sk) => s + sk.energyBar, 0) / skaterSnaps.length)
           : 100;
 
+        // Compute real SOS multiplier from season win% up to today
+        const { data: teamGames } = await supabaseAdmin
+          .from('games')
+          .select('home_team_id, away_team_id, home_score, away_score')
+          .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+          .eq('season', '20252026')
+          .not('home_score', 'is', null)
+          .lt('game_date', today);
+
+        let wins = 0;
+        let totalGames = 0;
+        for (const g of teamGames ?? []) {
+          if (g.home_score === null || g.away_score === null) continue;
+          const isHomeTeam = g.home_team_id === teamId;
+          const myScore  = isHomeTeam ? g.home_score  : g.away_score;
+          const oppScore = isHomeTeam ? g.away_score : g.home_score;
+          totalGames++;
+          if (myScore > oppScore) wins++;
+        }
+        const winPct = totalGames >= 5 ? wins / totalGames : 0.5;
+        const sosMultiplier = Math.round((1.0 + (winPct - 0.5) * 0.8) * 1000) / 1000;
+
         // Save the model-agnostic team snapshot
         const { error: snapErr } = await supabaseAdmin
           .from('game_team_snapshots')
@@ -229,7 +251,7 @@ export async function GET(req: NextRequest) {
             team_id: teamId,
             is_home: isHome,
             team_energy_bar: teamEnergy,
-            sos_multiplier: 1.0,   // TODO: compute from opponent strength
+            sos_multiplier: sosMultiplier,
             sh_toi_percentile: 0.5,
             skater_snapshots: skaterSnaps,
             goalie_snapshot: goalieSnap,
@@ -255,7 +277,7 @@ export async function GET(req: NextRequest) {
 
       if (!homeSnap || !awaySnap) continue;
 
-      // Run v1.2 formula — binary winner prediction (homeWin + awayWin = 1.0, no OT)
+      // Run v1.3 formula — binary winner + real SOS + calibrated home ice
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hSkaters = (homeSnap.skater_snapshots as any[]) ?? [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -265,9 +287,11 @@ export async function GET(req: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const aGoalie = (awaySnap.goalie_snapshot as any) ?? {};
 
-      const GOAL_SCALE = 90;
+      const GOAL_SCALE = 70;
       const MIN_SPG = 12;
       const MAX_SPG = 40;
+      const HOME_EDGE = 1.08;
+      const AWAY_EDGE = 0.92;
 
       const homeOff = hSkaters
         .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
@@ -289,11 +313,10 @@ export async function GET(req: NextRequest) {
       const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
       const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
       const total = homeXG + awayXG;
-      // Binary: no OT bucket, normalize directly to 1.0
       const homeBase = total > 0 ? homeXG / total : 0.5;
       const awayBase = total > 0 ? awayXG / total : 0.5;
-      const homeAdj = Math.min(0.9, homeBase * 1.05);
-      const awayAdj = Math.min(0.9, awayBase * 0.95);
+      const homeAdj = Math.min(0.92, homeBase * HOME_EDGE);
+      const awayAdj = Math.min(0.92, awayBase * AWAY_EDGE);
       const homeWin = homeAdj / (homeAdj + awayAdj);
       const awayWin = 1 - homeWin;
 
@@ -301,7 +324,7 @@ export async function GET(req: NextRequest) {
         .from('predictions')
         .upsert({
           game_id: game.id,
-          model_version: 'v1.2',
+          model_version: 'v1.3',
           predicted_home_score: Math.round(homeXG * 10) / 10,
           predicted_away_score: Math.round(awayXG * 10) / 10,
           home_win_probability: Math.round(homeWin * 1000) / 1000,
