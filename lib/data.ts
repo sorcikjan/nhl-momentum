@@ -9,6 +9,18 @@ export function teamLogoUrl(abbrev: string) {
   return `https://assets.nhle.com/logos/nhl/svg/${abbrev}_light.svg`;
 }
 
+// Returns the latest model version string (by created_at).
+// Used to pin all UI prediction queries to the most recent model.
+async function latestModelVersion(): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from('model_versions')
+    .select('version')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  return data?.version ?? 'v1.3';
+}
+
 // ─── Rankings ─────────────────────────────────────────────────────────────────
 
 export async function fetchRankings() {
@@ -65,11 +77,12 @@ export async function fetchRankings() {
 export async function fetchGames(date: string) {
   const games = await getGamesByDate(date);
   const gameIds = (games as { id: number }[]).map(g => g.id);
+  const activeModel = await latestModelVersion();
   const { data: predictions } = await supabaseAdmin
     .from('predictions')
     .select('*, prediction_outcomes(*)')
     .in('game_id', gameIds)
-    .eq('model_version', 'v1.3');
+    .eq('model_version', activeModel);
   return { games, predictions };
 }
 
@@ -286,11 +299,12 @@ export async function fetchMatch(id: string) {
   } catch { /* game may not exist in NHL API yet */ }
 
   // Our prediction
+  const activeModel = await latestModelVersion();
   const { data: predictions } = await supabaseAdmin
     .from('predictions')
     .select('*, prediction_outcomes(*)')
     .eq('game_id', id)
-    .eq('model_version', 'v1.3')
+    .eq('model_version', activeModel)
     .order('created_at', { ascending: false });
 
   // Team snapshots (player-level inputs)
