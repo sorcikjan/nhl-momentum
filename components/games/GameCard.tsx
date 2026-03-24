@@ -30,17 +30,18 @@ function WinBar({ home, away, ot }: { home: number; away: number; ot: number }) 
   const hp = Math.round(home * 100);
   const ap = Math.round(away * 100);
   const op = Math.round(ot * 100);
+  // Bar order matches team card order: away (top) on left, home (bottom) on right
   return (
     <div className="mt-3">
       <div className="flex text-xs justify-between mb-1" style={{ color: 'var(--text)' }}>
-        <span style={{ color: 'var(--neon)' }}>{hp}%</span>
-        <span>OT {op}%</span>
-        <span style={{ color: 'var(--amber)' }}>{ap}%</span>
+        <span style={{ color: 'var(--silver)' }}>{ap}% A</span>
+        {op > 0 && <span>OT {op}%</span>}
+        <span style={{ color: 'var(--neon)' }}>H {hp}%</span>
       </div>
-      <div className="flex h-1.5 rounded-full overflow-hidden gap-0.5">
+      <div className="flex h-1.5 rounded-full overflow-hidden">
+        <div style={{ width: `${ap}%`, background: 'var(--silver)' }} />
+        {op > 0 && <div style={{ width: `${op}%`, background: 'var(--amber)' }} />}
         <div style={{ width: `${hp}%`, background: 'var(--neon)' }} />
-        <div style={{ width: `${op}%`, background: 'var(--silver)' }} />
-        <div style={{ width: `${ap}%`, background: 'var(--amber)' }} />
       </div>
     </div>
   );
