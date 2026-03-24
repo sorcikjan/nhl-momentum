@@ -104,27 +104,32 @@ export async function GET() {
       updates.push({ game_id: snap.game_id, team_id: teamId, sos_multiplier: sosMult, recent_form: recentForm });
     }
 
-    // 5. Apply updates — sos_multiplier as its own column,
-    //    teamRecentForm stored inside goalie_snapshot JSON
+    // 5. Fetch all goalie_snapshots in one query, then update concurrently
+    const { data: allSnaps } = await supabaseAdmin
+      .from('game_team_snapshots')
+      .select('game_id, team_id, goalie_snapshot');
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const goalieMap = new Map<string, any>();
+    for (const s of allSnaps ?? []) {
+      goalieMap.set(`${s.game_id}_${s.team_id}`, s.goalie_snapshot);
+    }
+
     let updated = 0;
-    for (const u of updates) {
-      // Fetch existing goalie_snapshot to merge without overwriting other fields
-      const { data: existing } = await supabaseAdmin
-        .from('game_team_snapshots')
-        .select('goalie_snapshot')
-        .eq('game_id', u.game_id)
-        .eq('team_id', u.team_id)
-        .single();
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const mergedGoalie = { ...((existing?.goalie_snapshot as any) ?? {}), teamRecentForm: u.recent_form };
-
-      const { error } = await supabaseAdmin
-        .from('game_team_snapshots')
-        .update({ sos_multiplier: u.sos_multiplier, goalie_snapshot: mergedGoalie })
-        .eq('game_id', u.game_id)
-        .eq('team_id', u.team_id);
-      if (!error) updated++;
+    const CONCURRENCY = 10;
+    for (let i = 0; i < updates.length; i += CONCURRENCY) {
+      const batch = updates.slice(i, i + CONCURRENCY);
+      const results = await Promise.all(batch.map(u => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const existing = (goalieMap.get(`${u.game_id}_${u.team_id}`) as any) ?? {};
+        const mergedGoalie = { ...existing, teamRecentForm: u.recent_form };
+        return supabaseAdmin
+          .from('game_team_snapshots')
+          .update({ sos_multiplier: u.sos_multiplier, goalie_snapshot: mergedGoalie })
+          .eq('game_id', u.game_id)
+          .eq('team_id', u.team_id);
+      }));
+      updated += results.filter(r => !r.error).length;
     }
 
     return NextResponse.json({
