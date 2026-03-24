@@ -26,17 +26,24 @@ interface Game {
   awayTeam: { id: number; abbrev: string; score?: number; logo?: string };
 }
 
-function WinBar({ home, away, ot }: { home: number; away: number; ot: number }) {
+function WinBar({ home, away, ot, homeAbbrev, awayAbbrev }: {
+  home: number; away: number; ot: number;
+  homeAbbrev: string; awayAbbrev: string;
+}) {
   const hp = Math.round(home * 100);
   const ap = Math.round(away * 100);
   const op = Math.round(ot * 100);
-  // Bar order matches team card order: away (top) on left, home (bottom) on right
+  const favourite = home >= away ? homeAbbrev : awayAbbrev;
+  const favouritePct = Math.max(hp, ap);
   return (
     <div className="mt-3">
+      <div className="text-xs font-semibold mb-2 text-center" style={{ color: 'var(--neon)' }}>
+        {favourite} wins · {favouritePct}%
+      </div>
       <div className="flex text-xs justify-between mb-1" style={{ color: 'var(--text)' }}>
-        <span style={{ color: 'var(--silver)' }}>{ap}% A</span>
+        <span style={{ color: 'var(--silver)' }}>{awayAbbrev} {ap}%</span>
         {op > 0 && <span>OT {op}%</span>}
-        <span style={{ color: 'var(--neon)' }}>H {hp}%</span>
+        <span style={{ color: 'var(--neon)' }}>{homeAbbrev} {hp}%</span>
       </div>
       <div className="flex h-1.5 rounded-full overflow-hidden">
         <div style={{ width: `${ap}%`, background: 'var(--silver)' }} />
@@ -116,6 +123,8 @@ export default function GameCard({ game, prediction }: { game: Game; prediction?
           home={prediction.home_win_probability}
           away={prediction.away_win_probability}
           ot={prediction.ot_probability}
+          homeAbbrev={game.homeTeam.abbrev}
+          awayAbbrev={game.awayTeam.abbrev}
         />
       )}
 
