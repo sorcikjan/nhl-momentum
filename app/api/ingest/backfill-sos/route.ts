@@ -1,15 +1,20 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 
-// ─── Backfill SOS Multiplier ───────────────────────────────────────────────────
-// Populates sos_multiplier on all game_team_snapshots using real season win%
-// for each team at the time of that snapshot's game.
+// ─── Backfill SOS + Recent Form ───────────────────────────────────────────────
+// Populates sos_multiplier and goalie_snapshot.teamRecentForm on all
+// game_team_snapshots using actual season game results.
 //
-// Formula: sos_multiplier = 1.0 + (winPct - 0.5) × 0.8
-//   — 40% win team  → 0.92 (below average)
-//   — 50% win team  → 1.00 (average)
-//   — 60% win team  → 1.08 (above average)
-//   — 70% win team  → 1.16 (elite)
+// SOS formula:  1.0 + (seasonWinPct - 0.5) × 0.4
+//   — scaling ×0.4 (v1.4 reduced from ×0.8 in v1.3 — see backtest/route.ts notes)
+//   — TODO: linear scaling is artificial; calibrate against outcomes
+//
+// Recent form:  1.0 + (last10WinPct - 0.5) × 0.3
+//   — captures hot/cold streaks not reflected in full-season SOS
+//   — TODO: window size (10) and scaling (×0.3) should be calibrated
+//   — TODO: weight recency (last 3 games > games 8–10)
+//   — stored in goalie_snapshot.teamRecentForm (team-level metric — move to
+//     dedicated column once schema migration is done)
 //
 // GET /api/ingest/backfill-sos
 // ─────────────────────────────────────────────────────────────────────────────
@@ -50,44 +55,73 @@ export async function GET() {
       for (const g of extraGames ?? []) gameDateMap.set(g.id, g.game_date);
     }
 
-    // 4. For each snapshot, compute team win% in games BEFORE snapshot date
-    const updates: { game_id: number; team_id: number; sos_multiplier: number }[] = [];
+    // 4. For each snapshot, compute season win% and last-10-game form
+    const updates: {
+      game_id: number;
+      team_id: number;
+      sos_multiplier: number;
+      recent_form: number;
+    }[] = [];
 
     for (const snap of snapshots ?? []) {
       const gameDate = gameDateMap.get(snap.game_id);
       if (!gameDate) continue;
 
       const teamId = snap.team_id;
-      let wins = 0;
-      let totalGames = 0;
+      type GameRow = { id: number; game_date: string; home_team_id: number; away_team_id: number; home_score: number | null; away_score: number | null };
+      const teamGames: GameRow[] = [];
 
       for (const g of allGames ?? []) {
-        if (g.game_date >= gameDate) continue; // only games before this snapshot
+        if (g.game_date >= gameDate) continue;
         if (g.home_score === null || g.away_score === null) continue;
-
-        const isHome = g.home_team_id === teamId;
-        const isAway = g.away_team_id === teamId;
-        if (!isHome && !isAway) continue;
-
-        totalGames++;
-        const myScore  = isHome ? g.home_score  : g.away_score;
-        const oppScore = isHome ? g.away_score : g.home_score;
-        if (myScore > oppScore) wins++;
+        if (g.home_team_id !== teamId && g.away_team_id !== teamId) continue;
+        teamGames.push(g);
       }
 
-      // Minimum 5 games to use real data; otherwise stay at 1.0
-      const winPct = totalGames >= 5 ? wins / totalGames : 0.5;
-      const sosMult = Math.round((1.0 + (winPct - 0.5) * 0.8) * 1000) / 1000;
+      // Season SOS — full-season win%
+      // ×0.4 scaling: reduced from ×0.8 (v1.3) — see backtest/route.ts for rationale
+      // TODO: linear scaling is a placeholder; should be calibrated against outcomes
+      let seasonWins = 0;
+      for (const g of teamGames) {
+        const isHome = g.home_team_id === teamId;
+        if ((isHome ? g.home_score! : g.away_score!) > (isHome ? g.away_score! : g.home_score!)) seasonWins++;
+      }
+      const seasonWinPct = teamGames.length >= 5 ? seasonWins / teamGames.length : 0.5;
+      const sosMult = Math.round((1.0 + (seasonWinPct - 0.5) * 0.4) * 1000) / 1000;
 
-      updates.push({ game_id: snap.game_id, team_id: teamId, sos_multiplier: sosMult });
+      // Recent form — last 10 games
+      // TODO: window (10) and scaling (×0.3) are arbitrary — calibrate against outcomes
+      // TODO: weight recency so last 3 games matter more than games 8–10
+      const last10 = teamGames.slice(-10);
+      let recentWins = 0;
+      for (const g of last10) {
+        const isHome = g.home_team_id === teamId;
+        if ((isHome ? g.home_score! : g.away_score!) > (isHome ? g.away_score! : g.home_score!)) recentWins++;
+      }
+      const recentWinPct = last10.length >= 5 ? recentWins / last10.length : 0.5;
+      const recentForm = Math.round((1.0 + (recentWinPct - 0.5) * 0.3) * 1000) / 1000;
+
+      updates.push({ game_id: snap.game_id, team_id: teamId, sos_multiplier: sosMult, recent_form: recentForm });
     }
 
-    // 5. Apply updates in batches
+    // 5. Apply updates — sos_multiplier as its own column,
+    //    teamRecentForm stored inside goalie_snapshot JSON
     let updated = 0;
     for (const u of updates) {
+      // Fetch existing goalie_snapshot to merge without overwriting other fields
+      const { data: existing } = await supabaseAdmin
+        .from('game_team_snapshots')
+        .select('goalie_snapshot')
+        .eq('game_id', u.game_id)
+        .eq('team_id', u.team_id)
+        .single();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const mergedGoalie = { ...((existing?.goalie_snapshot as any) ?? {}), teamRecentForm: u.recent_form };
+
       const { error } = await supabaseAdmin
         .from('game_team_snapshots')
-        .update({ sos_multiplier: u.sos_multiplier })
+        .update({ sos_multiplier: u.sos_multiplier, goalie_snapshot: mergedGoalie })
         .eq('game_id', u.game_id)
         .eq('team_id', u.team_id);
       if (!error) updated++;

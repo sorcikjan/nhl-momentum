@@ -194,7 +194,7 @@ export async function GET(req: NextRequest) {
         }
 
         // Build goalie snapshot from first goalie with sufficient data
-        let goalieSnap = { playerId: 0, playerName: 'Unknown', momentumShotsPerGoal: 22, seasonShotsPerGoal: 22, momentumSavePct: 0.905, seasonSavePct: 0.905, energyBar: 100 };
+        let goalieSnap: { playerId: number; playerName: string; momentumShotsPerGoal: number; seasonShotsPerGoal: number; momentumSavePct: number; seasonSavePct: number; energyBar: number; teamRecentForm?: number } = { playerId: 0, playerName: 'Unknown', momentumShotsPerGoal: 22, seasonShotsPerGoal: 22, momentumSavePct: 0.905, seasonSavePct: 0.905, energyBar: 100 };
         for (const gid of goalieIds) {
           const data = goalieStatsMap.get(gid);
           if (data?.length) {
@@ -230,18 +230,36 @@ export async function GET(req: NextRequest) {
           .not('home_score', 'is', null)
           .lt('game_date', today);
 
-        let wins = 0;
-        let totalGames = 0;
-        for (const g of teamGames ?? []) {
-          if (g.home_score === null || g.away_score === null) continue;
+        const completedGamesForTeam = (teamGames ?? []).filter(
+          g => g.home_score !== null && g.away_score !== null
+        );
+
+        // Season SOS — full win% scaled ×0.4
+        // TODO: linear scaling is artificial; should be calibrated against outcomes
+        // TODO: replace combined win% with home/away split once enough history exists
+        let seasonWins = 0;
+        for (const g of completedGamesForTeam) {
           const isHomeTeam = g.home_team_id === teamId;
-          const myScore  = isHomeTeam ? g.home_score  : g.away_score;
-          const oppScore = isHomeTeam ? g.away_score : g.home_score;
-          totalGames++;
-          if (myScore > oppScore) wins++;
+          if ((isHomeTeam ? g.home_score! : g.away_score!) > (isHomeTeam ? g.away_score! : g.home_score!)) seasonWins++;
         }
-        const winPct = totalGames >= 5 ? wins / totalGames : 0.5;
-        const sosMultiplier = Math.round((1.0 + (winPct - 0.5) * 0.8) * 1000) / 1000;
+        const seasonWinPct = completedGamesForTeam.length >= 5 ? seasonWins / completedGamesForTeam.length : 0.5;
+        const sosMultiplier = Math.round((1.0 + (seasonWinPct - 0.5) * 0.4) * 1000) / 1000;
+
+        // Recent form — last 10 games win%
+        // TODO: window (10) and scaling (×0.3) are arbitrary placeholders
+        // TODO: weight recency so last 3 games matter more than games 8–10
+        const last10 = completedGamesForTeam.slice(-10);
+        let recentWins = 0;
+        for (const g of last10) {
+          const isHomeTeam = g.home_team_id === teamId;
+          if ((isHomeTeam ? g.home_score! : g.away_score!) > (isHomeTeam ? g.away_score! : g.home_score!)) recentWins++;
+        }
+        const recentWinPct = last10.length >= 5 ? recentWins / last10.length : 0.5;
+        const recentFormMultiplier = Math.round((1.0 + (recentWinPct - 0.5) * 0.3) * 1000) / 1000;
+
+        // teamRecentForm stored inside goalie_snapshot JSON — team-level metric
+        // living here for convenience until a dedicated column is added
+        goalieSnap = { ...goalieSnap, teamRecentForm: recentFormMultiplier };
 
         // Save the model-agnostic team snapshot
         const { error: snapErr } = await supabaseAdmin
@@ -277,7 +295,7 @@ export async function GET(req: NextRequest) {
 
       if (!homeSnap || !awaySnap) continue;
 
-      // Run v1.3 formula — binary winner + real SOS + calibrated home ice
+      // Run v1.4 formula — softer SOS (×0.4), recent form, home ice +4%
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hSkaters = (homeSnap.skater_snapshots as any[]) ?? [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -290,19 +308,22 @@ export async function GET(req: NextRequest) {
       const GOAL_SCALE = 70;
       const MIN_SPG = 12;
       const MAX_SPG = 40;
-      const HOME_EDGE = 1.08;
-      const AWAY_EDGE = 0.92;
+      // TODO: replace with per-team home/away win% split — see backtest/route.ts notes
+      const HOME_EDGE = 1.04;
+      const AWAY_EDGE = 0.96;
 
       const homeOff = hSkaters
         .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
         .reduce((sum: number, s: { compositePpm: number }) => sum + Math.max(0, s.compositePpm), 0)
         * Number(homeSnap.sos_multiplier)
+        * (hGoalie.teamRecentForm ?? 1.0)
         * energyMultiplier(homeSnap.team_energy_bar ?? 100);
 
       const awayOff = aSkaters
         .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
         .reduce((sum: number, s: { compositePpm: number }) => sum + Math.max(0, s.compositePpm), 0)
         * Number(awaySnap.sos_multiplier)
+        * (aGoalie.teamRecentForm ?? 1.0)
         * energyMultiplier(awaySnap.team_energy_bar ?? 100);
 
       const homeDef = Math.min(MAX_SPG, Math.max(MIN_SPG, hGoalie.momentumShotsPerGoal || 22))
@@ -324,7 +345,7 @@ export async function GET(req: NextRequest) {
         .from('predictions')
         .upsert({
           game_id: game.id,
-          model_version: 'v1.3',
+          model_version: 'v1.4',
           predicted_home_score: Math.round(homeXG * 10) / 10,
           predicted_away_score: Math.round(awayXG * 10) / 10,
           home_win_probability: Math.round(homeWin * 1000) / 1000,

@@ -36,6 +36,9 @@ interface SkaterSnap {
 
 interface GoalieSnap {
   momentumShotsPerGoal: number;
+  // teamRecentForm is a team-level metric stored here for convenience —
+  // ideally it should live in its own game_team_snapshots column.
+  teamRecentForm?: number;
 }
 
 interface TeamSnap {
@@ -263,6 +266,94 @@ function runModelV1_3(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   };
 }
 
+// v1.4 — fixes two systematic biases identified from v1.3 backtesting:
+//
+//   1. HOME ICE: reduced from +8% to +4%.
+//      v1.3 picked home as favourite 63% of the time vs real NHL ~55%, and
+//      home accuracy was only 52%. The +8% was overclaiming.
+//
+//      TODO: home ice advantage should ultimately be team-specific — some
+//      arenas/fanbases create materially more advantage than others. Requires
+//      per-team home vs away win% split, which needs more historical game data.
+//
+//   2. SOS MULTIPLIER: scaling factor reduced from ×0.8 to ×0.4.
+//      v1.3 showed an inverted confidence curve: high-confidence picks (driven
+//      by SOS spread) were LESS accurate than low-confidence ones. The season
+//      win% signal is real but one strong team doesn't win every individual game
+//      — hockey variance is too high for aggressive scaling.
+//
+//      TODO: the linear scaling formula (1.0 + (winPct - 0.5) × k) is artificial.
+//      A proper calibration would fit k against historical outcomes to find the
+//      multiplier that maximises accuracy without overfitting.
+//
+//   3. RECENT FORM: adds last-10-game win% as a separate multiplier on top of
+//      season SOS. A team on a hot/cold streak is meaningfully different from
+//      their season average, but short runs are noisy — scaling kept at ×0.3.
+//
+//      TODO: optimal window (10 games?) and scaling should be calibrated.
+//      Also: form should decay by recency (last 3 games matter more than games 8-10).
+function runModelV1_4(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
+  const GOAL_SCALE = 70;
+  const MIN_SPG = 12;
+  const MAX_SPG = 40;
+
+  // TODO: replace with per-team home/away win% split once enough game history exists
+  const HOME_EDGE = 1.04;
+  const AWAY_EDGE = 0.96;
+
+  function offPotential(snap: TeamSnap) {
+    const activeSkaters = snap.skaters.filter(s => !s.injuryStatus);
+    const totalPPM = activeSkaters.reduce((sum, s) => sum + Math.max(0, s.compositePpm), 0);
+
+    // sosMultiplier: season win% signal, scaling ×0.4 (reduced from ×0.8 in v1.3
+    // to prevent overconfident picks — see analysis notes above)
+    const sosEffect = snap.sosMultiplier; // already computed as 1.0 + (winPct-0.5)×0.4
+
+    // recentForm: last-10-game win% — hot/cold streaks not captured by full-season SOS
+    // Falls back to neutral (1.0) for snapshots captured before v1.4 backfill
+    const recentForm = snap.goalie.teamRecentForm ?? 1.0;
+
+    return totalPPM * sosEffect * recentForm * energyMultiplierFromBar(snap.energyBar);
+  }
+
+  function defFilter(snap: TeamSnap) {
+    const spg = Math.min(MAX_SPG, Math.max(MIN_SPG, snap.goalie.momentumShotsPerGoal || 22));
+    return spg;
+  }
+
+  const homeOff = offPotential(homeSnap);
+  const awayOff = offPotential(awaySnap);
+  const homeDef = defFilter(homeSnap);
+  const awayDef = defFilter(awaySnap);
+
+  const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
+  const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
+
+  const total = homeXG + awayXG;
+  if (total === 0) return {
+    homeXG: 0, awayXG: 0, homeWin: 0.52, awayWin: 0.48, ot: 0,
+    homeOff, awayOff, homeDef, awayDef,
+  };
+
+  const homeBase = homeXG / total;
+  const awayBase = awayXG / total;
+  const homeAdj = Math.min(0.90, homeBase * HOME_EDGE);
+  const awayAdj = Math.min(0.90, awayBase * AWAY_EDGE);
+  const homeWin = homeAdj / (homeAdj + awayAdj);
+
+  return {
+    homeXG: Math.round(homeXG * 10) / 10,
+    awayXG: Math.round(awayXG * 10) / 10,
+    homeWin: Math.round(homeWin * 1000) / 1000,
+    awayWin: Math.round((1 - homeWin) * 1000) / 1000,
+    ot: 0,
+    homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
+    awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
+    homeDef: Math.round(homeDef * 10) / 10,
+    awayDef: Math.round(awayDef * 10) / 10,
+  };
+}
+
 // Registry of available model formulas.
 // When you create v1.1 with a modified formula, add it here.
 // The formula_spec from model_versions can override default params.
@@ -276,6 +367,7 @@ const MODEL_FORMULAS: Record<string, (
   'v1.1': (h, a) => runModelV1_1(h, a),
   'v1.2': (h, a) => runModelV1_2(h, a),
   'v1.3': (h, a) => runModelV1_3(h, a),
+  'v1.4': (h, a) => runModelV1_4(h, a),
 };
 
 // ─── GET — compare model versions for a specific game ─────────────────────────
