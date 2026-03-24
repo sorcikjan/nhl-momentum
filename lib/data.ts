@@ -68,7 +68,8 @@ export async function fetchGames(date: string) {
   const { data: predictions } = await supabaseAdmin
     .from('predictions')
     .select('*, prediction_outcomes(*)')
-    .in('game_id', gameIds);
+    .in('game_id', gameIds)
+    .eq('model_version', 'v1.3');
   return { games, predictions };
 }
 
@@ -289,6 +290,7 @@ export async function fetchMatch(id: string) {
     .from('predictions')
     .select('*, prediction_outcomes(*)')
     .eq('game_id', id)
+    .eq('model_version', 'v1.3')
     .order('created_at', { ascending: false });
 
   // Team snapshots (player-level inputs)
