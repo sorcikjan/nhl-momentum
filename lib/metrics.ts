@@ -1,7 +1,13 @@
 import type { LayerMetrics, GoalieLayerMetrics, SkaterMomentumScore } from '@/types';
 
 // ─── Layer Weights ─────────────────────────────────────────────────────────────
-const WEIGHTS = { momentum: 0.5, season: 0.35, career: 0.15 } as const;
+// Career weight is 0 because career data is currently identical to season
+// (we only have one season in the DB). Setting it to 0 avoids artificially
+// double-counting season stats.
+// TODO: backfill multi-season career data from NHL API historical game logs,
+//       then raise career weight to ~0.10–0.15 to add stability for young players
+//       or players coming off injury with a short current-season sample.
+const WEIGHTS = { momentum: 0.5, season: 0.5, career: 0 } as const;
 
 // ─── PPM Calculation ──────────────────────────────────────────────────────────
 
