@@ -118,17 +118,18 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Batch insert — skip if snapshot already exists for that player+date
+    // Batch insert historical snapshots.
+    // player_metric_snapshots has no unique constraint on (player_id, calculated_at)
+    // so we use insert. The endpoint is idempotent in practice because checkpoint
+    // dates (fortnightly from Oct) don't overlap with daily ingest dates (Mar 18+).
+    // Running it twice would create duplicates — the PPMTimeline deduplicates by date.
     const BATCH = 200;
     let inserted = 0;
     for (let i = 0; i < snapshots.length; i += BATCH) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { error } = await supabaseAdmin
         .from('player_metric_snapshots')
-        .upsert(snapshots.slice(i, i + BATCH) as any[], {
-          onConflict: 'player_id,calculated_at',
-          ignoreDuplicates: true,
-        });
+        .insert(snapshots.slice(i, i + BATCH) as any[]);
       if (!error) inserted += Math.min(BATCH, snapshots.length - i);
     }
 
