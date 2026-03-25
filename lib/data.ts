@@ -135,31 +135,44 @@ export async function fetchPlayer(id: string) {
 
 // ─── Accuracy ─────────────────────────────────────────────────────────────────
 
-export async function fetchAccuracy() {
+export async function fetchAccuracy(modelVersion?: string) {
   const { data: accuracy, error: accErr } = await supabaseAdmin
     .from('model_versions')
     .select('version, description, created_at, is_active');
 
   if (accErr) throw accErr;
 
-  const { data: predictions, error: predErr } = await supabaseAdmin
-    .from('predictions')
-    .select(`
-      id, game_id, model_version, predicted_home_score, predicted_away_score,
-      home_win_probability, away_win_probability, ot_probability,
-      home_energy_bar, away_energy_bar, created_at,
-      prediction_outcomes (
-        actual_home_score, actual_away_score,
-        home_score_error, away_score_error, correct_winner, recorded_at
-      ),
-      games (
-        game_date,
-        home_team:teams!games_home_team_id_fkey ( abbrev ),
-        away_team:teams!games_away_team_id_fkey ( abbrev )
-      )
-    `)
-    .order('created_at', { ascending: false })
-    .limit(100);
+  // Fetch all predictions across all model versions by querying each version
+  // separately and merging — avoids the per-version row cap that a single
+  // ordered query would impose when versions have different created_at ranges.
+  const VERSIONS_TO_FETCH = modelVersion ? [modelVersion] : ['v1.3', 'v1.4', 'v1.5'];
+  const allPredictions: unknown[] = [];
+
+  for (const v of VERSIONS_TO_FETCH) {
+    const { data, error: predErr } = await supabaseAdmin
+      .from('predictions')
+      .select(`
+        id, game_id, model_version, predicted_home_score, predicted_away_score,
+        home_win_probability, away_win_probability, ot_probability,
+        home_energy_bar, away_energy_bar, created_at,
+        prediction_outcomes (
+          actual_home_score, actual_away_score,
+          home_score_error, away_score_error, correct_winner, recorded_at
+        ),
+        games (
+          game_date,
+          home_team:teams!games_home_team_id_fkey ( abbrev ),
+          away_team:teams!games_away_team_id_fkey ( abbrev )
+        )
+      `)
+      .eq('model_version', v)
+      .order('created_at', { ascending: false })
+      .limit(500);
+    if (predErr) throw predErr;
+    allPredictions.push(...(data ?? []));
+  }
+
+  const predictions = allPredictions;
 
   if (predErr) throw predErr;
 
