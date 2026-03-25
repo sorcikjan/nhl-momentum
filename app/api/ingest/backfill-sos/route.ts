@@ -9,10 +9,12 @@ import { supabaseAdmin } from '@/lib/supabase';
 //   — scaling ×0.4 (v1.4 reduced from ×0.8 in v1.3 — see backtest/route.ts notes)
 //   — TODO: linear scaling is artificial; calibrate against outcomes
 //
-// Recent form:  1.0 + (last10WinPct - 0.5) × 0.3
+// Recent form:  1.0 + (last5WinPct - 0.5) × 0.3
 //   — captures hot/cold streaks not reflected in full-season SOS
-//   — TODO: window size (10) and scaling (×0.3) should be calibrated
-//   — TODO: weight recency (last 3 games > games 8–10)
+//   — window reduced from 10 → 5 in v1.5: 10 games (~3 weeks) was too slow
+//     to reflect current team state; 5 games (~1.5 weeks) is more responsive
+//   — TODO: window size (5) and scaling (×0.3) should be calibrated
+//   — TODO: weight recency (last 2 games > games 4–5)
 //   — stored in goalie_snapshot.teamRecentForm (team-level metric — move to
 //     dedicated column once schema migration is done)
 //
@@ -89,16 +91,17 @@ export async function GET() {
       const seasonWinPct = teamGames.length >= 5 ? seasonWins / teamGames.length : 0.5;
       const sosMult = Math.round((1.0 + (seasonWinPct - 0.5) * 0.4) * 1000) / 1000;
 
-      // Recent form — last 10 games
-      // TODO: window (10) and scaling (×0.3) are arbitrary — calibrate against outcomes
-      // TODO: weight recency so last 3 games matter more than games 8–10
-      const last10 = teamGames.slice(-10);
+      // Recent form — last 5 games (reduced from 10 in v1.5)
+      // 10 games (~3 weeks) was too slow to capture current form
+      // TODO: window (5) and scaling (×0.3) should be calibrated against outcomes
+      // TODO: weight recency (last 2 games > games 4–5)
+      const last5 = teamGames.slice(-5);
       let recentWins = 0;
-      for (const g of last10) {
+      for (const g of last5) {
         const isHome = g.home_team_id === teamId;
         if ((isHome ? g.home_score! : g.away_score!) > (isHome ? g.away_score! : g.home_score!)) recentWins++;
       }
-      const recentWinPct = last10.length >= 5 ? recentWins / last10.length : 0.5;
+      const recentWinPct = last5.length >= 3 ? recentWins / last5.length : 0.5;
       const recentForm = Math.round((1.0 + (recentWinPct - 0.5) * 0.3) * 1000) / 1000;
 
       updates.push({ game_id: snap.game_id, team_id: teamId, sos_multiplier: sosMult, recent_form: recentForm });

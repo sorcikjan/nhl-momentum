@@ -266,6 +266,96 @@ function runModelV1_3(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   };
 }
 
+// v1.5 — three targeted fixes from v1.4 analysis (54-game sample):
+//
+//   1. PROBABILITY REGRESSION toward 50% (×0.6 shrinkage factor)
+//      v1.4 confidence buckets showed a clear inversion: 50–55% picks hit 68%
+//      while 60–65% picks hit only 43%. Our signals (PPM × SOS × form) claim more
+//      certainty than they can deliver against hockey's high per-game variance.
+//      After computing the raw win probability, we shrink it toward 50%:
+//        homeWin = 0.5 + (rawHomeWin – 0.5) × 0.6
+//      Effect: a raw 74% pick becomes 64%; a 65% pick becomes 59%.
+//      TODO: calibrate the 0.6 factor against a held-out outcome set rather than
+//      picking it manually — logistic regression on confidence vs outcome would help.
+//
+//   2. NEUTRAL HOME ICE (1.01 / 0.99, down from 1.04 / 0.96)
+//      v1.4 picked home 57.4% of games but homes actually won only 46.3% in the
+//      sample. Model accuracy when picking home was 54.8% vs 65.2% when picking away.
+//      Dropping HOME_EDGE to ~neutral lets the PPM/SOS signal carry directionality
+//      rather than defaulting everything to a home lean.
+//      TODO: replace with per-team home/away win% split once enough season data exists.
+//
+//   3. RECENT FORM WINDOW: last 5 games (down from 10)
+//      10 games covers ~3 weeks of NHL play — too long to reflect current form.
+//      A team that went 1-9 then won 4 straight shows as 5-10 (bad) but is hot.
+//      Shrinking to 5 games makes the form signal more responsive to current streaks.
+//      Requires re-running backfill-sos before backtesting so stored teamRecentForm
+//      values reflect the new window.
+//      TODO: calibrate window size and decay (recent 3 games > games 4-5).
+function runModelV1_5(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
+  const GOAL_SCALE = 70;
+  const MIN_SPG = 12;
+  const MAX_SPG = 40;
+
+  // Reduced from 1.04/0.96 — v1.4 data showed home bias overclaiming
+  // TODO: replace with per-team home/away win% split
+  const HOME_EDGE = 1.01;
+  const AWAY_EDGE = 0.99;
+
+  // Shrink raw win probability toward 50% to fix confidence inversion.
+  // v1.4 high-confidence picks (≥60%) hit only ~45%; low-confidence (50-55%) hit 68%.
+  // TODO: calibrate via logistic regression on confidence vs outcome
+  const REGRESSION = 0.6;
+
+  function offPotential(snap: TeamSnap) {
+    const activeSkaters = snap.skaters.filter(s => !s.injuryStatus);
+    const totalPPM = activeSkaters.reduce((sum, s) => sum + Math.max(0, s.compositePpm), 0);
+    const sosEffect = snap.sosMultiplier;
+    // teamRecentForm now reflects last-5 games (re-run backfill-sos before backtesting)
+    const recentForm = snap.goalie.teamRecentForm ?? 1.0;
+    return totalPPM * sosEffect * recentForm * energyMultiplierFromBar(snap.energyBar);
+  }
+
+  function defFilter(snap: TeamSnap) {
+    return Math.min(MAX_SPG, Math.max(MIN_SPG, snap.goalie.momentumShotsPerGoal || 22));
+  }
+
+  const homeOff = offPotential(homeSnap);
+  const awayOff = offPotential(awaySnap);
+  const homeDef = defFilter(homeSnap);
+  const awayDef = defFilter(awaySnap);
+
+  const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
+  const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
+
+  const total = homeXG + awayXG;
+  if (total === 0) return {
+    homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5, ot: 0,
+    homeOff, awayOff, homeDef, awayDef,
+  };
+
+  const homeBase = homeXG / total;
+  const awayBase = awayXG / total;
+  const homeAdj = Math.min(0.90, homeBase * HOME_EDGE);
+  const awayAdj = Math.min(0.90, awayBase * AWAY_EDGE);
+  const rawHomeWin = homeAdj / (homeAdj + awayAdj);
+
+  // Regress toward 50% to prevent overconfident picks
+  const homeWin = 0.5 + (rawHomeWin - 0.5) * REGRESSION;
+
+  return {
+    homeXG: Math.round(homeXG * 10) / 10,
+    awayXG: Math.round(awayXG * 10) / 10,
+    homeWin: Math.round(homeWin * 1000) / 1000,
+    awayWin: Math.round((1 - homeWin) * 1000) / 1000,
+    ot: 0,
+    homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
+    awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
+    homeDef: Math.round(homeDef * 10) / 10,
+    awayDef: Math.round(awayDef * 10) / 10,
+  };
+}
+
 // v1.4 — fixes two systematic biases identified from v1.3 backtesting:
 //
 //   1. HOME ICE: reduced from +8% to +4%.
@@ -368,6 +458,7 @@ const MODEL_FORMULAS: Record<string, (
   'v1.2': (h, a) => runModelV1_2(h, a),
   'v1.3': (h, a) => runModelV1_3(h, a),
   'v1.4': (h, a) => runModelV1_4(h, a),
+  'v1.5': (h, a) => runModelV1_5(h, a),
 };
 
 // ─── GET — compare model versions for a specific game ─────────────────────────

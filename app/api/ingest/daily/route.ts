@@ -245,16 +245,18 @@ export async function GET(req: NextRequest) {
         const seasonWinPct = completedGamesForTeam.length >= 5 ? seasonWins / completedGamesForTeam.length : 0.5;
         const sosMultiplier = Math.round((1.0 + (seasonWinPct - 0.5) * 0.4) * 1000) / 1000;
 
-        // Recent form — last 10 games win%
-        // TODO: window (10) and scaling (×0.3) are arbitrary placeholders
-        // TODO: weight recency so last 3 games matter more than games 8–10
-        const last10 = completedGamesForTeam.slice(-10);
+        // Recent form — last 5 games win% (reduced from 10 in v1.4)
+        // 10 games covered ~3 weeks — too slow to capture current hot/cold streaks.
+        // 5 games is ~1.5 weeks, more responsive to recent team state.
+        // TODO: weight recency (last 2 games > games 4–5)
+        // TODO: calibrate window size and scaling (×0.3) against outcomes
+        const last5 = completedGamesForTeam.slice(-5);
         let recentWins = 0;
-        for (const g of last10) {
+        for (const g of last5) {
           const isHomeTeam = g.home_team_id === teamId;
           if ((isHomeTeam ? g.home_score! : g.away_score!) > (isHomeTeam ? g.away_score! : g.home_score!)) recentWins++;
         }
-        const recentWinPct = last10.length >= 5 ? recentWins / last10.length : 0.5;
+        const recentWinPct = last5.length >= 3 ? recentWins / last5.length : 0.5;
         const recentFormMultiplier = Math.round((1.0 + (recentWinPct - 0.5) * 0.3) * 1000) / 1000;
 
         // teamRecentForm stored inside goalie_snapshot JSON — team-level metric
@@ -295,7 +297,8 @@ export async function GET(req: NextRequest) {
 
       if (!homeSnap || !awaySnap) continue;
 
-      // Run v1.4 formula — softer SOS (×0.4), recent form, home ice +4%
+      // Run v1.5 formula — neutral home ice, probability regression toward 50%,
+      // recent form from last-5 games (see backtest/route.ts for full change notes)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hSkaters = (homeSnap.skater_snapshots as any[]) ?? [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -308,9 +311,13 @@ export async function GET(req: NextRequest) {
       const GOAL_SCALE = 70;
       const MIN_SPG = 12;
       const MAX_SPG = 40;
-      // TODO: replace with per-team home/away win% split — see backtest/route.ts notes
-      const HOME_EDGE = 1.04;
-      const AWAY_EDGE = 0.96;
+      // Near-neutral home ice — v1.4 picked home 57% but actual home wins were 46%
+      // TODO: replace with per-team home/away win% split
+      const HOME_EDGE = 1.01;
+      const AWAY_EDGE = 0.99;
+      // Shrink predictions toward 50% — v1.4 high-confidence picks hit coin-flip accuracy
+      // TODO: calibrate via logistic regression on confidence vs outcome
+      const REGRESSION = 0.6;
 
       const homeOff = hSkaters
         .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
@@ -336,16 +343,17 @@ export async function GET(req: NextRequest) {
       const total = homeXG + awayXG;
       const homeBase = total > 0 ? homeXG / total : 0.5;
       const awayBase = total > 0 ? awayXG / total : 0.5;
-      const homeAdj = Math.min(0.92, homeBase * HOME_EDGE);
-      const awayAdj = Math.min(0.92, awayBase * AWAY_EDGE);
-      const homeWin = homeAdj / (homeAdj + awayAdj);
+      const homeAdj = Math.min(0.90, homeBase * HOME_EDGE);
+      const awayAdj = Math.min(0.90, awayBase * AWAY_EDGE);
+      const rawHomeWin = homeAdj / (homeAdj + awayAdj);
+      const homeWin = 0.5 + (rawHomeWin - 0.5) * REGRESSION;
       const awayWin = 1 - homeWin;
 
       const { error: predErr } = await supabaseAdmin
         .from('predictions')
         .upsert({
           game_id: game.id,
-          model_version: 'v1.4',
+          model_version: 'v1.5',
           predicted_home_score: Math.round(homeXG * 10) / 10,
           predicted_away_score: Math.round(awayXG * 10) / 10,
           home_win_probability: Math.round(homeWin * 1000) / 1000,
