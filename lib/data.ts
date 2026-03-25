@@ -146,7 +146,8 @@ export async function fetchAccuracy(modelVersion?: string) {
   // separately and merging — avoids the per-version row cap that a single
   // ordered query would impose when versions have different created_at ranges.
   const VERSIONS_TO_FETCH = modelVersion ? [modelVersion] : ['v1.3', 'v1.4', 'v1.5'];
-  const allPredictions: unknown[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allPredictions: any[] = [];
 
   for (const v of VERSIONS_TO_FETCH) {
     const { data, error: predErr } = await supabaseAdmin
@@ -173,8 +174,6 @@ export async function fetchAccuracy(modelVersion?: string) {
   }
 
   const predictions = allPredictions;
-
-  if (predErr) throw predErr;
 
   const stats: Record<string, {
     total: number; withOutcome: number; correctWinner: number;
