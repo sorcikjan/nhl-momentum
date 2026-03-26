@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getGamesByDate } from '@/lib/nhl-api';
-import { energyMultiplier, goalieEnergyPenalty } from '@/lib/energy';
+import { energyMultiplier, goalieEnergyPenalty, calculatePlayerEnergy, GOALIE_DRAIN_PER_MIN, type GameRecord } from '@/lib/energy';
 import type { NHLScheduledGame } from '@/types';
 
 // ─── Daily Pipeline ────────────────────────────────────────────────────────────
@@ -14,9 +14,11 @@ import type { NHLScheduledGame } from '@/types';
 // comparison. Every day's raw team state is permanently stored in
 // game_team_snapshots so any future model version can be backtested against it.
 //
-// GET /api/ingest/daily?date=YYYY-MM-DD&phase=outcomes|snapshots
+// GET /api/ingest/daily?date=YYYY-MM-DD&phase=outcomes|snapshots|energy
 //   phase=outcomes   → Phase 1 only (record yesterday's results) — fast, ~2s
 //   phase=snapshots  → Phase 2 only (build today's snapshots + predictions) — slower
+//   phase=energy     → Phase 3 only (recalculate energy bars for active players)
+//                      Supports &offset=N&limit=N (default 0/150) for pagination
 //   (no phase param) → both phases (may timeout on large game slates)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -435,12 +437,112 @@ export async function GET(req: NextRequest) {
     log.push(`Predictions stored: ${predictionsStored} for ${upcomingGames.length} upcoming games`);
     } // end phase 2
 
+    // ── Phase 3: Recalculate energy bars for active players ────────────────────
+    let energyUpdated = 0;
+    let energyInserted = 0;
+    if (phase === 'energy') {
+      const energyOffset = Number(req.nextUrl.searchParams.get('offset') ?? '0');
+      const energyLimit  = Number(req.nextUrl.searchParams.get('limit')  ?? '150');
+      const GAME_DURATION_MS = 2.5 * 3_600_000;
+      const now   = new Date();
+      const since = new Date(now.getTime() - 72 * 3_600_000);
+      const sinceDate = since.toISOString().slice(0, 10);
+
+      log.push(`Phase 3: recalculating energy (offset=${energyOffset}, limit=${energyLimit})`);
+
+      const { data: ePlayers, error: epErr } = await supabaseAdmin
+        .from('players')
+        .select('id, position_code')
+        .eq('is_active', true)
+        .order('id')
+        .range(energyOffset, energyOffset + energyLimit - 1);
+
+      if (epErr) throw epErr;
+
+      if (ePlayers?.length) {
+        const ePlayerIds  = ePlayers.map(p => p.id);
+        const eSkaterIds  = ePlayers.filter(p => p.position_code !== 'G').map(p => p.id);
+        const eGoalieIds  = ePlayers.filter(p => p.position_code === 'G').map(p => p.id);
+
+        const { data: recentGames } = await supabaseAdmin
+          .from('games')
+          .select('id, game_date, start_time_utc')
+          .gte('game_date', sinceDate)
+          .in('game_state', ['FINAL', 'OFF']);
+
+        const eGameMap    = new Map((recentGames ?? []).map(g => [g.id, g]));
+        const recentGIds  = Array.from(eGameMap.keys());
+
+        const [{ data: eSkaterStats }, { data: eGoalieStats }] = await Promise.all([
+          eSkaterIds.length && recentGIds.length
+            ? supabaseAdmin.from('game_player_stats').select('player_id, game_id, toi_seconds').in('player_id', eSkaterIds).in('game_id', recentGIds)
+            : Promise.resolve({ data: [] as { player_id: number; game_id: number; toi_seconds: number | null }[] }),
+          eGoalieIds.length && recentGIds.length
+            ? supabaseAdmin.from('game_goalie_stats').select('player_id, game_id, toi_seconds').in('player_id', eGoalieIds).in('game_id', recentGIds)
+            : Promise.resolve({ data: [] as { player_id: number; game_id: number; toi_seconds: number | null }[] }),
+        ]);
+
+        const recordsByPlayer = new Map<number, GameRecord[]>();
+        for (const row of [...(eSkaterStats ?? []), ...(eGoalieStats ?? [])]) {
+          const game = eGameMap.get(row.game_id);
+          if (!game) continue;
+          const startUtc = game.start_time_utc
+            ? new Date(game.start_time_utc)
+            : new Date(`${game.game_date}T20:00:00Z`);
+          const gameEnd = new Date(startUtc.getTime() + GAME_DURATION_MS);
+          if (!recordsByPlayer.has(row.player_id)) recordsByPlayer.set(row.player_id, []);
+          recordsByPlayer.get(row.player_id)!.push({ game_end_utc: gameEnd, toi_seconds: row.toi_seconds ?? 0 });
+        }
+
+        const { data: latestSnaps } = await supabaseAdmin
+          .from('player_metric_snapshots')
+          .select('id, player_id')
+          .in('player_id', ePlayerIds)
+          .order('calculated_at', { ascending: false });
+
+        const latestIdByPlayer = new Map<number, string>();
+        for (const snap of latestSnaps ?? []) {
+          if (!latestIdByPlayer.has(snap.player_id)) latestIdByPlayer.set(snap.player_id, snap.id);
+        }
+
+        const eUpdates: { id: string; energy_bar: number }[] = [];
+        const eInserts: { player_id: number; energy_bar: number; momentum_rank: number }[] = [];
+        for (const player of ePlayers) {
+          const drainRate = player.position_code === 'G' ? GOALIE_DRAIN_PER_MIN : undefined;
+          const records   = recordsByPlayer.get(player.id) ?? [];
+          const energy    = calculatePlayerEnergy(records, now, drainRate);
+          const snapId    = latestIdByPlayer.get(player.id);
+          if (snapId) eUpdates.push({ id: snapId, energy_bar: energy });
+          else eInserts.push({ player_id: player.id, energy_bar: energy, momentum_rank: 0 });
+        }
+
+        const CONCURRENT = 10;
+        for (let i = 0; i < eUpdates.length; i += CONCURRENT) {
+          const results = await Promise.all(
+            eUpdates.slice(i, i + CONCURRENT).map(({ id, energy_bar }) =>
+              supabaseAdmin.from('player_metric_snapshots').update({ energy_bar }).eq('id', id)
+            )
+          );
+          energyUpdated += results.filter(r => !r.error).length;
+        }
+
+        if (eInserts.length) {
+          const { error: insErr } = await supabaseAdmin.from('player_metric_snapshots').insert(eInserts);
+          if (!insErr) energyInserted += eInserts.length;
+        }
+
+        log.push(`Energy updated: ${energyUpdated}, inserted: ${energyInserted} of ${ePlayers.length} players`);
+      }
+    } // end phase 3
+
     return NextResponse.json({
       data: {
         date: today,
         outcomes_recorded: outcomesRecorded,
         snapshots_saved: snapshotsSaved,
         predictions_stored: predictionsStored,
+        energy_updated: energyUpdated,
+        energy_inserted: energyInserted,
         log,
       },
       error: null,
