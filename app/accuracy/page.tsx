@@ -26,9 +26,9 @@ export default async function AccuracyPage() {
     ?? modelStats?.sort((a: { version: string }, b: { version: string }) => b.version.localeCompare(a.version))[0]?.version
     ?? 'N/A';
 
-  // Best accuracy across all models with enough data
+  // Best accuracy across models with at least 10 scored games
   const bestStat = [...(modelStats ?? [])]
-    .filter((s: { withOutcome: number }) => s.withOutcome >= 20)
+    .filter((s: { withOutcome: number }) => s.withOutcome >= 10)
     .sort((a: { winnerAccuracyPct: number | null }, b: { winnerAccuracyPct: number | null }) =>
       (b.winnerAccuracyPct ?? 0) - (a.winnerAccuracyPct ?? 0)
     )[0];
@@ -65,7 +65,7 @@ export default async function AccuracyPage() {
           <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text)' }}>
             Model Performance
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {([...(modelStats ?? [])] as {
               version: string; totalPredictions: number; withOutcome: number;
               winnerAccuracyPct: number | null; avgHomeError: number | null; avgAwayError: number | null;
