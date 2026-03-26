@@ -14,11 +14,19 @@ import type { NHLScheduledGame } from '@/types';
 // comparison. Every day's raw team state is permanently stored in
 // game_team_snapshots so any future model version can be backtested against it.
 //
-// GET /api/ingest/daily?date=YYYY-MM-DD  (defaults to today)
+// GET /api/ingest/daily?date=YYYY-MM-DD&phase=outcomes|snapshots
+//   phase=outcomes   → Phase 1 only (record yesterday's results) — fast, ~2s
+//   phase=snapshots  → Phase 2 only (build today's snapshots + predictions) — slower
+//   (no phase param) → both phases (may timeout on large game slates)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
   const dateParam = req.nextUrl.searchParams.get('date');
+  // phase=outcomes  → only Phase 1 (record yesterday's results)
+  // phase=snapshots → only Phase 2 (build today's snapshots + predictions)
+  // (default)       → both phases (may timeout on large game slates)
+  const phase = req.nextUrl.searchParams.get('phase') ?? 'all';
+
   const today = dateParam ?? new Date().toISOString().slice(0, 10);
   const yesterday = new Date(new Date(today + 'T12:00:00Z').getTime() - 86400000)
     .toISOString().slice(0, 10);
@@ -30,6 +38,9 @@ export async function GET(req: NextRequest) {
 
   try {
     // ── Phase 1: Record outcomes for yesterday's completed games ───────────────
+    if (phase === 'snapshots') {
+      log.push('Phase 1: skipped (phase=snapshots)');
+    } else {
     log.push(`Phase 1: recording outcomes for ${yesterday}`);
 
     const yesterdayGames = (await getGamesByDate(yesterday)) as NHLScheduledGame[];
@@ -86,8 +97,12 @@ export async function GET(req: NextRequest) {
     }
 
     log.push(`Outcomes recorded: ${outcomesRecorded} from ${completedGames.length} completed games`);
+    } // end phase 1
 
     // ── Phase 2: Capture team snapshots + predictions for today's games ────────
+    if (phase === 'outcomes') {
+      log.push('Phase 2: skipped (phase=outcomes)');
+    } else {
     log.push(`Phase 2: capturing snapshots + predictions for ${today}`);
 
     const todayGames = (await getGamesByDate(today)) as NHLScheduledGame[];
@@ -114,11 +129,11 @@ export async function GET(req: NextRequest) {
     }
 
     for (const game of upcomingGames) {
-      // Build team snapshots from latest player_metric_snapshots for each team
-      for (const { teamId, isHome } of [
+      // Build home + away snapshots in parallel — they're fully independent
+      await Promise.all([
         { teamId: game.homeTeam.id, isHome: true },
         { teamId: game.awayTeam.id, isHome: false },
-      ]) {
+      ].map(async ({ teamId, isHome }) => {
         // Get latest snapshot for each active player on this team
         const { data: players } = await supabaseAdmin
           .from('players')
@@ -126,7 +141,7 @@ export async function GET(req: NextRequest) {
           .eq('team_id', teamId)
           .eq('is_active', true);
 
-        if (!players?.length) continue;
+        if (!players?.length) return;
 
         const skaterIds = players.filter(p => p.position_code !== 'G').map(p => p.id).slice(0, 20);
         const goalieIds = players.filter(p => p.position_code === 'G').map(p => p.id).slice(0, 3);
@@ -300,9 +315,9 @@ export async function GET(req: NextRequest) {
           }, { onConflict: 'game_id,team_id' });
 
         if (!snapErr) snapshotsSaved++;
-      }
+      })); // end Promise.all home+away
 
-      // Build and store prediction using v1.0 formula on the new snapshots
+      // Build and store prediction using v1.7 formula on the new snapshots
       const { data: homeSnap } = await supabaseAdmin
         .from('game_team_snapshots')
         .select('*')
@@ -418,6 +433,7 @@ export async function GET(req: NextRequest) {
 
     log.push(`Team snapshots saved: ${snapshotsSaved}`);
     log.push(`Predictions stored: ${predictionsStored} for ${upcomingGames.length} upcoming games`);
+    } // end phase 2
 
     return NextResponse.json({
       data: {
