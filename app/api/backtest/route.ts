@@ -31,6 +31,8 @@ interface ModelResult {
 
 interface SkaterSnap {
   compositePpm: number;
+  momentumPpm?: number;
+  seasonPpm?: number;
   injuryStatus: string | null;
 }
 
@@ -356,6 +358,84 @@ function runModelV1_5(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   };
 }
 
+// v1.6 — composite PPM reweighted based on weight-search grid results (31-game sample):
+//
+//   compositePPM = 0.2 × momentumPpm + 0.8 × seasonPpm
+//
+//   Weight-search showed momentum-heavy weights (0.5+) all tied at 45.2% accuracy,
+//   while season-heavy weights (0.1–0.2) reached 48.4%. The full-season record is a
+//   stronger predictor than the last-5-game streak on this dataset.
+//   Falls back to stored compositePpm for snapshots captured before momentumPpm/seasonPpm
+//   were individually stored (v1.3 era snapshots).
+//
+//   HOME_EDGE restored to 1.03 / 0.97 (up from v1.5's near-neutral 1.01 / 0.99).
+//   v1.5 overcorrected — picked home only 40.5% while homes won ~55% in those games.
+//   1.03 is between v1.4's 1.04 and v1.5's 1.01.
+//
+//   All other parameters unchanged from v1.5: GOAL_SCALE=70, REGRESSION=0.6, last-5 form.
+function runModelV1_6(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
+  const GOAL_SCALE = 70;
+  const MIN_SPG = 12;
+  const MAX_SPG = 40;
+  const HOME_EDGE = 1.03;
+  const AWAY_EDGE = 0.97;
+  const REGRESSION = 0.6;
+  const MOMENTUM_W = 0.2;
+  const SEASON_W = 0.8;
+
+  function effectivePPM(s: SkaterSnap): number {
+    // Use raw components if available; fall back to pre-baked composite for old snapshots
+    if (s.momentumPpm !== undefined && s.seasonPpm !== undefined) {
+      return MOMENTUM_W * s.momentumPpm + SEASON_W * s.seasonPpm;
+    }
+    return s.compositePpm;
+  }
+
+  function offPotential(snap: TeamSnap) {
+    const activeSkaters = snap.skaters.filter(s => !s.injuryStatus);
+    const totalPPM = activeSkaters.reduce((sum, s) => sum + Math.max(0, effectivePPM(s)), 0);
+    const recentForm = snap.goalie.teamRecentForm ?? 1.0;
+    return totalPPM * snap.sosMultiplier * recentForm * energyMultiplierFromBar(snap.energyBar);
+  }
+
+  function defFilter(snap: TeamSnap) {
+    return Math.min(MAX_SPG, Math.max(MIN_SPG, snap.goalie.momentumShotsPerGoal || 22));
+  }
+
+  const homeOff = offPotential(homeSnap);
+  const awayOff = offPotential(awaySnap);
+  const homeDef = defFilter(homeSnap);
+  const awayDef = defFilter(awaySnap);
+
+  const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
+  const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
+
+  const total = homeXG + awayXG;
+  if (total === 0) return {
+    homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5, ot: 0,
+    homeOff, awayOff, homeDef, awayDef,
+  };
+
+  const homeBase = homeXG / total;
+  const awayBase = awayXG / total;
+  const homeAdj = Math.min(0.90, homeBase * HOME_EDGE);
+  const awayAdj = Math.min(0.90, awayBase * AWAY_EDGE);
+  const rawHomeWin = homeAdj / (homeAdj + awayAdj);
+  const homeWin = 0.5 + (rawHomeWin - 0.5) * REGRESSION;
+
+  return {
+    homeXG: Math.round(homeXG * 10) / 10,
+    awayXG: Math.round(awayXG * 10) / 10,
+    homeWin: Math.round(homeWin * 1000) / 1000,
+    awayWin: Math.round((1 - homeWin) * 1000) / 1000,
+    ot: 0,
+    homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
+    awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
+    homeDef: Math.round(homeDef * 10) / 10,
+    awayDef: Math.round(awayDef * 10) / 10,
+  };
+}
+
 // v1.4 — fixes two systematic biases identified from v1.3 backtesting:
 //
 //   1. HOME ICE: reduced from +8% to +4%.
@@ -459,6 +539,7 @@ const MODEL_FORMULAS: Record<string, (
   'v1.3': (h, a) => runModelV1_3(h, a),
   'v1.4': (h, a) => runModelV1_4(h, a),
   'v1.5': (h, a) => runModelV1_5(h, a),
+  'v1.6': (h, a) => runModelV1_6(h, a),
 };
 
 // ─── GET — compare model versions for a specific game ─────────────────────────

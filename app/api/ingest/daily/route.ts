@@ -297,8 +297,9 @@ export async function GET(req: NextRequest) {
 
       if (!homeSnap || !awaySnap) continue;
 
-      // Run v1.5 formula — neutral home ice, probability regression toward 50%,
-      // recent form from last-5 games (see backtest/route.ts for full change notes)
+      // Run v1.6 formula — season-weighted PPM (0.2 momentum / 0.8 season),
+      // HOME_EDGE restored to 1.03, REGRESSION=0.6, last-5 recent form.
+      // See backtest/route.ts and weight-search results for full change notes.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hSkaters = (homeSnap.skater_snapshots as any[]) ?? [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -311,24 +312,33 @@ export async function GET(req: NextRequest) {
       const GOAL_SCALE = 70;
       const MIN_SPG = 12;
       const MAX_SPG = 40;
-      // Near-neutral home ice — v1.4 picked home 57% but actual home wins were 46%
-      // TODO: replace with per-team home/away win% split
-      const HOME_EDGE = 1.01;
-      const AWAY_EDGE = 0.99;
-      // Shrink predictions toward 50% — v1.4 high-confidence picks hit coin-flip accuracy
-      // TODO: calibrate via logistic regression on confidence vs outcome
+      // Restored from v1.5's 1.01 — weight-search confirmed season signal is stronger,
+      // so home edge no longer needs to be near-neutral to suppress over-picking home
+      const HOME_EDGE = 1.03;
+      const AWAY_EDGE = 0.97;
       const REGRESSION = 0.6;
+      // Weight-search result: season PPM is a stronger predictor than 5-game momentum
+      const MOMENTUM_W = 0.2;
+      const SEASON_W = 0.8;
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      function effectivePPM(s: any): number {
+        if (s.momentumPpm !== undefined && s.seasonPpm !== undefined) {
+          return MOMENTUM_W * s.momentumPpm + SEASON_W * s.seasonPpm;
+        }
+        return s.compositePpm ?? 0;
+      }
 
       const homeOff = hSkaters
         .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
-        .reduce((sum: number, s: { compositePpm: number }) => sum + Math.max(0, s.compositePpm), 0)
+        .reduce((sum: number, s: { compositePpm: number; momentumPpm?: number; seasonPpm?: number }) => sum + Math.max(0, effectivePPM(s)), 0)
         * Number(homeSnap.sos_multiplier)
         * (hGoalie.teamRecentForm ?? 1.0)
         * energyMultiplier(homeSnap.team_energy_bar ?? 100);
 
       const awayOff = aSkaters
         .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
-        .reduce((sum: number, s: { compositePpm: number }) => sum + Math.max(0, s.compositePpm), 0)
+        .reduce((sum: number, s: { compositePpm: number; momentumPpm?: number; seasonPpm?: number }) => sum + Math.max(0, effectivePPM(s)), 0)
         * Number(awaySnap.sos_multiplier)
         * (aGoalie.teamRecentForm ?? 1.0)
         * energyMultiplier(awaySnap.team_energy_bar ?? 100);
@@ -353,7 +363,7 @@ export async function GET(req: NextRequest) {
         .from('predictions')
         .upsert({
           game_id: game.id,
-          model_version: 'v1.5',
+          model_version: 'v1.6',
           predicted_home_score: Math.round(homeXG * 10) / 10,
           predicted_away_score: Math.round(awayXG * 10) / 10,
           home_win_probability: Math.round(homeWin * 1000) / 1000,
