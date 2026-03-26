@@ -162,24 +162,34 @@ export async function GET(req: NextRequest) {
           });
         }
 
-        // Batch fetch last 5 games for all goalies + their names in one query each
-        const { data: allGoalieStats } = await supabaseAdmin
-          .from('game_goalie_stats')
-          .select('player_id, shots_against, goals_against, save_pct, toi_seconds')
-          .in('player_id', goalieIds)
-          .order('recorded_at', { ascending: false })
-          .limit(goalieIds.length * 5);
-
-        const { data: goalieNames } = await supabaseAdmin
-          .from('players')
-          .select('id, first_name, last_name')
-          .in('id', goalieIds);
+        // Fetch last 5 games (momentum) and full season for goalies in parallel
+        const [{ data: allGoalieStats }, { data: seasonGoalieStats }, { data: goalieNames }] = await Promise.all([
+          supabaseAdmin
+            .from('game_goalie_stats')
+            .select('player_id, shots_against, goals_against, save_pct, toi_seconds')
+            .in('player_id', goalieIds)
+            .order('recorded_at', { ascending: false })
+            .limit(goalieIds.length * 5),
+          supabaseAdmin
+            .from('game_goalie_stats')
+            .select('player_id, shots_against, goals_against, save_pct')
+            .in('player_id', goalieIds),
+          supabaseAdmin
+            .from('players')
+            .select('id, first_name, last_name')
+            .in('id', goalieIds),
+        ]);
 
         const goalieNameMap = new Map((goalieNames ?? []).map(g => [g.id, g]));
         const goalieStatsMap = new Map<number, typeof allGoalieStats>();
         for (const row of allGoalieStats ?? []) {
           if (!goalieStatsMap.has(row.player_id)) goalieStatsMap.set(row.player_id, []);
           goalieStatsMap.get(row.player_id)!.push(row);
+        }
+        const goalieSeasonMap = new Map<number, typeof seasonGoalieStats>();
+        for (const row of seasonGoalieStats ?? []) {
+          if (!goalieSeasonMap.has(row.player_id)) goalieSeasonMap.set(row.player_id, []);
+          goalieSeasonMap.get(row.player_id)!.push(row);
         }
 
         // Fetch goalie energy from their latest snapshot
@@ -194,22 +204,31 @@ export async function GET(req: NextRequest) {
         }
 
         // Build goalie snapshot from first goalie with sufficient data
-        let goalieSnap: { playerId: number; playerName: string; momentumShotsPerGoal: number; seasonShotsPerGoal: number; momentumSavePct: number; seasonSavePct: number; energyBar: number; teamRecentForm?: number } = { playerId: 0, playerName: 'Unknown', momentumShotsPerGoal: 22, seasonShotsPerGoal: 22, momentumSavePct: 0.905, seasonSavePct: 0.905, energyBar: 100 };
+        let goalieSnap: { playerId: number; playerName: string; momentumShotsPerGoal: number; seasonShotsPerGoal: number; momentumSavePct: number; seasonSavePct: number; energyBar: number; teamRecentForm?: number; isBackToBack?: boolean } = { playerId: 0, playerName: 'Unknown', momentumShotsPerGoal: 22, seasonShotsPerGoal: 22, momentumSavePct: 0.905, seasonSavePct: 0.905, energyBar: 100 };
         for (const gid of goalieIds) {
-          const data = goalieStatsMap.get(gid);
-          if (data?.length) {
-            const totalShots = data.reduce((s, r) => s + r.shots_against, 0);
-            const totalGoals = data.reduce((s, r) => s + r.goals_against, 0);
-            // Cap SPG at 40 to avoid extreme values when a goalie hasn't conceded recently
-            const spg = totalGoals > 0 ? Math.min(40, totalShots / totalGoals) : 22;
+          const momentum = goalieStatsMap.get(gid);
+          if (momentum?.length) {
+            // Momentum: last 5 games
+            const mShots = momentum.reduce((s, r) => s + r.shots_against, 0);
+            const mGoals = momentum.reduce((s, r) => s + r.goals_against, 0);
+            const momentumSpg = mGoals > 0 ? Math.min(40, mShots / mGoals) : 22;
+            const momentumSavePct = momentum.reduce((s, r) => s + (r.save_pct ?? 0), 0) / momentum.length;
+
+            // Season: all available game_goalie_stats for this goalie
+            const season = goalieSeasonMap.get(gid) ?? momentum;
+            const sShots = season.reduce((s, r) => s + r.shots_against, 0);
+            const sGoals = season.reduce((s, r) => s + r.goals_against, 0);
+            const seasonSpg = sGoals > 0 ? Math.min(40, sShots / sGoals) : 22;
+            const seasonSavePct = season.reduce((s, r) => s + (r.save_pct ?? 0), 0) / season.length;
+
             const gp = goalieNameMap.get(gid);
             goalieSnap = {
               playerId: gid,
               playerName: gp ? `${gp.first_name} ${gp.last_name}` : 'Unknown',
-              momentumShotsPerGoal: Math.round(spg * 10) / 10,
-              seasonShotsPerGoal: Math.round(spg * 10) / 10,
-              momentumSavePct: data.reduce((s, r) => s + (r.save_pct ?? 0), 0) / data.length,
-              seasonSavePct: data.reduce((s, r) => s + (r.save_pct ?? 0), 0) / data.length,
+              momentumShotsPerGoal: Math.round(momentumSpg * 10) / 10,
+              seasonShotsPerGoal: Math.round(seasonSpg * 10) / 10,
+              momentumSavePct,
+              seasonSavePct,
               energyBar: goalieEnergyMap.get(gid) ?? 100,
             };
             break;
@@ -221,35 +240,39 @@ export async function GET(req: NextRequest) {
           ? Math.round(skaterSnaps.reduce((s, sk) => s + sk.energyBar, 0) / skaterSnaps.length)
           : 100;
 
-        // Compute real SOS multiplier from season win% up to today
+        // Compute SOS and back-to-back from completed games up to today
         const { data: teamGames } = await supabaseAdmin
           .from('games')
-          .select('home_team_id, away_team_id, home_score, away_score')
+          .select('game_date, home_team_id, away_team_id, home_score, away_score')
           .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
           .eq('season', '20252026')
           .not('home_score', 'is', null)
-          .lt('game_date', today);
+          .lt('game_date', today)
+          .order('game_date', { ascending: true });
 
         const completedGamesForTeam = (teamGames ?? []).filter(
           g => g.home_score !== null && g.away_score !== null
         );
 
-        // Season SOS — full win% scaled ×0.4
-        // TODO: linear scaling is artificial; should be calibrated against outcomes
-        // TODO: replace combined win% with home/away split once enough history exists
-        let seasonWins = 0;
+        // SOS — GF/GA ratio (v1.7+). More granular than binary win%.
+        // Formula: 1.0 + (gfPerGame/gaPerGame - 1.0) × 0.3
+        let goalsFor = 0, goalsAgainst = 0;
         for (const g of completedGamesForTeam) {
           const isHomeTeam = g.home_team_id === teamId;
-          if ((isHomeTeam ? g.home_score! : g.away_score!) > (isHomeTeam ? g.away_score! : g.home_score!)) seasonWins++;
+          goalsFor += (isHomeTeam ? g.home_score! : g.away_score!);
+          goalsAgainst += (isHomeTeam ? g.away_score! : g.home_score!);
         }
-        const seasonWinPct = completedGamesForTeam.length >= 5 ? seasonWins / completedGamesForTeam.length : 0.5;
-        const sosMultiplier = Math.round((1.0 + (seasonWinPct - 0.5) * 0.4) * 1000) / 1000;
+        const gfPerGame = completedGamesForTeam.length >= 5 ? goalsFor / completedGamesForTeam.length : 3.0;
+        const gaPerGame = completedGamesForTeam.length >= 5 && goalsAgainst > 0 ? goalsAgainst / completedGamesForTeam.length : 3.0;
+        const sosMultiplier = Math.round((1.0 + (gfPerGame / gaPerGame - 1.0) * 0.3) * 1000) / 1000;
 
-        // Recent form — last 5 games win% (reduced from 10 in v1.4)
-        // 10 games covered ~3 weeks — too slow to capture current hot/cold streaks.
-        // 5 games is ~1.5 weeks, more responsive to recent team state.
-        // TODO: weight recency (last 2 games > games 4–5)
-        // TODO: calibrate window size and scaling (×0.3) against outcomes
+        // Back-to-back detection
+        const yesterday = new Date(today + 'T12:00:00Z');
+        yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+        const yesterdayStr = yesterday.toISOString().slice(0, 10);
+        const isBackToBack = completedGamesForTeam.some(g => g.game_date === yesterdayStr);
+
+        // Recent form — last 5 games win%
         const last5 = completedGamesForTeam.slice(-5);
         let recentWins = 0;
         for (const g of last5) {
@@ -259,9 +282,8 @@ export async function GET(req: NextRequest) {
         const recentWinPct = last5.length >= 3 ? recentWins / last5.length : 0.5;
         const recentFormMultiplier = Math.round((1.0 + (recentWinPct - 0.5) * 0.3) * 1000) / 1000;
 
-        // teamRecentForm stored inside goalie_snapshot JSON — team-level metric
-        // living here for convenience until a dedicated column is added
-        goalieSnap = { ...goalieSnap, teamRecentForm: recentFormMultiplier };
+        // teamRecentForm, isBackToBack stored inside goalie_snapshot JSON
+        goalieSnap = { ...goalieSnap, teamRecentForm: recentFormMultiplier, isBackToBack };
 
         // Save the model-agnostic team snapshot
         const { error: snapErr } = await supabaseAdmin
@@ -297,9 +319,9 @@ export async function GET(req: NextRequest) {
 
       if (!homeSnap || !awaySnap) continue;
 
-      // Run v1.6 formula — season-weighted PPM (0.2 momentum / 0.8 season),
-      // HOME_EDGE restored to 1.03, REGRESSION=0.6, last-5 recent form.
-      // See backtest/route.ts and weight-search results for full change notes.
+      // Run v1.7 formula — GF/GA SOS, B2B fatigue, season goalie stats,
+      // HOME_EDGE=1.0 (neutral), season-weighted PPM 0.2/0.8, REGRESSION=0.6.
+      // See backtest/route.ts for full change notes.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hSkaters = (homeSnap.skater_snapshots as any[]) ?? [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -312,10 +334,9 @@ export async function GET(req: NextRequest) {
       const GOAL_SCALE = 70;
       const MIN_SPG = 12;
       const MAX_SPG = 40;
-      // Restored from v1.5's 1.01 — weight-search confirmed season signal is stronger,
-      // so home edge no longer needs to be near-neutral to suppress over-picking home
-      const HOME_EDGE = 1.03;
-      const AWAY_EDGE = 0.97;
+      // Neutral — let PPM/SOS signal carry directionality without home bias overlay
+      const HOME_EDGE = 1.0;
+      const AWAY_EDGE = 1.0;
       const REGRESSION = 0.6;
       // Weight-search result: season PPM is a stronger predictor than 5-game momentum
       const MOMENTUM_W = 0.2;
@@ -329,23 +350,31 @@ export async function GET(req: NextRequest) {
         return s.compositePpm ?? 0;
       }
 
+      // Back-to-back fatigue: ~8% offensive output penalty (research-backed)
+      const B2B_PENALTY = 0.92;
+      const homeB2bMult = hGoalie.isBackToBack ? B2B_PENALTY : 1.0;
+      const awayB2bMult = aGoalie.isBackToBack ? B2B_PENALTY : 1.0;
+
       const homeOff = hSkaters
         .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
         .reduce((sum: number, s: { compositePpm: number; momentumPpm?: number; seasonPpm?: number }) => sum + Math.max(0, effectivePPM(s)), 0)
         * Number(homeSnap.sos_multiplier)
         * (hGoalie.teamRecentForm ?? 1.0)
-        * energyMultiplier(homeSnap.team_energy_bar ?? 100);
+        * energyMultiplier(homeSnap.team_energy_bar ?? 100)
+        * homeB2bMult;
 
       const awayOff = aSkaters
         .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
         .reduce((sum: number, s: { compositePpm: number; momentumPpm?: number; seasonPpm?: number }) => sum + Math.max(0, effectivePPM(s)), 0)
         * Number(awaySnap.sos_multiplier)
         * (aGoalie.teamRecentForm ?? 1.0)
-        * energyMultiplier(awaySnap.team_energy_bar ?? 100);
+        * energyMultiplier(awaySnap.team_energy_bar ?? 100)
+        * awayB2bMult;
 
-      const homeDef = Math.min(MAX_SPG, Math.max(MIN_SPG, hGoalie.momentumShotsPerGoal || 22))
+      // Defense: use season SPG (more stable than last-5 momentum SPG)
+      const homeDef = Math.min(MAX_SPG, Math.max(MIN_SPG, hGoalie.seasonShotsPerGoal || hGoalie.momentumShotsPerGoal || 22))
         * goalieEnergyPenalty(hGoalie.energyBar ?? 100);
-      const awayDef = Math.min(MAX_SPG, Math.max(MIN_SPG, aGoalie.momentumShotsPerGoal || 22))
+      const awayDef = Math.min(MAX_SPG, Math.max(MIN_SPG, aGoalie.seasonShotsPerGoal || aGoalie.momentumShotsPerGoal || 22))
         * goalieEnergyPenalty(aGoalie.energyBar ?? 100);
 
       const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
@@ -363,7 +392,7 @@ export async function GET(req: NextRequest) {
         .from('predictions')
         .upsert({
           game_id: game.id,
-          model_version: 'v1.6',
+          model_version: 'v1.7',
           predicted_home_score: Math.round(homeXG * 10) / 10,
           predicted_away_score: Math.round(awayXG * 10) / 10,
           home_win_probability: Math.round(homeWin * 1000) / 1000,

@@ -38,9 +38,9 @@ interface SkaterSnap {
 
 interface GoalieSnap {
   momentumShotsPerGoal: number;
-  // teamRecentForm is a team-level metric stored here for convenience —
-  // ideally it should live in its own game_team_snapshots column.
+  seasonShotsPerGoal?: number;
   teamRecentForm?: number;
+  isBackToBack?: boolean;
 }
 
 interface TeamSnap {
@@ -436,6 +436,95 @@ function runModelV1_6(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   };
 }
 
+// v1.7 — four targeted fixes from v1.6 analysis:
+//
+//   1. HOME_EDGE = 1.0 (fully neutral)
+//      v1.6 picked home 61% of games and hit only 50% on those picks.
+//      The PPM/SOS signal should carry directionality — no artificial home boost.
+//
+//   2. GF/GA RATIO for SOS (replaces season win%)
+//      Goals-for/against per game is more granular than binary W/L.
+//      A team winning 4-1 is scored differently from one winning 2-1.
+//      Formula: 1.0 + (gfPerGame/gaPerGame - 1.0) × 0.3
+//      Requires re-running backfill-sos before backtesting.
+//
+//   3. BACK-TO-BACK FATIGUE (8% offensive output penalty)
+//      Teams playing on consecutive nights show measurable performance drops.
+//      Stored as isBackToBack in goalie_snapshot.isBackToBack.
+//      Requires re-running backfill-sos before backtesting.
+//
+//   4. SEASON GOALIE SPG for defense filter (replaces last-5 momentum SPG)
+//      5 games is too small a sample for goalie quality assessment.
+//      Season SPG is more stable; stored as seasonShotsPerGoal.
+//      Falls back to momentumShotsPerGoal for old snapshots.
+//
+//   Unchanged from v1.6: MOMENTUM_W=0.2/SEASON_W=0.8, REGRESSION=0.6, last-5 form.
+function runModelV1_7(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
+  const GOAL_SCALE = 70;
+  const MIN_SPG = 12;
+  const MAX_SPG = 40;
+  const HOME_EDGE = 1.0;
+  const AWAY_EDGE = 1.0;
+  const REGRESSION = 0.6;
+  const MOMENTUM_W = 0.2;
+  const SEASON_W = 0.8;
+  const B2B_PENALTY = 0.92;
+
+  function effectivePPM(s: SkaterSnap): number {
+    if (s.momentumPpm !== undefined && s.seasonPpm !== undefined) {
+      return MOMENTUM_W * s.momentumPpm + SEASON_W * s.seasonPpm;
+    }
+    return s.compositePpm;
+  }
+
+  function offPotential(snap: TeamSnap) {
+    const activeSkaters = snap.skaters.filter(s => !s.injuryStatus);
+    const totalPPM = activeSkaters.reduce((sum, s) => sum + Math.max(0, effectivePPM(s)), 0);
+    const recentForm = snap.goalie.teamRecentForm ?? 1.0;
+    const b2bMult = snap.goalie.isBackToBack ? B2B_PENALTY : 1.0;
+    return totalPPM * snap.sosMultiplier * recentForm * energyMultiplierFromBar(snap.energyBar) * b2bMult;
+  }
+
+  function defFilter(snap: TeamSnap) {
+    // Prefer season SPG (more stable); fall back to momentum for old snapshots
+    const spg = snap.goalie.seasonShotsPerGoal ?? snap.goalie.momentumShotsPerGoal;
+    return Math.min(MAX_SPG, Math.max(MIN_SPG, spg || 22));
+  }
+
+  const homeOff = offPotential(homeSnap);
+  const awayOff = offPotential(awaySnap);
+  const homeDef = defFilter(homeSnap);
+  const awayDef = defFilter(awaySnap);
+
+  const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
+  const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
+
+  const total = homeXG + awayXG;
+  if (total === 0) return {
+    homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5, ot: 0,
+    homeOff, awayOff, homeDef, awayDef,
+  };
+
+  const homeBase = homeXG / total;
+  const awayBase = awayXG / total;
+  const homeAdj = Math.min(0.90, homeBase * HOME_EDGE);
+  const awayAdj = Math.min(0.90, awayBase * AWAY_EDGE);
+  const rawHomeWin = homeAdj / (homeAdj + awayAdj);
+  const homeWin = 0.5 + (rawHomeWin - 0.5) * REGRESSION;
+
+  return {
+    homeXG: Math.round(homeXG * 10) / 10,
+    awayXG: Math.round(awayXG * 10) / 10,
+    homeWin: Math.round(homeWin * 1000) / 1000,
+    awayWin: Math.round((1 - homeWin) * 1000) / 1000,
+    ot: 0,
+    homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
+    awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
+    homeDef: Math.round(homeDef * 10) / 10,
+    awayDef: Math.round(awayDef * 10) / 10,
+  };
+}
+
 // v1.4 — fixes two systematic biases identified from v1.3 backtesting:
 //
 //   1. HOME ICE: reduced from +8% to +4%.
@@ -540,6 +629,7 @@ const MODEL_FORMULAS: Record<string, (
   'v1.4': (h, a) => runModelV1_4(h, a),
   'v1.5': (h, a) => runModelV1_5(h, a),
   'v1.6': (h, a) => runModelV1_6(h, a),
+  'v1.7': (h, a) => runModelV1_7(h, a),
 };
 
 // ─── GET — compare model versions for a specific game ─────────────────────────

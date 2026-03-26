@@ -57,12 +57,13 @@ export async function GET() {
       for (const g of extraGames ?? []) gameDateMap.set(g.id, g.game_date);
     }
 
-    // 4. For each snapshot, compute season win% and last-10-game form
+    // 4. For each snapshot, compute GF/GA ratio SOS, last-5 form, and back-to-back flag
     const updates: {
       game_id: number;
       team_id: number;
       sos_multiplier: number;
       recent_form: number;
+      is_back_to_back: boolean;
     }[] = [];
 
     for (const snap of snapshots ?? []) {
@@ -80,16 +81,21 @@ export async function GET() {
         teamGames.push(g);
       }
 
-      // Season SOS — full-season win%
-      // ×0.4 scaling: reduced from ×0.8 (v1.3) — see backtest/route.ts for rationale
-      // TODO: linear scaling is a placeholder; should be calibrated against outcomes
-      let seasonWins = 0;
+      // SOS — goals-for/against ratio (v1.7+). More granular than binary win%:
+      // a team winning 3-1 is scored differently from one winning 2-1.
+      // Formula: 1.0 + (gfPerGame/gaPerGame - 1.0) × 0.3
+      //   +1 goal diff/game (~3.5GF/2.5GA) → ratio 1.4 → sosMult 1.12
+      //   -1 goal diff/game (~2.5GF/3.5GA) → ratio 0.71 → sosMult 0.91
+      // Falls back to neutral 1.0 if < 5 games played.
+      let goalsFor = 0, goalsAgainst = 0;
       for (const g of teamGames) {
         const isHome = g.home_team_id === teamId;
-        if ((isHome ? g.home_score! : g.away_score!) > (isHome ? g.away_score! : g.home_score!)) seasonWins++;
+        goalsFor += (isHome ? g.home_score! : g.away_score!);
+        goalsAgainst += (isHome ? g.away_score! : g.home_score!);
       }
-      const seasonWinPct = teamGames.length >= 5 ? seasonWins / teamGames.length : 0.5;
-      const sosMult = Math.round((1.0 + (seasonWinPct - 0.5) * 0.4) * 1000) / 1000;
+      const gfPerGame = teamGames.length >= 5 ? goalsFor / teamGames.length : 3.0;
+      const gaPerGame = teamGames.length >= 5 && goalsAgainst > 0 ? goalsAgainst / teamGames.length : 3.0;
+      const sosMult = Math.round((1.0 + (gfPerGame / gaPerGame - 1.0) * 0.3) * 1000) / 1000;
 
       // Recent form — last 5 games (reduced from 10 in v1.5)
       // 10 games (~3 weeks) was too slow to capture current form
@@ -104,7 +110,15 @@ export async function GET() {
       const recentWinPct = last5.length >= 3 ? recentWins / last5.length : 0.5;
       const recentForm = Math.round((1.0 + (recentWinPct - 0.5) * 0.3) * 1000) / 1000;
 
-      updates.push({ game_id: snap.game_id, team_id: teamId, sos_multiplier: sosMult, recent_form: recentForm });
+      // Back-to-back detection — team played the calendar day before this game
+      const gameDay = new Date(gameDate + 'T12:00:00Z');
+      const dayBefore = new Date(gameDay.getTime() - 86400000).toISOString().slice(0, 10);
+      const isBackToBack = (allGames ?? []).some(g =>
+        g.game_date === dayBefore &&
+        (g.home_team_id === teamId || g.away_team_id === teamId)
+      );
+
+      updates.push({ game_id: snap.game_id, team_id: teamId, sos_multiplier: sosMult, recent_form: recentForm, is_back_to_back: isBackToBack });
     }
 
     // 5. Fetch all goalie_snapshots in one query, then update concurrently
@@ -125,7 +139,7 @@ export async function GET() {
       const results = await Promise.all(batch.map(u => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const existing = (goalieMap.get(`${u.game_id}_${u.team_id}`) as any) ?? {};
-        const mergedGoalie = { ...existing, teamRecentForm: u.recent_form };
+        const mergedGoalie = { ...existing, teamRecentForm: u.recent_form, isBackToBack: u.is_back_to_back };
         return supabaseAdmin
           .from('game_team_snapshots')
           .update({ sos_multiplier: u.sos_multiplier, goalie_snapshot: mergedGoalie })
