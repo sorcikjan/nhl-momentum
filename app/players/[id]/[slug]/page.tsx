@@ -6,7 +6,7 @@ import { fetchPlayer, fetchRankings } from '@/lib/data';
 import { teamUrl } from '@/lib/urls';
 import Link from 'next/link';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 120;
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string; slug: string }> }): Promise<Metadata> {
   const { id } = await params;

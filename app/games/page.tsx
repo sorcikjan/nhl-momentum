@@ -4,7 +4,7 @@ import DateNav from '@/components/games/DateNav';
 import GameCard from '@/components/games/GameCard';
 import { fetchGames } from '@/lib/data';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 30;
 
 export const metadata: Metadata = {
   title: 'Games',

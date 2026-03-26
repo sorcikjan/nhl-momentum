@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   },
 };
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 120;
 
 // Current 32-team NHL structure (2025-26)
 const NHL_STRUCTURE = {

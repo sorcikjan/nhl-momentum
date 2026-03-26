@@ -4,7 +4,7 @@ import BreakoutWatch from '@/components/dashboard/BreakoutWatch';
 import TodaysGames from '@/components/dashboard/TodaysGames';
 import { fetchRankings, fetchGames } from '@/lib/data';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: 'Dashboard',

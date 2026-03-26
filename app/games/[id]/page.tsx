@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabase';
 import { gameUrl } from '@/lib/urls';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 30;
 
 export default async function GameRedirect({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -3,7 +3,7 @@ import ModelStatsCard from '@/components/accuracy/ModelStatsCard';
 import MatchComparisonTable from '@/components/accuracy/MatchComparisonTable';
 import { fetchAccuracy } from '@/lib/data';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 120;
 
 export const metadata: Metadata = {
   title: 'Prediction Accuracy',

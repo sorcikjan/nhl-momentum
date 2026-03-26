@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import RankingsTable from '@/components/rankings/RankingsTable';
 import { fetchRankings } from '@/lib/data';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 120;
 
 export const metadata: Metadata = {
   title: 'Player Rankings',

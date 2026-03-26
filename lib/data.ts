@@ -75,9 +75,12 @@ export async function fetchRankings() {
 // ─── Games ────────────────────────────────────────────────────────────────────
 
 export async function fetchGames(date: string) {
-  const games = await getGamesByDate(date);
+  // NHL API and model version can run in parallel
+  const [games, activeModel] = await Promise.all([
+    getGamesByDate(date),
+    latestModelVersion(),
+  ]);
   const gameIds = (games as { id: number }[]).map(g => g.id);
-  const activeModel = await latestModelVersion();
   const { data: predictions } = await supabaseAdmin
     .from('predictions')
     .select('*, prediction_outcomes(*)')
@@ -89,32 +92,37 @@ export async function fetchGames(date: string) {
 // ─── Player ───────────────────────────────────────────────────────────────────
 
 export async function fetchPlayer(id: string) {
-  const { data: player, error: pErr } = await supabaseAdmin
-    .from('players')
-    .select('*, teams(id, abbrev, name, logo_url)')
-    .eq('id', id)
-    .single();
+  // Player info, metric timeline, and recent game stats are all independent
+  const [
+    { data: player, error: pErr },
+    { data: metricTimelineDesc },
+    { data: rawGameStats },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from('players')
+      .select('*, teams(id, abbrev, name, logo_url)')
+      .eq('id', id)
+      .single(),
+    supabaseAdmin
+      .from('player_metric_snapshots')
+      .select('*')
+      .eq('player_id', id)
+      .order('calculated_at', { ascending: false })
+      .limit(30),
+    supabaseAdmin
+      .from('game_player_stats')
+      .select('*')
+      .eq('player_id', id)
+      .order('recorded_at', { ascending: false })
+      .limit(10),
+  ]);
 
   if (pErr) throw pErr;
 
-  // Fetch newest 30 snapshots (for current metrics), then reverse for timeline chart
-  const { data: metricTimelineDesc } = await supabaseAdmin
-    .from('player_metric_snapshots')
-    .select('*')
-    .eq('player_id', id)
-    .order('calculated_at', { ascending: false })
-    .limit(30);
+  // Newest first → reverse for timeline chart
   const metricTimeline = (metricTimelineDesc ?? []).slice().reverse();
 
-  // Fetch raw game stats first (no join — game_player_stats may not have FK to games)
-  const { data: rawGameStats } = await supabaseAdmin
-    .from('game_player_stats')
-    .select('*')
-    .eq('player_id', id)
-    .order('recorded_at', { ascending: false })
-    .limit(10);
-
-  // Enrich with game metadata if game_ids exist in our games table
+  // Enrich game stats with game metadata (depends on rawGameStats result)
   let recentGames = rawGameStats ?? [];
   if (recentGames.length > 0) {
     const gameIds = recentGames.map((g: { game_id: number }) => g.game_id);
@@ -136,53 +144,49 @@ export async function fetchPlayer(id: string) {
 // ─── Accuracy ─────────────────────────────────────────────────────────────────
 
 export async function fetchAccuracy(modelVersion?: string) {
-  const { data: accuracy, error: accErr } = await supabaseAdmin
-    .from('model_versions')
-    .select('version, description, created_at, is_active');
-
-  if (accErr) throw accErr;
-
-  // Fetch all predictions across all model versions by querying each version
-  // separately and merging — avoids the per-version row cap that a single
-  // ordered query would impose when versions have different created_at ranges.
   const VERSIONS_TO_FETCH = modelVersion
     ? [modelVersion]
     : ['v1.0', 'v1.1', 'v1.2', 'v1.3', 'v1.4', 'v1.5', 'v1.6', 'v1.7'];
+
+  // Fetch model versions metadata + all per-version prediction queries in parallel
+  const [{ data: accuracy, error: accErr }, ...versionResults] = await Promise.all([
+    supabaseAdmin
+      .from('model_versions')
+      .select('version, description, created_at, is_active'),
+    ...VERSIONS_TO_FETCH.map(v =>
+      supabaseAdmin
+        .from('predictions')
+        .select(`
+          id, game_id, model_version, predicted_home_score, predicted_away_score,
+          home_win_probability, away_win_probability, ot_probability,
+          home_energy_bar, away_energy_bar, created_at,
+          prediction_outcomes (
+            actual_home_score, actual_away_score,
+            home_score_error, away_score_error, correct_winner, recorded_at
+          ),
+          games (
+            game_date,
+            home_team:teams!games_home_team_id_fkey ( abbrev ),
+            away_team:teams!games_away_team_id_fkey ( abbrev )
+          )
+        `)
+        .eq('model_version', v)
+        .order('created_at', { ascending: false })
+        .limit(500)
+    ),
+  ]);
+
+  if (accErr) throw accErr;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const allPredictions: any[] = [];
-
-  for (const v of VERSIONS_TO_FETCH) {
-    const { data, error: predErr } = await supabaseAdmin
-      .from('predictions')
-      .select(`
-        id, game_id, model_version, predicted_home_score, predicted_away_score,
-        home_win_probability, away_win_probability, ot_probability,
-        home_energy_bar, away_energy_bar, created_at,
-        prediction_outcomes (
-          actual_home_score, actual_away_score,
-          home_score_error, away_score_error, correct_winner, recorded_at
-        ),
-        games (
-          game_date,
-          home_team:teams!games_home_team_id_fkey ( abbrev ),
-          away_team:teams!games_away_team_id_fkey ( abbrev )
-        )
-      `)
-      .eq('model_version', v)
-      .order('created_at', { ascending: false })
-      .limit(500);
-    if (predErr) throw predErr;
-    allPredictions.push(...(data ?? []));
-  }
-
-  const predictions = allPredictions;
+  const predictions: any[] = versionResults.flatMap(r => r.data ?? []);
 
   const stats: Record<string, {
     total: number; withOutcome: number; correctWinner: number;
     totalHomeErr: number; totalAwayErr: number;
   }> = {};
 
-  for (const p of predictions ?? []) {
+  for (const p of predictions) {
     const v = p.model_version;
     if (!stats[v]) stats[v] = { total: 0, withOutcome: 0, correctWinner: 0, totalHomeErr: 0, totalAwayErr: 0 };
     stats[v].total++;
@@ -225,19 +229,54 @@ export async function fetchTeam(id: string) {
 
   if (error) throw error;
 
-  // Top players on this team by momentum rank
-  const { data: players } = await supabaseAdmin
-    .from('player_metric_snapshots')
-    .select(`
-      player_id, momentum_rank, composite_ppm, momentum_ppm, season_ppm, breakout_delta,
-      energy_bar, momentum_goals, momentum_assists, momentum_points,
-      players!inner ( id, first_name, last_name, position_code, headshot_url, injury_status, team_id )
-    `)
-    .eq('players.team_id', team.id)
-    .order('calculated_at', { ascending: false })
-    .limit(500);
+  // Roster, games, and external API calls are all independent — run in parallel
+  const [
+    { data: players },
+    { data: recentGames },
+    { data: upcoming },
+    seasonStatsResult,
+    standingResult,
+  ] = await Promise.all([
+    supabaseAdmin
+      .from('player_metric_snapshots')
+      .select(`
+        player_id, momentum_rank, composite_ppm, momentum_ppm, season_ppm, breakout_delta,
+        energy_bar, momentum_goals, momentum_assists, momentum_points,
+        players!inner ( id, first_name, last_name, position_code, headshot_url, injury_status, team_id )
+      `)
+      .eq('players.team_id', team.id)
+      .order('calculated_at', { ascending: false })
+      .limit(500),
+    supabaseAdmin
+      .from('games')
+      .select(`
+        id, game_date, home_score, away_score, game_state,
+        home_team:teams!games_home_team_id_fkey ( id, abbrev ),
+        away_team:teams!games_away_team_id_fkey ( id, abbrev )
+      `)
+      .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
+      .in('game_state', ['FINAL', 'OFF'])
+      .order('game_date', { ascending: false })
+      .limit(10),
+    supabaseAdmin
+      .from('games')
+      .select(`
+        id, game_date, start_time_utc, game_state,
+        home_team:teams!games_home_team_id_fkey ( id, abbrev ),
+        away_team:teams!games_away_team_id_fkey ( id, abbrev )
+      `)
+      .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
+      .in('game_state', ['FUT', 'PRE', 'LIVE', 'CRIT'])
+      .order('game_date', { ascending: true })
+      .limit(5),
+    getTeamSeasonStats(team.abbrev).catch(() => null),
+    getStandings(new Date().toISOString().slice(0, 10))
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then((s: any) => (s.standings as any[])?.find((st: any) => st.teamAbbrev?.default === team.abbrev) ?? null)
+      .catch(() => null),
+  ]);
 
-  // Deduplicate — latest snapshot per player
+  // Deduplicate roster — latest snapshot per player
   const seen = new Set<number>();
   const roster = (players ?? []).filter(p => {
     if (seen.has(p.player_id)) return false;
@@ -245,99 +284,54 @@ export async function fetchTeam(id: string) {
     return true;
   }).sort((a, b) => (b.composite_ppm ?? 0) - (a.composite_ppm ?? 0));
 
-  // Recent completed games for this team
-  const { data: recentGames } = await supabaseAdmin
-    .from('games')
-    .select(`
-      id, game_date, home_score, away_score, game_state,
-      home_team:teams!games_home_team_id_fkey ( id, abbrev ),
-      away_team:teams!games_away_team_id_fkey ( id, abbrev )
-    `)
-    .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
-    .in('game_state', ['FINAL', 'OFF'])
-    .order('game_date', { ascending: false })
-    .limit(10);
-
-  // Upcoming games
-  const { data: upcoming } = await supabaseAdmin
-    .from('games')
-    .select(`
-      id, game_date, start_time_utc, game_state,
-      home_team:teams!games_home_team_id_fkey ( id, abbrev ),
-      away_team:teams!games_away_team_id_fkey ( id, abbrev )
-    `)
-    .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
-    .in('game_state', ['FUT', 'PRE', 'LIVE', 'CRIT'])
-    .order('game_date', { ascending: true })
-    .limit(5);
-
-  // Season stats from NHL API
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let seasonStats: any = null;
-  try {
-    seasonStats = await getTeamSeasonStats(team.abbrev);
-  } catch { /* optional */ }
-
-  // Standings for W/L record
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let standing: any = null;
-  try {
-    const today = new Date().toISOString().slice(0, 10);
-    const standings = await getStandings(today);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    standing = (standings.standings as any[])?.find((s: any) => s.teamAbbrev?.default === team.abbrev);
-  } catch { /* optional */ }
-
-  return { team, roster, recentGames, upcoming, seasonStats, standing };
+  return { team, roster, recentGames, upcoming, seasonStats: seasonStatsResult, standing: standingResult };
 }
 
 // ─── Match ────────────────────────────────────────────────────────────────────
 
 export async function fetchMatch(id: string) {
-  // Game from our DB
-  const { data: game } = await supabaseAdmin
-    .from('games')
-    .select(`
-      *,
-      home_team:teams!games_home_team_id_fkey ( id, abbrev, name ),
-      away_team:teams!games_away_team_id_fkey ( id, abbrev, name )
-    `)
-    .eq('id', id)
-    .single();
+  // Game record, live NHL data, and model version can all start at once
+  const [{ data: game }, liveData, activeModel] = await Promise.all([
+    supabaseAdmin
+      .from('games')
+      .select(`
+        *,
+        home_team:teams!games_home_team_id_fkey ( id, abbrev, name ),
+        away_team:teams!games_away_team_id_fkey ( id, abbrev, name )
+      `)
+      .eq('id', id)
+      .single(),
+    getGameBoxscore(Number(id)).catch(() => null),
+    latestModelVersion(),
+  ]);
 
-  // Live data from NHL API
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let liveData: any = null;
-  try {
-    liveData = await getGameBoxscore(Number(id));
-  } catch { /* game may not exist in NHL API yet */ }
-
-  // Our prediction
-  const activeModel = await latestModelVersion();
-  const { data: predictions } = await supabaseAdmin
-    .from('predictions')
-    .select('*, prediction_outcomes(*)')
-    .eq('game_id', id)
-    .eq('model_version', activeModel)
-    .order('created_at', { ascending: false });
-
-  // Team snapshots (player-level inputs)
-  const { data: snapshots } = await supabaseAdmin
-    .from('game_team_snapshots')
-    .select('*')
-    .eq('game_id', id);
-
-  // Player stats if game is complete
-  const { data: playerStats } = await supabaseAdmin
-    .from('game_player_stats')
-    .select('*, players(first_name, last_name, position_code, headshot_url)')
-    .eq('game_id', id)
-    .order('goals', { ascending: false });
-
-  const { data: goalieStats } = await supabaseAdmin
-    .from('game_goalie_stats')
-    .select('*, players(first_name, last_name)')
-    .eq('game_id', id);
+  // All DB reads are now independent — run in parallel
+  const [
+    { data: predictions },
+    { data: snapshots },
+    { data: playerStats },
+    { data: goalieStats },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from('predictions')
+      .select('*, prediction_outcomes(*)')
+      .eq('game_id', id)
+      .eq('model_version', activeModel)
+      .order('created_at', { ascending: false }),
+    supabaseAdmin
+      .from('game_team_snapshots')
+      .select('*')
+      .eq('game_id', id),
+    supabaseAdmin
+      .from('game_player_stats')
+      .select('*, players(first_name, last_name, position_code, headshot_url)')
+      .eq('game_id', id)
+      .order('goals', { ascending: false }),
+    supabaseAdmin
+      .from('game_goalie_stats')
+      .select('*, players(first_name, last_name)')
+      .eq('game_id', id),
+  ]);
 
   return { game, liveData, predictions, snapshots, playerStats, goalieStats };
 }

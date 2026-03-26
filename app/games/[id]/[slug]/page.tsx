@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { fetchMatch, teamLogoUrl } from '@/lib/data';
 import { teamUrl, playerUrl } from '@/lib/urls';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 30;
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string; slug: string }> }): Promise<Metadata> {
   const { id } = await params;
