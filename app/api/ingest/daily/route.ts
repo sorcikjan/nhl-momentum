@@ -563,16 +563,18 @@ export async function GET(req: NextRequest) {
           recordsByPlayer.get(row.player_id)!.push({ game_end_utc: gameEnd, toi_seconds: row.toi_seconds ?? 0 });
         }
 
-        // Fetch latest snapshot ID per player
+        // Fetch latest snapshot ID + current energy per player.
+        // Limit to 2× player count — rows are newest-first so first occurrence per player is latest.
         const { data: latestSnaps } = await supabaseAdmin
           .from('player_metric_snapshots')
-          .select('id, player_id')
+          .select('id, player_id, energy_bar')
           .in('player_id', ePlayerIds)
-          .order('calculated_at', { ascending: false });
+          .order('calculated_at', { ascending: false })
+          .limit(ePlayerIds.length * 2);
 
-        const latestIdByPlayer = new Map<number, string>();
+        const latestSnapByPlayer = new Map<number, { id: string; energy_bar: number }>();
         for (const snap of latestSnaps ?? []) {
-          if (!latestIdByPlayer.has(snap.player_id)) latestIdByPlayer.set(snap.player_id, snap.id);
+          if (!latestSnapByPlayer.has(snap.player_id)) latestSnapByPlayer.set(snap.player_id, { id: snap.id, energy_bar: snap.energy_bar ?? 100 });
         }
 
         const eUpdates: { id: string; energy_bar: number }[] = [];
@@ -580,12 +582,16 @@ export async function GET(req: NextRequest) {
         for (const player of ePlayers) {
           const drainRate = player.position_code === 'G' ? GOALIE_DRAIN_PER_MIN : undefined;
           const energy    = calculatePlayerEnergy(recordsByPlayer.get(player.id) ?? [], now, drainRate);
-          const snapId    = latestIdByPlayer.get(player.id);
-          if (snapId) eUpdates.push({ id: snapId, energy_bar: energy });
-          else eInserts.push({ player_id: player.id, energy_bar: energy, momentum_rank: 0 });
+          const existing  = latestSnapByPlayer.get(player.id);
+          if (existing) {
+            // Skip if value unchanged — avoids unnecessary DB writes for recovered players
+            if (existing.energy_bar !== energy) eUpdates.push({ id: existing.id, energy_bar: energy });
+          } else {
+            eInserts.push({ player_id: player.id, energy_bar: energy, momentum_rank: 0 });
+          }
         }
 
-        // 50 concurrent updates — ~750 players = 15 batches × ~150ms ≈ 2-3s
+        // 50 concurrent updates — only changed values, typically ~60-120 players who played recently
         const CONCURRENT = 50;
         for (let i = 0; i < eUpdates.length; i += CONCURRENT) {
           const results = await Promise.all(
@@ -601,7 +607,7 @@ export async function GET(req: NextRequest) {
           if (!insErr) energyInserted += eInserts.length;
         }
 
-        log.push(`Energy updated: ${energyUpdated}, inserted: ${energyInserted} of ${ePlayers.length} players`);
+        log.push(`Energy updated: ${energyUpdated} changed, ${ePlayers.length - eUpdates.length - eInserts.length} already correct, inserted: ${energyInserted} (${ePlayers.length} total active players)`);
       }
     } // end phase 3
 
