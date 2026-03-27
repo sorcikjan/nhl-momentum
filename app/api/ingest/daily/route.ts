@@ -517,50 +517,40 @@ export async function GET(req: NextRequest) {
     log.push(`Predictions stored: ${predictionsStored} for ${upcomingGames.length} upcoming games`);
     } // end phase 2
 
-    // ── Phase 3: Recalculate energy bars for active players ────────────────────
+    // ── Phase 3: Recalculate energy bars for ALL active players ───────────────
+    // Strategy: fetch recent game stats once (no player filter), process all
+    // players in memory. Players with no recent games → 100 instantly.
+    // Updates run at 50 concurrent to stay within Netlify's 10s budget.
     let energyInserted = 0;
     if (phase === 'energy') {
-      const energyOffset = Number(req.nextUrl.searchParams.get('offset') ?? '0');
-      const energyLimit  = Number(req.nextUrl.searchParams.get('limit')  ?? '150');
       const GAME_DURATION_MS = 2.5 * 3_600_000;
-      const now   = new Date();
-      const since = new Date(now.getTime() - 72 * 3_600_000);
+      const now       = new Date();
+      const since     = new Date(now.getTime() - 72 * 3_600_000);
       const sinceDate = since.toISOString().slice(0, 10);
 
-      log.push(`Phase 3: recalculating energy (offset=${energyOffset}, limit=${energyLimit})`);
+      log.push(`Phase 3: recalculating energy for all active players (since ${sinceDate})`);
 
-      const { data: ePlayers, error: epErr } = await supabaseAdmin
-        .from('players')
-        .select('id, position_code')
-        .eq('is_active', true)
-        .order('id')
-        .range(energyOffset, energyOffset + energyLimit - 1);
+      // Fetch all active players + recent game stats + snapshots in parallel
+      const [
+        { data: ePlayers, error: epErr },
+        { data: recentGames },
+        { data: eSkaterStats },
+        { data: eGoalieStats },
+      ] = await Promise.all([
+        supabaseAdmin.from('players').select('id, position_code').eq('is_active', true).order('id'),
+        supabaseAdmin.from('games').select('id, game_date, start_time_utc').gte('game_date', sinceDate).in('game_state', ['FINAL', 'OFF']),
+        supabaseAdmin.from('game_player_stats').select('player_id, game_id, toi_seconds').gte('recorded_at', since.toISOString()),
+        supabaseAdmin.from('game_goalie_stats').select('player_id, game_id, toi_seconds').gte('recorded_at', since.toISOString()),
+      ]);
 
       if (epErr) throw epErr;
 
       if (ePlayers?.length) {
-        const ePlayerIds  = ePlayers.map(p => p.id);
-        const eSkaterIds  = ePlayers.filter(p => p.position_code !== 'G').map(p => p.id);
-        const eGoalieIds  = ePlayers.filter(p => p.position_code === 'G').map(p => p.id);
+        const ePlayerIds = ePlayers.map(p => p.id);
 
-        const { data: recentGames } = await supabaseAdmin
-          .from('games')
-          .select('id, game_date, start_time_utc')
-          .gte('game_date', sinceDate)
-          .in('game_state', ['FINAL', 'OFF']);
+        const eGameMap = new Map((recentGames ?? []).map(g => [g.id, g]));
 
-        const eGameMap    = new Map((recentGames ?? []).map(g => [g.id, g]));
-        const recentGIds  = Array.from(eGameMap.keys());
-
-        const [{ data: eSkaterStats }, { data: eGoalieStats }] = await Promise.all([
-          eSkaterIds.length && recentGIds.length
-            ? supabaseAdmin.from('game_player_stats').select('player_id, game_id, toi_seconds').in('player_id', eSkaterIds).in('game_id', recentGIds)
-            : Promise.resolve({ data: [] as { player_id: number; game_id: number; toi_seconds: number | null }[] }),
-          eGoalieIds.length && recentGIds.length
-            ? supabaseAdmin.from('game_goalie_stats').select('player_id, game_id, toi_seconds').in('player_id', eGoalieIds).in('game_id', recentGIds)
-            : Promise.resolve({ data: [] as { player_id: number; game_id: number; toi_seconds: number | null }[] }),
-        ]);
-
+        // Build game records per player from stats
         const recordsByPlayer = new Map<number, GameRecord[]>();
         for (const row of [...(eSkaterStats ?? []), ...(eGoalieStats ?? [])]) {
           const game = eGameMap.get(row.game_id);
@@ -573,6 +563,7 @@ export async function GET(req: NextRequest) {
           recordsByPlayer.get(row.player_id)!.push({ game_end_utc: gameEnd, toi_seconds: row.toi_seconds ?? 0 });
         }
 
+        // Fetch latest snapshot ID per player
         const { data: latestSnaps } = await supabaseAdmin
           .from('player_metric_snapshots')
           .select('id, player_id')
@@ -588,14 +579,14 @@ export async function GET(req: NextRequest) {
         const eInserts: { player_id: number; energy_bar: number; momentum_rank: number }[] = [];
         for (const player of ePlayers) {
           const drainRate = player.position_code === 'G' ? GOALIE_DRAIN_PER_MIN : undefined;
-          const records   = recordsByPlayer.get(player.id) ?? [];
-          const energy    = calculatePlayerEnergy(records, now, drainRate);
+          const energy    = calculatePlayerEnergy(recordsByPlayer.get(player.id) ?? [], now, drainRate);
           const snapId    = latestIdByPlayer.get(player.id);
           if (snapId) eUpdates.push({ id: snapId, energy_bar: energy });
           else eInserts.push({ player_id: player.id, energy_bar: energy, momentum_rank: 0 });
         }
 
-        const CONCURRENT = 10;
+        // 50 concurrent updates — ~750 players = 15 batches × ~150ms ≈ 2-3s
+        const CONCURRENT = 50;
         for (let i = 0; i < eUpdates.length; i += CONCURRENT) {
           const results = await Promise.all(
             eUpdates.slice(i, i + CONCURRENT).map(({ id, energy_bar }) =>
