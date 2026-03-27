@@ -125,6 +125,8 @@ export async function GET(req: NextRequest) {
       const eGameMap = new Map((recentGames ?? []).map(g => [g.id, g]));
       const recentGameIds = Array.from(eGameMap.keys());
 
+      log.push(`Energy: ${recentGameIds.length} recent FINAL games found (since ${sinceDate})`);
+
       if (recentGameIds.length > 0) {
         const [{ data: eSkaterStats }, { data: eGoalieStats }] = await Promise.all([
           supabaseAdmin.from('game_player_stats').select('player_id, game_id, toi_seconds').in('game_id', recentGameIds),
@@ -135,6 +137,8 @@ export async function GET(req: NextRequest) {
           ...(eSkaterStats ?? []).map(r => r.player_id),
           ...(eGoalieStats ?? []).map(r => r.player_id),
         ])];
+
+        log.push(`Energy: ${playedPlayerIds.length} players with stats in those games`);
 
         if (playedPlayerIds.length > 0) {
           const recordsByPlayer = new Map<number, GameRecord[]>();
