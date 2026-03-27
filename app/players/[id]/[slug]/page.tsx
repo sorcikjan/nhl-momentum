@@ -265,7 +265,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
               </span>
             )}
           </div>
-          <PPMTimeline snapshots={metricTimeline ?? []} />
+          <PPMTimeline snapshots={metricTimeline ?? []} leagueAvgPpm={leagueAvg?.seasonPpm} />
         </div>
       </div>
 

@@ -10,7 +10,7 @@ interface Snapshot {
   calculated_at: string;
 }
 
-export default function PPMTimeline({ snapshots }: { snapshots: Snapshot[] }) {
+export default function PPMTimeline({ snapshots, leagueAvgPpm }: { snapshots: Snapshot[]; leagueAvgPpm?: number }) {
   if (!snapshots.length) {
     return (
       <div className="rounded-xl border p-6 text-center" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
@@ -51,6 +51,14 @@ export default function PPMTimeline({ snapshots }: { snapshots: Snapshot[] }) {
             itemStyle={{ color: 'var(--text)' }}
           />
           <ReferenceLine y={latestSeason} stroke="var(--silver)" strokeDasharray="4 4" />
+          {leagueAvgPpm !== undefined && (
+            <ReferenceLine
+              y={Math.round(leagueAvgPpm * 10000) / 10000}
+              stroke="#f59e0b"
+              strokeDasharray="3 3"
+              label={{ value: 'Lg Avg', position: 'insideTopRight', fill: '#f59e0b', fontSize: 10 }}
+            />
+          )}
           <Line
             type="monotone" dataKey="momentum" name="Momentum PPM"
             stroke="var(--neon)" strokeWidth={2} dot={false} activeDot={{ r: 4 }}
