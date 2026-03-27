@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import PlayerRadarChart from '@/components/players/RadarChart';
 import PPMTimeline from '@/components/players/PPMTimeline';
 import EnergyBar from '@/components/players/EnergyBar';
-import { fetchPlayer, fetchRankings } from '@/lib/data';
+import { fetchPlayer, fetchRankings, fetchLeagueAverages } from '@/lib/data';
 import { teamUrl } from '@/lib/urls';
 import Link from 'next/link';
 
@@ -42,9 +42,10 @@ function rankBadge(rank: number | undefined) {
 
 export default async function PlayerPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
   const { id } = await params;
-  const [data, rankings] = await Promise.all([
+  const [data, rankings, leagueAvg] = await Promise.all([
     fetchPlayer(id).catch(() => null),
     fetchRankings().catch(() => null),
+    fetchLeagueAverages().catch(() => null),
   ]);
 
   if (!data?.player) {
@@ -81,42 +82,58 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const energyColor = energyBar >= 70 ? 'var(--green)' : energyBar >= 40 ? 'var(--amber)' : 'var(--red)';
   const energyLabel = energyBar >= 70 ? 'HIGH PERFORMANCE' : energyBar >= 40 ? 'MODERATE' : 'DRAINED';
 
+  const lgPpm    = leagueAvg?.seasonPpm      ?? 0;
+  const lgG      = leagueAvg?.goalsPerGame   ?? 0;
+  const lgA      = leagueAvg?.assistsPerGame ?? 0;
+  const lgShoot  = leagueAvg?.shootingPct    ?? 0;
+  const lgEnergy = Math.round(leagueAvg?.energyBar ?? 85);
+  const vsLeague = (playerVal: number, lgVal: number) =>
+    lgVal > 0 ? ((playerVal - lgVal) / lgVal) * 100 : 0;
+
   const perfMetrics = [
     {
       label: 'Points Per Match (PPM)',
       momVal: momPpm.toFixed(3),
       seaVal: seaPpm.toFixed(3),
-      carVal: carPpm.toFixed(3),
+      lgVal:  lgPpm.toFixed(3),
       momFill: pct(momPpm, 0.15),
       seaFill: pct(seaPpm, 0.15),
+      lgFill:  pct(lgPpm, 0.15),
       delta: delta(momPpm, seaPpm),
+      vsLeague: vsLeague(seaPpm, lgPpm),
     },
     {
       label: 'Goals / Game',
       momVal: (momGoals / Math.max(1, momGames)).toFixed(2),
       seaVal: (seaGoals / Math.max(1, seaGames)).toFixed(2),
-      carVal: '—',
+      lgVal:  lgG.toFixed(2),
       momFill: pct(momGoals / Math.max(1, momGames), 0.7),
       seaFill: pct(seaGoals / Math.max(1, seaGames), 0.7),
+      lgFill:  pct(lgG, 0.7),
       delta: delta(momGoals / Math.max(1, momGames), seaGoals / Math.max(1, seaGames)),
+      vsLeague: vsLeague(seaGoals / Math.max(1, seaGames), lgG),
     },
     {
       label: 'Assists / Game',
       momVal: (momAssists / Math.max(1, momGames)).toFixed(2),
       seaVal: (seaAssists / Math.max(1, seaGames)).toFixed(2),
-      carVal: '—',
+      lgVal:  lgA.toFixed(2),
       momFill: pct(momAssists / Math.max(1, momGames), 1.0),
       seaFill: pct(seaAssists / Math.max(1, seaGames), 1.0),
+      lgFill:  pct(lgA, 1.0),
       delta: delta(momAssists / Math.max(1, momGames), seaAssists / Math.max(1, seaGames)),
+      vsLeague: vsLeague(seaAssists / Math.max(1, seaGames), lgA),
     },
     {
       label: 'Shooting Efficiency',
       momVal: `${(momShootPct * 100).toFixed(1)}%`,
       seaVal: `${(seaShootPct * 100).toFixed(1)}%`,
-      carVal: '—',
+      lgVal:  `${(lgShoot * 100).toFixed(1)}%`,
       momFill: pct(momShootPct, 0.25),
       seaFill: pct(seaShootPct, 0.25),
+      lgFill:  pct(lgShoot, 0.25),
       delta: delta(momShootPct, seaShootPct),
+      vsLeague: vsLeague(seaShootPct, lgShoot),
     },
   ];
 
@@ -144,6 +161,14 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     trend: 0,
     energy: energyBar,
   };
+  const leagueAvgRadar = leagueAvg ? {
+    ppm: leagueAvg.seasonPpm,
+    shootingPct: leagueAvg.shootingPct,
+    goalsPerGame: leagueAvg.goalsPerGame,
+    assistsPerGame: leagueAvg.assistsPerGame,
+    trend: 0,
+    energy: leagueAvg.energyBar,
+  } : undefined;
 
   return (
     <div className="max-w-5xl mx-auto pb-20 md:pb-0 space-y-4">
@@ -211,7 +236,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       </div>
 
       {/* ── Energy Bar ──────────────────────────────────────────────────────────── */}
-      <EnergyBar value={energyBar} />
+      <EnergyBar value={energyBar} leagueAvg={lgEnergy} />
 
       {/* ── Radar + PPM timeline ────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -223,9 +248,10 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
             <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text)' }}>
               <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--neon)' }} />Momentum</span>
               <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--text)' }} />Season</span>
+              {leagueAvgRadar && <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--amber)' }} />Lg Avg</span>}
             </div>
           </div>
-          <PlayerRadarChart momentum={momentumRadar} season={seasonRadar} leagueMax={leagueMax} />
+          <PlayerRadarChart momentum={momentumRadar} season={seasonRadar} leagueMax={leagueMax} leagueAvg={leagueAvgRadar} />
         </div>
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="px-4 pt-3 pb-1 flex items-center justify-between">
@@ -250,18 +276,20 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
             Advanced Performance Matrix
           </span>
-          <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--text)' }}>
-            <span>Season Baseline</span>
-            <span className="font-semibold" style={{ color: 'var(--neon)' }}>Momentum Delta</span>
+          <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text)' }}>
+            <span className="flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm" style={{ background: 'var(--silver)' }}/>Season</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm" style={{ background: 'var(--neon)' }}/>Momentum</span>
+            <span className="flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm" style={{ background: 'var(--amber)' }}/>League Avg</span>
           </div>
         </div>
 
         {/* Header */}
         <div className="grid text-xs font-semibold uppercase tracking-wide px-4 py-2 border-b"
-          style={{ gridTemplateColumns: '2fr 1fr 3fr 1fr', color: 'var(--text)', borderColor: 'var(--border)' }}>
-          <span>Metric Identifier</span>
-          <span>Value</span>
-          <span>Relative Performance (Momentum vs Season)</span>
+          style={{ gridTemplateColumns: '2fr 1fr 3fr 1fr 1fr', color: 'var(--text)', borderColor: 'var(--border)' }}>
+          <span>Metric</span>
+          <span>Momentum</span>
+          <span>Relative Performance</span>
+          <span className="text-right">vs League</span>
           <span className="text-right">Trend</span>
         </div>
 
@@ -269,26 +297,44 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           const d = m.delta;
           const trendColor = d > 2 ? 'var(--green)' : d < -2 ? 'var(--red)' : 'var(--text)';
           const trendSign = d > 0 ? '+' : '';
+          const vl = m.vsLeague;
+          const vlColor = vl > 5 ? 'var(--green)' : vl < -5 ? 'var(--red)' : 'var(--text)';
+          const vlSign = vl > 0 ? '+' : '';
           return (
             <div key={m.label}
               className="grid items-center px-4 py-3 border-b"
               style={{
-                gridTemplateColumns: '2fr 1fr 3fr 1fr',
+                gridTemplateColumns: '2fr 1fr 3fr 1fr 1fr',
                 borderColor: 'var(--border)',
                 background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)',
               }}>
-              <span className="text-sm" style={{ color: 'var(--text-bright)' }}>{m.label}</span>
+              <div>
+                <span className="text-sm" style={{ color: 'var(--text-bright)' }}>{m.label}</span>
+                <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text)' }}>
+                  Sea: {m.seaVal} · Avg: {m.lgVal}
+                </div>
+              </div>
               <span className="text-sm font-mono font-bold" style={{ color: 'var(--neon)' }}>{m.momVal}</span>
               <div className="px-2 space-y-1">
-                {/* Season baseline bar (grey) */}
+                {/* Season bar */}
                 <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
                   <div className="h-full rounded-full" style={{ width: `${m.seaFill}%`, background: 'var(--silver)' }} />
                 </div>
-                {/* Momentum bar (neon) */}
+                {/* Momentum bar */}
                 <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
                   <div className="h-full rounded-full transition-all"
                     style={{ width: `${m.momFill}%`, background: 'var(--neon)' }} />
                 </div>
+                {/* League average bar */}
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                  <div className="h-full rounded-full"
+                    style={{ width: `${m.lgFill}%`, background: 'var(--amber)' }} />
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-xs font-mono font-semibold" style={{ color: vlColor }}>
+                  {Math.abs(vl) > 1 ? `${vlSign}${vl.toFixed(0)}%` : '≈ avg'}
+                </span>
               </div>
               <div className="text-right">
                 <span className="text-xs font-mono font-semibold" style={{ color: trendColor }}>

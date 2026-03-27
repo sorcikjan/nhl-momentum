@@ -21,6 +21,46 @@ async function latestModelVersion(): Promise<string> {
   return data?.version ?? 'v1.3';
 }
 
+// ─── League Averages ──────────────────────────────────────────────────────────
+
+export async function fetchLeagueAverages() {
+  // Latest snapshot per active skater — limit 1500 covers all ~650 non-goalie players
+  const { data } = await supabaseAdmin
+    .from('player_metric_snapshots')
+    .select(`
+      player_id, season_ppm, momentum_ppm,
+      season_goals, season_games, season_assists, season_shooting_pct,
+      energy_bar,
+      players!inner(position_code)
+    `)
+    .eq('players.is_active', true)
+    .neq('players.position_code', 'G')
+    .order('calculated_at', { ascending: false })
+    .limit(1500);
+
+  // Deduplicate to latest per player
+  const seen = new Set<number>();
+  const latest = (data ?? []).filter(r => {
+    if (seen.has(r.player_id)) return false;
+    seen.add(r.player_id);
+    return true;
+  });
+
+  const n = latest.length || 1;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const avg = (fn: (r: any) => number) => latest.reduce((s, r) => s + fn(r), 0) / n;
+
+  return {
+    seasonPpm:      avg(r => r.season_ppm ?? 0),
+    momentumPpm:    avg(r => r.momentum_ppm ?? 0),
+    goalsPerGame:   avg(r => (r.season_goals ?? 0) / Math.max(1, r.season_games ?? 1)),
+    assistsPerGame: avg(r => (r.season_assists ?? 0) / Math.max(1, r.season_games ?? 1)),
+    shootingPct:    avg(r => r.season_shooting_pct ?? 0),
+    energyBar:      avg(r => r.energy_bar ?? 100),
+    playerCount:    n,
+  };
+}
+
 // ─── Rankings ─────────────────────────────────────────────────────────────────
 
 export async function fetchRankings() {

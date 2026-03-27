@@ -7,6 +7,7 @@ interface Props {
   momentum: Record<string, number>;
   season: Record<string, number>;
   leagueMax: Record<string, number>;
+  leagueAvg?: Record<string, number>;
 }
 
 const METRICS = [
@@ -18,13 +19,14 @@ const METRICS = [
   { key: 'energy',        label: 'Energy' },
 ];
 
-export default function PlayerRadarChart({ momentum, season, leagueMax }: Props) {
+export default function PlayerRadarChart({ momentum, season, leagueMax, leagueAvg }: Props) {
   const data = METRICS.map(m => {
     const max = leagueMax[m.key] || 1;
     return {
       metric: m.label,
-      Momentum: Math.round(Math.min(100, ((momentum[m.key] ?? 0) / max) * 100)),
-      Season:   Math.round(Math.min(100, ((season[m.key]   ?? 0) / max) * 100)),
+      Momentum:   Math.round(Math.min(100, ((momentum[m.key]  ?? 0) / max) * 100)),
+      Season:     Math.round(Math.min(100, ((season[m.key]    ?? 0) / max) * 100)),
+      'Lg Avg':   leagueAvg ? Math.round(Math.min(100, ((leagueAvg[m.key] ?? 0) / max) * 100)) : undefined,
     };
   });
 
@@ -54,13 +56,23 @@ export default function PlayerRadarChart({ momentum, season, leagueMax }: Props)
             fill="var(--silver)"
             fillOpacity={0.1}
           />
+          {leagueAvg && (
+            <Radar
+              name="Lg Avg"
+              dataKey="Lg Avg"
+              stroke="#f59e0b"
+              fill="#f59e0b"
+              fillOpacity={0.08}
+              strokeDasharray="4 2"
+            />
+          )}
           <Legend
             wrapperStyle={{ fontSize: 11, color: 'var(--text)' }}
           />
         </RadarChart>
       </ResponsiveContainer>
       <p className="text-xs text-center mt-1" style={{ color: 'var(--text)' }}>
-        100% = league leader in each metric
+        100% = league leader · dashed = league season average
       </p>
     </div>
   );
