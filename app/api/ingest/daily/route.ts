@@ -41,8 +41,8 @@ export async function GET(req: NextRequest) {
 
   try {
     // ── Phase 1: Record outcomes for yesterday's completed games ───────────────
-    if (phase === 'snapshots') {
-      log.push('Phase 1: skipped (phase=snapshots)');
+    if (phase === 'snapshots' || phase === 'energy') {
+      log.push(`Phase 1: skipped (phase=${phase})`);
     } else {
     log.push(`Phase 1: recording outcomes for ${yesterday}`);
 
@@ -103,8 +103,8 @@ export async function GET(req: NextRequest) {
     } // end phase 1
 
     // ── Phase 2: Capture team snapshots + predictions for today's games ────────
-    if (phase === 'outcomes') {
-      log.push('Phase 2: skipped (phase=outcomes)');
+    if (phase === 'outcomes' || phase === 'energy') {
+      log.push(`Phase 2: skipped (phase=${phase})`);
     } else {
     log.push(`Phase 2: capturing snapshots + predictions for ${today}`);
 
