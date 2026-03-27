@@ -235,6 +235,52 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
+      {/* ── Bio strip ───────────────────────────────────────────────────────────── */}
+      {(player.birth_date || player.height_inches || player.draft_year || player.career_games) && (
+        <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 divide-x divide-y md:divide-y-0"
+            style={{ borderColor: 'var(--border)' }}>
+
+            {player.birth_date && (() => {
+              const age = Math.floor((Date.now() - new Date(player.birth_date).getTime()) / (365.25 * 86400000));
+              return (
+                <BioCell label="Age / Born" value={String(age)}
+                  sub={new Date(player.birth_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} />
+              );
+            })()}
+
+            {player.birth_country && (
+              <BioCell label="Birthplace"
+                value={player.birth_city ?? player.birth_country}
+                sub={[player.birth_state_province, player.birth_country].filter(Boolean).join(', ')} />
+            )}
+
+            {player.height_inches && (
+              <BioCell label="Height / Weight"
+                value={`${Math.floor(player.height_inches / 12)}′${player.height_inches % 12}″`}
+                sub={player.weight_pounds ? `${player.weight_pounds} lbs` : undefined} />
+            )}
+
+            {player.shoots_catches && (
+              <BioCell label={player.position_code === 'G' ? 'Catches' : 'Shoots'}
+                value={player.shoots_catches === 'L' ? 'Left' : 'Right'} />
+            )}
+
+            {player.draft_year && (
+              <BioCell label="Draft"
+                value={`${player.draft_year} · R${player.draft_round} · #${player.draft_pick}`}
+                sub={player.draft_team_abbrev ?? undefined} />
+            )}
+
+            {player.career_games && (
+              <BioCell label="Career"
+                value={`${player.career_points ?? 0} PTS`}
+                sub={`${player.career_games} GP · ${player.career_goals ?? 0}G ${player.career_assists ?? 0}A`} />
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Energy Bar ──────────────────────────────────────────────────────────── */}
       <EnergyBar value={energyBar} leagueAvg={lgEnergy} />
 
@@ -429,6 +475,16 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function BioCell({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="px-4 py-3 flex flex-col gap-0.5" style={{ borderColor: 'var(--border)' }}>
+      <span className="text-xs uppercase tracking-wider" style={{ color: 'var(--text)' }}>{label}</span>
+      <span className="text-sm font-semibold font-mono" style={{ color: 'var(--text-bright)' }}>{value}</span>
+      {sub && <span className="text-xs" style={{ color: 'var(--text)' }}>{sub}</span>}
     </div>
   );
 }

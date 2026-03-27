@@ -140,7 +140,13 @@ export async function fetchPlayer(id: string) {
   ] = await Promise.all([
     supabaseAdmin
       .from('players')
-      .select('*, teams(id, abbrev, name, logo_url)')
+      .select(`
+        *, teams(id, abbrev, name, logo_url),
+        birth_date, birth_city, birth_state_province, birth_country,
+        height_inches, weight_pounds, shoots_catches,
+        draft_year, draft_round, draft_pick, draft_team_abbrev,
+        career_games, career_goals, career_assists, career_points, career_plus_minus
+      `)
       .eq('id', id)
       .single(),
     supabaseAdmin
