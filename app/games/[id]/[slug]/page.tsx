@@ -203,19 +203,42 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         const rows = allRows.filter((o: any) => o.home_odds && o.away_odds);
         if (!rows.length) return null;
 
-        // Market consensus — average normalized prob across all bookmakers
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const probs = rows.map((o: any) => decimalToNormProb(o.home_odds, o.away_odds, o.draw_odds));
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const avg = (fn: (p: any) => number) => Math.round(probs.reduce((s: number, p: any) => s + fn(p), 0) / probs.length * 100);
-        const consHome = avg(p => p.home);
-        const consAway = avg(p => p.away);
-        const consOT   = probs[0].draw ? avg(p => p.draw ?? 0) : 0;
+        const pinnacle = rows.find((o: any) => o.bookmaker === 'pinnacle') ?? rows[0];
+        const pinProb  = decimalToNormProb(pinnacle.home_odds, pinnacle.away_odds, pinnacle.draw_odds);
+        const pinH  = Math.round(pinProb.home * 100);
+        const pinA  = Math.round(pinProb.away * 100);
+        const pinOT = pinProb.draw ? Math.round(pinProb.draw * 100) : 0;
 
-        const modelH = prediction ? Math.round(prediction.home_win_probability * 100) : null;
-        const modelA = prediction ? Math.round(prediction.away_win_probability * 100) : null;
+        const modelH  = prediction ? Math.round(prediction.home_win_probability * 100) : null;
+        const modelA  = prediction ? Math.round(prediction.away_win_probability * 100) : null;
         const modelOT = prediction ? Math.round(prediction.ot_probability * 100) : 0;
-        const consDelta = modelH !== null ? consHome - modelH : null;
+
+        // Who does each source favour?
+        const modelFav  = modelH !== null ? (modelH >= (modelA ?? 0) ? homeAbbrev : awayAbbrev) : null;
+        const pinFav    = pinH >= pinA ? homeAbbrev : awayAbbrev;
+        const agree     = modelFav !== null && modelFav === pinFav;
+
+        // Gap between model and Pinnacle on home team
+        const delta = modelH !== null ? modelH - pinH : null;
+        const absDelta = delta !== null ? Math.abs(delta) : 0;
+        const bigGap = absDelta >= 5;
+
+        // The team model is more bullish on vs Pinnacle
+        const modelBullishOn = delta !== null
+          ? (delta > 0 ? homeAbbrev : awayAbbrev)
+          : null;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const otherBooks = rows.filter((o: any) => o.bookmaker !== pinnacle.bookmaker);
+
+        const ProbBar = ({ a, h, ot, opacity = 1 }: { a: number; h: number; ot: number; opacity?: number }) => (
+          <div className="flex h-3 rounded-full overflow-hidden" style={{ opacity }}>
+            <div style={{ width: `${a}%`, background: 'var(--silver)' }} />
+            {ot > 0 && <div style={{ width: `${ot}%`, background: 'var(--amber)' }} />}
+            <div style={{ width: `${h}%`, background: 'var(--neon)' }} />
+          </div>
+        );
 
         return (
           <div className="rounded-xl border p-4 mb-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
@@ -231,135 +254,158 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
               </span>
             </div>
 
-            {/* Model vs Market consensus */}
-            {prediction && (
-              <div className="rounded-lg p-3 mb-4" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text)' }}>
-                  Model vs Market Consensus
+            {/* ── Our Model ── */}
+            {prediction && modelH !== null && modelA !== null && (
+              <div className="rounded-lg p-3 mb-2" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
+                    Our Model <span style={{ color: 'var(--text)', fontWeight: 400 }}>· {prediction.model_version}</span>
+                  </span>
+                  <span className="text-xs font-bold px-2 py-0.5 rounded"
+                    style={{ background: 'rgba(var(--neon-rgb, 74,222,128),0.12)', color: 'var(--neon)' }}>
+                    picks {modelFav}
+                  </span>
                 </div>
-
-                {/* Model bar */}
-                <div className="mb-3">
-                  <div className="flex justify-between text-xs mb-1">
-                    <span style={{ color: 'var(--silver)' }}>{awayAbbrev} {modelA}%</span>
-                    <span style={{ color: 'var(--text)' }}>Model · {prediction.model_version}</span>
-                    <span style={{ color: 'var(--neon)' }}>{homeAbbrev} {modelH}%</span>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <img src={awayLogo} alt={awayAbbrev} className="w-5 h-5 object-contain flex-shrink-0" />
+                  <div className="flex-1">
+                    <ProbBar a={modelA} h={modelH} ot={modelOT} />
                   </div>
-                  <div className="flex h-2.5 rounded-full overflow-hidden">
-                    <div style={{ width: `${modelA}%`, background: 'var(--silver)' }} />
-                    {modelOT > 0 && <div style={{ width: `${modelOT}%`, background: 'var(--amber)' }} />}
-                    <div style={{ width: `${modelH}%`, background: 'var(--neon)' }} />
-                  </div>
+                  <img src={homeLogo} alt={homeAbbrev} className="w-5 h-5 object-contain flex-shrink-0" />
                 </div>
-
-                {/* Market consensus bar */}
-                <div className="mb-4">
-                  <div className="flex justify-between text-xs mb-1" style={{ opacity: 0.75 }}>
-                    <span style={{ color: 'var(--silver)' }}>{awayAbbrev} {consAway}%</span>
-                    <span style={{ color: 'var(--text)' }}>Market consensus</span>
-                    <span style={{ color: 'var(--neon)' }}>{homeAbbrev} {consHome}%</span>
-                  </div>
-                  <div className="flex h-2.5 rounded-full overflow-hidden" style={{ opacity: 0.5 }}>
-                    <div style={{ width: `${consAway}%`, background: 'var(--silver)' }} />
-                    {consOT > 0 && <div style={{ width: `${consOT}%`, background: 'var(--amber)' }} />}
-                    <div style={{ width: `${consHome}%`, background: 'var(--neon)' }} />
-                  </div>
+                <div className="flex justify-between text-xs font-mono">
+                  <span style={{ color: 'var(--silver)', fontWeight: modelFav === awayAbbrev ? 700 : 400 }}>
+                    {awayAbbrev} {modelA}%
+                  </span>
+                  {modelOT > 0 && <span style={{ color: 'var(--amber)' }}>OT {modelOT}%</span>}
+                  <span style={{ color: 'var(--neon)', fontWeight: modelFav === homeAbbrev ? 700 : 400 }}>
+                    {homeAbbrev} {modelH}%
+                  </span>
                 </div>
+              </div>
+            )}
 
-                {/* Delta callout */}
-                {consDelta !== null && (
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="text-xs" style={{ color: 'var(--text)' }}>
-                      {homeAbbrev} model vs market:
+            {/* ── Pinnacle (or best available) ── */}
+            <div className="rounded-lg p-3 mb-3"
+              style={{ background: 'var(--bg)', border: '1px solid rgba(251,191,36,0.4)' }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                  <span style={{ color: 'var(--amber)' }}>◆</span>
+                  <span style={{ color: 'var(--text)' }}>{formatBookmaker(pinnacle.bookmaker)}</span>
+                  {pinnacle.bookmaker === 'pinnacle' && (
+                    <span className="font-mono font-normal px-1 rounded text-xs"
+                      style={{ background: 'rgba(251,191,36,0.15)', color: 'var(--amber)' }}>
+                      sharpest market
                     </span>
-                    <span className="px-2 py-0.5 rounded font-mono text-xs font-semibold"
-                      style={{
-                        background: Math.abs(consDelta) >= 5
-                          ? consDelta > 0 ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)'
-                          : 'var(--border)',
-                        color: Math.abs(consDelta) >= 5
-                          ? consDelta > 0 ? 'var(--red)' : 'var(--green)'
-                          : 'var(--text)',
-                      }}>
-                      {consDelta === 0
-                        ? 'Aligned'
-                        : consDelta > 0
-                          ? `Model +${consDelta}pp on ${homeAbbrev}`
-                          : `Market +${Math.abs(consDelta)}pp on ${homeAbbrev}`}
+                  )}
+                </span>
+                <span className="text-xs font-bold px-2 py-0.5 rounded"
+                  style={{ background: 'rgba(251,191,36,0.12)', color: 'var(--amber)' }}>
+                  picks {pinFav}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <img src={awayLogo} alt={awayAbbrev} className="w-5 h-5 object-contain flex-shrink-0" />
+                <div className="flex-1">
+                  <ProbBar a={pinA} h={pinH} ot={pinOT} opacity={0.75} />
+                </div>
+                <img src={homeLogo} alt={homeAbbrev} className="w-5 h-5 object-contain flex-shrink-0" />
+              </div>
+              <div className="flex justify-between text-xs font-mono">
+                <span style={{ color: 'var(--silver)', fontWeight: pinFav === awayAbbrev ? 700 : 400 }}>
+                  {awayAbbrev} {pinA}%
+                </span>
+                {pinOT > 0 && <span style={{ color: 'var(--amber)' }}>OT {pinOT}%</span>}
+                <span style={{ color: 'var(--neon)', fontWeight: pinFav === homeAbbrev ? 700 : 400 }}>
+                  {homeAbbrev} {pinH}%
+                </span>
+              </div>
+              {/* Decimal odds */}
+              <div className="flex justify-between text-xs font-mono mt-2 pt-2 border-t"
+                style={{ borderColor: 'rgba(251,191,36,0.2)', color: 'var(--text)' }}>
+                <span>{pinnacle.away_odds.toFixed(2)}</span>
+                {pinnacle.draw_odds && <span>{pinnacle.draw_odds.toFixed(2)}</span>}
+                <span>{pinnacle.home_odds.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* ── Verdict ── */}
+            {modelFav && (
+              <div className="rounded-lg px-3 py-2.5 mb-4 flex flex-col gap-1.5"
+                style={{
+                  background: agree ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)',
+                  border: `1px solid ${agree ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                }}>
+                <div className="flex items-center gap-2 text-sm font-semibold"
+                  style={{ color: agree ? 'var(--green)' : 'var(--red)' }}>
+                  <span>{agree ? '✓' : '✗'}</span>
+                  <span>
+                    {agree
+                      ? `Both favour ${modelFav}`
+                      : `Disagreement — model picks ${modelFav}, market picks ${pinFav}`}
+                  </span>
+                </div>
+                {bigGap && modelBullishOn && delta !== null && (
+                  <div className="flex items-center gap-2 text-xs"
+                    style={{ color: 'var(--amber)' }}>
+                    <span>⚠</span>
+                    <span>
+                      Model is <strong>{absDelta}pp</strong> more confident on {modelBullishOn} than Pinnacle
+                      {absDelta >= 10 ? ' — major divergence' : absDelta >= 7 ? ' — notable gap' : ''}
                     </span>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Bookmaker cards grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {rows.map((o: any) => {
-                const prob = decimalToNormProb(o.home_odds, o.away_odds, o.draw_odds);
-                const mktH = Math.round(prob.home * 100);
-                const mktA = Math.round(prob.away * 100);
-                const mktOT = prob.draw ? Math.round(prob.draw * 100) : 0;
-                const delta = modelH !== null ? mktH - modelH : null;
-                const isSharp = o.bookmaker === 'pinnacle';
-
-                return (
-                  <div key={o.id} className="rounded-lg p-2.5 flex flex-col gap-2"
-                    style={{
-                      background: 'var(--bg)',
-                      border: `1px solid ${isSharp ? 'rgba(251,191,36,0.35)' : 'var(--border)'}`,
-                    }}>
-
-                    {/* Name + sharp badge */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold" style={{ color: 'var(--text-bright)' }}>
-                        {formatBookmaker(o.bookmaker)}
-                      </span>
-                      {isSharp && (
-                        <span className="text-xs px-1 rounded font-mono"
-                          style={{ background: 'rgba(251,191,36,0.15)', color: 'var(--amber)' }}>
-                          sharp
+            {/* ── Other bookmakers ── */}
+            {otherBooks.length > 0 && (
+              <>
+                <div className="text-xs font-semibold uppercase tracking-wider mb-2"
+                  style={{ color: 'var(--text)' }}>
+                  Other bookmakers
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                  {otherBooks.map((o: any) => {
+                    const prob = decimalToNormProb(o.home_odds, o.away_odds, o.draw_odds);
+                    const mktH  = Math.round(prob.home * 100);
+                    const mktA  = Math.round(prob.away * 100);
+                    const mktOT = prob.draw ? Math.round(prob.draw * 100) : 0;
+                    const d = modelH !== null ? modelH - mktH : null;
+                    return (
+                      <div key={o.id} className="rounded-lg p-2.5 flex flex-col gap-1.5"
+                        style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                        <span className="text-xs font-semibold" style={{ color: 'var(--text-bright)' }}>
+                          {formatBookmaker(o.bookmaker)}
                         </span>
-                      )}
-                    </div>
+                        <div className="flex justify-between text-xs font-mono">
+                          <span style={{ color: 'var(--silver)' }}>{o.away_odds.toFixed(2)}</span>
+                          {o.draw_odds ? <span style={{ color: 'var(--text)' }}>{o.draw_odds.toFixed(2)}</span> : <span />}
+                          <span style={{ color: 'var(--neon)' }}>{o.home_odds.toFixed(2)}</span>
+                        </div>
+                        <div className="flex h-1 rounded-full overflow-hidden" style={{ opacity: 0.5 }}>
+                          <div style={{ width: `${mktA}%`, background: 'var(--silver)' }} />
+                          {mktOT > 0 && <div style={{ width: `${mktOT}%`, background: 'var(--amber)' }} />}
+                          <div style={{ width: `${mktH}%`, background: 'var(--neon)' }} />
+                        </div>
+                        <div className="flex justify-between text-xs font-mono">
+                          <span style={{ color: 'var(--text)' }}>H {mktH}%</span>
+                          {d !== null && (
+                            <span style={{ color: Math.abs(d) >= 3 ? (d > 0 ? 'var(--red)' : 'var(--green)') : 'var(--text)' }}>
+                              {d > 0 ? `+${d}` : d}pp
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
-                    {/* Decimal odds: away | OT? | home */}
-                    <div className="flex justify-between text-xs font-mono">
-                      <span style={{ color: 'var(--silver)' }}>{o.away_odds.toFixed(2)}</span>
-                      {o.draw_odds
-                        ? <span style={{ color: 'var(--text)' }}>{o.draw_odds.toFixed(2)}</span>
-                        : <span />
-                      }
-                      <span style={{ color: 'var(--neon)' }}>{o.home_odds.toFixed(2)}</span>
-                    </div>
-
-                    {/* Implied prob bar */}
-                    <div className="flex h-1 rounded-full overflow-hidden" style={{ opacity: 0.6 }}>
-                      <div style={{ width: `${mktA}%`, background: 'var(--silver)' }} />
-                      {mktOT > 0 && <div style={{ width: `${mktOT}%`, background: 'var(--amber)' }} />}
-                      <div style={{ width: `${mktH}%`, background: 'var(--neon)' }} />
-                    </div>
-
-                    {/* Home implied % + delta vs model */}
-                    <div className="flex items-center justify-between text-xs font-mono">
-                      <span style={{ color: 'var(--text)' }}>H {mktH}%</span>
-                      {delta !== null && (
-                        <span style={{
-                          color: Math.abs(delta) >= 3
-                            ? delta > 0 ? 'var(--green)' : 'var(--red)'
-                            : 'var(--text)',
-                        }}>
-                          {delta > 0 ? `+${delta}` : delta}pp
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <p className="text-xs mt-3" style={{ color: 'var(--text)', opacity: 0.6 }}>
-              pp = percentage points vs model · sharp = Pinnacle (lowest margin, sharpest market)
+            <p className="text-xs mt-3" style={{ color: 'var(--text)', opacity: 0.5 }}>
+              Implied % removes bookmaker margin · pp = model minus market on home team
             </p>
           </div>
         );
