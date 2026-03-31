@@ -15,23 +15,46 @@ interface Player {
   };
 }
 
-export default function BreakoutWatch({ players }: { players: Player[] }) {
+function relativeTime(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1)  return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  return `${Math.floor(mins / 60)}h ago`;
+}
+
+export default function BreakoutWatch({
+  players,
+  lastUpdated,
+}: {
+  players: Player[];
+  lastUpdated?: string | null;
+}) {
   return (
-    <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="flex items-center justify-between mb-4">
+    <div className="rounded-xl border p-4 flex flex-col" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <div className="flex items-center justify-between mb-1">
         <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--amber)' }}>
           🔥 Breakout Watch
         </h2>
         <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--amber)' }}>
-          Momentum vs Season
+          Recent vs Season
         </span>
       </div>
 
-      <div className="flex flex-col gap-2">
+      {lastUpdated && (
+        <p className="text-xs mb-3" style={{ color: 'var(--text)' }}>
+          Updated {relativeTime(lastUpdated)}
+        </p>
+      )}
+
+      <div className="flex flex-col gap-2 flex-1">
         {players.map((p) => {
           const name = `${p.players.first_name} ${p.players.last_name}`;
           const delta = p.breakout_delta ?? 0;
-          const pct = Math.min(100, Math.abs(delta) * 500);
+          const barPct = Math.min(100, Math.abs(delta) * 500);
+          const pctAbove = p.season_ppm > 0
+            ? Math.round(((p.momentum_ppm - p.season_ppm) / p.season_ppm) * 100)
+            : 0;
+
           return (
             <Link key={p.player_id}
               href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
@@ -39,7 +62,7 @@ export default function BreakoutWatch({ players }: { players: Player[] }) {
               style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
               <div className="w-7 h-7 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
                 {p.players.headshot_url
-                  ? <img src={p.players.headshot_url} alt={name} className="w-full h-full object-cover" />
+                  ? <img src={p.players.headshot_url} alt={name} className="w-full h-full object-cover" loading="lazy" />
                   : <div className="w-full h-full flex items-center justify-center text-xs" style={{ color: 'var(--text)' }}>
                       {p.players.first_name[0]}
                     </div>
@@ -48,12 +71,12 @@ export default function BreakoutWatch({ players }: { players: Player[] }) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-sm font-medium truncate" style={{ color: 'var(--text-bright)' }}>{name}</span>
-                  <span className="text-xs font-mono ml-2" style={{ color: 'var(--green)' }}>
-                    +{delta.toFixed(4)}
+                  <span className="text-xs font-mono font-semibold ml-2 flex-shrink-0" style={{ color: 'var(--amber)' }}>
+                    {pctAbove >= 0 ? '+' : ''}{pctAbove}% vs avg
                   </span>
                 </div>
-                <div className="w-full h-1 rounded-full" style={{ background: 'var(--border)' }}>
-                  <div className="h-1 rounded-full transition-all" style={{ width: `${pct}%`, background: 'var(--amber)' }} />
+                <div className="w-full h-1.5 rounded-full" style={{ background: 'var(--border)' }}>
+                  <div className="h-1.5 rounded-full transition-all" style={{ width: `${barPct}%`, background: 'var(--amber)' }} />
                 </div>
                 <div className="flex justify-between mt-1">
                   <span className="text-xs" style={{ color: 'var(--text)' }}>
@@ -67,6 +90,19 @@ export default function BreakoutWatch({ players }: { players: Player[] }) {
             </Link>
           );
         })}
+      </div>
+
+      <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="flex items-center justify-between">
+          <span className="text-xs" style={{ color: 'var(--text)' }}>
+            Showing top {players.length}
+          </span>
+          <Link href="/rankings"
+            className="text-xs font-medium hover:underline"
+            style={{ color: 'var(--amber)' }}>
+            View all rankings →
+          </Link>
+        </div>
       </div>
     </div>
   );

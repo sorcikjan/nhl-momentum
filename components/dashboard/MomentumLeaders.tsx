@@ -14,10 +14,23 @@ interface Player {
   };
 }
 
-export default function MomentumLeaders({ players }: { players: Player[] }) {
+function relativeTime(iso: string): string {
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1)  return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  return `${Math.floor(mins / 60)}h ago`;
+}
+
+export default function MomentumLeaders({
+  players,
+  lastUpdated,
+}: {
+  players: Player[];
+  lastUpdated?: string | null;
+}) {
   return (
-    <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="flex items-center justify-between mb-4">
+    <div className="rounded-xl border p-4 flex flex-col" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <div className="flex items-center justify-between mb-1">
         <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--neon)' }}>
           ⚡ Momentum Leaders
         </h2>
@@ -26,7 +39,13 @@ export default function MomentumLeaders({ players }: { players: Player[] }) {
         </span>
       </div>
 
-      <div className="flex flex-col gap-2">
+      {lastUpdated && (
+        <p className="text-xs mb-3" style={{ color: 'var(--text)' }}>
+          Updated {relativeTime(lastUpdated)}
+        </p>
+      )}
+
+      <div className="flex flex-col gap-2 flex-1">
         {players.map((p, i) => {
           const name = `${p.players.first_name} ${p.players.last_name}`;
           const ppm = p.momentum_ppm?.toFixed(4) ?? '—';
@@ -35,12 +54,12 @@ export default function MomentumLeaders({ players }: { players: Player[] }) {
               href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors hover:opacity-80"
               style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
-              <span className="text-xs w-5 text-center font-mono" style={{ color: 'var(--text)' }}>
+              <span className="text-xs w-5 text-center font-mono font-bold" style={{ color: 'var(--neon)' }}>
                 {i + 1}
               </span>
               <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
                 {p.players.headshot_url
-                  ? <img src={p.players.headshot_url} alt={name} className="w-full h-full object-cover" />
+                  ? <img src={p.players.headshot_url} alt={name} className="w-full h-full object-cover" loading="lazy" />
                   : <div className="w-full h-full flex items-center justify-center text-xs" style={{ color: 'var(--text)' }}>
                       {p.players.first_name[0]}
                     </div>
@@ -59,6 +78,19 @@ export default function MomentumLeaders({ players }: { players: Player[] }) {
             </Link>
           );
         })}
+      </div>
+
+      <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="flex items-center justify-between">
+          <span className="text-xs" style={{ color: 'var(--text)' }}>
+            Showing top {players.length}
+          </span>
+          <Link href="/rankings"
+            className="text-xs font-medium hover:underline"
+            style={{ color: 'var(--neon)' }}>
+            View all rankings →
+          </Link>
+        </div>
       </div>
     </div>
   );
