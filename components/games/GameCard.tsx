@@ -165,57 +165,52 @@ export default function GameCard({
         />
       )}
 
-      {/* Market odds comparison */}
-      {showMarket && bestOdds && mktHp !== null && mktAp !== null && (
-        <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+      {/* Model vs Market — who wins, side by side */}
+      {showMarket && bestOdds && mktHp !== null && mktAp !== null && prediction && (() => {
+        const modelH = Math.round(prediction.home_win_probability * 100);
+        const modelA = Math.round(prediction.away_win_probability * 100);
+        const modelFav = modelH >= modelA ? game.homeTeam.abbrev : game.awayTeam.abbrev;
+        const modelFavPct = Math.max(modelH, modelA);
+        const mktFav = mktHp >= mktAp ? game.homeTeam.abbrev : game.awayTeam.abbrev;
+        const mktFavPct = Math.max(mktHp, mktAp);
+        const agree = modelFav === mktFav;
 
-          {/* Header row: bookmaker + delta chip */}
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs flex items-center gap-1">
-              <span style={{ color: 'var(--amber)' }}>◆</span>
-              <span style={{ color: 'var(--text)' }}>{formatBookmaker(bestOdds.bookmaker)}</span>
-              {bestOdds.bookmaker === 'pinnacle' && (
-                <span className="text-xs px-1 rounded font-mono"
-                  style={{ background: 'rgba(251,191,36,0.15)', color: 'var(--amber)' }}>
-                  sharp
-                </span>
-              )}
-            </span>
-            {delta !== null && (
-              <span className="text-xs font-mono font-semibold px-1.5 py-0.5 rounded"
-                style={{
-                  background: Math.abs(delta) >= 4
-                    ? delta > 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'
-                    : 'var(--border)',
-                  color: Math.abs(delta) >= 4
-                    ? delta > 0 ? 'var(--green)' : 'var(--red)'
-                    : 'var(--text)',
-                }}>
-                {delta > 0 ? `+${delta}` : delta}pp
-              </span>
-            )}
-          </div>
+        return (
+          <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+            <div className="grid grid-cols-2 gap-2">
+              {/* Momentum pick */}
+              <div className="rounded-lg p-2.5 text-center"
+                style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                <div className="text-xs mb-1" style={{ color: 'var(--text)' }}>Momentum</div>
+                <div className="text-base font-bold" style={{ color: 'var(--neon)' }}>{modelFav} wins</div>
+                <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text)' }}>{modelFavPct}% confidence</div>
+              </div>
 
-          {/* Market probability bar */}
-          <div className="flex text-xs justify-between mb-1" style={{ color: 'var(--text)' }}>
-            <span style={{ color: 'var(--silver)', opacity: 0.8 }}>{game.awayTeam.abbrev} {mktAp}%</span>
-            {(mktOp ?? 0) > 0 && <span style={{ opacity: 0.8 }}>OT {mktOp}%</span>}
-            <span style={{ opacity: 0.8 }}>{game.homeTeam.abbrev} {mktHp}%</span>
-          </div>
-          <div className="flex h-1 rounded-full overflow-hidden mb-2" style={{ opacity: 0.55 }}>
-            <div style={{ width: `${mktAp}%`, background: 'var(--silver)' }} />
-            {(mktOp ?? 0) > 0 && <div style={{ width: `${mktOp}%`, background: 'var(--amber)' }} />}
-            <div style={{ width: `${mktHp}%`, background: 'var(--neon)' }} />
-          </div>
+              {/* Pinnacle pick */}
+              <div className="rounded-lg p-2.5 text-center"
+                style={{ background: 'var(--bg)', border: `1px solid ${agree ? 'var(--border)' : 'rgba(239,68,68,0.3)'}` }}>
+                <div className="text-xs mb-1 flex items-center justify-center gap-1">
+                  <span style={{ color: 'var(--amber)' }}>◆</span>
+                  <span style={{ color: 'var(--text)' }}>{formatBookmaker(bestOdds.bookmaker)}</span>
+                </div>
+                <div className="text-base font-bold"
+                  style={{ color: agree ? 'var(--neon)' : 'var(--red)' }}>
+                  {mktFav} wins
+                </div>
+                <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text)' }}>{mktFavPct}% implied</div>
+              </div>
+            </div>
 
-          {/* Decimal odds */}
-          <div className="flex items-center justify-between font-mono text-xs" style={{ color: 'var(--text)' }}>
-            <span style={{ color: 'var(--silver)' }}>{bestOdds.away_odds?.toFixed(2)}</span>
-            {bestOdds.draw_odds && <span>{bestOdds.draw_odds.toFixed(2)}</span>}
-            <span style={{ color: 'var(--neon)' }}>{bestOdds.home_odds?.toFixed(2)}</span>
+            {/* Agreement / disagreement */}
+            <div className="text-xs text-center mt-2 font-semibold"
+              style={{ color: agree ? 'var(--green)' : 'var(--red)' }}>
+              {agree
+                ? `✓ Both pick ${modelFav}`
+                : `✗ Split — Momentum: ${modelFav} · Market: ${mktFav}`}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Outcome badge */}
       {isFinal && outcome && (
