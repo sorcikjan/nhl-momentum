@@ -367,6 +367,7 @@ export async function fetchMatch(id: string) {
     { data: snapshots },
     { data: playerStats },
     { data: goalieStats },
+    { data: externalOdds },
   ] = await Promise.all([
     supabaseAdmin
       .from('predictions')
@@ -387,7 +388,12 @@ export async function fetchMatch(id: string) {
       .from('game_goalie_stats')
       .select('*, players(first_name, last_name)')
       .eq('game_id', id),
+    supabaseAdmin
+      .from('external_odds')
+      .select('*')
+      .eq('game_id', id)
+      .order('fetched_at', { ascending: false }),
   ]);
 
-  return { game, liveData, predictions, snapshots, playerStats, goalieStats };
+  return { game, liveData, predictions, snapshots, playerStats, goalieStats, externalOdds };
 }

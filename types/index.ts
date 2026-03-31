@@ -169,6 +169,19 @@ export interface ModelAccuracy {
   avgTotalScoreError: number;
 }
 
+// ─── External Odds ────────────────────────────────────────────────────────────
+
+export interface ExternalOdds {
+  id: string;
+  gameId: number;
+  source: string;
+  bookmaker: string;
+  homeOdds: number | null;
+  awayOdds: number | null;
+  drawOdds: number | null;   // OT/draw (3-way European markets); null for 2-way
+  fetchedAt: string;
+}
+
 // ─── API Response Wrappers ────────────────────────────────────────────────────
 
 export interface ApiResponse<T> {

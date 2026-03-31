@@ -22,10 +22,19 @@ export default async function GamesPage({
 }) {
   const { date } = await searchParams;
   const selected = date ?? new Date().toISOString().slice(0, 10);
-  const { games, predictions } = await fetchGames(selected).catch(() => ({ games: [], predictions: [] }));
+  const { games, predictions, odds } = await fetchGames(selected).catch(() => ({ games: [], predictions: [], odds: [] }));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const predMap = new Map<number, any>((predictions ?? []).map((p: { game_id: number }) => [p.game_id, p]));
+
+  // Group odds rows by game_id so each GameCard gets its own slice
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const oddsMap = new Map<number, any[]>();
+  for (const o of (odds ?? []) as { game_id: number }[]) {
+    const arr = oddsMap.get(o.game_id) ?? [];
+    arr.push(o);
+    oddsMap.set(o.game_id, arr);
+  }
 
   const label = (() => {
     const today = new Date().toISOString().slice(0, 10);
@@ -70,6 +79,7 @@ export default async function GamesPage({
               key={game.id}
               game={game}
               prediction={predMap.get(game.id)}
+              odds={oddsMap.get(game.id)}
             />
           ))}
         </div>

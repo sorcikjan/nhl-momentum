@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { fetchMatch, teamLogoUrl } from '@/lib/data';
 import { teamUrl, playerUrl } from '@/lib/urls';
+import { decimalToNormProb, formatBookmaker } from '@/lib/odds-api';
 
 export const revalidate = 30;
 
@@ -31,7 +32,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function MatchPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
   const { id } = await params;
-  const { game, liveData, predictions, snapshots, playerStats, goalieStats } = await fetchMatch(id);
+  const { game, liveData, predictions, snapshots, playerStats, goalieStats, externalOdds } = await fetchMatch(id);
 
   // Resolve team info from live data or DB game
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -193,6 +194,82 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
       )}
+
+      {/* Market Odds */}
+      {externalOdds && externalOdds.length > 0 && (() => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rows = externalOdds as any[];
+        const modelHomeProb = prediction
+          ? Math.round(prediction.home_win_probability * 100)
+          : null;
+        return (
+          <div className="rounded-xl border p-4 mb-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text)' }}>
+              Market Odds
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>
+                    <th className="text-left pb-2 font-semibold uppercase">Bookmaker</th>
+                    <th className="text-right pb-2 font-semibold uppercase">{awayAbbrev}</th>
+                    {rows.some((r: { draw_odds: number | null }) => r.draw_odds) && (
+                      <th className="text-right pb-2 font-semibold uppercase">OT</th>
+                    )}
+                    <th className="text-right pb-2 font-semibold uppercase">{homeAbbrev}</th>
+                    <th className="text-right pb-2 font-semibold uppercase">Mkt H%</th>
+                    {modelHomeProb !== null && (
+                      <th className="text-right pb-2 font-semibold uppercase">vs Model</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((o: { id: string; bookmaker: string; home_odds: number | null; away_odds: number | null; draw_odds: number | null }) => {
+                    if (!o.home_odds || !o.away_odds) return null;
+                    const prob = decimalToNormProb(o.home_odds, o.away_odds, o.draw_odds);
+                    const mktH = Math.round(prob.home * 100);
+                    const delta = modelHomeProb !== null ? mktH - modelHomeProb : null;
+                    const hasDrawCol = rows.some((r: { draw_odds: number | null }) => r.draw_odds);
+                    return (
+                      <tr key={o.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
+                        <td className="py-2 font-medium" style={{ color: 'var(--text-bright)' }}>
+                          {formatBookmaker(o.bookmaker)}
+                        </td>
+                        <td className="py-2 text-right font-mono" style={{ color: 'var(--silver)' }}>
+                          {o.away_odds.toFixed(2)}
+                        </td>
+                        {hasDrawCol && (
+                          <td className="py-2 text-right font-mono" style={{ color: 'var(--text)' }}>
+                            {o.draw_odds ? o.draw_odds.toFixed(2) : '—'}
+                          </td>
+                        )}
+                        <td className="py-2 text-right font-mono" style={{ color: 'var(--neon)' }}>
+                          {o.home_odds.toFixed(2)}
+                        </td>
+                        <td className="py-2 text-right font-mono font-semibold" style={{ color: 'var(--text-bright)' }}>
+                          {mktH}%
+                        </td>
+                        {delta !== null && (
+                          <td className="py-2 text-right font-mono" style={{
+                            color: delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : 'var(--text)',
+                          }}>
+                            {delta > 0 ? `+${delta}` : delta}pp
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {modelHomeProb !== null && (
+              <p className="text-xs mt-2" style={{ color: 'var(--text)' }}>
+                Model: {homeAbbrev} {modelHomeProb}% · vs Model = market minus model (positive = market favours {homeAbbrev} more)
+              </p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Side-by-side lineups */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

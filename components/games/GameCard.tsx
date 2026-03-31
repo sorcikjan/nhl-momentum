@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { gameUrl } from '@/lib/urls';
+import { pickBestOdds, decimalToNormProb, formatBookmaker } from '@/lib/odds-api';
 
 interface Prediction {
   predicted_home_score: number;
@@ -14,6 +15,15 @@ interface Prediction {
     actual_away_score: number;
     correct_winner: boolean;
   }[];
+}
+
+interface OddsRow {
+  id: string;
+  game_id: number;
+  bookmaker: string;
+  home_odds: number | null;
+  away_odds: number | null;
+  draw_odds: number | null;
 }
 
 interface Game {
@@ -57,7 +67,15 @@ function WinBar({ home, away, ot, homeAbbrev, awayAbbrev }: {
 const logoUrl = (abbrev: string, logo?: string) =>
   logo || `https://assets.nhle.com/logos/nhl/svg/${abbrev}_light.svg`;
 
-export default function GameCard({ game, prediction }: { game: Game; prediction?: Prediction }) {
+export default function GameCard({
+  game,
+  prediction,
+  odds,
+}: {
+  game: Game;
+  prediction?: Prediction;
+  odds?: OddsRow[];
+}) {
   const time = new Date(game.startTimeUTC).toLocaleTimeString('en-GB', {
     hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London',
   });
@@ -67,6 +85,9 @@ export default function GameCard({ game, prediction }: { game: Game; prediction?
   const outcome = prediction?.prediction_outcomes?.[0];
 
   const date = game.gameDate ?? game.startTimeUTC?.slice(0, 10);
+
+  // Pick the best available odds row to show on the card
+  const bestOdds = odds?.length ? pickBestOdds(odds) : null;
 
   return (
     <Link href={gameUrl(game.id, game.awayTeam.abbrev, game.homeTeam.abbrev, date)} className="block">
@@ -127,6 +148,33 @@ export default function GameCard({ game, prediction }: { game: Game; prediction?
           awayAbbrev={game.awayTeam.abbrev}
         />
       )}
+
+      {/* Market odds row */}
+      {bestOdds && bestOdds.home_odds && bestOdds.away_odds && !isFinal && (() => {
+        const prob = decimalToNormProb(bestOdds.home_odds, bestOdds.away_odds, bestOdds.draw_odds);
+        const hp = Math.round(prob.home * 100);
+        const ap = Math.round(prob.away * 100);
+        return (
+          <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex items-center justify-between text-xs">
+              <span style={{ color: 'var(--text)' }}>
+                {formatBookmaker(bestOdds.bookmaker)}
+              </span>
+              <div className="flex items-center gap-2 font-mono">
+                <span style={{ color: 'var(--silver)' }}>{game.awayTeam.abbrev} {ap}%</span>
+                <span style={{ color: 'var(--text)' }}>·</span>
+                <span style={{ color: 'var(--neon)' }}>{game.homeTeam.abbrev} {hp}%</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-xs mt-1 font-mono"
+              style={{ color: 'var(--text)' }}>
+              <span>{bestOdds.away_odds.toFixed(2)}</span>
+              {bestOdds.draw_odds && <span>{bestOdds.draw_odds.toFixed(2)}</span>}
+              <span>{bestOdds.home_odds.toFixed(2)}</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Outcome badge */}
       {isFinal && outcome && (
