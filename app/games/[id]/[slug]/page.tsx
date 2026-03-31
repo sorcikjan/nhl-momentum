@@ -198,75 +198,169 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
       {/* Market Odds */}
       {externalOdds && externalOdds.length > 0 && (() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rows = externalOdds as any[];
-        const modelHomeProb = prediction
-          ? Math.round(prediction.home_win_probability * 100)
-          : null;
+        const allRows = externalOdds as any[];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rows = allRows.filter((o: any) => o.home_odds && o.away_odds);
+        if (!rows.length) return null;
+
+        // Market consensus — average normalized prob across all bookmakers
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const probs = rows.map((o: any) => decimalToNormProb(o.home_odds, o.away_odds, o.draw_odds));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const avg = (fn: (p: any) => number) => Math.round(probs.reduce((s: number, p: any) => s + fn(p), 0) / probs.length * 100);
+        const consHome = avg(p => p.home);
+        const consAway = avg(p => p.away);
+        const consOT   = probs[0].draw ? avg(p => p.draw ?? 0) : 0;
+
+        const modelH = prediction ? Math.round(prediction.home_win_probability * 100) : null;
+        const modelA = prediction ? Math.round(prediction.away_win_probability * 100) : null;
+        const modelOT = prediction ? Math.round(prediction.ot_probability * 100) : 0;
+        const consDelta = modelH !== null ? consHome - modelH : null;
+
         return (
           <div className="rounded-xl border p-4 mb-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text)' }}>
-              Market Odds
-            </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>
-                    <th className="text-left pb-2 font-semibold uppercase">Bookmaker</th>
-                    <th className="text-right pb-2 font-semibold uppercase">{awayAbbrev}</th>
-                    {rows.some((r: { draw_odds: number | null }) => r.draw_odds) && (
-                      <th className="text-right pb-2 font-semibold uppercase">OT</th>
-                    )}
-                    <th className="text-right pb-2 font-semibold uppercase">{homeAbbrev}</th>
-                    <th className="text-right pb-2 font-semibold uppercase">Mkt H%</th>
-                    {modelHomeProb !== null && (
-                      <th className="text-right pb-2 font-semibold uppercase">vs Model</th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((o: { id: string; bookmaker: string; home_odds: number | null; away_odds: number | null; draw_odds: number | null }) => {
-                    if (!o.home_odds || !o.away_odds) return null;
-                    const prob = decimalToNormProb(o.home_odds, o.away_odds, o.draw_odds);
-                    const mktH = Math.round(prob.home * 100);
-                    const delta = modelHomeProb !== null ? mktH - modelHomeProb : null;
-                    const hasDrawCol = rows.some((r: { draw_odds: number | null }) => r.draw_odds);
-                    return (
-                      <tr key={o.id} className="border-t" style={{ borderColor: 'var(--border)' }}>
-                        <td className="py-2 font-medium" style={{ color: 'var(--text-bright)' }}>
-                          {formatBookmaker(o.bookmaker)}
-                        </td>
-                        <td className="py-2 text-right font-mono" style={{ color: 'var(--silver)' }}>
-                          {o.away_odds.toFixed(2)}
-                        </td>
-                        {hasDrawCol && (
-                          <td className="py-2 text-right font-mono" style={{ color: 'var(--text)' }}>
-                            {o.draw_odds ? o.draw_odds.toFixed(2) : '—'}
-                          </td>
-                        )}
-                        <td className="py-2 text-right font-mono" style={{ color: 'var(--neon)' }}>
-                          {o.home_odds.toFixed(2)}
-                        </td>
-                        <td className="py-2 text-right font-mono font-semibold" style={{ color: 'var(--text-bright)' }}>
-                          {mktH}%
-                        </td>
-                        {delta !== null && (
-                          <td className="py-2 text-right font-mono" style={{
-                            color: delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : 'var(--text)',
-                          }}>
-                            {delta > 0 ? `+${delta}` : delta}pp
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+
+            {/* Header */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
+                Market Odds
+              </h2>
+              <span className="text-xs px-2 py-0.5 rounded font-mono"
+                style={{ background: 'var(--border)', color: 'var(--text)' }}>
+                {rows.length} bookmaker{rows.length !== 1 ? 's' : ''}
+              </span>
             </div>
-            {modelHomeProb !== null && (
-              <p className="text-xs mt-2" style={{ color: 'var(--text)' }}>
-                Model: {homeAbbrev} {modelHomeProb}% · vs Model = market minus model (positive = market favours {homeAbbrev} more)
-              </p>
+
+            {/* Model vs Market consensus */}
+            {prediction && (
+              <div className="rounded-lg p-3 mb-4" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text)' }}>
+                  Model vs Market Consensus
+                </div>
+
+                {/* Model bar */}
+                <div className="mb-3">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span style={{ color: 'var(--silver)' }}>{awayAbbrev} {modelA}%</span>
+                    <span style={{ color: 'var(--text)' }}>Model · {prediction.model_version}</span>
+                    <span style={{ color: 'var(--neon)' }}>{homeAbbrev} {modelH}%</span>
+                  </div>
+                  <div className="flex h-2.5 rounded-full overflow-hidden">
+                    <div style={{ width: `${modelA}%`, background: 'var(--silver)' }} />
+                    {modelOT > 0 && <div style={{ width: `${modelOT}%`, background: 'var(--amber)' }} />}
+                    <div style={{ width: `${modelH}%`, background: 'var(--neon)' }} />
+                  </div>
+                </div>
+
+                {/* Market consensus bar */}
+                <div className="mb-4">
+                  <div className="flex justify-between text-xs mb-1" style={{ opacity: 0.75 }}>
+                    <span style={{ color: 'var(--silver)' }}>{awayAbbrev} {consAway}%</span>
+                    <span style={{ color: 'var(--text)' }}>Market consensus</span>
+                    <span style={{ color: 'var(--neon)' }}>{homeAbbrev} {consHome}%</span>
+                  </div>
+                  <div className="flex h-2.5 rounded-full overflow-hidden" style={{ opacity: 0.5 }}>
+                    <div style={{ width: `${consAway}%`, background: 'var(--silver)' }} />
+                    {consOT > 0 && <div style={{ width: `${consOT}%`, background: 'var(--amber)' }} />}
+                    <div style={{ width: `${consHome}%`, background: 'var(--neon)' }} />
+                  </div>
+                </div>
+
+                {/* Delta callout */}
+                {consDelta !== null && (
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-xs" style={{ color: 'var(--text)' }}>
+                      {homeAbbrev} model vs market:
+                    </span>
+                    <span className="px-2 py-0.5 rounded font-mono text-xs font-semibold"
+                      style={{
+                        background: Math.abs(consDelta) >= 5
+                          ? consDelta > 0 ? 'rgba(239,68,68,0.15)' : 'rgba(34,197,94,0.15)'
+                          : 'var(--border)',
+                        color: Math.abs(consDelta) >= 5
+                          ? consDelta > 0 ? 'var(--red)' : 'var(--green)'
+                          : 'var(--text)',
+                      }}>
+                      {consDelta === 0
+                        ? 'Aligned'
+                        : consDelta > 0
+                          ? `Model +${consDelta}pp on ${homeAbbrev}`
+                          : `Market +${Math.abs(consDelta)}pp on ${homeAbbrev}`}
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
+
+            {/* Bookmaker cards grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              {rows.map((o: any) => {
+                const prob = decimalToNormProb(o.home_odds, o.away_odds, o.draw_odds);
+                const mktH = Math.round(prob.home * 100);
+                const mktA = Math.round(prob.away * 100);
+                const mktOT = prob.draw ? Math.round(prob.draw * 100) : 0;
+                const delta = modelH !== null ? mktH - modelH : null;
+                const isSharp = o.bookmaker === 'pinnacle';
+
+                return (
+                  <div key={o.id} className="rounded-lg p-2.5 flex flex-col gap-2"
+                    style={{
+                      background: 'var(--bg)',
+                      border: `1px solid ${isSharp ? 'rgba(251,191,36,0.35)' : 'var(--border)'}`,
+                    }}>
+
+                    {/* Name + sharp badge */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-bright)' }}>
+                        {formatBookmaker(o.bookmaker)}
+                      </span>
+                      {isSharp && (
+                        <span className="text-xs px-1 rounded font-mono"
+                          style={{ background: 'rgba(251,191,36,0.15)', color: 'var(--amber)' }}>
+                          sharp
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Decimal odds: away | OT? | home */}
+                    <div className="flex justify-between text-xs font-mono">
+                      <span style={{ color: 'var(--silver)' }}>{o.away_odds.toFixed(2)}</span>
+                      {o.draw_odds
+                        ? <span style={{ color: 'var(--text)' }}>{o.draw_odds.toFixed(2)}</span>
+                        : <span />
+                      }
+                      <span style={{ color: 'var(--neon)' }}>{o.home_odds.toFixed(2)}</span>
+                    </div>
+
+                    {/* Implied prob bar */}
+                    <div className="flex h-1 rounded-full overflow-hidden" style={{ opacity: 0.6 }}>
+                      <div style={{ width: `${mktA}%`, background: 'var(--silver)' }} />
+                      {mktOT > 0 && <div style={{ width: `${mktOT}%`, background: 'var(--amber)' }} />}
+                      <div style={{ width: `${mktH}%`, background: 'var(--neon)' }} />
+                    </div>
+
+                    {/* Home implied % + delta vs model */}
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <span style={{ color: 'var(--text)' }}>H {mktH}%</span>
+                      {delta !== null && (
+                        <span style={{
+                          color: Math.abs(delta) >= 3
+                            ? delta > 0 ? 'var(--green)' : 'var(--red)'
+                            : 'var(--text)',
+                        }}>
+                          {delta > 0 ? `+${delta}` : delta}pp
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <p className="text-xs mt-3" style={{ color: 'var(--text)', opacity: 0.6 }}>
+              pp = percentage points vs model · sharp = Pinnacle (lowest margin, sharpest market)
+            </p>
           </div>
         );
       })()}

@@ -83,11 +83,27 @@ export default function GameCard({
   const isLive  = game.gameState === 'LIVE' || game.gameState === 'CRIT';
   const isFinal = game.gameState === 'FINAL' || game.gameState === 'OFF';
   const outcome = prediction?.prediction_outcomes?.[0];
-
   const date = game.gameDate ?? game.startTimeUTC?.slice(0, 10);
 
-  // Pick the best available odds row to show on the card
   const bestOdds = odds?.length ? pickBestOdds(odds) : null;
+
+  // Pre-compute market implied probs
+  let mktHp: number | null = null;
+  let mktAp: number | null = null;
+  let mktOp: number | null = null;
+  let delta: number | null = null;
+
+  if (bestOdds?.home_odds && bestOdds?.away_odds) {
+    const prob = decimalToNormProb(bestOdds.home_odds, bestOdds.away_odds, bestOdds.draw_odds);
+    mktHp = Math.round(prob.home * 100);
+    mktAp = Math.round(prob.away * 100);
+    mktOp = prob.draw ? Math.round(prob.draw * 100) : 0;
+    if (prediction) {
+      delta = mktHp - Math.round(prediction.home_win_probability * 100);
+    }
+  }
+
+  const showMarket = bestOdds && mktHp !== null && mktAp !== null && !isFinal;
 
   return (
     <Link href={gameUrl(game.id, game.awayTeam.abbrev, game.homeTeam.abbrev, date)} className="block">
@@ -138,7 +154,7 @@ export default function GameCard({
         })}
       </div>
 
-      {/* Win probability bar */}
+      {/* Model win probability bar */}
       {prediction && (
         <WinBar
           home={prediction.home_win_probability}
@@ -149,32 +165,57 @@ export default function GameCard({
         />
       )}
 
-      {/* Market odds row */}
-      {bestOdds && bestOdds.home_odds && bestOdds.away_odds && !isFinal && (() => {
-        const prob = decimalToNormProb(bestOdds.home_odds, bestOdds.away_odds, bestOdds.draw_odds);
-        const hp = Math.round(prob.home * 100);
-        const ap = Math.round(prob.away * 100);
-        return (
-          <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-            <div className="flex items-center justify-between text-xs">
-              <span style={{ color: 'var(--text)' }}>
-                {formatBookmaker(bestOdds.bookmaker)}
+      {/* Market odds comparison */}
+      {showMarket && bestOdds && mktHp !== null && mktAp !== null && (
+        <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
+
+          {/* Header row: bookmaker + delta chip */}
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs flex items-center gap-1">
+              <span style={{ color: 'var(--amber)' }}>◆</span>
+              <span style={{ color: 'var(--text)' }}>{formatBookmaker(bestOdds.bookmaker)}</span>
+              {bestOdds.bookmaker === 'pinnacle' && (
+                <span className="text-xs px-1 rounded font-mono"
+                  style={{ background: 'rgba(251,191,36,0.15)', color: 'var(--amber)' }}>
+                  sharp
+                </span>
+              )}
+            </span>
+            {delta !== null && (
+              <span className="text-xs font-mono font-semibold px-1.5 py-0.5 rounded"
+                style={{
+                  background: Math.abs(delta) >= 4
+                    ? delta > 0 ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'
+                    : 'var(--border)',
+                  color: Math.abs(delta) >= 4
+                    ? delta > 0 ? 'var(--green)' : 'var(--red)'
+                    : 'var(--text)',
+                }}>
+                {delta > 0 ? `+${delta}` : delta}pp
               </span>
-              <div className="flex items-center gap-2 font-mono">
-                <span style={{ color: 'var(--silver)' }}>{game.awayTeam.abbrev} {ap}%</span>
-                <span style={{ color: 'var(--text)' }}>·</span>
-                <span style={{ color: 'var(--neon)' }}>{game.homeTeam.abbrev} {hp}%</span>
-              </div>
-            </div>
-            <div className="flex items-center justify-between text-xs mt-1 font-mono"
-              style={{ color: 'var(--text)' }}>
-              <span>{bestOdds.away_odds.toFixed(2)}</span>
-              {bestOdds.draw_odds && <span>{bestOdds.draw_odds.toFixed(2)}</span>}
-              <span>{bestOdds.home_odds.toFixed(2)}</span>
-            </div>
+            )}
           </div>
-        );
-      })()}
+
+          {/* Market probability bar */}
+          <div className="flex text-xs justify-between mb-1" style={{ color: 'var(--text)' }}>
+            <span style={{ color: 'var(--silver)', opacity: 0.8 }}>{game.awayTeam.abbrev} {mktAp}%</span>
+            {(mktOp ?? 0) > 0 && <span style={{ opacity: 0.8 }}>OT {mktOp}%</span>}
+            <span style={{ opacity: 0.8 }}>{game.homeTeam.abbrev} {mktHp}%</span>
+          </div>
+          <div className="flex h-1 rounded-full overflow-hidden mb-2" style={{ opacity: 0.55 }}>
+            <div style={{ width: `${mktAp}%`, background: 'var(--silver)' }} />
+            {(mktOp ?? 0) > 0 && <div style={{ width: `${mktOp}%`, background: 'var(--amber)' }} />}
+            <div style={{ width: `${mktHp}%`, background: 'var(--neon)' }} />
+          </div>
+
+          {/* Decimal odds */}
+          <div className="flex items-center justify-between font-mono text-xs" style={{ color: 'var(--text)' }}>
+            <span style={{ color: 'var(--silver)' }}>{bestOdds.away_odds?.toFixed(2)}</span>
+            {bestOdds.draw_odds && <span>{bestOdds.draw_odds.toFixed(2)}</span>}
+            <span style={{ color: 'var(--neon)' }}>{bestOdds.home_odds?.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
 
       {/* Outcome badge */}
       {isFinal && outcome && (
