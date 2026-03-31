@@ -28,10 +28,20 @@ export async function GET(req: NextRequest) {
       .select('id, name, abbrev');
     if (teamsErr) throw teamsErr;
 
+    // Known name differences between The Odds API and the NHL API
+    const ALIASES: Record<string, string> = {
+      'st louis blues': 'st. louis blues',
+    };
+
     const teamMap = new Map<string, { id: number; abbrev: string }>();
     for (const t of teams ?? []) {
       teamMap.set(t.name.toLowerCase(), { id: t.id, abbrev: t.abbrev });
     }
+
+    const resolveTeam = (name: string) => {
+      const key = name.toLowerCase();
+      return teamMap.get(ALIASES[key] ?? key);
+    };
 
     // 2. Fetch odds from The Odds API
     const events = await fetchNHLOdds(apiKey);
@@ -75,8 +85,8 @@ export async function GET(req: NextRequest) {
     const now = new Date().toISOString();
 
     for (const ev of events) {
-      const homeTeam = teamMap.get(ev.home_team.toLowerCase());
-      const awayTeam = teamMap.get(ev.away_team.toLowerCase());
+      const homeTeam = resolveTeam(ev.home_team);
+      const awayTeam = resolveTeam(ev.away_team);
 
       if (!homeTeam || !awayTeam) {
         log.push(`Unknown team: "${ev.away_team}" @ "${ev.home_team}"`);
