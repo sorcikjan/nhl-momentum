@@ -67,7 +67,9 @@ export async function fetchRankings() {
   const { data, error } = await supabaseAdmin
     .from('player_metric_snapshots')
     .select(`
-      *,
+      player_id, momentum_rank, composite_ppm, momentum_ppm, season_ppm,
+      breakout_delta, energy_bar, momentum_goals, momentum_assists, momentum_points,
+      sos_coefficient, season_goals, season_points, calculated_at,
       players (
         id, first_name, last_name, position_code, team_id,
         headshot_url, injury_status,
@@ -80,13 +82,15 @@ export async function fetchRankings() {
   if (error) throw error;
 
   const seen = new Set<number>();
-  const latest = (data ?? []).filter(row => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const latest = (data as any[] ?? []).filter((row: any) => {
     if (seen.has(row.player_id)) return false;
     seen.add(row.player_id);
     return true;
   });
 
-  const skaters = latest.filter(r => r.players?.position_code !== 'G');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const skaters = latest.filter((r: any) => r.players?.position_code !== 'G');
 
   // Rank globally by composite_ppm at query time — stored momentum_rank is only
   // valid within each ingest batch and cannot be trusted for cross-batch ordering.
@@ -100,7 +104,8 @@ export async function fetchRankings() {
   const momentumLeaderSkaters = [...skaters]
     .sort((a, b) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0))
     .slice(0, 5);
-  const goalies = latest.filter(r => r.players?.position_code === 'G');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const goalies = latest.filter((r: any) => r.players?.position_code === 'G');
   const momentumLeaderGoalies = [...goalies]
     .sort((a, b) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0))
     .slice(0, 5);
@@ -121,12 +126,19 @@ export async function fetchGames(date: string) {
     latestModelVersion(),
   ]);
   const gameIds = (games as { id: number }[]).map(g => g.id);
-  const { data: predictions } = await supabaseAdmin
-    .from('predictions')
-    .select('*, prediction_outcomes(*)')
-    .in('game_id', gameIds)
-    .eq('model_version', activeModel);
-  return { games, predictions };
+  const [{ data: predictions }, { data: odds }] = await Promise.all([
+    supabaseAdmin
+      .from('predictions')
+      .select('*, prediction_outcomes(*)')
+      .in('game_id', gameIds)
+      .eq('model_version', activeModel),
+    supabaseAdmin
+      .from('external_odds')
+      .select('*')
+      .in('game_id', gameIds)
+      .order('fetched_at', { ascending: false }),
+  ]);
+  return { games, predictions, odds };
 }
 
 // ─── Player ───────────────────────────────────────────────────────────────────
@@ -194,38 +206,36 @@ export async function fetchAccuracy(modelVersion?: string) {
     ? [modelVersion]
     : ['v1.0', 'v1.1', 'v1.2', 'v1.3', 'v1.4', 'v1.5', 'v1.6', 'v1.7'];
 
-  // Fetch model versions metadata + all per-version prediction queries in parallel
-  const [{ data: accuracy, error: accErr }, ...versionResults] = await Promise.all([
+  // Fetch model versions metadata + all predictions in a single query
+  const [{ data: accuracy, error: accErr }, { data: rawPredictions }] = await Promise.all([
     supabaseAdmin
       .from('model_versions')
       .select('version, description, created_at, is_active'),
-    ...VERSIONS_TO_FETCH.map(v =>
-      supabaseAdmin
-        .from('predictions')
-        .select(`
-          id, game_id, model_version, predicted_home_score, predicted_away_score,
-          home_win_probability, away_win_probability, ot_probability,
-          home_energy_bar, away_energy_bar, created_at,
-          prediction_outcomes (
-            actual_home_score, actual_away_score,
-            home_score_error, away_score_error, correct_winner, recorded_at
-          ),
-          games (
-            game_date,
-            home_team:teams!games_home_team_id_fkey ( abbrev ),
-            away_team:teams!games_away_team_id_fkey ( abbrev )
-          )
-        `)
-        .eq('model_version', v)
-        .order('created_at', { ascending: false })
-        .limit(500)
-    ),
+    supabaseAdmin
+      .from('predictions')
+      .select(`
+        id, game_id, model_version, predicted_home_score, predicted_away_score,
+        home_win_probability, away_win_probability, ot_probability,
+        home_energy_bar, away_energy_bar, created_at,
+        prediction_outcomes (
+          actual_home_score, actual_away_score,
+          home_score_error, away_score_error, correct_winner, recorded_at
+        ),
+        games (
+          game_date,
+          home_team:teams!games_home_team_id_fkey ( abbrev ),
+          away_team:teams!games_away_team_id_fkey ( abbrev )
+        )
+      `)
+      .in('model_version', VERSIONS_TO_FETCH)
+      .order('created_at', { ascending: false })
+      .limit(4000),
   ]);
 
   if (accErr) throw accErr;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const predictions: any[] = versionResults.flatMap(r => r.data ?? []);
+  const predictions: any[] = rawPredictions ?? [];
 
   const stats: Record<string, {
     total: number; withOutcome: number; correctWinner: number;

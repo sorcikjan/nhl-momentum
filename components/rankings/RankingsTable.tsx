@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { playerUrl, teamUrl } from '@/lib/urls';
 
@@ -34,13 +34,16 @@ export default function RankingsTable({ players }: { players: Player[] }) {
 
   const positions = ['ALL', 'C', 'L', 'R', 'D'];
 
-  const filtered = players
-    .filter(p => pos === 'ALL' || p.players.position_code === pos)
-    .sort((a, b) => {
-      if (sort === 'momentum_rank') return (a.momentum_rank ?? 999) - (b.momentum_rank ?? 999);
-      if (sort === 'energy_bar') return (b.energy_bar ?? 0) - (a.energy_bar ?? 0);
-      return (b[sort] ?? 0) - (a[sort] ?? 0);
-    });
+  const filtered = useMemo(() =>
+    players
+      .filter(p => pos === 'ALL' || p.players.position_code === pos)
+      .sort((a, b) => {
+        if (sort === 'momentum_rank') return (a.momentum_rank ?? 999) - (b.momentum_rank ?? 999);
+        if (sort === 'energy_bar') return (b.energy_bar ?? 0) - (a.energy_bar ?? 0);
+        return (b[sort] ?? 0) - (a[sort] ?? 0);
+      }),
+    [players, pos, sort]
+  );
 
   const th = (label: string, key: SortKey) => (
     <th
@@ -116,7 +119,7 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                         className="flex items-center gap-2 hover:opacity-80">
                         <div className="w-7 h-7 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
                           {p.players.headshot_url
-                            ? <img src={p.players.headshot_url} alt={name} className="w-full h-full object-cover" />
+                            ? <img src={p.players.headshot_url} alt={name} className="w-full h-full object-cover" loading="lazy" />
                             : <div className="w-full h-full flex items-center justify-center text-xs"
                                 style={{ color: 'var(--text)' }}>{p.players.first_name[0]}</div>
                           }
