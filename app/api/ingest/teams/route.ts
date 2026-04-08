@@ -1,10 +1,14 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireIngestAuth } from '@/lib/ingest-auth';
 
 // GET /api/ingest/teams
 // Fetches all 32 NHL teams and upserts into DB
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
   try {
     const res = await fetch('https://api.nhle.com/stats/rest/en/team', {
       cache: 'no-store',

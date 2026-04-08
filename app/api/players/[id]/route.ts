@@ -10,6 +10,7 @@ export async function GET(
     const data = await fetchPlayer(id);
     return NextResponse.json({ data, error: null });
   } catch (err) {
-    return NextResponse.json({ data: null, error: (err as Error).message }, { status: 500 });
+    console.error('[/api/players]', err);
+    return NextResponse.json({ data: null, error: 'Internal server error' }, { status: 500 });
   }
 }

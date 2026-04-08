@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireIngestAuth } from '@/lib/ingest-auth';
 
 // ─── Backfill SOS + Recent Form ───────────────────────────────────────────────
 // Populates sos_multiplier and goalie_snapshot.teamRecentForm on all
@@ -21,7 +22,10 @@ import { supabaseAdmin } from '@/lib/supabase';
 // GET /api/ingest/backfill-sos
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
   try {
     // 1. Fetch all completed games this season with scores
     const { data: allGames, error: gamesErr } = await supabaseAdmin

@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireIngestAuth } from '@/lib/ingest-auth';
 
 // ─── Momentum/Season Weight Grid Search ───────────────────────────────────────
 // Tests all momentum weight values (0.1 → 0.9, step 0.1) against the full set
@@ -95,7 +96,10 @@ function runWithWeight(
   return { homeWin, awayWin: 1 - homeWin };
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
   try {
     // Fetch all snapshots
     const { data: snapshots, error: snapErr } = await supabaseAdmin

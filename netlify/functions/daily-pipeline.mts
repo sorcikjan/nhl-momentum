@@ -11,17 +11,19 @@ import type { Config } from '@netlify/functions';
 
 export default async function handler() {
   const base = process.env.URL ?? 'https://nhl-momentum.netlify.app';
+  const ingestKey = process.env.INGEST_API_KEY ?? '';
+  const headers = { 'x-api-key': ingestKey };
   const log: string[] = [];
 
   try {
     // 1. Outcomes
-    const outcomes = await fetch(`${base}/api/ingest/daily?phase=outcomes`).then(r => r.json());
+    const outcomes = await fetch(`${base}/api/ingest/daily?phase=outcomes`, { headers }).then(r => r.json());
     log.push(`outcomes: ${outcomes.data?.outcomes_recorded ?? `error: ${outcomes.error}`} recorded`);
 
     // 2. Gamelogs (paginated — loop until no players returned)
     let glOffset = 0, glSkaterRows = 0, glGoalieRows = 0;
     for (;;) {
-      const gl = await fetch(`${base}/api/ingest/gamelogs?offset=${glOffset}&limit=50`).then(r => r.json());
+      const gl = await fetch(`${base}/api/ingest/gamelogs?offset=${glOffset}&limit=50`, { headers }).then(r => r.json());
       if (gl.error || (!gl.data?.skaterRows && glOffset > 0)) break;
       glSkaterRows += gl.data?.skaterRows ?? 0;
       glGoalieRows += gl.data?.goalieRows ?? 0;
@@ -35,7 +37,7 @@ export default async function handler() {
     // 3. Metrics (paginated — loop until no snapshots inserted)
     let mOffset = 0, mTotal = 0;
     for (;;) {
-      const m = await fetch(`${base}/api/ingest/metrics?offset=${mOffset}&limit=100`).then(r => r.json());
+      const m = await fetch(`${base}/api/ingest/metrics?offset=${mOffset}&limit=100`, { headers }).then(r => r.json());
       const inserted = m.data?.snapshotsInserted ?? 0;
       mTotal += inserted;
       if (inserted === 0) break;
@@ -45,11 +47,11 @@ export default async function handler() {
     log.push(`metrics: ${mTotal} snapshots inserted`);
 
     // 4. Snapshots + predictions (includes energy auto-update for recent players)
-    const snaps = await fetch(`${base}/api/ingest/daily?phase=snapshots`).then(r => r.json());
+    const snaps = await fetch(`${base}/api/ingest/daily?phase=snapshots`, { headers }).then(r => r.json());
     log.push(`snapshots: ${snaps.data?.snapshots_saved ?? `error: ${snaps.error}`} saved, ${snaps.data?.energy_updated ?? 0} energy updated`);
 
     // 5. Full energy sweep for all active players
-    const energy = await fetch(`${base}/api/ingest/daily?phase=energy`).then(r => r.json());
+    const energy = await fetch(`${base}/api/ingest/daily?phase=energy`, { headers }).then(r => r.json());
     log.push(`energy: ${energy.data?.energy_updated ?? `error: ${energy.error}`} updated`);
 
     console.log('[daily-pipeline] complete:', log.join(' | '));

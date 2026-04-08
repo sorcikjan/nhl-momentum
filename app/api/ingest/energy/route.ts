@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { calculatePlayerEnergy, GOALIE_DRAIN_PER_MIN, type GameRecord } from '@/lib/energy';
+import { requireIngestAuth } from '@/lib/ingest-auth';
 
 // GET /api/ingest/energy?offset=0&limit=100
 //
@@ -16,8 +17,11 @@ import { calculatePlayerEnergy, GOALIE_DRAIN_PER_MIN, type GameRecord } from '@/
 const GAME_DURATION_MS = 2.5 * 3_600_000; // avg NHL game length (2h30m)
 
 export async function GET(req: NextRequest) {
-  const limit  = Number(req.nextUrl.searchParams.get('limit')  ?? '100');
-  const offset = Number(req.nextUrl.searchParams.get('offset') ?? '0');
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
+  const limit  = Math.min(500, Math.max(1, Number(req.nextUrl.searchParams.get('limit')  ?? '100')));
+  const offset = Math.max(0, Number(req.nextUrl.searchParams.get('offset') ?? '0'));
 
   try {
     const now     = new Date();

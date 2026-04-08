@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { fetchNHLOdds } from '@/lib/odds-api';
+import { requireIngestAuth } from '@/lib/ingest-auth';
 
 // ─── Odds Ingest ──────────────────────────────────────────────────────────────
 // Fetches NHL game odds from The Odds API and upserts them into external_odds.

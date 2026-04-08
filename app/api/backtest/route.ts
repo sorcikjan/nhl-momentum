@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireIngestAuth } from '@/lib/ingest-auth';
 
 // ─── Backtest Engine ───────────────────────────────────────────────────────────
 // Reads stored game_team_snapshots (the model-agnostic raw state captured at
@@ -635,6 +636,9 @@ const MODEL_FORMULAS: Record<string, (
 // ─── GET — compare model versions for a specific game ─────────────────────────
 
 export async function GET(req: NextRequest) {
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
   const { searchParams } = req.nextUrl;
   const compareParam = searchParams.get('compare');   // "v1.0,v1.1"
   const gameId = searchParams.get('game_id');
@@ -701,6 +705,9 @@ export async function GET(req: NextRequest) {
 // ─── POST — run a model version against all stored snapshots ──────────────────
 
 export async function POST(req: NextRequest) {
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
   try {
     const body = await req.json();
     const { model_version, description, formula_spec } = body as {

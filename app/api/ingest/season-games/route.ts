@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSchedule } from '@/lib/nhl-api';
+import { requireIngestAuth } from '@/lib/ingest-auth';
 
 // ─── Full Season Games Download ────────────────────────────────────────────────
 // Downloads every 2025-26 regular season game from the NHL schedule API and
@@ -12,7 +13,10 @@ import { getSchedule } from '@/lib/nhl-api';
 // GET /api/ingest/season-games
 // ─────────────────────────────────────────────────────────────────────────────
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
   const SEASON_START = '2025-10-01';
   const today = new Date().toISOString().slice(0, 10);
 

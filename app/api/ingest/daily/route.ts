@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getGamesByDate } from '@/lib/nhl-api';
+import { requireIngestAuth } from '@/lib/ingest-auth';
 import { energyMultiplier, goalieEnergyPenalty, calculatePlayerEnergy, GOALIE_DRAIN_PER_MIN, type GameRecord } from '@/lib/energy';
 import type { NHLScheduledGame } from '@/types';
 
@@ -23,11 +24,26 @@ import type { NHLScheduledGame } from '@/types';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
   const dateParam = req.nextUrl.searchParams.get('date');
+  const phaseParam = req.nextUrl.searchParams.get('phase') ?? 'all';
+
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  if (dateParam && !DATE_RE.test(dateParam)) {
+    return NextResponse.json({ data: null, error: 'Invalid date format' }, { status: 400 });
+  }
+
+  const VALID_PHASES = new Set(['all', 'outcomes', 'snapshots', 'energy']);
+  if (!VALID_PHASES.has(phaseParam)) {
+    return NextResponse.json({ data: null, error: 'Invalid phase' }, { status: 400 });
+  }
+
   // phase=outcomes  → only Phase 1 (record yesterday's results)
   // phase=snapshots → only Phase 2 (build today's snapshots + predictions)
   // (default)       → both phases (may timeout on large game slates)
-  const phase = req.nextUrl.searchParams.get('phase') ?? 'all';
+  const phase = phaseParam;
 
   const today = dateParam ?? new Date().toISOString().slice(0, 10);
   const yesterday = new Date(new Date(today + 'T12:00:00Z').getTime() - 86400000)

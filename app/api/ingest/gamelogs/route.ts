@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { currentSeason, toiToSeconds } from '@/lib/nhl-api';
+import { requireIngestAuth } from '@/lib/ingest-auth';
 
 // GET /api/ingest/gamelogs?limit=30&offset=0
 // Pulls game logs for active players and upserts into game_player_stats / game_goalie_stats
 // Use offset to paginate: run with offset=0, 30, 60, ... until exhausted
 
 export async function GET(req: NextRequest) {
-  const limit  = Number(req.nextUrl.searchParams.get('limit')  ?? '30');
-  const offset = Number(req.nextUrl.searchParams.get('offset') ?? '0');
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
+  const limit  = Math.min(200, Math.max(1, Number(req.nextUrl.searchParams.get('limit')  ?? '30')));
+  const offset = Math.max(0, Number(req.nextUrl.searchParams.get('offset') ?? '0'));
   const season = currentSeason();
 
   // Fetch active players from DB with pagination

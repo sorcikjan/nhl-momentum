@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getGamesByDate } from '@/lib/nhl-api';
 import type { NHLScheduledGame } from '@/types';
+import { requireIngestAuth } from '@/lib/ingest-auth';
 
 // GET /api/ingest/backfill?days=30
 // Fetches completed games from the past N days from the NHL schedule API
@@ -11,7 +12,10 @@ import type { NHLScheduledGame } from '@/types';
 // Stays well within Netlify 26s timeout: 30 days × ~300ms/call ≈ 9s.
 
 export async function GET(req: NextRequest) {
-  const days = Math.min(60, Number(req.nextUrl.searchParams.get('days') ?? '30'));
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
+  const days = Math.min(60, Math.max(1, Number(req.nextUrl.searchParams.get('days') ?? '30')));
 
   const log: string[] = [];
   let gamesUpserted = 0;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireIngestAuth } from '@/lib/ingest-auth';
 import {
   buildLayerMetrics,
   compositeLayer,
@@ -14,8 +15,11 @@ import { calcSOSCoefficient } from '@/lib/sos';
 // Reads game_player_stats from DB, computes 3-layer metrics, writes snapshots
 
 export async function GET(req: NextRequest) {
-  const limit  = Number(req.nextUrl.searchParams.get('limit')  ?? '100');
-  const offset = Number(req.nextUrl.searchParams.get('offset') ?? '0');
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
+  const limit  = Math.min(500, Math.max(1, Number(req.nextUrl.searchParams.get('limit')  ?? '100')));
+  const offset = Math.max(0, Number(req.nextUrl.searchParams.get('offset') ?? '0'));
 
   try {
     // Fetch active skaters with pagination

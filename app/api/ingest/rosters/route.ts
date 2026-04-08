@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { currentSeason } from '@/lib/nhl-api';
+import { requireIngestAuth } from '@/lib/ingest-auth';
 
 // All 32 current NHL team abbreviations
 const NHL_TEAMS = [
@@ -19,7 +20,10 @@ interface RosterPlayer {
   headshot: string;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
   const season = currentSeason();
   let totalUpserted = 0;
   const errors: string[] = [];

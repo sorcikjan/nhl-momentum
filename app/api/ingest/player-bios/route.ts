@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireIngestAuth } from '@/lib/ingest-auth';
 
 // GET /api/ingest/player-bios?offset=0&limit=20
 //
@@ -8,8 +9,11 @@ import { supabaseAdmin } from '@/lib/supabase';
 // offset=0, 20, 40, ... until exhausted.
 
 export async function GET(req: NextRequest) {
-  const limit  = Number(req.nextUrl.searchParams.get('limit')  ?? '20');
-  const offset = Number(req.nextUrl.searchParams.get('offset') ?? '0');
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
+  const limit  = Math.min(100, Math.max(1, Number(req.nextUrl.searchParams.get('limit')  ?? '20')));
+  const offset = Math.max(0, Number(req.nextUrl.searchParams.get('offset') ?? '0'));
 
   const { data: players, error } = await supabaseAdmin
     .from('players')

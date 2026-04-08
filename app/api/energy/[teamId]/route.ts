@@ -62,8 +62,9 @@ export async function GET(
       error: null,
     });
   } catch (err) {
+    console.error('[/api/energy]', err);
     return NextResponse.json(
-      { data: null, error: (err as Error).message },
+      { data: null, error: 'Internal server error' },
       { status: 500 },
     );
   }

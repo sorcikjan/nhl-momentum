@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
     const data = await fetchAccuracy(model);
     return NextResponse.json({ data, error: null });
   } catch (err) {
-    return NextResponse.json({ data: null, error: (err as Error).message }, { status: 500 });
+    console.error('[/api/accuracy]', err);
+    return NextResponse.json({ data: null, error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { buildLayerMetrics, compositeLayer, calcBreakoutDelta } from '@/lib/metrics';
+import { requireIngestAuth } from '@/lib/ingest-auth';
 
 // ─── Historical Metric Snapshot Backfill ──────────────────────────────────────
 // Creates player_metric_snapshots at fortnightly intervals from the season
@@ -33,8 +34,11 @@ function buildCheckpoints(today: string): string[] {
 }
 
 export async function GET(req: NextRequest) {
-  const limit  = Number(req.nextUrl.searchParams.get('limit')  ?? '50');
-  const offset = Number(req.nextUrl.searchParams.get('offset') ?? '0');
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
+  const limit  = Math.min(200, Math.max(1, Number(req.nextUrl.searchParams.get('limit')  ?? '50')));
+  const offset = Math.max(0, Number(req.nextUrl.searchParams.get('offset') ?? '0'));
   const today  = new Date().toISOString().slice(0, 10);
 
   try {
