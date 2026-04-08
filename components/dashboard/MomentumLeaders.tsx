@@ -38,9 +38,12 @@ export default function MomentumLeaders({
           Last 5 Games
         </span>
       </div>
+      <p className="text-xs mb-2" style={{ color: 'var(--text)' }}>
+        Top skaters by PPM (Points Per Momentum) — a score of how much they&apos;ve produced in their last 5 games.
+      </p>
 
       {lastUpdated && (
-        <p className="text-xs mb-3" style={{ color: 'var(--text)' }}>
+        <p className="text-xs mb-3" style={{ color: 'var(--text)', opacity: 0.7 }}>
           Updated {relativeTime(lastUpdated)}
         </p>
       )}

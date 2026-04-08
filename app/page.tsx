@@ -123,9 +123,9 @@ export default function DashboardPage() {
 
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-bright)' }}>Dashboard</h1>
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-bright)' }}>NHL Momentum</h1>
         <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>
-          Momentum-based NHL analytics · Model v1.0
+          See which NHL players are heating up right now. We score every skater&apos;s last 5 games and compare it to their season average — refreshed hourly.
         </p>
       </div>
 

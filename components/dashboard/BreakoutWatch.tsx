@@ -39,9 +39,12 @@ export default function BreakoutWatch({
           Recent vs Season
         </span>
       </div>
+      <p className="text-xs mb-2" style={{ color: 'var(--text)' }}>
+        Players whose last 5-game pace is well above their season average — potential hot streaks worth watching.
+      </p>
 
       {lastUpdated && (
-        <p className="text-xs mb-3" style={{ color: 'var(--text)' }}>
+        <p className="text-xs mb-3" style={{ color: 'var(--text)', opacity: 0.7 }}>
           Updated {relativeTime(lastUpdated)}
         </p>
       )}
