@@ -43,26 +43,34 @@ export async function GET(req: NextRequest) {
       ? goalieSnapshots.reduce((s, g) => s + (g.momentum_ppm ?? 0), 0) / goalieSnapshots.length
       : 1.0;
 
+    // Bulk-fetch all game stats for skaters in this batch — 2 queries instead of N*2 sequential queries
+    const skaterIds = (players ?? []).filter(p => p.position_code !== 'G').map(p => p.id);
+
+    const { data: allStats, error: statsErr } = await supabaseAdmin
+      .from('game_player_stats')
+      .select('player_id,goals,assists,shots_on_goal,toi_seconds,hits,blocked_shots,plus_minus,pp_points,sh_toi_seconds,game_id')
+      .in('player_id', skaterIds)
+      .order('game_id', { ascending: false });
+
+    if (statsErr) throw statsErr;
+
+    // Group by player_id in memory (rows already sorted newest-first)
+    const statsByPlayer = new Map<number, NonNullable<typeof allStats>>();
+    for (const row of allStats ?? []) {
+      if (!statsByPlayer.has(row.player_id)) statsByPlayer.set(row.player_id, []);
+      statsByPlayer.get(row.player_id)!.push(row);
+    }
+
     const snapshots = [];
 
     for (const player of players ?? []) {
       if (player.position_code === 'G') continue; // Goalies handled separately
 
-      // Fetch last 5 games (Momentum layer)
-      const { data: last5 } = await supabaseAdmin
-        .from('game_player_stats')
-        .select('goals,assists,shots_on_goal,toi_seconds,hits,blocked_shots,plus_minus,pp_points,sh_toi_seconds,game_id')
-        .eq('player_id', player.id)
-        .order('game_id', { ascending: false })
-        .limit(5);
+      const playerStats = statsByPlayer.get(player.id);
+      if (!playerStats?.length) continue;
 
-      // Fetch full season (Season layer)
-      const { data: fullSeason } = await supabaseAdmin
-        .from('game_player_stats')
-        .select('goals,assists,shots_on_goal,toi_seconds,hits,blocked_shots,plus_minus,pp_points,sh_toi_seconds')
-        .eq('player_id', player.id);
-
-      if (!last5?.length || !fullSeason?.length) continue;
+      const last5      = playerStats.slice(0, 5); // newest-first, top 5 = momentum window
+      const fullSeason = playerStats;              // all rows = full season
 
       const momentum = buildLayerMetrics(last5);
       const season   = buildLayerMetrics(fullSeason);
