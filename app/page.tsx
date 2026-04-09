@@ -3,7 +3,8 @@ import { cache } from 'react';
 import type { Metadata } from 'next';
 import MomentumLeaders from '@/components/dashboard/MomentumLeaders';
 import BreakoutWatch from '@/components/dashboard/BreakoutWatch';
-import TodaysGames from '@/components/dashboard/TodaysGames';
+import SeasonLeaders from '@/components/dashboard/SeasonLeaders';
+import SpotlightGames from '@/components/dashboard/SpotlightGames';
 import { fetchRankings, fetchGames } from '@/lib/data';
 
 export const revalidate = 60;
@@ -20,7 +21,7 @@ export const metadata: Metadata = {
 // Deduplicate fetches across server components in the same render pass
 const getRankings = cache(() => fetchRankings().catch(() => null));
 const getTodayGames = cache((date: string) =>
-  fetchGames(date).catch(() => ({ games: [], predictions: [] }))
+  fetchGames(date).catch(() => ({ games: [], predictions: [], odds: [] }))
 );
 
 async function DashboardStats({ today }: { today: string }) {
@@ -35,10 +36,11 @@ async function DashboardStats({ today }: { today: string }) {
     ? Math.floor((Date.now() - new Date(lastCalc).getTime()) / 60000)
     : null;
   const updatedLabel =
-    minsAgo === null ? '—'
-    : minsAgo < 1   ? 'just now'
-    : minsAgo < 60  ? `${minsAgo}m ago`
-    : `${Math.floor(minsAgo / 60)}h ago`;
+    minsAgo === null  ? '—'
+    : minsAgo < 1    ? 'just now'
+    : minsAgo < 60   ? `${minsAgo}m ago`
+    : minsAgo < 1440 ? `${Math.floor(minsAgo / 60)}h ago`
+    : `${Math.floor(minsAgo / 1440)}d ago`;
 
   const playerCount = (rankings?.top100?.length ?? 0) >= 100 ? '100+' : String(rankings?.top100?.length ?? '—');
   const gameCount = (games as unknown[]).length;
@@ -60,31 +62,62 @@ async function DashboardStats({ today }: { today: string }) {
   );
 }
 
-async function LeadersAndBreakout() {
-  const rankings = await getRankings();
-  // momentumLeaders.skaters has up to 10 — components show top 5 by default, expand to 10
+// ── Spotlight games section ────────────────────────────────────────────────────
+
+async function SpotlightSection({ today }: { today: string }) {
+  const { games, predictions, odds } = await getTodayGames(today);
+
+  // Build prediction lookup: game_id → prediction
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const leaders = (rankings?.momentumLeaders?.skaters ?? []) as any[];
+  const predMap: Record<number, any> = {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const p of (predictions ?? []) as any[]) predMap[p.game_id] = p;
+
+  // Build odds lookup: game_id → array of odds rows
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const oddsMap: Record<number, any[]> = {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const o of (odds ?? []) as any[]) {
+    oddsMap[o.game_id] = [...(oddsMap[o.game_id] ?? []), o];
+  }
+
+  return (
+    <SpotlightGames
+      games={games as never[]}
+      predMap={predMap}
+      oddsMap={oddsMap}
+    />
+  );
+}
+
+// ── Player panels section ─────────────────────────────────────────────────────
+
+async function PlayerPanels() {
+  const rankings = await getRankings();
+  // momentumLeaders.skaters has up to 10 (default show 5, expand to 10)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const leaders  = (rankings?.momentumLeaders?.skaters ?? []) as any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const breakout = (rankings?.breakoutWatch ?? []) as any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lastUpdated = (leaders[0] as any)?.calculated_at as string | null ?? null;
+
+  // Season leaders: top100 re-sorted by season_ppm (top 10 passed, component shows 5 by default)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const seasonLeaders = [...(rankings?.top100 ?? [])]
+    .sort((a, b) => ((b as never as { season_ppm: number }).season_ppm ?? 0) - ((a as never as { season_ppm: number }).season_ppm ?? 0))
+    .slice(0, 10) as never[];
+
   return (
     <>
-      <div>
-        <MomentumLeaders players={leaders} lastUpdated={lastUpdated} />
-      </div>
-      <div>
-        <BreakoutWatch players={breakout} lastUpdated={lastUpdated} />
-      </div>
+      <SeasonLeaders players={seasonLeaders} lastUpdated={lastUpdated} />
+      <BreakoutWatch players={breakout} lastUpdated={lastUpdated} />
+      <MomentumLeaders players={leaders} lastUpdated={lastUpdated} />
     </>
   );
 }
 
-async function GamesPanel({ today }: { today: string }) {
-  const { games } = await getTodayGames(today);
-  return <TodaysGames games={games as never[]} />;
-}
+// ── Skeletons ─────────────────────────────────────────────────────────────────
 
 function StatSkeleton() {
   return (
@@ -95,6 +128,23 @@ function StatSkeleton() {
           <div className="h-6 rounded mb-1.5 mx-auto w-16" style={{ background: 'var(--border)' }} />
           <div className="h-2.5 rounded mx-auto w-20" style={{ background: 'var(--border)' }} />
         </div>
+      ))}
+    </div>
+  );
+}
+
+function GamesSkeleton() {
+  return (
+    <div className="rounded-xl border p-4 animate-pulse"
+      style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <div className="h-3 w-28 rounded mb-4" style={{ background: 'var(--border)' }} />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+        {[1, 2].map(i => (
+          <div key={i} className="h-36 rounded-xl" style={{ background: 'var(--bg)' }} />
+        ))}
+      </div>
+      {[1, 2, 3].map(i => (
+        <div key={i} className="h-10 rounded-lg mb-1.5" style={{ background: 'var(--bg)' }} />
       ))}
     </div>
   );
@@ -116,6 +166,8 @@ function PanelSkeleton({ count = 1 }: { count?: number }) {
   );
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function DashboardPage() {
   const today = new Date().toISOString().slice(0, 10);
 
@@ -135,24 +187,23 @@ export default function DashboardPage() {
         <DashboardStats today={today} />
       </Suspense>
 
-      {/* Main grid — sm: Leaders|Breakout on row 1, Games full-width row 2; lg: all 3 in one row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Suspense fallback={<PanelSkeleton count={2} />}>
-          <LeadersAndBreakout />
+      {/* Spotlight games — full width top section */}
+      <div className="mb-6">
+        <Suspense fallback={<GamesSkeleton />}>
+          <SpotlightSection today={today} />
         </Suspense>
-        <div className="sm:col-span-2 lg:col-span-1">
-          <Suspense fallback={
-            <div className="rounded-xl border p-4 animate-pulse"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-              <div className="h-3 w-24 rounded mb-4" style={{ background: 'var(--border)' }} />
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="h-14 rounded-lg mb-2" style={{ background: 'var(--bg)' }} />
-              ))}
-            </div>
-          }>
-            <GamesPanel today={today} />
-          </Suspense>
-        </div>
+      </div>
+
+      {/* Player Metrics */}
+      <div className="mb-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)', opacity: 0.6 }}>
+          Player Metrics
+        </h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Suspense fallback={<PanelSkeleton count={3} />}>
+          <PlayerPanels />
+        </Suspense>
       </div>
     </div>
   );
