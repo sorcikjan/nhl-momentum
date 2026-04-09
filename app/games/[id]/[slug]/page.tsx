@@ -159,8 +159,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
               <span style={{ color: 'var(--neon)' }}>{homeAbbrev} {Math.round(prediction.home_win_probability * 100)}%</span>
             </div>
             <div className="flex h-3 rounded-full overflow-hidden">
-              <div style={{ flexGrow: prediction.away_win_probability, background: 'var(--silver)' }} />
-              <div style={{ flexGrow: prediction.home_win_probability, background: 'var(--neon)' }} />
+              <div style={{ flexGrow: Math.round(prediction.away_win_probability * 1000), background: 'var(--silver)' }} />
+              <div style={{ flexGrow: Math.round(prediction.home_win_probability * 1000), background: 'var(--neon)' }} />
             </div>
           </div>
 
@@ -227,8 +227,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
 
         const ProbBar = ({ a, h, opacity = 1 }: { a: number; h: number; opacity?: number }) => (
           <div className="flex h-3 rounded-full overflow-hidden" style={{ opacity }}>
-            <div style={{ flexGrow: a, background: 'var(--silver)' }} />
-            <div style={{ flexGrow: h, background: 'var(--neon)' }} />
+            <div style={{ flexGrow: Math.round(a * 1000), background: 'var(--silver)' }} />
+            <div style={{ flexGrow: Math.round(h * 1000), background: 'var(--neon)' }} />
           </div>
         );
 

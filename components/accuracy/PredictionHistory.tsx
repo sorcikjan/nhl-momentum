@@ -26,8 +26,8 @@ interface Prediction {
 function WinBar({ home, away }: { home: number; away: number }) {
   return (
     <div className="flex h-1.5 rounded-full overflow-hidden w-24">
-      <div style={{ flexGrow: home, background: 'var(--neon)' }} />
-      <div style={{ flexGrow: away, background: 'var(--silver)' }} />
+      <div style={{ flexGrow: Math.round(home * 1000), background: 'var(--neon)' }} />
+      <div style={{ flexGrow: Math.round(away * 1000), background: 'var(--silver)' }} />
     </div>
   );
 }

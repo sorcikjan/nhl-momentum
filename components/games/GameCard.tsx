@@ -54,8 +54,8 @@ function WinBar({ home, away, homeAbbrev, awayAbbrev }: {
         <span style={{ color: 'var(--neon)' }}>{homeAbbrev} {hp}%</span>
       </div>
       <div className="flex h-1.5 rounded-full overflow-hidden">
-        <div style={{ flexGrow: away, background: 'var(--silver)' }} />
-        <div style={{ flexGrow: home, background: 'var(--neon)' }} />
+        <div style={{ flexGrow: Math.round(away * 1000), background: 'var(--silver)' }} />
+        <div style={{ flexGrow: Math.round(home * 1000), background: 'var(--neon)' }} />
       </div>
     </div>
   );
