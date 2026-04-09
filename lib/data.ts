@@ -9,16 +9,17 @@ export function teamLogoUrl(abbrev: string) {
   return `https://assets.nhle.com/logos/nhl/svg/${abbrev}_light.svg`;
 }
 
-// Returns the latest model version string (by created_at).
-// Used to pin all UI prediction queries to the most recent model.
+// Returns the active model version string.
+// Used to pin all UI prediction queries to the current active model.
 async function latestModelVersion(): Promise<string> {
   const { data } = await supabaseAdmin
     .from('model_versions')
     .select('version')
+    .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
-  return data?.version ?? 'v1.3';
+  return data?.version ?? 'v1.7';
 }
 
 // ─── League Averages ──────────────────────────────────────────────────────────
