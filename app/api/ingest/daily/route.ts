@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getGamesByDate } from '@/lib/nhl-api';
 import { requireIngestAuth } from '@/lib/ingest-auth';
-import { energyMultiplier, goalieEnergyPenalty, calculatePlayerEnergy, GOALIE_DRAIN_PER_MIN, type GameRecord } from '@/lib/energy';
+import { calculatePlayerEnergy, GOALIE_DRAIN_PER_MIN, type GameRecord } from '@/lib/energy';
+import { MODEL_REGISTRY } from '@/lib/prediction-models';
 import type { NHLScheduledGame } from '@/types';
 
 // ─── Daily Pipeline ────────────────────────────────────────────────────────────
@@ -343,7 +344,7 @@ export async function GET(req: NextRequest) {
         if (!snapErr) snapshotsSaved++;
       })); // end Promise.all home+away
 
-      // Build and store prediction using v1.7 formula on the new snapshots
+      // Build predictions for ALL model versions using the stored snapshots
       const { data: homeSnap } = await supabaseAdmin
         .from('game_team_snapshots')
         .select('*')
@@ -360,9 +361,6 @@ export async function GET(req: NextRequest) {
 
       if (!homeSnap || !awaySnap) continue;
 
-      // Run v1.7 formula — GF/GA SOS, B2B fatigue, season goalie stats,
-      // HOME_EDGE=1.0 (neutral), season-weighted PPM 0.2/0.8, REGRESSION=0.6.
-      // See backtest/route.ts for full change notes.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const hSkaters = (homeSnap.skater_snapshots as any[]) ?? [];
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -372,89 +370,54 @@ export async function GET(req: NextRequest) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const aGoalie = (awaySnap.goalie_snapshot as any) ?? {};
 
-      const GOAL_SCALE = 70;
-      const MIN_SPG = 12;
-      const MAX_SPG = 40;
-      // Neutral — let PPM/SOS signal carry directionality without home bias overlay
-      const HOME_EDGE = 1.0;
-      const AWAY_EDGE = 1.0;
-      const REGRESSION = 0.6;
-      // Weight-search result: season PPM is a stronger predictor than 5-game momentum
-      const MOMENTUM_W = 0.2;
-      const SEASON_W = 0.8;
+      // Build TeamSnap shape that MODEL_REGISTRY expects
+      const homeTeamSnap = {
+        energyBar: homeSnap.team_energy_bar ?? 100,
+        sosMultiplier: Number(homeSnap.sos_multiplier ?? 1),
+        shToiPercentile: homeSnap.sh_toi_percentile ?? 0.5,
+        skaters: hSkaters,
+        goalie: hGoalie,
+      };
+      const awayTeamSnap = {
+        energyBar: awaySnap.team_energy_bar ?? 100,
+        sosMultiplier: Number(awaySnap.sos_multiplier ?? 1),
+        shToiPercentile: awaySnap.sh_toi_percentile ?? 0.5,
+        skaters: aSkaters,
+        goalie: aGoalie,
+      };
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      function effectivePPM(s: any): number {
-        if (s.momentumPpm !== undefined && s.seasonPpm !== undefined) {
-          return MOMENTUM_W * s.momentumPpm + SEASON_W * s.seasonPpm;
-        }
-        return s.compositePpm ?? 0;
-      }
-
-      // Back-to-back fatigue: ~8% offensive output penalty (research-backed)
-      const B2B_PENALTY = 0.92;
-      const homeB2bMult = hGoalie.isBackToBack ? B2B_PENALTY : 1.0;
-      const awayB2bMult = aGoalie.isBackToBack ? B2B_PENALTY : 1.0;
-
-      const homeOff = hSkaters
-        .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
-        .reduce((sum: number, s: { compositePpm: number; momentumPpm?: number; seasonPpm?: number }) => sum + Math.max(0, effectivePPM(s)), 0)
-        * Number(homeSnap.sos_multiplier)
-        * (hGoalie.teamRecentForm ?? 1.0)
-        * energyMultiplier(homeSnap.team_energy_bar ?? 100)
-        * homeB2bMult;
-
-      const awayOff = aSkaters
-        .filter((s: { injuryStatus: string | null }) => !s.injuryStatus)
-        .reduce((sum: number, s: { compositePpm: number; momentumPpm?: number; seasonPpm?: number }) => sum + Math.max(0, effectivePPM(s)), 0)
-        * Number(awaySnap.sos_multiplier)
-        * (aGoalie.teamRecentForm ?? 1.0)
-        * energyMultiplier(awaySnap.team_energy_bar ?? 100)
-        * awayB2bMult;
-
-      // Defense: use season SPG (more stable than last-5 momentum SPG)
-      const homeDef = Math.min(MAX_SPG, Math.max(MIN_SPG, hGoalie.seasonShotsPerGoal || hGoalie.momentumShotsPerGoal || 22))
-        * goalieEnergyPenalty(hGoalie.energyBar ?? 100);
-      const awayDef = Math.min(MAX_SPG, Math.max(MIN_SPG, aGoalie.seasonShotsPerGoal || aGoalie.momentumShotsPerGoal || 22))
-        * goalieEnergyPenalty(aGoalie.energyBar ?? 100);
-
-      const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
-      const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
-      const total = homeXG + awayXG;
-      const homeBase = total > 0 ? homeXG / total : 0.5;
-      const awayBase = total > 0 ? awayXG / total : 0.5;
-      const homeAdj = Math.min(0.90, homeBase * HOME_EDGE);
-      const awayAdj = Math.min(0.90, awayBase * AWAY_EDGE);
-      const rawHomeWin = homeAdj / (homeAdj + awayAdj);
-      const homeWin = 0.5 + (rawHomeWin - 0.5) * REGRESSION;
-      const awayWin = 1 - homeWin;
-
-      const { error: predErr } = await supabaseAdmin
-        .from('predictions')
-        .upsert({
-          game_id: game.id,
-          model_version: 'v1.7',
-          predicted_home_score: Math.round(homeXG * 10) / 10,
-          predicted_away_score: Math.round(awayXG * 10) / 10,
-          home_win_probability: Math.round(homeWin * 1000) / 1000,
-          away_win_probability: Math.round(awayWin * 1000) / 1000,
-          ot_probability: 0,
-          home_energy_bar: homeSnap.team_energy_bar,
-          away_energy_bar: awaySnap.team_energy_bar,
-          home_sos_multiplier: homeSnap.sos_multiplier,
-          away_sos_multiplier: awaySnap.sos_multiplier,
-          home_offensive_potential: Math.round(homeOff * GOAL_SCALE * 10) / 10,
-          away_offensive_potential: Math.round(awayOff * GOAL_SCALE * 10) / 10,
-          home_defensive_filter: homeDef,
-          away_defensive_filter: awayDef,
-          input_snapshot: {
-            captured_at: new Date().toISOString(),
-            home: { energyBar: homeSnap.team_energy_bar, skaterCount: hSkaters.length, goalie: hGoalie.playerName },
-            away: { energyBar: awaySnap.team_energy_bar, skaterCount: aSkaters.length, goalie: aGoalie.playerName },
-          },
-        }, { onConflict: 'game_id,model_version' });
-
-      if (!predErr) predictionsStored++;
+      // Run all models in parallel, one upsert per model version
+      const modelResults = await Promise.all(
+        Object.entries(MODEL_REGISTRY).map(async ([version, runModel]) => {
+          const r = runModel(homeTeamSnap, awayTeamSnap);
+          const { error } = await supabaseAdmin
+            .from('predictions')
+            .upsert({
+              game_id: game.id,
+              model_version: version,
+              predicted_home_score: Math.round(r.homeXG * 10) / 10,
+              predicted_away_score: Math.round(r.awayXG * 10) / 10,
+              home_win_probability: Math.round(r.homeWin * 1000) / 1000,
+              away_win_probability: Math.round(r.awayWin * 1000) / 1000,
+              ot_probability: r.ot,
+              home_energy_bar: homeSnap.team_energy_bar,
+              away_energy_bar: awaySnap.team_energy_bar,
+              home_sos_multiplier: homeSnap.sos_multiplier,
+              away_sos_multiplier: awaySnap.sos_multiplier,
+              home_offensive_potential: r.homeOff != null ? Math.round(r.homeOff * 10) / 10 : null,
+              away_offensive_potential: r.awayOff != null ? Math.round(r.awayOff * 10) / 10 : null,
+              home_defensive_filter: r.homeDef ?? null,
+              away_defensive_filter: r.awayDef ?? null,
+              input_snapshot: {
+                captured_at: new Date().toISOString(),
+                home: { energyBar: homeSnap.team_energy_bar, skaterCount: hSkaters.length, goalie: hGoalie.playerName },
+                away: { energyBar: awaySnap.team_energy_bar, skaterCount: aSkaters.length, goalie: aGoalie.playerName },
+              },
+            }, { onConflict: 'game_id,model_version' });
+          return !error;
+        })
+      );
+      predictionsStored += modelResults.filter(Boolean).length;
     }
 
     log.push(`Team snapshots saved: ${snapshotsSaved}`);
