@@ -1,7 +1,6 @@
 import { Suspense } from 'react';
 import { cache } from 'react';
 import type { Metadata } from 'next';
-import BreakoutWatch from '@/components/dashboard/BreakoutWatch';
 import PlayerLeaderboard, { type LeaderboardConfig } from '@/components/dashboard/PlayerLeaderboard';
 import SpotlightGames from '@/components/dashboard/SpotlightGames';
 import { fetchRankings, fetchGames } from '@/lib/data';
@@ -22,98 +21,192 @@ const getTodayGames = cache((date: string) =>
   fetchGames(date).catch(() => ({ games: [], predictions: [], odds: [] }))
 );
 
-// ── Leaderboard configs ───────────────────────────────────────────────────────
+// ── Metric row definitions ────────────────────────────────────────────────────
+// Each row = one metric. Three lenses: Season | Surge | Last 5 Games.
+// Color convention:  silver = season baseline  |  amber = surge  |  neon = recent
 
-const CONFIGS: Record<string, LeaderboardConfig> = {
-  seasonPpm: {
-    title: '🏅 Season Leaders',
-    subtitle: 'Top skaters by season PPM — consistent performers across the whole season.',
-    badge: 'Full Season',
-    color: 'var(--silver)',
-    colorBg: 'rgba(148,163,184,0.12)',
-    metricKey: 'season_ppm',
-    decimals: 4,
-    metricLabel: 'PPM',
-    fullPageHref: '/rankings',
+interface MetricRow {
+  label: string;           // section heading
+  season: LeaderboardConfig;
+  surge: LeaderboardConfig;
+  momentum: LeaderboardConfig;
+}
+
+const ROWS: MetricRow[] = [
+  // ── PPM ──────────────────────────────────────────────────────────────────
+  {
+    label: 'PPM — Points Per Momentum',
+    season: {
+      title: '🏅 Season PPM',
+      subtitle: 'Top skaters by season-long PPM — the consistent performers.',
+      badge: 'Full Season',
+      color: 'var(--silver)', colorBg: 'rgba(148,163,184,0.12)',
+      metricKey: 'season_ppm', decimals: 4, metricLabel: 'PPM',
+      fullPageHref: '/rankings',
+    },
+    surge: {
+      title: '🔥 PPM Surge',
+      subtitle: 'Biggest jump in PPM vs their own season average — the breakout artists.',
+      badge: 'vs Season',
+      color: 'var(--amber)', colorBg: 'rgba(245,158,11,0.12)',
+      metricKey: 'breakout_delta', decimals: 4, metricLabel: 'PPM+', signed: true,
+      fullPageHref: '/rankings',
+    },
+    momentum: {
+      title: '⚡ Momentum PPM',
+      subtitle: 'Highest PPM over the last 5 games — who\'s on fire right now.',
+      badge: 'Last 5 Games',
+      color: 'var(--neon)', colorBg: 'var(--neon-glow)',
+      metricKey: 'momentum_ppm', decimals: 4, metricLabel: 'PPM',
+      fullPageHref: '/rankings',
+    },
   },
-  momentumPpm: {
-    title: '⚡ Momentum Leaders',
-    subtitle: 'Top skaters by PPM in their last 5 games — who\'s hottest right now.',
-    badge: 'Last 5 Games',
-    color: 'var(--neon)',
-    colorBg: 'var(--neon-glow)',
-    metricKey: 'momentum_ppm',
-    decimals: 4,
-    metricLabel: 'PPM',
-    fullPageHref: '/rankings',
+
+  // ── Goals ─────────────────────────────────────────────────────────────────
+  {
+    label: 'Goals',
+    season: {
+      title: '🎯 Season Goals',
+      subtitle: 'Most goals scored on the season — the pure finishers.',
+      badge: 'Full Season',
+      color: 'var(--silver)', colorBg: 'rgba(148,163,184,0.12)',
+      metricKey: 'season_goals', decimals: 0, metricLabel: 'G',
+      fullPageHref: '/rankings',
+    },
+    surge: {
+      title: '🔥 Goal Surge',
+      subtitle: 'Scoring goals at the highest rate above their season pace.',
+      badge: 'vs Season',
+      color: 'var(--amber)', colorBg: 'rgba(245,158,11,0.12)',
+      metricKey: '_goals_surge', decimals: 2, metricLabel: 'G/gm+', signed: true,
+      fullPageHref: '/rankings',
+    },
+    momentum: {
+      title: '⚡ Hot Scorers',
+      subtitle: 'Most goals in their last 5 games — the current snipers.',
+      badge: 'Last 5 Games',
+      color: 'var(--neon)', colorBg: 'var(--neon-glow)',
+      metricKey: 'momentum_goals', decimals: 0, metricLabel: 'G',
+      fullPageHref: '/rankings',
+    },
   },
-  seasonGoals: {
-    title: '🎯 Goal Scorers',
-    subtitle: 'Skaters with the most goals on the season — the pure finishers.',
-    badge: 'Season Goals',
-    color: 'var(--red)',
-    colorBg: 'rgba(239,68,68,0.12)',
-    metricKey: 'season_goals',
-    decimals: 0,
-    metricLabel: 'G',
-    fullPageHref: '/rankings',
+
+  // ── Assists ───────────────────────────────────────────────────────────────
+  {
+    label: 'Assists',
+    season: {
+      title: '🎩 Season Assists',
+      subtitle: 'Most assists on the season — the elite playmakers.',
+      badge: 'Full Season',
+      color: 'var(--silver)', colorBg: 'rgba(148,163,184,0.12)',
+      metricKey: 'season_assists', decimals: 0, metricLabel: 'A',
+      fullPageHref: '/rankings',
+    },
+    surge: {
+      title: '🔥 Assist Surge',
+      subtitle: 'Dishing assists at the highest rate above their season pace.',
+      badge: 'vs Season',
+      color: 'var(--amber)', colorBg: 'rgba(245,158,11,0.12)',
+      metricKey: '_assists_surge', decimals: 2, metricLabel: 'A/gm+', signed: true,
+      fullPageHref: '/rankings',
+    },
+    momentum: {
+      title: '⚡ Hot Playmakers',
+      subtitle: 'Most assists in their last 5 games — on a passing streak.',
+      badge: 'Last 5 Games',
+      color: 'var(--neon)', colorBg: 'var(--neon-glow)',
+      metricKey: 'momentum_assists', decimals: 0, metricLabel: 'A',
+      fullPageHref: '/rankings',
+    },
   },
-  seasonPoints: {
-    title: '📊 Points Leaders',
-    subtitle: 'Season points leaders — goals + assists over the full campaign.',
-    badge: 'Season Pts',
-    color: 'var(--silver)',
-    colorBg: 'rgba(148,163,184,0.12)',
-    metricKey: 'season_points',
-    decimals: 0,
-    metricLabel: 'pts',
-    fullPageHref: '/rankings',
+
+  // ── Points ────────────────────────────────────────────────────────────────
+  {
+    label: 'Points',
+    season: {
+      title: '📊 Season Points',
+      subtitle: 'Season points leaders — goals + assists, the complete picture.',
+      badge: 'Full Season',
+      color: 'var(--silver)', colorBg: 'rgba(148,163,184,0.12)',
+      metricKey: 'season_points', decimals: 0, metricLabel: 'pts',
+      fullPageHref: '/rankings',
+    },
+    surge: {
+      title: '🔥 Points Surge',
+      subtitle: 'Producing points at the highest rate above their season pace.',
+      badge: 'vs Season',
+      color: 'var(--amber)', colorBg: 'rgba(245,158,11,0.12)',
+      metricKey: '_points_surge', decimals: 2, metricLabel: 'pts/gm+', signed: true,
+      fullPageHref: '/rankings',
+    },
+    momentum: {
+      title: '⚡ Hot Point Getters',
+      subtitle: 'Most points in their last 5 games — producing at every turn.',
+      badge: 'Last 5 Games',
+      color: 'var(--neon)', colorBg: 'var(--neon-glow)',
+      metricKey: 'momentum_points', decimals: 0, metricLabel: 'pts',
+      fullPageHref: '/rankings',
+    },
   },
-  compositePpm: {
-    title: '🧠 Model Score',
-    subtitle: 'Composite PPM — the model\'s overall signal blending season + momentum + SOS.',
-    badge: 'Composite',
-    color: 'var(--neon)',
-    colorBg: 'var(--neon-glow)',
-    metricKey: 'composite_ppm',
-    decimals: 4,
-    metricLabel: 'PPM',
-    fullPageHref: '/rankings',
+
+  // ── Shooting % ────────────────────────────────────────────────────────────
+  {
+    label: 'Shooting %',
+    season: {
+      title: '🎯 Season Shot%',
+      subtitle: 'Best season shooting percentage — skaters who make shots count.',
+      badge: 'Full Season',
+      color: 'var(--silver)', colorBg: 'rgba(148,163,184,0.12)',
+      metricKey: '_season_shot_pct', decimals: 1, metricLabel: '%',
+      fullPageHref: '/rankings',
+    },
+    surge: {
+      title: '🔥 Shot% Surge',
+      subtitle: 'Shooting percentage climbing furthest above their season average.',
+      badge: 'vs Season',
+      color: 'var(--amber)', colorBg: 'rgba(245,158,11,0.12)',
+      metricKey: '_shot_pct_surge', decimals: 1, metricLabel: '%+', signed: true,
+      fullPageHref: '/rankings',
+    },
+    momentum: {
+      title: '⚡ Hot Shot%',
+      subtitle: 'Best shooting percentage over the last 5 games — dialled in.',
+      badge: 'Last 5 Games',
+      color: 'var(--neon)', colorBg: 'var(--neon-glow)',
+      metricKey: '_momentum_shot_pct', decimals: 1, metricLabel: '%',
+      fullPageHref: '/rankings',
+    },
   },
-  hotGoals: {
-    title: '🔴 Hot Scorers',
-    subtitle: 'Skaters scoring the most goals in their last 5 games — on fire.',
-    badge: 'Last 5 Goals',
-    color: 'var(--red)',
-    colorBg: 'rgba(239,68,68,0.12)',
-    metricKey: 'momentum_goals',
-    decimals: 0,
-    metricLabel: 'G',
-    fullPageHref: '/rankings',
+
+  // ── Ice Time ──────────────────────────────────────────────────────────────
+  {
+    label: 'Ice Time (min/game)',
+    season: {
+      title: '⏱ Season TOI',
+      subtitle: 'Most minutes per game on the season — the coaches\' trust.',
+      badge: 'Full Season',
+      color: 'var(--silver)', colorBg: 'rgba(148,163,184,0.12)',
+      metricKey: '_season_toi_mins', decimals: 1, metricLabel: 'min',
+      fullPageHref: '/rankings',
+    },
+    surge: {
+      title: '🔥 TOI Surge',
+      subtitle: 'Ice time climbing furthest above their season average — earning more trust.',
+      badge: 'vs Season',
+      color: 'var(--amber)', colorBg: 'rgba(245,158,11,0.12)',
+      metricKey: '_toi_surge_mins', decimals: 1, metricLabel: 'min+', signed: true,
+      fullPageHref: '/rankings',
+    },
+    momentum: {
+      title: '⚡ Recent TOI',
+      subtitle: 'Most minutes per game in their last 5 — heavily deployed right now.',
+      badge: 'Last 5 Games',
+      color: 'var(--neon)', colorBg: 'var(--neon-glow)',
+      metricKey: '_momentum_toi_mins', decimals: 1, metricLabel: 'min',
+      fullPageHref: '/rankings',
+    },
   },
-  hotAssists: {
-    title: '🎩 Top Playmakers',
-    subtitle: 'Skaters with the most assists in their last 5 games — setting up goals.',
-    badge: 'Last 5 Assists',
-    color: 'var(--green)',
-    colorBg: 'rgba(34,197,94,0.12)',
-    metricKey: 'momentum_assists',
-    decimals: 0,
-    metricLabel: 'A',
-    fullPageHref: '/rankings',
-  },
-  energy: {
-    title: '⚡ Freshest Legs',
-    subtitle: 'Players with the highest energy bar — well-rested and ready to perform.',
-    badge: 'Energy',
-    color: 'var(--green)',
-    colorBg: 'rgba(34,197,94,0.12)',
-    metricKey: 'energy_bar',
-    decimals: 0,
-    metricLabel: '%',
-    fullPageHref: '/rankings',
-  },
-};
+];
 
 // ── Server components ─────────────────────────────────────────────────────────
 
@@ -173,67 +266,83 @@ async function SpotlightSection({ today }: { today: string }) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function sortTop10(arr: any[], key: string): any[] {
-  return [...arr].sort((a, b) => (b[key] ?? 0) - (a[key] ?? 0)).slice(0, 10);
+  return [...arr].sort((a, b) => (b[key] ?? -Infinity) - (a[key] ?? -Infinity)).slice(0, 10);
 }
 
 async function PlayerMetrics() {
   const rankings = await getRankings();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const top = (rankings?.top100 ?? []) as any[];
+  const raw = (rankings?.top100 ?? []) as any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const breakout = (rankings?.breakoutWatch ?? []) as any[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lastUpdated = (top[0] as any)?.calculated_at as string | null ?? null;
+  const lastUpdated = (raw[0] as any)?.calculated_at as string | null ?? null;
 
-  // Derive all leaderboards from top100 (already fetched — no extra DB queries)
-  const lists = {
-    seasonPpm:    sortTop10(top, 'season_ppm'),
-    momentumPpm:  sortTop10(top, 'momentum_ppm'),
-    seasonGoals:  sortTop10(top, 'season_goals'),
-    seasonPoints: sortTop10(top, 'season_points'),
-    compositePpm: sortTop10(top, 'composite_ppm'),
-    hotGoals:     sortTop10(top, 'momentum_goals'),
-    hotAssists:   sortTop10(top, 'momentum_assists'),
-    energy:       sortTop10(top, 'energy_bar'),
-  };
+  // Enrich each player with derived fields used by surge and toi columns.
+  // All math happens once here on the server — components just read the key.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const top = raw.map((p: any) => {
+    const sg = Math.max(1, p.season_games ?? 1);
+    const mg = Math.max(1, p.momentum_games ?? 5);
+
+    // Per-game rates
+    const seasonGoalsPerGame  = (p.season_goals ?? 0)  / sg;
+    const seasonAssistsPerGame = (p.season_assists ?? 0) / sg;
+    const seasonPointsPerGame  = (p.season_points ?? 0)  / sg;
+    const seasonToiMins        = (p.season_toi_sec ?? 0) / 60 / sg;
+
+    const momentumGoalsPerGame  = (p.momentum_goals ?? 0)  / mg;
+    const momentumAssistsPerGame = (p.momentum_assists ?? 0) / mg;
+    const momentumPointsPerGame  = (p.momentum_points ?? 0)  / mg;
+    const momentumToiMins        = (p.momentum_toi_sec ?? 0) / 60 / mg;
+
+    // Shooting % — stored as 0–1 fraction, display as 0–100
+    const seasonShotPct   = (p.season_shooting_pct   ?? 0) * 100;
+    const momentumShotPct = (p.momentum_shooting_pct ?? 0) * 100;
+
+    return {
+      ...p,
+      // Surge (delta) fields
+      _goals_surge:    momentumGoalsPerGame  - seasonGoalsPerGame,
+      _assists_surge:  momentumAssistsPerGame - seasonAssistsPerGame,
+      _points_surge:   momentumPointsPerGame  - seasonPointsPerGame,
+      _shot_pct_surge: momentumShotPct - seasonShotPct,
+      _toi_surge_mins: momentumToiMins - seasonToiMins,
+      // Display-ready fields
+      _season_shot_pct:   seasonShotPct,
+      _momentum_shot_pct: momentumShotPct,
+      _season_toi_mins:   seasonToiMins,
+      _momentum_toi_mins: momentumToiMins,
+    };
+  });
 
   return (
     <>
-      {/* Row 1 — PPM Perspectives */}
-      <SectionHeading label="PPM Perspectives" />
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <PlayerLeaderboard config={CONFIGS.seasonPpm}    players={lists.seasonPpm}    lastUpdated={lastUpdated} />
-        <BreakoutWatch players={breakout} lastUpdated={lastUpdated} />
-        <PlayerLeaderboard config={CONFIGS.momentumPpm}  players={lists.momentumPpm}  lastUpdated={lastUpdated} />
-      </div>
-
-      {/* Row 2 — Season Performance */}
-      <SectionHeading label="Season Performance" />
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <PlayerLeaderboard config={CONFIGS.seasonGoals}  players={lists.seasonGoals}  lastUpdated={lastUpdated} />
-        <PlayerLeaderboard config={CONFIGS.seasonPoints} players={lists.seasonPoints} lastUpdated={lastUpdated} />
-        <PlayerLeaderboard config={CONFIGS.compositePpm} players={lists.compositePpm} lastUpdated={lastUpdated} />
-      </div>
-
-      {/* Row 3 — Last 5 Games */}
-      <SectionHeading label="Last 5 Games" />
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <PlayerLeaderboard config={CONFIGS.hotGoals}   players={lists.hotGoals}   lastUpdated={lastUpdated} />
-        <PlayerLeaderboard config={CONFIGS.hotAssists} players={lists.hotAssists} lastUpdated={lastUpdated} />
-        <PlayerLeaderboard config={CONFIGS.energy}     players={lists.energy}     lastUpdated={lastUpdated} />
-      </div>
+      {ROWS.map(row => (
+        <div key={row.label} className="mb-10">
+          <div className="mb-3 pb-2" style={{ borderBottom: '1px solid var(--border)' }}>
+            <h2 className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
+              {row.label}
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <PlayerLeaderboard
+              config={row.season}
+              players={sortTop10(top, row.season.metricKey)}
+              lastUpdated={lastUpdated}
+            />
+            <PlayerLeaderboard
+              config={row.surge}
+              players={sortTop10(top, row.surge.metricKey)}
+              lastUpdated={lastUpdated}
+            />
+            <PlayerLeaderboard
+              config={row.momentum}
+              players={sortTop10(top, row.momentum.metricKey)}
+              lastUpdated={lastUpdated}
+            />
+          </div>
+        </div>
+      ))}
     </>
-  );
-}
-
-function SectionHeading({ label }: { label: string }) {
-  return (
-    <div className="mb-3">
-      <h2 className="text-xs font-semibold uppercase tracking-wider"
-        style={{ color: 'var(--text)', opacity: 0.5 }}>
-        {label}
-      </h2>
-    </div>
   );
 }
 
@@ -269,10 +378,10 @@ function GamesSkeleton() {
 function MetricsSkeleton() {
   return (
     <>
-      {[1, 2, 3].map(row => (
-        <div key={row}>
-          <div className="h-3 w-32 rounded mb-3" style={{ background: 'var(--border)' }} />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      {[1, 2, 3, 4, 5, 6].map(row => (
+        <div key={row} className="mb-10">
+          <div className="h-4 w-40 rounded mb-3" style={{ background: 'var(--border)' }} />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[1, 2, 3].map(col => (
               <div key={col} className="rounded-xl border p-4 animate-pulse"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
@@ -311,13 +420,13 @@ export default function DashboardPage() {
       </Suspense>
 
       {/* Spotlight games */}
-      <div className="mb-8">
+      <div className="mb-10">
         <Suspense fallback={<GamesSkeleton />}>
           <SpotlightSection today={today} />
         </Suspense>
       </div>
 
-      {/* Player metrics — 3 rows of 3 */}
+      {/* Player metrics — 6 rows × 3 columns */}
       <Suspense fallback={<MetricsSkeleton />}>
         <PlayerMetrics />
       </Suspense>

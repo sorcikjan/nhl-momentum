@@ -25,6 +25,7 @@ export interface LeaderboardConfig {
   metricKey: string;    // field name on the player object
   decimals: number;     // decimal places for value
   metricLabel: string;  // unit label, e.g. 'PPM', 'G', 'A', 'pts', '%'
+  signed?: boolean;     // prepend '+' to positive values (for surge/delta columns)
   fullPageHref: string;
 }
 
@@ -79,11 +80,15 @@ export default function PlayerLeaderboard({
         {visible.map((p, i) => {
           const name = `${p.players.first_name} ${p.players.last_name}`;
           const raw = p[config.metricKey];
-          const value = raw == null
+          const numRaw = Number(raw);
+          const formatted = raw == null
             ? '—'
             : config.decimals === 0
-              ? String(Math.round(Number(raw)))
-              : Number(raw).toFixed(config.decimals);
+              ? String(Math.round(numRaw))
+              : numRaw.toFixed(config.decimals);
+          const value = raw != null && config.signed && numRaw > 0
+            ? `+${formatted}`
+            : formatted;
 
           return (
             <Link key={p.player_id}

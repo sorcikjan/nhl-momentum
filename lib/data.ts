@@ -69,8 +69,12 @@ export async function fetchRankings() {
     .from('player_metric_snapshots')
     .select(`
       player_id, momentum_rank, composite_ppm, momentum_ppm, season_ppm,
-      breakout_delta, energy_bar, momentum_goals, momentum_assists, momentum_points,
-      sos_coefficient, season_goals, season_points, calculated_at,
+      breakout_delta, energy_bar,
+      momentum_games, momentum_goals, momentum_assists, momentum_points,
+      momentum_shooting_pct, momentum_toi_sec,
+      season_games, season_goals, season_assists, season_points,
+      season_shooting_pct, season_toi_sec,
+      sos_coefficient, calculated_at,
       players (
         id, first_name, last_name, position_code, team_id,
         headshot_url, injury_status,
