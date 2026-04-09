@@ -77,6 +77,7 @@ export async function GET(req: NextRequest) {
           goals: number;
           assists: number;
           plusMinus: number;
+          pim: number;
           hits: number;
           blockedShots: number;
           shots: number;
@@ -87,23 +88,28 @@ export async function GET(req: NextRequest) {
           shorthandedGoals: number;
           shorthandedPoints: number;
           shorthandedToi: string;
+          gameWinningGoals: number;
+          otGoals: number;
         }) => ({
-          game_id:        g.gameId,
-          player_id:      player.id,
-          team_id:        player.team_id,
-          goals:          g.goals          ?? 0,
-          assists:        g.assists         ?? 0,
-          plus_minus:     g.plusMinus       ?? 0,
-          hits:           g.hits            ?? 0,
-          blocked_shots:  g.blockedShots    ?? 0,
-          shots_on_goal:  g.shots           ?? 0,
-          toi_seconds:    toiToSeconds(g.toi),
-          pp_goals:       g.powerPlayGoals  ?? 0,
-          pp_points:      g.powerPlayPoints ?? 0,
-          pp_toi_seconds: toiToSeconds(g.powerPlayToi),
-          sh_goals:       g.shorthandedGoals   ?? 0,
-          sh_points:      g.shorthandedPoints  ?? 0,
-          sh_toi_seconds: toiToSeconds(g.shorthandedToi),
+          game_id:             g.gameId,
+          player_id:           player.id,
+          team_id:             player.team_id,
+          goals:               g.goals              ?? 0,
+          assists:             g.assists             ?? 0,
+          plus_minus:          g.plusMinus           ?? 0,
+          pim:                 g.pim                 ?? 0,
+          hits:                g.hits                ?? 0,
+          blocked_shots:       g.blockedShots        ?? 0,
+          shots_on_goal:       g.shots               ?? 0,
+          toi_seconds:         toiToSeconds(g.toi),
+          pp_goals:            g.powerPlayGoals      ?? 0,
+          pp_points:           g.powerPlayPoints     ?? 0,
+          pp_toi_seconds:      toiToSeconds(g.powerPlayToi),
+          sh_goals:            g.shorthandedGoals    ?? 0,
+          sh_points:           g.shorthandedPoints   ?? 0,
+          sh_toi_seconds:      toiToSeconds(g.shorthandedToi),
+          game_winning_goals:  g.gameWinningGoals    ?? 0,
+          ot_goals:            g.otGoals             ?? 0,
         }));
 
         if (rows.length > 0) {

@@ -26,22 +26,36 @@ export function buildLayerMetrics(games: {
   hits: number;
   blocked_shots: number;
   plus_minus: number;
+  pim?: number;
+  pp_goals: number;
   pp_points: number;
+  sh_goals: number;
+  sh_points: number;
   sh_toi_seconds: number;
+  game_winning_goals?: number;
+  ot_goals?: number;
 }[]): LayerMetrics {
   const g = games.reduce(
     (acc, row) => ({
-      goals:           acc.goals + row.goals,
-      assists:         acc.assists + row.assists,
-      shots:           acc.shots + row.shots_on_goal,
-      toi:             acc.toi + row.toi_seconds,
-      hits:            acc.hits + row.hits,
-      blocks:          acc.blocks + row.blocked_shots,
-      plusMinus:       acc.plusMinus + row.plus_minus,
-      ppPoints:        acc.ppPoints + row.pp_points,
-      shToi:           acc.shToi + row.sh_toi_seconds,
+      goals:      acc.goals      + row.goals,
+      assists:    acc.assists    + row.assists,
+      shots:      acc.shots      + row.shots_on_goal,
+      toi:        acc.toi        + row.toi_seconds,
+      hits:       acc.hits       + row.hits,
+      blocks:     acc.blocks     + row.blocked_shots,
+      plusMinus:  acc.plusMinus  + row.plus_minus,
+      pim:        acc.pim        + (row.pim ?? 0),
+      ppGoals:    acc.ppGoals    + row.pp_goals,
+      ppPoints:   acc.ppPoints   + row.pp_points,
+      shGoals:    acc.shGoals    + row.sh_goals,
+      shPoints:   acc.shPoints   + row.sh_points,
+      shToi:      acc.shToi      + row.sh_toi_seconds,
+      gwGoals:    acc.gwGoals    + (row.game_winning_goals ?? 0),
+      otGoals:    acc.otGoals    + (row.ot_goals ?? 0),
     }),
-    { goals: 0, assists: 0, shots: 0, toi: 0, hits: 0, blocks: 0, plusMinus: 0, ppPoints: 0, shToi: 0 }
+    { goals: 0, assists: 0, shots: 0, toi: 0, hits: 0, blocks: 0,
+      plusMinus: 0, pim: 0, ppGoals: 0, ppPoints: 0, shGoals: 0, shPoints: 0,
+      shToi: 0, gwGoals: 0, otGoals: 0 }
   );
 
   const points = g.goals + g.assists;
@@ -49,18 +63,24 @@ export function buildLayerMetrics(games: {
   const sPct   = g.shots > 0 ? g.goals / g.shots : 0;
 
   return {
-    gamesPlayed:         games.length,
-    goals:               g.goals,
-    assists:             g.assists,
+    gamesPlayed:           games.length,
+    goals:                 g.goals,
+    assists:               g.assists,
     points,
-    toiSeconds:          g.toi,
+    toiSeconds:            g.toi,
     ppm,
-    shotsOnGoal:         g.shots,
-    shootingPct:         sPct,
-    hits:                g.hits,
-    blockedShots:        g.blocks,
-    plusMinus:           g.plusMinus,
-    powerPlayPoints:     g.ppPoints,
+    shotsOnGoal:           g.shots,
+    shootingPct:           sPct,
+    hits:                  g.hits,
+    blockedShots:          g.blocks,
+    plusMinus:             g.plusMinus,
+    pim:                   g.pim,
+    powerPlayGoals:        g.ppGoals,
+    powerPlayPoints:       g.ppPoints,
+    shorthandedGoals:      g.shGoals,
+    shorthandedPoints:     g.shPoints,
+    gameWinningGoals:      g.gwGoals,
+    otGoals:               g.otGoals,
     shorthandedToiSeconds: g.shToi,
   };
 }
@@ -77,19 +97,25 @@ export function compositeLayer(
     a * w.momentum + b * w.season + c * w.career;
 
   return {
-    gamesPlayed:            momentum.gamesPlayed,
-    goals:                  blend(momentum.goals,          season.goals,          career.goals),
-    assists:                blend(momentum.assists,        season.assists,        career.assists),
-    points:                 blend(momentum.points,         season.points,         career.points),
-    toiSeconds:             blend(momentum.toiSeconds,     season.toiSeconds,     career.toiSeconds),
-    ppm:                    blend(momentum.ppm,            season.ppm,            career.ppm),
-    shotsOnGoal:            blend(momentum.shotsOnGoal,    season.shotsOnGoal,    career.shotsOnGoal),
-    shootingPct:            blend(momentum.shootingPct,    season.shootingPct,    career.shootingPct),
-    hits:                   blend(momentum.hits,           season.hits,           career.hits),
-    blockedShots:           blend(momentum.blockedShots,   season.blockedShots,   career.blockedShots),
-    plusMinus:              blend(momentum.plusMinus,      season.plusMinus,      career.plusMinus),
-    powerPlayPoints:        blend(momentum.powerPlayPoints, season.powerPlayPoints, career.powerPlayPoints),
-    shorthandedToiSeconds:  blend(momentum.shorthandedToiSeconds, season.shorthandedToiSeconds, career.shorthandedToiSeconds),
+    gamesPlayed:           momentum.gamesPlayed,
+    goals:                 blend(momentum.goals,               season.goals,               career.goals),
+    assists:               blend(momentum.assists,             season.assists,             career.assists),
+    points:                blend(momentum.points,              season.points,              career.points),
+    toiSeconds:            blend(momentum.toiSeconds,          season.toiSeconds,          career.toiSeconds),
+    ppm:                   blend(momentum.ppm,                 season.ppm,                 career.ppm),
+    shotsOnGoal:           blend(momentum.shotsOnGoal,         season.shotsOnGoal,         career.shotsOnGoal),
+    shootingPct:           blend(momentum.shootingPct,         season.shootingPct,         career.shootingPct),
+    hits:                  blend(momentum.hits,                season.hits,                career.hits),
+    blockedShots:          blend(momentum.blockedShots,        season.blockedShots,        career.blockedShots),
+    plusMinus:             blend(momentum.plusMinus,           season.plusMinus,           career.plusMinus),
+    pim:                   blend(momentum.pim,                 season.pim,                 career.pim),
+    powerPlayGoals:        blend(momentum.powerPlayGoals,      season.powerPlayGoals,      career.powerPlayGoals),
+    powerPlayPoints:       blend(momentum.powerPlayPoints,     season.powerPlayPoints,     career.powerPlayPoints),
+    shorthandedGoals:      blend(momentum.shorthandedGoals,    season.shorthandedGoals,    career.shorthandedGoals),
+    shorthandedPoints:     blend(momentum.shorthandedPoints,   season.shorthandedPoints,   career.shorthandedPoints),
+    gameWinningGoals:      blend(momentum.gameWinningGoals,    season.gameWinningGoals,    career.gameWinningGoals),
+    otGoals:               blend(momentum.otGoals,             season.otGoals,             career.otGoals),
+    shorthandedToiSeconds: blend(momentum.shorthandedToiSeconds, season.shorthandedToiSeconds, career.shorthandedToiSeconds),
   };
 }
 

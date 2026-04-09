@@ -281,6 +281,77 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         </div>
       )}
 
+      {/* ── Season Statistics Table ─────────────────────────────────────────────── */}
+      {seaGames > 0 && (
+        <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
+              Season Statistics
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
+                  {['', 'GP','G','A','PTS','+/-','PIM','PPG','PPP','SHG','SHP','GWG','S','S%','TOI/GP'].map(h => (
+                    <th key={h} className="px-3 py-2 text-right first:text-left font-semibold uppercase tracking-wide"
+                      style={{ color: 'var(--text)', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {/* Season row */}
+                <tr className="border-b" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
+                  <td className="px-3 py-2.5 font-semibold" style={{ color: 'var(--silver)', whiteSpace: 'nowrap' }}>Season</td>
+                  <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{seaGames}</td>
+                  <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{seaGoals}</td>
+                  <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{seaAssists}</td>
+                  <td className="px-3 py-2.5 text-right font-mono font-bold" style={{ color: 'var(--text-bright)' }}>{seaGoals + seaAssists}</td>
+                  <td className="px-3 py-2.5 text-right font-mono" style={{ color: Number(latestSnapshot.season_plus_minus ?? 0) >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                    {Number(latestSnapshot.season_plus_minus ?? 0) > 0 ? '+' : ''}{latestSnapshot.season_plus_minus ?? '—'}
+                  </td>
+                  <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{latestSnapshot.season_pim ?? '—'}</td>
+                  <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{latestSnapshot.season_pp_goals ?? '—'}</td>
+                  <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{latestSnapshot.season_pp_points ?? '—'}</td>
+                  <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{latestSnapshot.season_sh_goals ?? '—'}</td>
+                  <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{latestSnapshot.season_sh_points ?? '—'}</td>
+                  <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{latestSnapshot.season_gw_goals ?? '—'}</td>
+                  <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{latestSnapshot.season_shots ?? '—'}</td>
+                  <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{(seaShootPct * 100).toFixed(1)}%</td>
+                  <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)', whiteSpace: 'nowrap' }}>
+                    {seaGames > 0 ? `${Math.floor(Number(latestSnapshot.season_toi_sec ?? 0) / seaGames / 60)}:${String(Math.floor(Number(latestSnapshot.season_toi_sec ?? 0) / seaGames % 60)).padStart(2,'0')}` : '—'}
+                  </td>
+                </tr>
+                {/* Momentum (Last 5) row */}
+                {momGames > 0 && (
+                  <tr style={{ background: 'var(--bg-card)' }}>
+                    <td className="px-3 py-2.5 font-semibold" style={{ color: 'var(--neon)', whiteSpace: 'nowrap' }}>Last {momGames}</td>
+                    <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{momGames}</td>
+                    <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{momGoals}</td>
+                    <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{momAssists}</td>
+                    <td className="px-3 py-2.5 text-right font-mono font-bold" style={{ color: 'var(--text-bright)' }}>{momGoals + momAssists}</td>
+                    <td className="px-3 py-2.5 text-right font-mono" style={{ color: Number(latestSnapshot.momentum_plus_minus ?? 0) >= 0 ? 'var(--green)' : 'var(--red)' }}>
+                      {Number(latestSnapshot.momentum_plus_minus ?? 0) > 0 ? '+' : ''}{latestSnapshot.momentum_plus_minus ?? '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{latestSnapshot.momentum_pim ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{latestSnapshot.momentum_pp_goals ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{latestSnapshot.momentum_pp_points ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>—</td>
+                    <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>—</td>
+                    <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>—</td>
+                    <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{latestSnapshot.momentum_shots ?? '—'}</td>
+                    <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{(momShootPct * 100).toFixed(1)}%</td>
+                    <td className="px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)', whiteSpace: 'nowrap' }}>
+                      {momGames > 0 ? `${Math.floor(Number(latestSnapshot.momentum_toi_sec ?? 0) / momGames / 60)}:${String(Math.floor(Number(latestSnapshot.momentum_toi_sec ?? 0) / momGames % 60)).padStart(2,'0')}` : '—'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* ── Energy Bar ──────────────────────────────────────────────────────────── */}
       <EnergyBar value={energyBar} leagueAvg={lgEnergy} />
 
@@ -457,6 +528,13 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                     <StatPill label="G" value={String(g.goals ?? 0)} highlight={Number(g.goals) > 0} />
                     <StatPill label="A" value={String(g.assists ?? 0)} highlight={Number(g.assists) > 1} />
                     <StatPill label="PTS" value={String(pts)} highlight={pts > 1} bold />
+                    {g.plus_minus !== undefined && g.plus_minus !== null && (
+                      <StatPill label="+/-" value={`${Number(g.plus_minus) > 0 ? '+' : ''}${g.plus_minus}`}
+                        highlight={Number(g.plus_minus) > 0} />
+                    )}
+                    {Number(g.pim ?? 0) > 0 && (
+                      <StatPill label="PIM" value={String(g.pim)} />
+                    )}
                     <span className="text-xs font-mono hidden sm:block" style={{ color: 'var(--text)' }}>
                       {toiMin}:{toiSec} TOI
                     </span>

@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
       // Fetch all game stats for this player this season
       const { data: allStats } = await supabaseAdmin
         .from('game_player_stats')
-        .select('game_id,goals,assists,shots_on_goal,toi_seconds,hits,blocked_shots,plus_minus,pp_points,sh_toi_seconds')
+        .select('game_id,goals,assists,shots_on_goal,toi_seconds,hits,blocked_shots,plus_minus,pim,pp_goals,pp_points,sh_goals,sh_points,sh_toi_seconds,game_winning_goals,ot_goals')
         .eq('player_id', player.id)
         .order('game_id', { ascending: true });
 

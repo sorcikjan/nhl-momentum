@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
 
     const { data: allStats, error: statsErr } = await supabaseAdmin
       .from('game_player_stats')
-      .select('player_id,goals,assists,shots_on_goal,toi_seconds,hits,blocked_shots,plus_minus,pp_points,sh_toi_seconds,game_id')
+      .select('player_id,goals,assists,shots_on_goal,toi_seconds,hits,blocked_shots,plus_minus,pim,pp_goals,pp_points,sh_goals,sh_points,sh_toi_seconds,game_winning_goals,ot_goals,game_id')
       .in('player_id', skaterIds)
       .order('game_id', { ascending: false });
 
@@ -84,29 +84,50 @@ export async function GET(req: NextRequest) {
       const rankScore      = calcMomentumRankScore(momentum.ppm, momentum.shootingPct, sosCoefficient);
 
       snapshots.push({
-        player_id:            player.id,
-        momentum_games:       momentum.gamesPlayed,
-        momentum_goals:       momentum.goals,
-        momentum_assists:     momentum.assists,
-        momentum_points:      momentum.points,
-        momentum_toi_sec:     momentum.toiSeconds,
-        momentum_ppm:         momentum.ppm,
-        momentum_shooting_pct: momentum.shootingPct,
-        momentum_sh_toi_sec:  momentum.shorthandedToiSeconds,
-        season_games:         season.gamesPlayed,
-        season_goals:         season.goals,
-        season_assists:       season.assists,
-        season_points:        season.points,
-        season_toi_sec:       season.toiSeconds,
-        season_ppm:           season.ppm,
-        season_shooting_pct:  season.shootingPct,
-        career_games:         career.gamesPlayed,
-        career_ppm:           career.ppm,
-        composite_ppm:        composite.ppm,
-        sos_coefficient:      sosCoefficient,
-        energy_bar:           100, // placeholder until energy route populates this
-        momentum_rank:        0,   // will be set after ranking
-        breakout_delta:       breakoutDelta,
+        player_id:                    player.id,
+        // Momentum layer
+        momentum_games:               momentum.gamesPlayed,
+        momentum_goals:               momentum.goals,
+        momentum_assists:             momentum.assists,
+        momentum_points:              momentum.points,
+        momentum_toi_sec:             momentum.toiSeconds,
+        momentum_ppm:                 momentum.ppm,
+        momentum_shooting_pct:        momentum.shootingPct,
+        momentum_sh_toi_sec:          momentum.shorthandedToiSeconds,
+        momentum_plus_minus:          momentum.plusMinus,
+        momentum_pp_goals:            momentum.powerPlayGoals,
+        momentum_pp_points:           momentum.powerPlayPoints,
+        momentum_pim:                 momentum.pim,
+        momentum_shots:               momentum.shotsOnGoal,
+        momentum_hits:                momentum.hits,
+        momentum_blocked_shots:       momentum.blockedShots,
+        // Season layer
+        season_games:                 season.gamesPlayed,
+        season_goals:                 season.goals,
+        season_assists:               season.assists,
+        season_points:                season.points,
+        season_toi_sec:               season.toiSeconds,
+        season_ppm:                   season.ppm,
+        season_shooting_pct:          season.shootingPct,
+        season_plus_minus:            season.plusMinus,
+        season_pp_goals:              season.powerPlayGoals,
+        season_pp_points:             season.powerPlayPoints,
+        season_sh_goals:              season.shorthandedGoals,
+        season_sh_points:             season.shorthandedPoints,
+        season_pim:                   season.pim,
+        season_gw_goals:              season.gameWinningGoals,
+        season_ot_goals:              season.otGoals,
+        season_shots:                 season.shotsOnGoal,
+        season_hits:                  season.hits,
+        season_blocked_shots:         season.blockedShots,
+        // Career / composite
+        career_games:                 career.gamesPlayed,
+        career_ppm:                   career.ppm,
+        composite_ppm:                composite.ppm,
+        sos_coefficient:              sosCoefficient,
+        energy_bar:                   100, // placeholder until energy route populates this
+        momentum_rank:                0,   // will be set after ranking
+        breakout_delta:               breakoutDelta,
       });
     }
 

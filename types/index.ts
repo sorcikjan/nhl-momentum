@@ -29,6 +29,7 @@ export interface NHLGameLog {
   assists: number;
   points: number;
   plusMinus: number;
+  pim: number;              // Penalties in minutes
   hits: number;
   blockedShots: number;
   shots: number;
@@ -38,6 +39,8 @@ export interface NHLGameLog {
   powerPlayPoints: number;
   shorthandedGoals: number;
   shorthandedPoints: number;
+  gameWinningGoals: number;
+  otGoals: number;
   powerPlayToi: string;
   shorthandedToi: string;
 }
@@ -79,7 +82,13 @@ export interface LayerMetrics {
   hits: number;
   blockedShots: number;
   plusMinus: number;
+  pim: number;
+  powerPlayGoals: number;
   powerPlayPoints: number;
+  shorthandedGoals: number;
+  shorthandedPoints: number;
+  gameWinningGoals: number;
+  otGoals: number;
   shorthandedToiSeconds: number;
 }
 
