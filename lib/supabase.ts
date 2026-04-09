@@ -11,12 +11,23 @@ function getClient(): SupabaseClient {
   return createClient(url, anonKey);
 }
 
-// Single client — tables have no RLS so anon key has full access
+function getAdminClient(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceKey) {
+    throw new Error('Missing Supabase admin env vars: NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY');
+  }
+
+  return createClient(url, serviceKey, { auth: { persistSession: false } });
+}
+
 export const supabase = {
   get client() { return getClient(); },
   from: (...args: Parameters<SupabaseClient['from']>) => getClient().from(...args),
 };
 
+// Uses service role key — bypasses RLS, only call from server-side ingest routes
 export const supabaseAdmin = {
-  from: (...args: Parameters<SupabaseClient['from']>) => getClient().from(...args),
+  from: (...args: Parameters<SupabaseClient['from']>) => getAdminClient().from(...args),
 };
