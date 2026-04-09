@@ -29,6 +29,8 @@ export async function GET(req: NextRequest) {
 
   const dateParam = req.nextUrl.searchParams.get('date');
   const phaseParam = req.nextUrl.searchParams.get('phase') ?? 'all';
+  const gameOffset = Math.max(0, Number(req.nextUrl.searchParams.get('game_offset') ?? '0'));
+  const gameLimit  = Math.min(10, Math.max(1, Number(req.nextUrl.searchParams.get('game_limit') ?? '2')));
 
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   if (dateParam && !DATE_RE.test(dateParam)) {
@@ -54,6 +56,7 @@ export async function GET(req: NextRequest) {
   let snapshotsSaved = 0;
   let predictionsStored = 0;
   let energyUpdated = 0;
+  let totalUpcomingGames = 0;
 
   try {
     // ── Phase 1: Record outcomes for yesterday's completed games ───────────────
@@ -125,8 +128,9 @@ export async function GET(req: NextRequest) {
     log.push(`Phase 2: capturing snapshots + predictions for ${today}`);
 
     // Auto-run energy for players who played yesterday before building snapshots.
+    // Only on first pagination call (game_offset=0) to avoid redundant work.
     // gamelogs + metrics ingest must have already run so game_player_stats is populated.
-    {
+    if (gameOffset === 0) {
       const GAME_DURATION_MS = 2.5 * 3_600_000;
       const now = new Date();
       const since = new Date(now.getTime() - 72 * 3_600_000);
@@ -207,6 +211,7 @@ export async function GET(req: NextRequest) {
     const upcomingGames = todayGames.filter(
       g => g.gameState === 'FUT' || g.gameState === 'PRE'
     );
+    totalUpcomingGames = upcomingGames.length;
 
     // Upsert today's games into games table
     for (const g of upcomingGames) {
@@ -226,7 +231,9 @@ export async function GET(req: NextRequest) {
         }, { onConflict: 'id' });
     }
 
-    for (const game of upcomingGames) {
+    const gamesToProcess = upcomingGames.slice(gameOffset, gameOffset + gameLimit);
+
+    for (const game of gamesToProcess) {
       // Build home + away snapshots in parallel — they're fully independent
       await Promise.all([
         { teamId: game.homeTeam.id, isHome: true },
@@ -530,7 +537,7 @@ export async function GET(req: NextRequest) {
     }
 
     log.push(`Team snapshots saved: ${snapshotsSaved}`);
-    log.push(`Predictions stored: ${predictionsStored} for ${upcomingGames.length} upcoming games`);
+    log.push(`Predictions stored: ${predictionsStored} for ${gamesToProcess.length} games (offset ${gameOffset}/${upcomingGames.length})`);
     } // end phase 2
 
     // ── Phase 3: Recalculate energy bars for ALL active players ───────────────
@@ -635,6 +642,7 @@ export async function GET(req: NextRequest) {
         predictions_stored: predictionsStored,
         energy_updated: energyUpdated,
         energy_inserted: energyInserted,
+        has_more: phase === 'snapshots' && gameOffset + gameLimit < totalUpcomingGames,
         log,
       },
       error: null,

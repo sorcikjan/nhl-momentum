@@ -46,9 +46,18 @@ export default async function handler() {
     }
     log.push(`metrics: ${mTotal} snapshots inserted`);
 
-    // 4. Snapshots + predictions (includes energy auto-update for recent players)
-    const snaps = await fetch(`${base}/api/ingest/daily?phase=snapshots`, { headers }).then(r => r.json());
-    log.push(`snapshots: ${snaps.data?.snapshots_saved ?? `error: ${snaps.error}`} saved, ${snaps.data?.energy_updated ?? 0} energy updated`);
+    // 4. Snapshots + predictions (paginated — 2 games per call to stay within 10s limit)
+    let snapOffset = 0, totalSnaps = 0, totalPreds = 0;
+    for (;;) {
+      const snaps = await fetch(`${base}/api/ingest/daily?phase=snapshots&game_offset=${snapOffset}&game_limit=2`, { headers }).then(r => r.json());
+      if (snaps.error) { log.push(`snapshots error at offset ${snapOffset}: ${snaps.error}`); break; }
+      totalSnaps += snaps.data?.snapshots_saved ?? 0;
+      totalPreds += snaps.data?.predictions_stored ?? 0;
+      if (!snaps.data?.has_more) break;
+      snapOffset += 2;
+      if (snapOffset > 50) break; // safety cap
+    }
+    log.push(`snapshots: ${totalSnaps} saved, ${totalPreds} predictions stored`);
 
     // 5. Full energy sweep for all active players
     const energy = await fetch(`${base}/api/ingest/daily?phase=energy`, { headers }).then(r => r.json());
