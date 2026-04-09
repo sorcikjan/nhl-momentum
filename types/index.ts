@@ -141,7 +141,6 @@ export interface GamePrediction {
   predictedAwayScore: number;
   homeWinProbability: number;
   awayWinProbability: number;
-  otProbability: number;
   // Breakdown of factors
   homeOffensivePotential: number;
   awayOffensivePotential: number;

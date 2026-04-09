@@ -156,16 +156,10 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           <div className="mb-2">
             <div className="flex justify-between text-xs mb-1" style={{ color: 'var(--text)' }}>
               <span style={{ color: 'var(--silver)' }}>{awayAbbrev} {Math.round(prediction.away_win_probability * 100)}%</span>
-              {prediction.ot_probability > 0 && (
-                <span>OT {Math.round(prediction.ot_probability * 100)}%</span>
-              )}
               <span style={{ color: 'var(--neon)' }}>{homeAbbrev} {Math.round(prediction.home_win_probability * 100)}%</span>
             </div>
             <div className="flex h-3 rounded-full overflow-hidden">
               <div style={{ width: `${prediction.away_win_probability * 100}%`, background: 'var(--silver)' }} />
-              {prediction.ot_probability > 0 && (
-                <div style={{ width: `${prediction.ot_probability * 100}%`, background: 'var(--amber)' }} />
-              )}
               <div style={{ width: `${prediction.home_win_probability * 100}%`, background: 'var(--neon)' }} />
             </div>
           </div>
@@ -212,7 +206,6 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
 
         const modelH  = prediction ? Math.round(prediction.home_win_probability * 100) : null;
         const modelA  = prediction ? Math.round(prediction.away_win_probability * 100) : null;
-        const modelOT = prediction ? Math.round(prediction.ot_probability * 100) : 0;
 
         // Who does each source favour?
         const modelFav  = modelH !== null ? (modelH >= (modelA ?? 0) ? homeAbbrev : awayAbbrev) : null;
@@ -232,10 +225,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const otherBooks = rows.filter((o: any) => o.bookmaker !== pinnacle.bookmaker);
 
-        const ProbBar = ({ a, h, ot, opacity = 1 }: { a: number; h: number; ot: number; opacity?: number }) => (
+        const ProbBar = ({ a, h, opacity = 1 }: { a: number; h: number; opacity?: number }) => (
           <div className="flex h-3 rounded-full overflow-hidden" style={{ opacity }}>
             <div style={{ width: `${a}%`, background: 'var(--silver)' }} />
-            {ot > 0 && <div style={{ width: `${ot}%`, background: 'var(--amber)' }} />}
             <div style={{ width: `${h}%`, background: 'var(--neon)' }} />
           </div>
         );
@@ -269,7 +261,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                 <div className="flex items-center gap-2 mb-1.5">
                   <img src={awayLogo} alt={awayAbbrev} className="w-5 h-5 object-contain flex-shrink-0" />
                   <div className="flex-1">
-                    <ProbBar a={modelA} h={modelH} ot={modelOT} />
+                    <ProbBar a={modelA} h={modelH} />
                   </div>
                   <img src={homeLogo} alt={homeAbbrev} className="w-5 h-5 object-contain flex-shrink-0" />
                 </div>
@@ -277,7 +269,6 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                   <span style={{ color: 'var(--silver)', fontWeight: modelFav === awayAbbrev ? 700 : 400 }}>
                     {awayAbbrev} {modelA}%
                   </span>
-                  {modelOT > 0 && <span style={{ color: 'var(--amber)' }}>OT {modelOT}%</span>}
                   <span style={{ color: 'var(--neon)', fontWeight: modelFav === homeAbbrev ? 700 : 400 }}>
                     {homeAbbrev} {modelH}%
                   </span>
@@ -307,7 +298,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
               <div className="flex items-center gap-2 mb-1.5">
                 <img src={awayLogo} alt={awayAbbrev} className="w-5 h-5 object-contain flex-shrink-0" />
                 <div className="flex-1">
-                  <ProbBar a={pinA} h={pinH} ot={pinOT} opacity={0.75} />
+                  <ProbBar a={pinA} h={pinH} opacity={0.75} />
                 </div>
                 <img src={homeLogo} alt={homeAbbrev} className="w-5 h-5 object-contain flex-shrink-0" />
               </div>
@@ -315,7 +306,6 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                 <span style={{ color: 'var(--silver)', fontWeight: pinFav === awayAbbrev ? 700 : 400 }}>
                   {awayAbbrev} {pinA}%
                 </span>
-                {pinOT > 0 && <span style={{ color: 'var(--amber)' }}>OT {pinOT}%</span>}
                 <span style={{ color: 'var(--neon)', fontWeight: pinFav === homeAbbrev ? 700 : 400 }}>
                   {homeAbbrev} {pinH}%
                 </span>

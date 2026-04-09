@@ -8,7 +8,6 @@ interface VersionPred {
     predicted_away_score: number;
     home_win_probability: number;
     away_win_probability: number;
-    ot_probability: number;
   } | null;
   correct: boolean | null;
 }

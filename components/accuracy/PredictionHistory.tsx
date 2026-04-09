@@ -15,7 +15,6 @@ interface Prediction {
   predicted_away_score: number;
   home_win_probability: number;
   away_win_probability: number;
-  ot_probability: number;
   home_energy_bar: number;
   away_energy_bar: number;
   created_at: string;
@@ -24,11 +23,10 @@ interface Prediction {
   games: any;
 }
 
-function WinBar({ home, away, ot }: { home: number; away: number; ot: number }) {
+function WinBar({ home, away }: { home: number; away: number }) {
   return (
     <div className="flex h-1.5 rounded-full overflow-hidden w-24">
       <div style={{ width: `${home * 100}%`, background: 'var(--neon)' }} />
-      <div style={{ width: `${ot * 100}%`, background: 'var(--amber)' }} />
       <div style={{ width: `${away * 100}%`, background: 'var(--silver)' }} />
     </div>
   );
@@ -80,7 +78,6 @@ export default function PredictionHistory({ predictions }: { predictions: Predic
                     <WinBar
                       home={p.home_win_probability ?? 0}
                       away={p.away_win_probability ?? 0}
-                      ot={p.ot_probability ?? 0}
                     />
                     <span className="text-xs font-mono" style={{ color: 'var(--neon)' }}>
                       {Math.round((p.home_win_probability ?? 0) * 100)}%

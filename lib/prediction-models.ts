@@ -4,7 +4,7 @@
 
 export interface ModelResult {
   homeXG: number; awayXG: number;
-  homeWin: number; awayWin: number; ot: number;
+  homeWin: number; awayWin: number;
   homeOff?: number; awayOff?: number;
   homeDef?: number; awayDef?: number;
 }
@@ -66,23 +66,19 @@ function runModelV1(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   const homeXG = awayDef > 0 ? homeOff / awayDef : 0;
   const awayXG = homeDef > 0 ? awayOff / homeDef : 0;
   const total = homeXG + awayXG;
-  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.33, awayWin: 0.33, ot: 0.34 };
+  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5 };
 
   const homeBase = homeXG / total;
   const awayBase = awayXG / total;
   const homeAdj = Math.min(0.85, homeBase * 1.05);
   const awayAdj = Math.min(0.85, awayBase * 0.95);
-  const convergence = 1 - Math.abs(homeXG - awayXG) / Math.max(homeXG, awayXG, 0.01);
-  const otProb = Math.min(0.25, convergence * 0.2);
-  const remaining = 1 - otProb;
-  const homeWin = (homeAdj / (homeAdj + awayAdj)) * remaining;
+  const homeWin = homeAdj / (homeAdj + awayAdj);
 
   return {
     homeXG: Math.round(homeXG * 100) / 100,
     awayXG: Math.round(awayXG * 100) / 100,
     homeWin: Math.round(homeWin * 1000) / 1000,
-    awayWin: Math.round((remaining - homeWin) * 1000) / 1000,
-    ot: Math.round(otProb * 1000) / 1000,
+    awayWin: Math.round((1 - homeWin) * 1000) / 1000,
   };
 }
 
@@ -113,23 +109,19 @@ function runModelV1_1(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
   const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
   const total = homeXG + awayXG;
-  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.33, awayWin: 0.33, ot: 0.34, homeOff, awayOff, homeDef, awayDef };
+  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5, homeOff, awayOff, homeDef, awayDef };
 
   const homeBase = homeXG / total;
   const awayBase = awayXG / total;
   const homeAdj = Math.min(0.85, homeBase * 1.05);
   const awayAdj = Math.min(0.85, awayBase * 0.95);
-  const convergence = 1 - Math.abs(homeXG - awayXG) / Math.max(homeXG, awayXG, 0.01);
-  const otProb = Math.min(0.25, convergence * 0.2);
-  const remaining = 1 - otProb;
-  const homeWin = (homeAdj / (homeAdj + awayAdj)) * remaining;
+  const homeWin = homeAdj / (homeAdj + awayAdj);
 
   return {
     homeXG: Math.round(homeXG * 10) / 10,
     awayXG: Math.round(awayXG * 10) / 10,
     homeWin: Math.round(homeWin * 1000) / 1000,
-    awayWin: Math.round((remaining - homeWin) * 1000) / 1000,
-    ot: Math.round(otProb * 1000) / 1000,
+    awayWin: Math.round((1 - homeWin) * 1000) / 1000,
     homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
     awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
     homeDef: Math.round(homeDef * 10) / 10,
@@ -164,7 +156,7 @@ function runModelV1_2(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
   const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
   const total = homeXG + awayXG;
-  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5, ot: 0, homeOff, awayOff, homeDef, awayDef };
+  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5,  homeOff, awayOff, homeDef, awayDef };
 
   const homeBase = homeXG / total;
   const awayBase = awayXG / total;
@@ -177,7 +169,7 @@ function runModelV1_2(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
     awayXG: Math.round(awayXG * 10) / 10,
     homeWin: Math.round(homeWin * 1000) / 1000,
     awayWin: Math.round((1 - homeWin) * 1000) / 1000,
-    ot: 0,
+
     homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
     awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
     homeDef: Math.round(homeDef * 10) / 10,
@@ -214,7 +206,7 @@ function runModelV1_3(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
   const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
   const total = homeXG + awayXG;
-  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.52, awayWin: 0.48, ot: 0, homeOff, awayOff, homeDef, awayDef };
+  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.52, awayWin: 0.48,  homeOff, awayOff, homeDef, awayDef };
 
   const homeBase = homeXG / total;
   const awayBase = awayXG / total;
@@ -227,7 +219,7 @@ function runModelV1_3(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
     awayXG: Math.round(awayXG * 10) / 10,
     homeWin: Math.round(homeWin * 1000) / 1000,
     awayWin: Math.round((1 - homeWin) * 1000) / 1000,
-    ot: 0,
+
     homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
     awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
     homeDef: Math.round(homeDef * 10) / 10,
@@ -262,7 +254,7 @@ function runModelV1_4(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
   const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
   const total = homeXG + awayXG;
-  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.52, awayWin: 0.48, ot: 0, homeOff, awayOff, homeDef, awayDef };
+  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.52, awayWin: 0.48,  homeOff, awayOff, homeDef, awayDef };
 
   const homeBase = homeXG / total;
   const awayBase = awayXG / total;
@@ -275,7 +267,7 @@ function runModelV1_4(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
     awayXG: Math.round(awayXG * 10) / 10,
     homeWin: Math.round(homeWin * 1000) / 1000,
     awayWin: Math.round((1 - homeWin) * 1000) / 1000,
-    ot: 0,
+
     homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
     awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
     homeDef: Math.round(homeDef * 10) / 10,
@@ -311,7 +303,7 @@ function runModelV1_5(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
   const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
   const total = homeXG + awayXG;
-  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5, ot: 0, homeOff, awayOff, homeDef, awayDef };
+  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5,  homeOff, awayOff, homeDef, awayDef };
 
   const homeBase = homeXG / total;
   const awayBase = awayXG / total;
@@ -325,7 +317,7 @@ function runModelV1_5(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
     awayXG: Math.round(awayXG * 10) / 10,
     homeWin: Math.round(homeWin * 1000) / 1000,
     awayWin: Math.round((1 - homeWin) * 1000) / 1000,
-    ot: 0,
+
     homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
     awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
     homeDef: Math.round(homeDef * 10) / 10,
@@ -370,7 +362,7 @@ function runModelV1_6(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
   const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
   const total = homeXG + awayXG;
-  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5, ot: 0, homeOff, awayOff, homeDef, awayDef };
+  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5,  homeOff, awayOff, homeDef, awayDef };
 
   const homeBase = homeXG / total;
   const awayBase = awayXG / total;
@@ -384,7 +376,7 @@ function runModelV1_6(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
     awayXG: Math.round(awayXG * 10) / 10,
     homeWin: Math.round(homeWin * 1000) / 1000,
     awayWin: Math.round((1 - homeWin) * 1000) / 1000,
-    ot: 0,
+
     homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
     awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
     homeDef: Math.round(homeDef * 10) / 10,
@@ -433,7 +425,7 @@ function runModelV1_7(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
   const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
   const total = homeXG + awayXG;
-  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5, ot: 0, homeOff, awayOff, homeDef, awayDef };
+  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5,  homeOff, awayOff, homeDef, awayDef };
 
   const homeBase = homeXG / total;
   const awayBase = awayXG / total;
@@ -447,7 +439,7 @@ function runModelV1_7(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
     awayXG: Math.round(awayXG * 10) / 10,
     homeWin: Math.round(homeWin * 1000) / 1000,
     awayWin: Math.round((1 - homeWin) * 1000) / 1000,
-    ot: 0,
+
     homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
     awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
     homeDef: Math.round(homeDef * 10) / 10,

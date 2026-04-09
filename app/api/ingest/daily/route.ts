@@ -399,7 +399,7 @@ export async function GET(req: NextRequest) {
               predicted_away_score: Math.round(r.awayXG * 10) / 10,
               home_win_probability: Math.round(r.homeWin * 1000) / 1000,
               away_win_probability: Math.round(r.awayWin * 1000) / 1000,
-              ot_probability: r.ot,
+              ot_probability: 0,
               home_energy_bar: homeSnap.team_energy_bar,
               away_energy_bar: awaySnap.team_energy_bar,
               home_sos_multiplier: homeSnap.sos_multiplier,

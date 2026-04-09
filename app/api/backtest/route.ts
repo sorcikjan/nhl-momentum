@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
     .from('predictions')
     .select(`
       model_version, predicted_home_score, predicted_away_score,
-      home_win_probability, away_win_probability, ot_probability,
+      home_win_probability, away_win_probability,
       home_offensive_potential, away_offensive_potential,
       home_defensive_filter, away_defensive_filter,
       home_energy_bar, away_energy_bar, created_at
@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
         predicted_away_score: result.awayXG,
         home_win_probability: result.homeWin,
         away_win_probability: result.awayWin,
-        ot_probability: result.ot,
+        ot_probability: 0,
         home_energy_bar: homeSnap.energyBar,
         away_energy_bar: awaySnap.energyBar,
         home_sos_multiplier: homeSnap.sosMultiplier,

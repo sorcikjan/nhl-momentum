@@ -64,7 +64,7 @@ function expectedScore(offPotential: number, defFilter: number): number {
  */
 function calcProbabilities(homeXG: number, awayXG: number) {
   const total = homeXG + awayXG;
-  if (total === 0) return { home: 0.33, away: 0.33, ot: 0.34 };
+  if (total === 0) return { home: 0.5, away: 0.5 };
 
   const homeBase = homeXG / total;
   const awayBase = awayXG / total;
@@ -73,15 +73,10 @@ function calcProbabilities(homeXG: number, awayXG: number) {
   const homeAdj = Math.min(0.85, homeBase * 1.05);
   const awayAdj = Math.min(0.85, awayBase * 0.95);
 
-  // OT probability increases as scores converge
-  const convergence = 1 - Math.abs(homeXG - awayXG) / Math.max(homeXG, awayXG, 0.01);
-  const otProb = Math.min(0.25, convergence * 0.2);
+  const homeWin = homeAdj / (homeAdj + awayAdj);
+  const awayWin = 1 - homeWin;
 
-  const remainingProb = 1 - otProb;
-  const homeWin = (homeAdj / (homeAdj + awayAdj)) * remainingProb;
-  const awayWin = remainingProb - homeWin;
-
-  return { home: homeWin, away: awayWin, ot: otProb };
+  return { home: homeWin, away: awayWin };
 }
 
 // ─── Main Prediction Builder ───────────────────────────────────────────────────
@@ -117,7 +112,6 @@ export function buildPrediction(
     predictedAwayScore: Math.round(awayXG * 10) / 10,
     homeWinProbability: Math.round(probs.home * 1000) / 1000,
     awayWinProbability: Math.round(probs.away * 1000) / 1000,
-    otProbability:      Math.round(probs.ot * 1000) / 1000,
     homeOffensivePotential: homeOffPotential,
     awayOffensivePotential: awayOffPotential,
     homeDefensiveFilter:    homeDefFilter,

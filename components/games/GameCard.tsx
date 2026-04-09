@@ -7,7 +7,6 @@ interface Prediction {
   predicted_away_score: number;
   home_win_probability: number;
   away_win_probability: number;
-  ot_probability: number;
   home_energy_bar: number;
   away_energy_bar: number;
   prediction_outcomes?: {
@@ -36,13 +35,12 @@ interface Game {
   awayTeam: { id: number; abbrev: string; score?: number; logo?: string };
 }
 
-function WinBar({ home, away, ot, homeAbbrev, awayAbbrev }: {
-  home: number; away: number; ot: number;
+function WinBar({ home, away, homeAbbrev, awayAbbrev }: {
+  home: number; away: number;
   homeAbbrev: string; awayAbbrev: string;
 }) {
   const hp = Math.round(home * 100);
   const ap = Math.round(away * 100);
-  const op = Math.round(ot * 100);
   const favourite = home >= away ? homeAbbrev : awayAbbrev;
   const favouritePct = Math.max(hp, ap);
   return (
@@ -52,12 +50,10 @@ function WinBar({ home, away, ot, homeAbbrev, awayAbbrev }: {
       </div>
       <div className="flex text-xs justify-between mb-1" style={{ color: 'var(--text)' }}>
         <span style={{ color: 'var(--silver)' }}>{awayAbbrev} {ap}%</span>
-        {op > 0 && <span>OT {op}%</span>}
         <span style={{ color: 'var(--neon)' }}>{homeAbbrev} {hp}%</span>
       </div>
       <div className="flex h-1.5 rounded-full overflow-hidden">
         <div style={{ width: `${ap}%`, background: 'var(--silver)' }} />
-        {op > 0 && <div style={{ width: `${op}%`, background: 'var(--amber)' }} />}
         <div style={{ width: `${hp}%`, background: 'var(--neon)' }} />
       </div>
     </div>
@@ -159,7 +155,6 @@ export default function GameCard({
         <WinBar
           home={prediction.home_win_probability}
           away={prediction.away_win_probability}
-          ot={prediction.ot_probability}
           homeAbbrev={game.homeTeam.abbrev}
           awayAbbrev={game.awayTeam.abbrev}
         />
