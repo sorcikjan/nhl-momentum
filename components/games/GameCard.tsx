@@ -39,8 +39,9 @@ function WinBar({ home, away, homeAbbrev, awayAbbrev }: {
   home: number; away: number;
   homeAbbrev: string; awayAbbrev: string;
 }) {
-  const hp = Math.round(home * 100);
-  const ap = Math.round(away * 100);
+  const total = home + away || 1;
+  const hp = Math.round((home / total) * 100);
+  const ap = 100 - hp;
   const favourite = home >= away ? homeAbbrev : awayAbbrev;
   const favouritePct = Math.max(hp, ap);
   return (
@@ -53,8 +54,8 @@ function WinBar({ home, away, homeAbbrev, awayAbbrev }: {
         <span style={{ color: 'var(--neon)' }}>{homeAbbrev} {hp}%</span>
       </div>
       <div className="flex h-1.5 rounded-full overflow-hidden">
-        <div style={{ width: `${ap}%`, background: 'var(--silver)' }} />
-        <div style={{ width: `${hp}%`, background: 'var(--neon)' }} />
+        <div style={{ flexGrow: away, background: 'var(--silver)' }} />
+        <div style={{ flexGrow: home, background: 'var(--neon)' }} />
       </div>
     </div>
   );
