@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
 import { playerUrl } from '@/lib/urls';
 
@@ -30,6 +33,10 @@ export default function BreakoutWatch({
   players: Player[];
   lastUpdated?: string | null;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = players.slice(0, expanded ? 10 : 5);
+  const canExpand = players.length > 5;
+
   return (
     <div className="rounded-xl border p-4 flex flex-col" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
       <div className="flex items-center justify-between mb-1">
@@ -51,7 +58,7 @@ export default function BreakoutWatch({
       )}
 
       <div className="flex flex-col gap-2 flex-1">
-        {players.map((p) => {
+        {visible.map((p) => {
           const name = `${p.players.first_name} ${p.players.last_name}`;
           const delta = p.breakout_delta ?? 0;
           const barPct = Math.min(100, Math.abs(delta) * 500);
@@ -96,15 +103,24 @@ export default function BreakoutWatch({
         })}
       </div>
 
+      {canExpand && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="mt-2 w-full text-xs py-1.5 rounded-lg transition-opacity hover:opacity-80"
+          style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+          {expanded ? '↑ Show less' : `↓ Show ${players.length - 5} more`}
+        </button>
+      )}
+
       <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="flex items-center justify-between">
           <span className="text-xs" style={{ color: 'var(--text)' }}>
-            Showing top {players.length}
+            Showing top {visible.length}
           </span>
           <Link href="/rankings"
             className="text-xs font-medium hover:underline"
             style={{ color: 'var(--amber)' }}>
-            View all rankings →
+            View full rankings →
           </Link>
         </div>
       </div>

@@ -104,7 +104,7 @@ export async function fetchRankings() {
     .slice(0, 10);
   const momentumLeaderSkaters = [...skaters]
     .sort((a, b) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0))
-    .slice(0, 5);
+    .slice(0, 10);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const goalies = latest.filter((r: any) => r.players?.position_code === 'G');
   const momentumLeaderGoalies = [...goalies]

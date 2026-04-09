@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
 import { gameUrl } from '@/lib/urls';
 
@@ -22,6 +25,10 @@ function stateLabel(state: string) {
 }
 
 export default function TodaysGames({ games }: { games: Game[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = games.slice(0, expanded ? games.length : 5);
+  const canExpand = games.length > 5;
+
   if (!games.length) {
     return (
       <div className="rounded-xl border p-8 text-center flex flex-col items-center gap-3"
@@ -38,12 +45,12 @@ export default function TodaysGames({ games }: { games: Game[] }) {
   }
 
   return (
-    <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <h2 className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--silver)' }}>
+    <div className="rounded-xl border p-4 flex flex-col" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--silver)' }}>
         🏒 Today&apos;s Games
       </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
-        {games.map((g) => {
+      <div className="flex flex-col gap-2 flex-1">
+        {visible.map((g) => {
           const time = new Date(g.startTimeUTC).toLocaleTimeString('en-US', {
             hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York',
           });
@@ -92,6 +99,28 @@ export default function TodaysGames({ games }: { games: Game[] }) {
             </Link>
           );
         })}
+      </div>
+
+      {canExpand && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="mt-2 w-full text-xs py-1.5 rounded-lg transition-opacity hover:opacity-80"
+          style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+          {expanded ? '↑ Show less' : `↓ Show ${games.length - 5} more`}
+        </button>
+      )}
+
+      <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+        <div className="flex items-center justify-between">
+          <span className="text-xs" style={{ color: 'var(--text)' }}>
+            {visible.length} of {games.length} games
+          </span>
+          <Link href="/games"
+            className="text-xs font-medium hover:underline"
+            style={{ color: 'var(--silver)' }}>
+            View full schedule →
+          </Link>
+        </div>
       </div>
     </div>
   );

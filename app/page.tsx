@@ -62,6 +62,7 @@ async function DashboardStats({ today }: { today: string }) {
 
 async function LeadersAndBreakout() {
   const rankings = await getRankings();
+  // momentumLeaders.skaters has up to 10 — components show top 5 by default, expand to 10
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const leaders = (rankings?.momentumLeaders?.skaters ?? []) as any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
