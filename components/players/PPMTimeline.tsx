@@ -43,8 +43,8 @@ export default function PPMTimeline({ snapshots, leagueAvgPpm }: { snapshots: Sn
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-          <XAxis dataKey="label" tick={{ fill: 'var(--text)', fontSize: 10 }} interval="preserveStartEnd" />
-          <YAxis tick={{ fill: 'var(--text)', fontSize: 10 }} width={50} />
+          <XAxis dataKey="label" tick={{ fill: 'var(--text)', fontSize: 11 }} interval="preserveStartEnd" />
+          <YAxis tick={{ fill: 'var(--text)', fontSize: 11 }} width={44} />
           <Tooltip
             contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8 }}
             labelStyle={{ color: 'var(--text-bright)' }}

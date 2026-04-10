@@ -65,10 +65,10 @@ export default function RankingsTable({ players }: { players: Player[] }) {
     [players, pos, sort]
   );
 
-  const th = (label: string, key: SortKey) => (
+  const th = (label: string, key: SortKey, hideOnMobile = false) => (
     <th
       onClick={() => setSort(key)}
-      className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none transition-colors"
+      className={`px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none transition-colors${hideOnMobile ? ' hidden md:table-cell' : ''}`}
       style={{ color: sort === key ? 'var(--neon)' : 'var(--text)' }}
     >
       {label} {sort === key ? '↓' : ''}
@@ -81,7 +81,7 @@ export default function RankingsTable({ players }: { players: Player[] }) {
       <div className="flex gap-2 mb-4">
         {positions.map(p => (
           <button key={p} onClick={() => setPos(p)}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer"
+            className="px-3 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer min-h-[44px]"
             style={{
               background: pos === p ? 'var(--neon-glow)' : 'var(--bg-card)',
               color: pos === p ? 'var(--neon)' : 'var(--text)',
@@ -101,16 +101,16 @@ export default function RankingsTable({ players }: { players: Player[] }) {
           <table className="w-full text-sm">
             <thead style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
               <tr>
-                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider w-12"
+                <th className="px-2 md:px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider w-8 md:w-12"
                   style={{ color: 'var(--text)' }}>#</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider"
                   style={{ color: 'var(--text)' }}>Player</th>
                 {th('M.PPM', 'momentum_ppm')}
                 {th('S.PPM', 'season_ppm')}
                 {th('Delta', 'breakout_delta')}
-                {th('SOS', 'sos_coefficient')}
-                {th('Energy', 'energy_bar')}
-                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider"
+                {th('SOS', 'sos_coefficient', true)}
+                {th('Energy', 'energy_bar', true)}
+                <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell"
                   style={{ color: 'var(--text)' }}>Last 5</th>
               </tr>
             </thead>
@@ -133,7 +133,7 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                     onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)')}
                   >
-                    <td className="px-3 py-2.5 font-mono text-xs w-12" style={{ color: 'var(--text)' }}>
+                    <td className="px-2 md:px-3 py-2.5 font-mono text-xs w-8 md:w-12" style={{ color: 'var(--text)' }}>
                       {p.momentum_rank}
                     </td>
                     <td className="px-3 py-2.5">
@@ -186,10 +186,10 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                       style={{ color: delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : 'var(--text)' }}>
                       {delta > 0 ? '+' : ''}{delta.toFixed(4)}
                     </td>
-                    <td className="px-3 py-2.5 font-mono text-xs" style={{ color: 'var(--text)' }}>
+                    <td className="px-3 py-2.5 font-mono text-xs hidden md:table-cell" style={{ color: 'var(--text)' }}>
                       {(p.sos_coefficient ?? 1).toFixed(2)}
                     </td>
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2.5 hidden md:table-cell">
                       <div className="flex items-center gap-2">
                         <div className="w-16 h-1.5 rounded-full" style={{ background: 'var(--border)' }}>
                           <div className="h-1.5 rounded-full" style={{ width: `${energy}%`, background: energyColor }} />
@@ -197,7 +197,7 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                         <span className="text-xs font-mono" style={{ color: energyColor }}>{energy}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-2.5 font-mono text-xs" style={{ color: 'var(--text-bright)' }}>
+                    <td className="px-3 py-2.5 font-mono text-xs hidden md:table-cell" style={{ color: 'var(--text-bright)' }}>
                       {p.momentum_goals}G {p.momentum_assists}A
                     </td>
                   </tr>

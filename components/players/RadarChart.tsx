@@ -40,7 +40,7 @@ export default function PlayerRadarChart({ momentum, season, leagueMax, leagueAv
           <PolarGrid stroke="var(--border)" />
           <PolarAngleAxis
             dataKey="metric"
-            tick={{ fill: 'var(--text)', fontSize: 11 }}
+            tick={{ fill: 'var(--text)', fontSize: 12 }}
           />
           <Radar
             name="Momentum"

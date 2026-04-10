@@ -76,7 +76,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     <div className="max-w-5xl mx-auto pb-20 md:pb-0">
 
       {/* Match header */}
-      <div className="rounded-xl border p-6 mb-4" style={{ background: 'var(--bg-card)', borderColor: isLive ? 'var(--red)' : 'var(--border)' }}>
+      <div className="rounded-xl border p-4 sm:p-6 mb-4" style={{ background: 'var(--bg-card)', borderColor: isLive ? 'var(--red)' : 'var(--border)' }}>
         <div className="text-center text-xs mb-4 font-mono" style={{ color: isLive ? 'var(--red)' : 'var(--text)' }}>
           {isLive ? '● LIVE' : isFinal ? 'FINAL' : `${gameDate?.slice(5)} · Scheduled`}
           {live?.periodDescriptor?.periodType && (

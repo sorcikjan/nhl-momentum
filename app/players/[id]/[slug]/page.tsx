@@ -190,7 +190,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         const borderColor = isInjured ? 'rgba(239,68,68,0.4)' : isScratch ? 'rgba(251,191,36,0.35)' : 'rgba(239,68,68,0.4)';
         const textColor = isInjured ? 'var(--red)' : isScratch ? 'var(--amber)' : 'var(--red)';
         return (
-          <div className="rounded-xl border px-5 py-4 flex items-center gap-4"
+          <div className="rounded-xl border px-4 py-4 flex flex-col sm:flex-row sm:items-center gap-3"
             style={{ background: bgColor, borderColor }}>
             <div className="text-xl font-black tracking-tight px-3 py-1.5 rounded-lg"
               style={{ background: isInjured ? 'rgba(239,68,68,0.15)' : isScratch ? 'rgba(251,191,36,0.15)' : 'rgba(239,68,68,0.15)', color: textColor }}>
@@ -456,6 +456,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
 
+        {/* Scrollable grid — wraps on mobile */}
+        <div className="overflow-x-auto">
+        <div style={{ minWidth: '480px' }}>
         {/* Header */}
         <div className="grid text-xs font-semibold uppercase tracking-wide px-4 py-2 border-b"
           style={{ gridTemplateColumns: '2fr 1fr 3fr 1fr 1fr', color: 'var(--text)', borderColor: 'var(--border)' }}>
@@ -517,6 +520,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
             </div>
           );
         })}
+        </div>{/* min-width wrapper */}
+        </div>{/* overflow-x-auto */}
       </div>
 
       {/* ── Recent Games Log ───────────────────────────────────────────────────── */}
@@ -548,11 +553,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
               const gameDate     = String(game?.game_date ?? '').slice(5);
 
               return (
-                <div key={i} className="flex items-center gap-3 px-4 py-3"
+                <div key={i} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3"
                   style={{ background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)' }}>
 
                   {/* Date + opponent */}
-                  <div className="flex-shrink-0 w-28">
+                  <div className="flex-shrink-0 w-16 sm:w-28">
                     {opponentAbbrev && (
                       <div className="text-xs mb-0.5" style={{ color: 'var(--text)' }}>
                         {isHome ? 'VS' : '@'} {opponentAbbrev}
@@ -563,7 +568,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
                   {/* Result badge */}
                   {hasResult ? (
-                    <div className="flex items-center gap-2 flex-shrink-0 w-24">
+                    <div className="flex items-center gap-1.5 flex-shrink-0 w-20 sm:w-24">
                       <span className="text-xs font-bold px-1.5 py-0.5 rounded"
                         style={{
                           background: won ? 'rgba(34,197,94,0.15)' : lost ? 'rgba(239,68,68,0.15)' : 'rgba(160,174,192,0.1)',
@@ -576,11 +581,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                       </span>
                     </div>
                   ) : (
-                    <div className="w-24" />
+                    <div className="w-20 sm:w-24" />
                   )}
 
                   {/* Stats */}
-                  <div className="flex items-center gap-4 flex-1">
+                  <div className="flex items-center gap-2 sm:gap-4 flex-1">
                     <StatPill label="G" value={String(g.goals ?? 0)} highlight={Number(g.goals) > 0} />
                     <StatPill label="A" value={String(g.assists ?? 0)} highlight={Number(g.assists) > 1} />
                     <StatPill label="PTS" value={String(pts)} highlight={pts > 1} bold />
@@ -596,9 +601,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                     </span>
                   </div>
 
-                  {/* PPM badge */}
+                  {/* PPM badge — hidden on small screens to save space */}
                   {g.points_per_minute !== null && g.points_per_minute !== undefined && (
-                    <div className="flex-shrink-0 text-xs font-mono px-2 py-1 rounded"
+                    <div className="hidden sm:block flex-shrink-0 text-xs font-mono px-2 py-1 rounded"
                       style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--neon)', border: '1px solid rgba(59,130,246,0.2)' }}>
                       PPM: {Number(g.points_per_minute).toFixed(2)}
                     </div>
