@@ -126,19 +126,20 @@ export default function MatchComparisonTable({ predictions }: { predictions: Pre
           <table className="w-full text-sm">
             <thead style={{ background: 'var(--bg-card)' }}>
               <tr>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase"
-                  style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)', minWidth: 150 }}>
+                <th className="px-2 md:px-4 py-2.5 text-left text-xs font-semibold uppercase"
+                  style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>
                   Match
                 </th>
                 {tab === 'scored' && (
-                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase"
+                  <th className="px-2 md:px-4 py-2.5 text-left text-xs font-semibold uppercase"
                     style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
                     Result
                   </th>
                 )}
-                {versions.map(v => (
-                  <th key={v} className="px-4 py-2.5 text-left text-xs font-semibold uppercase font-mono"
-                    style={{ color: 'var(--neon)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap', minWidth: 120 }}>
+                {versions.map((v, vi) => (
+                  <th key={v}
+                    className={`px-2 md:px-4 py-2.5 text-left text-xs font-semibold uppercase font-mono${vi < versions.length - 1 ? ' hidden md:table-cell' : ''}`}
+                    style={{ color: 'var(--neon)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
                     {v}
                   </th>
                 ))}
@@ -153,8 +154,8 @@ export default function MatchComparisonTable({ predictions }: { predictions: Pre
                 return (
                   <tr key={game.gameId} className="border-t" style={{ borderColor: 'var(--border)', background: bg }}>
                     {/* Match */}
-                    <td className="px-4 py-3">
-                      <div className="font-semibold" style={{ color: 'var(--text-bright)' }}>
+                    <td className="px-2 md:px-4 py-2.5">
+                      <div className="font-semibold text-xs md:text-sm" style={{ color: 'var(--text-bright)' }}>
                         {game.away} @ {game.home}
                       </div>
                       <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text)' }}>
@@ -164,10 +165,10 @@ export default function MatchComparisonTable({ predictions }: { predictions: Pre
 
                     {/* Actual result */}
                     {tab === 'scored' && (
-                      <td className="px-4 py-3">
+                      <td className="px-2 md:px-4 py-2.5">
                         {game.actualHome !== null ? (
                           <>
-                            <div className="font-mono font-bold" style={{ color: 'var(--text-bright)' }}>
+                            <div className="font-mono font-bold text-xs md:text-sm" style={{ color: 'var(--text-bright)' }}>
                               {game.actualHome} – {game.actualAway}
                             </div>
                             {scoredCount > 0 && (
@@ -176,7 +177,7 @@ export default function MatchComparisonTable({ predictions }: { predictions: Pre
                                   : correctCount / scoredCount >= 0.4 ? 'var(--amber)'
                                   : 'var(--red)',
                               }}>
-                                {correctCount}/{scoredCount} correct
+                                {correctCount}/{scoredCount}
                               </div>
                             )}
                           </>
@@ -185,25 +186,26 @@ export default function MatchComparisonTable({ predictions }: { predictions: Pre
                     )}
 
                     {/* Per-version cells */}
-                    {versions.map(v => {
+                    {versions.map((v, vi) => {
                       const pred = game.byVersion[v];
+                      const cellClass = `px-2 md:px-4 py-2.5 text-xs${vi < versions.length - 1 ? ' hidden md:table-cell' : ''}`;
                       if (!pred) {
                         return (
-                          <td key={v} className="px-4 py-3 text-xs" style={{ color: 'var(--text)' }}>—</td>
+                          <td key={v} className={cellClass} style={{ color: 'var(--text)' }}>—</td>
                         );
                       }
                       const pickedHome = pred.homeWinPct > 50;
                       return (
-                        <td key={v} className="px-4 py-3">
-                          <div className="font-mono text-xs" style={{ color: 'var(--text-bright)' }}>
+                        <td key={v} className={cellClass}>
+                          <div className="font-mono" style={{ color: 'var(--text-bright)' }}>
                             {pred.predictedHome.toFixed(1)} – {pred.predictedAway.toFixed(1)}
                           </div>
-                          <div className="flex items-center gap-1.5 mt-1">
-                            <span className="text-xs font-mono" style={{ color: pickedHome ? 'var(--neon)' : 'var(--silver)' }}>
-                              {pickedHome ? `${pred.homeWinPct}% home` : `${100 - pred.homeWinPct}% away`}
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <span className="font-mono" style={{ color: pickedHome ? 'var(--neon)' : 'var(--silver)' }}>
+                              {pickedHome ? `${pred.homeWinPct}%H` : `${100 - pred.homeWinPct}%A`}
                             </span>
                             {pred.correct !== null && (
-                              <span className="text-xs px-1.5 py-0.5 rounded font-bold"
+                              <span className="px-1 py-0.5 rounded font-bold"
                                 style={{
                                   background: pred.correct ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
                                   color: pred.correct ? 'var(--green)' : 'var(--red)',

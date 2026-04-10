@@ -68,7 +68,7 @@ export default function RankingsTable({ players }: { players: Player[] }) {
   const th = (label: string, key: SortKey, hideOnMobile = false) => (
     <th
       onClick={() => setSort(key)}
-      className={`px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none transition-colors${hideOnMobile ? ' hidden md:table-cell' : ''}`}
+      className={`px-2 md:px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none transition-colors${hideOnMobile ? ' hidden md:table-cell' : ''}`}
       style={{ color: sort === key ? 'var(--neon)' : 'var(--text)' }}
     >
       {label} {sort === key ? '↓' : ''}
@@ -176,13 +176,13 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                         </div>
                       </Link>
                     </td>
-                    <td className="px-3 py-2.5 font-mono text-sm font-semibold" style={{ color: 'var(--neon)' }}>
+                    <td className="px-2 py-2.5 font-mono text-xs md:text-sm font-semibold" style={{ color: 'var(--neon)' }}>
                       {(p.momentum_ppm ?? 0).toFixed(4)}
                     </td>
-                    <td className="px-3 py-2.5 font-mono text-sm" style={{ color: 'var(--silver)' }}>
+                    <td className="px-2 py-2.5 font-mono text-xs md:text-sm" style={{ color: 'var(--silver)' }}>
                       {(p.season_ppm ?? 0).toFixed(4)}
                     </td>
-                    <td className="px-3 py-2.5 font-mono text-sm"
+                    <td className="px-2 py-2.5 font-mono text-xs md:text-sm"
                       style={{ color: delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : 'var(--text)' }}>
                       {delta > 0 ? '+' : ''}{delta.toFixed(4)}
                     </td>

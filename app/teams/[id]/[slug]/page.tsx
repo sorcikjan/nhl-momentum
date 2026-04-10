@@ -48,7 +48,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
         <img src={logo} alt={team.abbrev} className="w-20 h-20 object-contain" />
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-bright)' }}>{team.name}</h1>
-          <div className="flex items-center gap-3 mt-1 text-sm" style={{ color: 'var(--text)' }}>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm" style={{ color: 'var(--text)' }}>
             {team.conference && <span>{team.conference}</span>}
             {team.division && <><span>·</span><span>{team.division} Division</span></>}
             {standing && (
