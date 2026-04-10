@@ -317,27 +317,44 @@ async function PlayerMetrics() {
   return (
     <>
       {ROWS.map(row => (
-        <div key={row.label} className="mb-10">
+        <div key={row.label} className="mb-8">
           <div className="mb-3 pb-2" style={{ borderBottom: '1px solid var(--border)' }}>
             <h2 className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
               {row.label}
             </h2>
           </div>
-          {/* Mobile: snap-scroll carousel showing 85vw per card.
-              Desktop: standard 3-column grid. */}
-          <div className="flex overflow-x-auto gap-3 -mx-4 px-4 pb-2 snap-x snap-mandatory md:grid md:grid-cols-3 md:gap-4 md:overflow-x-visible md:mx-0 md:px-0 md:pb-0 md:snap-none">
-            <div className="flex-shrink-0 w-[85vw] md:w-auto snap-start">
-              <PlayerLeaderboard config={row.season} players={sortTop10(top, row.season.metricKey)} lastUpdated={lastUpdated} />
-            </div>
-            <div className="flex-shrink-0 w-[85vw] md:w-auto snap-start">
-              <PlayerLeaderboard config={row.surge} players={sortTop10(top, row.surge.metricKey)} lastUpdated={lastUpdated} />
-            </div>
-            <div className="flex-shrink-0 w-[85vw] md:w-auto snap-start">
-              <PlayerLeaderboard config={row.momentum} players={sortTop10(top, row.momentum.metricKey)} lastUpdated={lastUpdated} />
-            </div>
+
+          {/* Mobile: momentum (last 5 games) only — clean single-column feed */}
+          <div className="md:hidden">
+            <PlayerLeaderboard
+              config={row.momentum}
+              players={sortTop10(top, row.momentum.metricKey)}
+              lastUpdated={lastUpdated}
+              compact
+            />
+          </div>
+
+          {/* Desktop: all three views side by side */}
+          <div className="hidden md:grid md:grid-cols-3 md:gap-4">
+            <PlayerLeaderboard config={row.season}   players={sortTop10(top, row.season.metricKey)}   lastUpdated={lastUpdated} />
+            <PlayerLeaderboard config={row.surge}    players={sortTop10(top, row.surge.metricKey)}    lastUpdated={lastUpdated} />
+            <PlayerLeaderboard config={row.momentum} players={sortTop10(top, row.momentum.metricKey)} lastUpdated={lastUpdated} />
           </div>
         </div>
       ))}
+
+      {/* Mobile hint — season & surge available on Rankings */}
+      <div className="md:hidden rounded-xl border p-4 text-center mb-4"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+        <p className="text-xs mb-2" style={{ color: 'var(--text)' }}>
+          Showing current-form leaders (last 5 games)
+        </p>
+        <a href="/rankings"
+          className="text-sm font-semibold"
+          style={{ color: 'var(--neon)' }}>
+          See season leaders &amp; surge rankings →
+        </a>
+      </div>
     </>
   );
 }
@@ -375,11 +392,20 @@ function MetricsSkeleton() {
   return (
     <>
       {[1, 2, 3, 4, 5, 6].map(row => (
-        <div key={row} className="mb-10">
+        <div key={row} className="mb-8">
           <div className="h-4 w-40 rounded mb-3" style={{ background: 'var(--border)' }} />
-          <div className="flex overflow-x-auto gap-3 -mx-4 px-4 pb-2 snap-x snap-mandatory md:grid md:grid-cols-3 md:gap-4 md:overflow-x-visible md:mx-0 md:px-0 md:pb-0 md:snap-none">
+          {/* Mobile: single card */}
+          <div className="md:hidden rounded-xl border p-4 animate-pulse"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <div className="h-3 w-28 rounded mb-4" style={{ background: 'var(--border)' }} />
+            {[1, 2, 3, 4, 5].map(j => (
+              <div key={j} className="h-11 rounded-lg mb-2" style={{ background: 'var(--bg)' }} />
+            ))}
+          </div>
+          {/* Desktop: 3-column */}
+          <div className="hidden md:grid md:grid-cols-3 md:gap-4">
             {[1, 2, 3].map(col => (
-              <div key={col} className="flex-shrink-0 w-[85vw] md:w-auto snap-start rounded-xl border p-4 animate-pulse"
+              <div key={col} className="rounded-xl border p-4 animate-pulse"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
                 <div className="h-3 w-28 rounded mb-4" style={{ background: 'var(--border)' }} />
                 {[1, 2, 3, 4, 5].map(j => (

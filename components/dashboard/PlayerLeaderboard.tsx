@@ -50,14 +50,17 @@ export default function PlayerLeaderboard({
   config,
   players,
   lastUpdated,
+  compact = false,
 }: {
   config: LeaderboardConfig;
   players: AnyPlayer[];
   lastUpdated?: string | null;
+  compact?: boolean;
 }) {
+  const defaultCount = compact ? 5 : 5;
   const [expanded, setExpanded] = useState(false);
-  const visible = players.slice(0, expanded ? 10 : 5);
-  const canExpand = players.length > 5;
+  const visible = players.slice(0, expanded ? 10 : defaultCount);
+  const canExpand = players.length > defaultCount;
 
   return (
     <div className="rounded-xl border p-4 flex flex-col"
@@ -74,11 +77,13 @@ export default function PlayerLeaderboard({
           {config.badge}
         </span>
       </div>
-      <p className="text-xs mb-2" style={{ color: 'var(--text)' }}>
-        {config.subtitle}
-      </p>
+      {!compact && (
+        <p className="text-xs mb-2" style={{ color: 'var(--text)' }}>
+          {config.subtitle}
+        </p>
+      )}
 
-      {lastUpdated && (
+      {!compact && lastUpdated && (
         <p className="text-xs mb-3" style={{ color: 'var(--text)', opacity: 0.7 }}>
           Updated {relativeTime(lastUpdated)}
         </p>
