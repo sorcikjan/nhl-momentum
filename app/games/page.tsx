@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import DateNav from '@/components/games/DateNav';
 import GameCard from '@/components/games/GameCard';
+import DayPredictionSummary from '@/components/games/DayPredictionSummary';
 import { fetchGames } from '@/lib/data';
 
 export const revalidate = 30;
@@ -65,6 +66,8 @@ export default async function GamesPage({
           {games.length} game{games.length !== 1 ? 's' : ''}
         </span>
       </div>
+
+      <DayPredictionSummary predictions={predictions ?? []} />
 
       {games.length === 0 ? (
         <div className="rounded-xl border p-12 text-center" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
