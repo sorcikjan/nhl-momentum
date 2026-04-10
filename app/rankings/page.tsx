@@ -30,7 +30,7 @@ export default async function RankingsPage() {
         <span><span style={{ color: 'var(--neon)' }}>M.PPM</span> — Momentum PPM (last 5 games)</span>
         <span><span style={{ color: 'var(--silver)' }}>S.PPM</span> — Season PPM</span>
         <span><span style={{ color: 'var(--green)' }}>Delta</span> — Surge vs season baseline</span>
-        <span>SOS — Strength of schedule (0.8–1.2)</span>
+        <span className="hidden md:inline">SOS — Strength of schedule (0.8–1.2)</span>
       </div>
 
       <RankingsTable players={players} />

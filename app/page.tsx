@@ -323,22 +323,18 @@ async function PlayerMetrics() {
               {row.label}
             </h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <PlayerLeaderboard
-              config={row.season}
-              players={sortTop10(top, row.season.metricKey)}
-              lastUpdated={lastUpdated}
-            />
-            <PlayerLeaderboard
-              config={row.surge}
-              players={sortTop10(top, row.surge.metricKey)}
-              lastUpdated={lastUpdated}
-            />
-            <PlayerLeaderboard
-              config={row.momentum}
-              players={sortTop10(top, row.momentum.metricKey)}
-              lastUpdated={lastUpdated}
-            />
+          {/* Mobile: snap-scroll carousel showing 85vw per card.
+              Desktop: standard 3-column grid. */}
+          <div className="flex overflow-x-auto gap-3 -mx-4 px-4 pb-2 snap-x snap-mandatory md:grid md:grid-cols-3 md:gap-4 md:overflow-x-visible md:mx-0 md:px-0 md:pb-0 md:snap-none">
+            <div className="flex-shrink-0 w-[85vw] md:w-auto snap-start">
+              <PlayerLeaderboard config={row.season} players={sortTop10(top, row.season.metricKey)} lastUpdated={lastUpdated} />
+            </div>
+            <div className="flex-shrink-0 w-[85vw] md:w-auto snap-start">
+              <PlayerLeaderboard config={row.surge} players={sortTop10(top, row.surge.metricKey)} lastUpdated={lastUpdated} />
+            </div>
+            <div className="flex-shrink-0 w-[85vw] md:w-auto snap-start">
+              <PlayerLeaderboard config={row.momentum} players={sortTop10(top, row.momentum.metricKey)} lastUpdated={lastUpdated} />
+            </div>
           </div>
         </div>
       ))}
@@ -381,9 +377,9 @@ function MetricsSkeleton() {
       {[1, 2, 3, 4, 5, 6].map(row => (
         <div key={row} className="mb-10">
           <div className="h-4 w-40 rounded mb-3" style={{ background: 'var(--border)' }} />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex overflow-x-auto gap-3 -mx-4 px-4 pb-2 snap-x snap-mandatory md:grid md:grid-cols-3 md:gap-4 md:overflow-x-visible md:mx-0 md:px-0 md:pb-0 md:snap-none">
             {[1, 2, 3].map(col => (
-              <div key={col} className="rounded-xl border p-4 animate-pulse"
+              <div key={col} className="flex-shrink-0 w-[85vw] md:w-auto snap-start rounded-xl border p-4 animate-pulse"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
                 <div className="h-3 w-28 rounded mb-4" style={{ background: 'var(--border)' }} />
                 {[1, 2, 3, 4, 5].map(j => (

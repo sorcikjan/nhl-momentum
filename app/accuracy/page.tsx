@@ -51,8 +51,8 @@ export default async function AccuracyPage() {
             sub: bestStat ? bestStat.version : undefined },
           { label: 'Active Model', value: activeModel },
         ].map(kpi => (
-          <div key={kpi.label} className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <p className="text-xs uppercase tracking-wider mb-1" style={{ color: 'var(--text)' }}>{kpi.label}</p>
+          <div key={kpi.label} className="rounded-xl border p-3 md:p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <p className="text-xs leading-tight mb-1" style={{ color: 'var(--text)' }}>{kpi.label}</p>
             <p className="text-xl font-bold font-mono" style={{ color: 'var(--neon)' }}>{kpi.value}</p>
             {kpi.sub && <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--text)' }}>{kpi.sub}</p>}
           </div>
@@ -65,7 +65,7 @@ export default async function AccuracyPage() {
           <h2 className="text-sm font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text)' }}>
             Model Performance
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
             {([...(modelStats ?? [])] as {
               version: string; totalPredictions: number; withOutcome: number;
               winnerAccuracyPct: number | null; avgHomeError: number | null; avgAwayError: number | null;
