@@ -3,6 +3,10 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { playerUrl, teamUrl } from '@/lib/urls';
 
+function daysAgo(dateStr: string): number {
+  return Math.floor((Date.now() - new Date(dateStr + 'T12:00:00Z').getTime()) / 86_400_000);
+}
+
 interface Player {
   player_id: number;
   momentum_rank: number;
@@ -16,6 +20,7 @@ interface Player {
   momentum_points: number;
   season_goals: number;
   season_points: number;
+  last_played_date?: string | null;
   players: {
     first_name: string;
     last_name: string;
@@ -100,6 +105,8 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                 const delta = p.breakout_delta ?? 0;
                 const energy = p.energy_bar ?? 100;
                 const energyColor = energy >= 70 ? 'var(--green)' : energy >= 40 ? 'var(--amber)' : 'var(--red)';
+                const lastPlayedDaysAgo = p.last_played_date ? daysAgo(p.last_played_date) : null;
+                const isOut = lastPlayedDaysAgo !== null && lastPlayedDaysAgo >= 5;
 
                 return (
                   <tr key={p.player_id}
@@ -125,11 +132,12 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                           }
                         </div>
                         <div>
-                          <div className="font-medium text-sm" style={{ color: 'var(--text-bright)' }}>
+                          <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap" style={{ color: 'var(--text-bright)' }}>
                             {name}
-                            {p.players.injury_status && (
-                              <span className="ml-1 text-xs px-1 rounded" style={{ background: 'rgba(239,68,68,0.2)', color: 'var(--red)' }}>
-                                {p.players.injury_status}
+                            {(isOut || p.players.injury_status) && (
+                              <span className="text-xs px-1.5 py-0.5 rounded font-bold"
+                                style={{ background: 'rgba(239,68,68,0.18)', color: 'var(--red)' }}>
+                                {p.players.injury_status ?? `OUT · ${lastPlayedDaysAgo}d`}
                               </span>
                             )}
                           </div>

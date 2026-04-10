@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { fetchTeam, teamLogoUrl } from '@/lib/data';
+import { fetchTeam, teamLogoUrl, daysAgo } from '@/lib/data';
 import { playerUrl, gameUrl } from '@/lib/urls';
 
 export const revalidate = 120;
@@ -102,11 +102,18 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                     </div>
                 }
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold truncate" style={{ color: 'var(--text-bright)' }}>
+                  <div className="text-sm font-semibold flex items-center gap-1.5 flex-wrap" style={{ color: 'var(--text-bright)' }}>
                     {p.players.first_name} {p.players.last_name}
-                    {p.players.injury_status && (
-                      <span className="ml-1 text-xs" style={{ color: 'var(--red)' }}>IR</span>
-                    )}
+                    {(() => {
+                      const d = p.last_played_date ? daysAgo(p.last_played_date) : null;
+                      const out = d !== null && d >= 5;
+                      return (out || p.players.injury_status) ? (
+                        <span className="text-xs px-1.5 py-0.5 rounded font-bold"
+                          style={{ background: 'rgba(239,68,68,0.18)', color: 'var(--red)' }}>
+                          {p.players.injury_status ?? `OUT · ${d}d`}
+                        </span>
+                      ) : null;
+                    })()}
                   </div>
                   <div className="text-xs" style={{ color: 'var(--text)' }}>
                     #{i + 1} on team &middot; {p.players.position_code}

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import PlayerRadarChart from '@/components/players/RadarChart';
 import PPMTimeline from '@/components/players/PPMTimeline';
 import EnergyBar from '@/components/players/EnergyBar';
-import { fetchPlayer, fetchRankings, fetchLeagueAverages } from '@/lib/data';
+import { fetchPlayer, fetchRankings, fetchLeagueAverages, daysAgo } from '@/lib/data';
 import { teamUrl } from '@/lib/urls';
 import Link from 'next/link';
 
@@ -56,7 +56,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     );
   }
 
-  const { player, metricTimeline, recentGames } = data;
+  const { player, metricTimeline, recentGames, gamesMissed, lastPlayedDate } = data;
   const latestSnapshot = metricTimeline?.[metricTimeline.length - 1] ?? {};
   const name = `${player.first_name} ${player.last_name}`;
 
@@ -81,6 +81,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
   const energyColor = energyBar >= 70 ? 'var(--green)' : energyBar >= 40 ? 'var(--amber)' : 'var(--red)';
   const energyLabel = energyBar >= 70 ? 'HIGH PERFORMANCE' : energyBar >= 40 ? 'MODERATE' : 'DRAINED';
+
+  const lastPlayedDaysAgo = lastPlayedDate ? daysAgo(lastPlayedDate) : null;
+  const isOut = lastPlayedDaysAgo !== null && lastPlayedDaysAgo >= 5;
 
   const lgPpm    = leagueAvg?.seasonPpm      ?? 0;
   const lgG      = leagueAvg?.goalsPerGame   ?? 0;
@@ -173,6 +176,41 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   return (
     <div className="max-w-5xl mx-auto pb-20 md:pb-0 space-y-4">
 
+      {/* ── OUT / Injury banner ───────────────────────────────────────────────── */}
+      {isOut && (
+        <div className="rounded-xl border px-5 py-4 flex items-center gap-4"
+          style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.4)' }}>
+          <div className="text-2xl font-black tracking-tight px-3 py-1 rounded-lg"
+            style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--red)' }}>
+            OUT
+          </div>
+          <div className="flex-1">
+            <div className="font-bold text-sm" style={{ color: 'var(--red)' }}>
+              Not in lineup
+            </div>
+            <div className="text-xs mt-0.5" style={{ color: 'var(--text)' }}>
+              Last played{' '}
+              <span className="font-semibold" style={{ color: 'var(--text-bright)' }}>
+                {lastPlayedDate ? new Date(lastPlayedDate + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+              </span>
+              {' '}·{' '}
+              <span className="font-semibold" style={{ color: 'var(--text-bright)' }}>
+                {lastPlayedDaysAgo} days ago
+              </span>
+              {gamesMissed > 0 && (
+                <> · <span className="font-semibold" style={{ color: 'var(--text-bright)' }}>{gamesMissed} team game{gamesMissed !== 1 ? 's' : ''} missed</span></>
+              )}
+            </div>
+          </div>
+          {player.injury_status && (
+            <div className="text-xs px-3 py-1.5 rounded-lg font-semibold"
+              style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.3)' }}>
+              {player.injury_status}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ── Hero card ─────────────────────────────────────────────────────────── */}
       <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
         <div className="flex items-stretch gap-0">
@@ -213,10 +251,10 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                       <span style={{ color: 'var(--text)' }}>#{player.sweater_number}</span>
                     </>
                   )}
-                  {player.injury_status && (
-                    <span className="px-2 py-0.5 rounded text-xs font-semibold"
+                  {(isOut || player.injury_status) && (
+                    <span className="px-2 py-0.5 rounded text-xs font-bold"
                       style={{ background: 'rgba(239,68,68,0.2)', color: 'var(--red)' }}>
-                      {player.injury_status}
+                      {player.injury_status ?? 'OUT'}
                     </span>
                   )}
                 </div>

@@ -62,6 +62,45 @@ export async function fetchLeagueAverages() {
   };
 }
 
+// ─── Out Status ───────────────────────────────────────────────────────────────
+
+/** Returns Map<playerId, lastGameDate> for the given player IDs. */
+async function getLastPlayedDates(playerIds: number[]): Promise<Map<number, string>> {
+  if (!playerIds.length) return new Map();
+  // Fetch recent stats sorted by game_id desc — newest first, dedup per player in JS
+  const { data: stats } = await supabaseAdmin
+    .from('game_player_stats')
+    .select('player_id, game_id')
+    .in('player_id', playerIds)
+    .order('game_id', { ascending: false })
+    .limit(playerIds.length * 4);
+
+  const lastGameId = new Map<number, number>();
+  for (const row of stats ?? []) {
+    if (!lastGameId.has(row.player_id)) lastGameId.set(row.player_id, row.game_id);
+  }
+
+  const gameIds = [...new Set(lastGameId.values())];
+  if (!gameIds.length) return new Map();
+
+  const { data: games } = await supabaseAdmin
+    .from('games')
+    .select('id, game_date')
+    .in('id', gameIds);
+
+  const dateById = new Map((games ?? []).map(g => [g.id, g.game_date as string]));
+  const result = new Map<number, string>();
+  for (const [pid, gid] of lastGameId) {
+    const date = dateById.get(gid);
+    if (date) result.set(pid, date);
+  }
+  return result;
+}
+
+export function daysAgo(dateStr: string): number {
+  return Math.floor((Date.now() - new Date(dateStr + 'T12:00:00Z').getTime()) / 86_400_000);
+}
+
 // ─── Rankings ─────────────────────────────────────────────────────────────────
 
 export async function fetchRankings() {
@@ -114,6 +153,13 @@ export async function fetchRankings() {
   const momentumLeaderGoalies = [...goalies]
     .sort((a, b) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0))
     .slice(0, 5);
+
+  // Attach last-played date to all skaters for OUT status display
+  const allSkaterIds = sortedSkaters.map((s: { player_id: number }) => s.player_id);
+  const lastPlayed = await getLastPlayedDates(allSkaterIds);
+  for (const s of sortedSkaters as Array<{ player_id: number; last_played_date?: string | null }>) {
+    s.last_played_date = lastPlayed.get(s.player_id) ?? null;
+  }
 
   return {
     top100,
@@ -187,6 +233,8 @@ export async function fetchPlayer(id: string) {
 
   // Enrich game stats with game metadata (depends on rawGameStats result)
   let recentGames = rawGameStats ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let teamRecentGames: any[] = [];
   if (recentGames.length > 0) {
     const gameIds = recentGames.map((g: { game_id: number }) => g.game_id);
     const { data: gameRows } = await supabaseAdmin
@@ -199,9 +247,29 @@ export async function fetchPlayer(id: string) {
       .in('id', gameIds);
     const gameMap = new Map((gameRows ?? []).map((g: { id: number }) => [g.id, g]));
     recentGames = recentGames.map((g: { game_id: number }) => ({ ...g, games: gameMap.get(g.game_id) ?? null }));
+    teamRecentGames = (gameRows ?? []);
   }
 
-  return { player, metricTimeline, recentGames };
+  // Fetch team's last 10 completed games to detect how many the player missed
+  const teamId = player?.team_id ?? (player as { teams?: { id?: number } })?.teams?.id ?? null;
+  if (teamId) {
+    const { data: tgRows } = await supabaseAdmin
+      .from('games')
+      .select('id, game_date')
+      .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+      .in('game_state', ['FINAL', 'OFF'])
+      .order('game_date', { ascending: false })
+      .limit(10);
+    teamRecentGames = tgRows ?? [];
+  }
+
+  const playerGameIds = new Set(recentGames.map((g: { game_id: number }) => g.game_id));
+  const gamesMissed = teamRecentGames.filter((g: { id: number }) => !playerGameIds.has(g.id)).length;
+  const lastPlayedDate: string | null = recentGames.length > 0
+    ? (recentGames[0]?.games?.game_date ?? null)
+    : null;
+
+  return { player, metricTimeline, recentGames, gamesMissed, lastPlayedDate };
 }
 
 // ─── Accuracy ─────────────────────────────────────────────────────────────────
@@ -345,7 +413,15 @@ export async function fetchTeam(id: string) {
     return true;
   }).sort((a, b) => (b.composite_ppm ?? 0) - (a.composite_ppm ?? 0));
 
-  return { team, roster, recentGames, upcoming, seasonStats: seasonStatsResult, standing: standingResult };
+  // Attach last-played dates to roster for OUT status badges
+  const rosterPlayerIds = roster.map(p => p.player_id);
+  const lastPlayedMap = await getLastPlayedDates(rosterPlayerIds);
+  const rosterWithOutStatus = roster.map(p => ({
+    ...p,
+    last_played_date: lastPlayedMap.get(p.player_id) ?? null,
+  }));
+
+  return { team, roster: rosterWithOutStatus, recentGames, upcoming, seasonStats: seasonStatsResult, standing: standingResult };
 }
 
 // ─── Match ────────────────────────────────────────────────────────────────────
