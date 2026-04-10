@@ -491,7 +491,8 @@ function LineupCard({
                   style={{ borderColor: 'var(--border)', background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)' }}>
                   <td className="px-3 py-1.5">
                     <Link href={playerHref}
-                      className="text-xs hover:opacity-80" style={{ color: 'var(--text-bright)' }}>
+                      className="text-xs hover:opacity-80 flex items-center gap-1" style={{ color: 'var(--text-bright)' }}>
+                      <span>{p.injuryStatus ? '🔴' : '🟢'}</span>
                       {name}
                     </Link>
                     {p.injuryStatus && (

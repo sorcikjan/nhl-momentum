@@ -4,6 +4,15 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { playerUrl } from '@/lib/urls';
 
+function statusEmoji(lastPlayedDate: string | null | undefined): string {
+  if (!lastPlayedDate) return '🟢';
+  const d = Math.floor((Date.now() - new Date(lastPlayedDate + 'T12:00:00Z').getTime()) / 86_400_000);
+  if (d >= 14) return '🔴';
+  if (d >= 7)  return '🟠';
+  if (d >= 3)  return '🟡';
+  return '🟢';
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyPlayer = Record<string, any> & {
   player_id: number;
@@ -110,8 +119,11 @@ export default function PlayerLeaderboard({
                 }
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate"
-                  style={{ color: 'var(--text-bright)' }}>{name}</div>
+                <div className="text-sm font-medium truncate flex items-center gap-1"
+                  style={{ color: 'var(--text-bright)' }}>
+                  <span>{statusEmoji(p.last_played_date)}</span>
+                  {name}
+                </div>
                 <div className="text-xs" style={{ color: 'var(--text)' }}>
                   {p.players.teams.abbrev} · {p.players.position_code}
                 </div>

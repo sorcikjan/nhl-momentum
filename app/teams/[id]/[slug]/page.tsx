@@ -103,6 +103,13 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                 }
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold flex items-center gap-1.5 flex-wrap" style={{ color: 'var(--text-bright)' }}>
+                    {(() => {
+                      const status = p.players.injury_status
+                        ? 'injured'
+                        : deriveOutStatus(p.consecutive_games_missed ?? null, null);
+                      const emoji = status === 'injured' ? '🔴' : status === 'out' ? '🟠' : status === 'scratch' ? '🟡' : '🟢';
+                      return <span>{emoji}</span>;
+                    })()}
                     {p.players.first_name} {p.players.last_name}
                     {(() => {
                       const status = p.players.injury_status

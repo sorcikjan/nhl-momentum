@@ -4,11 +4,21 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { playerUrl } from '@/lib/urls';
 
+function statusEmoji(lastPlayedDate: string | null | undefined): string {
+  if (!lastPlayedDate) return '🟢';
+  const d = Math.floor((Date.now() - new Date(lastPlayedDate + 'T12:00:00Z').getTime()) / 86_400_000);
+  if (d >= 14) return '🔴';
+  if (d >= 7)  return '🟠';
+  if (d >= 3)  return '🟡';
+  return '🟢';
+}
+
 interface Player {
   player_id: number;
   breakout_delta: number;
   momentum_ppm: number;
   season_ppm: number;
+  last_played_date?: string | null;
   players: {
     first_name: string;
     last_name: string;
@@ -81,7 +91,10 @@ export default function BreakoutWatch({
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium truncate" style={{ color: 'var(--text-bright)' }}>{name}</span>
+                  <span className="text-sm font-medium truncate flex items-center gap-1" style={{ color: 'var(--text-bright)' }}>
+                    <span>{statusEmoji(p.last_played_date)}</span>
+                    {name}
+                  </span>
                   <span className="text-xs font-mono font-semibold ml-2 flex-shrink-0" style={{ color: 'var(--amber)' }}>
                     {pctAbove >= 0 ? '+' : ''}{pctAbove}% vs avg
                   </span>
