@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import PlayerSearch from './PlayerSearch';
 
 const NAV = [
   { href: '/',           label: 'Dashboard',   icon: '◈' },
@@ -8,6 +9,7 @@ const NAV = [
   { href: '/rankings',   label: 'Rankings',    icon: '⚡' },
   { href: '/teams',      label: 'Teams',       icon: '🛡' },
   { href: '/accuracy',   label: 'Accuracy',    icon: '🎯' },
+  { href: '/search',     label: 'Search',      icon: '🔍' },
 ];
 
 export default function Sidebar() {
@@ -30,9 +32,14 @@ export default function Sidebar() {
           </div>
         </div>
 
+        {/* Search */}
+        <div className="px-3 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+          <PlayerSearch />
+        </div>
+
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-          {NAV.map(item => {
+          {NAV.filter(item => item.href !== '/search').map(item => {
             const active = path === item.href;
             return (
               <Link key={item.href} href={item.href}
