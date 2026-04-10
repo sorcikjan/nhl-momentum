@@ -437,17 +437,26 @@ export async function GET(req: NextRequest) {
 
       log.push(`Phase 3: recalculating energy for all active players (since ${sinceDate})`);
 
-      // Fetch all active players + recent game stats + snapshots in parallel
+      // Fetch active players and recent games first, then use game IDs for stats
       const [
         { data: ePlayers, error: epErr },
         { data: recentGames },
-        { data: eSkaterStats },
-        { data: eGoalieStats },
       ] = await Promise.all([
         supabaseAdmin.from('players').select('id, position_code').eq('is_active', true).order('id'),
         supabaseAdmin.from('games').select('id, game_date, start_time_utc').gte('game_date', sinceDate).in('game_state', ['FINAL', 'OFF']),
-        supabaseAdmin.from('game_player_stats').select('player_id, game_id, toi_seconds').gte('recorded_at', since.toISOString()),
-        supabaseAdmin.from('game_goalie_stats').select('player_id, game_id, toi_seconds').gte('recorded_at', since.toISOString()),
+      ]);
+
+      const recentGameIds = (recentGames ?? []).map(g => g.id);
+
+      // Filter stats by game_id (not recorded_at) — recorded_at is only set on INSERT,
+      // never updated on upsert conflict, so it reflects original ingest time, not game date.
+      const [{ data: eSkaterStats }, { data: eGoalieStats }] = await Promise.all([
+        recentGameIds.length
+          ? supabaseAdmin.from('game_player_stats').select('player_id, game_id, toi_seconds').in('game_id', recentGameIds)
+          : Promise.resolve({ data: [] }),
+        recentGameIds.length
+          ? supabaseAdmin.from('game_goalie_stats').select('player_id, game_id, toi_seconds').in('game_id', recentGameIds)
+          : Promise.resolve({ data: [] }),
       ]);
 
       if (epErr) throw epErr;
