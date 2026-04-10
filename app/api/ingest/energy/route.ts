@@ -43,12 +43,13 @@ export async function GET(req: NextRequest) {
     const skaterIds = players.filter(p => p.position_code !== 'G').map(p => p.id);
     const goalieIds = players.filter(p => p.position_code === 'G').map(p => p.id);
 
-    // 2. Recent completed games (last 72h)
+    // 2. Recent games (last 72h) — no game_state filter: if outcomes phase hasn't
+    // marked a game FINAL yet, we'd lose energy data for those players.
     const { data: recentGames } = await supabaseAdmin
       .from('games')
       .select('id, game_date, start_time_utc')
       .gte('game_date', sinceDate)
-      .in('game_state', ['FINAL', 'OFF']);
+      .limit(200);
 
     const gameMap = new Map((recentGames ?? []).map(g => [g.id, g]));
     const recentGameIds = Array.from(gameMap.keys());
@@ -88,12 +89,14 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // 5. Get latest snapshot ID per player
+    // 5. Get latest snapshot ID per player — limit to 3× player count so each
+    // player's latest row is always included (Supabase default cap is 1000)
     const { data: latestSnaps } = await supabaseAdmin
       .from('player_metric_snapshots')
       .select('id, player_id')
       .in('player_id', playerIds)
-      .order('calculated_at', { ascending: false });
+      .order('calculated_at', { ascending: false })
+      .limit(playerIds.length * 3);
 
     const latestIdByPlayer = new Map<number, string>();
     for (const snap of latestSnaps ?? []) {

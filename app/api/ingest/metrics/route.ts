@@ -46,11 +46,14 @@ export async function GET(req: NextRequest) {
     // Bulk-fetch all game stats for skaters in this batch — 2 queries instead of N*2 sequential queries
     const skaterIds = (players ?? []).filter(p => p.position_code !== 'G').map(p => p.id);
 
+    // Fetch full season stats — explicit limit of 100 games × player count so
+    // fullSeason isn't truncated by Supabase's 1000-row default.
     const { data: allStats, error: statsErr } = await supabaseAdmin
       .from('game_player_stats')
       .select('player_id,goals,assists,shots_on_goal,toi_seconds,hits,blocked_shots,plus_minus,pim,pp_goals,pp_points,sh_goals,sh_points,sh_toi_seconds,game_winning_goals,ot_goals,game_id')
       .in('player_id', skaterIds)
-      .order('game_id', { ascending: false });
+      .order('game_id', { ascending: false })
+      .limit(skaterIds.length * 100);
 
     if (statsErr) throw statsErr;
 
@@ -67,7 +70,8 @@ export async function GET(req: NextRequest) {
       .from('player_metric_snapshots')
       .select('player_id, energy_bar')
       .in('player_id', skaterIds)
-      .order('calculated_at', { ascending: false });
+      .order('calculated_at', { ascending: false })
+      .limit(skaterIds.length * 3);
     const existingEnergyByPlayer = new Map<number, number>();
     for (const snap of existingSnaps ?? []) {
       if (!existingEnergyByPlayer.has(snap.player_id)) existingEnergyByPlayer.set(snap.player_id, snap.energy_bar ?? 100);

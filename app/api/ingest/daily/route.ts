@@ -182,7 +182,8 @@ export async function GET(req: NextRequest) {
             players!inner(first_name, last_name, position_code, injury_status)
           `)
           .in('player_id', skaterIds)
-          .order('calculated_at', { ascending: false });
+          .order('calculated_at', { ascending: false })
+          .limit(skaterIds.length * 3);
 
         const seenSkaters = new Set<number>();
         const skaterSnaps = [];
@@ -442,8 +443,11 @@ export async function GET(req: NextRequest) {
         { data: ePlayers, error: epErr },
         { data: recentGames },
       ] = await Promise.all([
-        supabaseAdmin.from('players').select('id, position_code').eq('is_active', true).order('id'),
-        supabaseAdmin.from('games').select('id, game_date, start_time_utc').gte('game_date', sinceDate).in('game_state', ['FINAL', 'OFF']),
+        supabaseAdmin.from('players').select('id, position_code').eq('is_active', true).order('id').limit(2000),
+        // Do NOT filter by game_state — if outcomes phase failed to mark a game FINAL,
+        // we'd lose all energy data for players in that game. Any game in the date
+        // window that has stats is a played game; game_state is just bookkeeping.
+        supabaseAdmin.from('games').select('id, game_date, start_time_utc').gte('game_date', sinceDate).limit(200),
       ]);
 
       const recentGameIds = (recentGames ?? []).map(g => g.id);
