@@ -252,8 +252,8 @@ export async function fetchPlayer(id: string) {
       .from('game_player_stats')
       .select('*')
       .eq('player_id', id)
-      .order('recorded_at', { ascending: false })
-      .limit(10),
+      .order('game_id', { ascending: false })
+      .limit(20),
   ]);
 
   if (pErr) throw pErr;
@@ -289,7 +289,7 @@ export async function fetchPlayer(id: string) {
       .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
       .in('game_state', ['FINAL', 'OFF'])
       .order('game_date', { ascending: false })
-      .limit(10);
+      .limit(15);
     teamRecentGames = tgRows ?? [];
   }
 
