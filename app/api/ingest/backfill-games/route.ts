@@ -62,19 +62,24 @@ export async function GET(req: NextRequest) {
     cursor.setUTCDate(cursor.getUTCDate() + 7);
   }
 
+  // Filter to only games whose team IDs exist in our teams table (excludes All-Star etc.)
+  const { data: knownTeams } = await supabaseAdmin.from('teams').select('id');
+  const knownTeamIds = new Set((knownTeams ?? []).map(t => t.id));
+  const validGames = allGames.filter(g => knownTeamIds.has(g.home_team_id) && knownTeamIds.has(g.away_team_id));
+
   // Bulk upsert in batches of 200 to stay within PostgREST limits
   let gamesUpserted = 0;
   const BATCH = 200;
-  for (let i = 0; i < allGames.length; i += BATCH) {
+  for (let i = 0; i < validGames.length; i += BATCH) {
     const { error } = await supabaseAdmin
       .from('games')
-      .upsert(allGames.slice(i, i + BATCH), { onConflict: 'id' });
+      .upsert(validGames.slice(i, i + BATCH), { onConflict: 'id' });
     if (error) errors.push(`upsert batch ${i}: ${error.message}`);
-    else gamesUpserted += Math.min(BATCH, allGames.length - i);
+    else gamesUpserted += Math.min(BATCH, validGames.length - i);
   }
 
   return NextResponse.json({
-    data: { gamesUpserted, totalFound: allGames.length, errors: errors.slice(0, 20) },
+    data: { gamesUpserted, totalFound: allGames.length, validGames: validGames.length, skipped: allGames.length - validGames.length, errors: errors.slice(0, 20) },
     error: errors.length > 0 ? `${errors.length} errors` : null,
   });
 }
