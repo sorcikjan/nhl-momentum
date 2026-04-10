@@ -447,6 +447,73 @@ function runModelV1_7(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   };
 }
 
+// v1.8 — corrected GOAL_SCALE for pts/min PPM unit
+// v1.0–v1.7 used GOAL_SCALE=70–90, but calcPPM() returns points-per-minute,
+// not points-per-second. With typical defFilter ≈ 12 (NHL goalie sv%≈0.910 →
+// SPG≈11, clamped to MIN_SPG=12) and ~15 active skaters averaging 0.025 pts/min,
+// totalPPM ≈ 0.375. Target xG ≈ 3.0 → GOAL_SCALE = 3.0 × 12 / 0.375 = 96 ≈ 100.
+function runModelV1_8(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
+  const GOAL_SCALE = 100;
+  const MIN_SPG = 12;
+  const MAX_SPG = 40;
+  const HOME_EDGE = 1.0;
+  const AWAY_EDGE = 1.0;
+  const REGRESSION = 0.6;
+  const MOMENTUM_W = 0.2;
+  const SEASON_W = 0.8;
+  const B2B_PENALTY = 0.92;
+
+  function effectivePPM(s: SkaterSnap): number {
+    if (s.momentumPpm !== undefined && s.seasonPpm !== undefined) {
+      return MOMENTUM_W * s.momentumPpm + SEASON_W * s.seasonPpm;
+    }
+    return s.compositePpm;
+  }
+
+  function offPotential(snap: TeamSnap) {
+    const activeSkaters = snap.skaters.filter(s => !s.injuryStatus);
+    const totalPPM = activeSkaters.reduce((sum, s) => sum + Math.max(0, effectivePPM(s)), 0);
+    const recentForm = snap.goalie.teamRecentForm ?? 1.0;
+    const b2bMult = snap.goalie.isBackToBack ? B2B_PENALTY : 1.0;
+    return totalPPM * snap.sosMultiplier * recentForm * energyMultiplierFromBar(snap.energyBar) * b2bMult;
+  }
+
+  function defFilter(snap: TeamSnap) {
+    const spg = snap.goalie.seasonShotsPerGoal ?? snap.goalie.momentumShotsPerGoal;
+    return Math.min(MAX_SPG, Math.max(MIN_SPG, spg || 22))
+      * goalieEnergyPenaltyFromBar(snap.goalie.energyBar ?? 100);
+  }
+
+  const homeOff = offPotential(homeSnap);
+  const awayOff = offPotential(awaySnap);
+  const homeDef = defFilter(homeSnap);
+  const awayDef = defFilter(awaySnap);
+
+  const homeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
+  const awayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
+  const total = homeXG + awayXG;
+  if (total === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5, homeOff, awayOff, homeDef, awayDef };
+
+  const homeBase = homeXG / total;
+  const awayBase = awayXG / total;
+  const homeAdj = Math.min(0.90, homeBase * HOME_EDGE);
+  const awayAdj = Math.min(0.90, awayBase * AWAY_EDGE);
+  const rawHomeWin = homeAdj / (homeAdj + awayAdj);
+  const homeWin = 0.5 + (rawHomeWin - 0.5) * REGRESSION;
+
+  return {
+    homeXG: Math.round(homeXG * 10) / 10,
+    awayXG: Math.round(awayXG * 10) / 10,
+    homeWin: Math.round(homeWin * 1000) / 1000,
+    awayWin: Math.round((1 - homeWin) * 1000) / 1000,
+
+    homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
+    awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
+    homeDef: Math.round(homeDef * 10) / 10,
+    awayDef: Math.round(awayDef * 10) / 10,
+  };
+}
+
 // Registry of all model versions — add new versions here
 export const MODEL_REGISTRY: Record<string, (home: TeamSnap, away: TeamSnap) => ModelResult> = {
   'v1.0': runModelV1,
@@ -457,4 +524,5 @@ export const MODEL_REGISTRY: Record<string, (home: TeamSnap, away: TeamSnap) => 
   'v1.5': runModelV1_5,
   'v1.6': runModelV1_6,
   'v1.7': runModelV1_7,
+  'v1.8': runModelV1_8,
 };
