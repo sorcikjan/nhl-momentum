@@ -61,6 +61,18 @@ export async function GET(req: NextRequest) {
       statsByPlayer.get(row.player_id)!.push(row);
     }
 
+    // Carry forward existing energy_bar — energy phase writes this separately;
+    // inserting 100 here would overwrite a valid fatigue value.
+    const { data: existingSnaps } = await supabaseAdmin
+      .from('player_metric_snapshots')
+      .select('player_id, energy_bar')
+      .in('player_id', skaterIds)
+      .order('calculated_at', { ascending: false });
+    const existingEnergyByPlayer = new Map<number, number>();
+    for (const snap of existingSnaps ?? []) {
+      if (!existingEnergyByPlayer.has(snap.player_id)) existingEnergyByPlayer.set(snap.player_id, snap.energy_bar ?? 100);
+    }
+
     const snapshots = [];
 
     for (const player of players ?? []) {
@@ -125,7 +137,7 @@ export async function GET(req: NextRequest) {
         career_ppm:                   career.ppm,
         composite_ppm:                composite.ppm,
         sos_coefficient:              sosCoefficient,
-        energy_bar:                   100, // placeholder until energy route populates this
+        energy_bar:                   existingEnergyByPlayer.get(player.id) ?? 100,
         momentum_rank:                0,   // will be set after ranking
         breakout_delta:               breakoutDelta,
       });
