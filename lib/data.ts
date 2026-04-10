@@ -19,7 +19,7 @@ async function latestModelVersion(): Promise<string> {
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
-  return data?.version ?? 'v1.8';
+  return data?.version ?? 'v1.7';
 }
 
 // ─── League Averages ──────────────────────────────────────────────────────────
@@ -316,7 +316,7 @@ export async function fetchPlayer(id: string) {
 export async function fetchAccuracy(modelVersion?: string) {
   const VERSIONS_TO_FETCH = modelVersion
     ? [modelVersion]
-    : ['v1.0', 'v1.1', 'v1.2', 'v1.3', 'v1.4', 'v1.5', 'v1.6', 'v1.7', 'v1.8'];
+    : ['v1.0', 'v1.1', 'v1.2', 'v1.3', 'v1.4', 'v1.5', 'v1.6', 'v1.7'];
 
   // Fetch model versions metadata + all predictions in a single query
   const [{ data: accuracy, error: accErr }, { data: rawPredictions }] = await Promise.all([
