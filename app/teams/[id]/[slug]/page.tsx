@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { fetchTeam, teamLogoUrl, daysAgo } from '@/lib/data';
+import { fetchTeam, teamLogoUrl, deriveOutStatus } from '@/lib/data';
 import { playerUrl, gameUrl } from '@/lib/urls';
 
 export const revalidate = 120;
@@ -105,14 +105,18 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                   <div className="text-sm font-semibold flex items-center gap-1.5 flex-wrap" style={{ color: 'var(--text-bright)' }}>
                     {p.players.first_name} {p.players.last_name}
                     {(() => {
-                      const d = p.last_played_date ? daysAgo(p.last_played_date) : null;
-                      const out = d !== null && d >= 5;
-                      return (out || p.players.injury_status) ? (
-                        <span className="text-xs px-1.5 py-0.5 rounded font-bold"
-                          style={{ background: 'rgba(239,68,68,0.18)', color: 'var(--red)' }}>
-                          {p.players.injury_status ?? `OUT · ${d}d`}
+                      const status = p.players.injury_status
+                        ? 'injured'
+                        : deriveOutStatus(p.consecutive_games_missed ?? null, null);
+                      if (!status) return null;
+                      const label = p.players.injury_status ?? (status === 'injured' ? 'INJURED' : status === 'scratch' ? 'SCRATCH' : 'OUT');
+                      const color = status === 'scratch' ? 'var(--amber)' : 'var(--red)';
+                      const bg    = status === 'scratch' ? 'rgba(251,191,36,0.18)' : 'rgba(239,68,68,0.18)';
+                      return (
+                        <span className="text-xs px-1.5 py-0.5 rounded font-bold" style={{ background: bg, color }}>
+                          {label}
                         </span>
-                      ) : null;
+                      );
                     })()}
                   </div>
                   <div className="text-xs" style={{ color: 'var(--text)' }}>

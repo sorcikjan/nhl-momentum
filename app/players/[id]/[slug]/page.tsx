@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import PlayerRadarChart from '@/components/players/RadarChart';
 import PPMTimeline from '@/components/players/PPMTimeline';
 import EnergyBar from '@/components/players/EnergyBar';
-import { fetchPlayer, fetchRankings, fetchLeagueAverages, daysAgo } from '@/lib/data';
+import { fetchPlayer, fetchRankings, fetchLeagueAverages, daysAgo, deriveOutStatus } from '@/lib/data';
 import { teamUrl } from '@/lib/urls';
 import Link from 'next/link';
 
@@ -56,7 +56,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     );
   }
 
-  const { player, metricTimeline, recentGames, gamesMissed, lastPlayedDate } = data;
+  const { player, metricTimeline, recentGames, consecutiveGamesMissed, lastPlayedDate } = data;
   const latestSnapshot = metricTimeline?.[metricTimeline.length - 1] ?? {};
   const name = `${player.first_name} ${player.last_name}`;
 
@@ -83,7 +83,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const energyLabel = energyBar >= 70 ? 'HIGH PERFORMANCE' : energyBar >= 40 ? 'MODERATE' : 'DRAINED';
 
   const lastPlayedDaysAgo = lastPlayedDate ? daysAgo(lastPlayedDate) : null;
-  const isOut = lastPlayedDaysAgo !== null && lastPlayedDaysAgo >= 5;
+  const outStatus = deriveOutStatus(consecutiveGamesMissed ?? null, lastPlayedDaysAgo);
 
   const lgPpm    = leagueAvg?.seasonPpm      ?? 0;
   const lgG      = leagueAvg?.goalsPerGame   ?? 0;
@@ -177,39 +177,53 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     <div className="max-w-5xl mx-auto pb-20 md:pb-0 space-y-4">
 
       {/* ── OUT / Injury banner ───────────────────────────────────────────────── */}
-      {isOut && (
-        <div className="rounded-xl border px-5 py-4 flex items-center gap-4"
-          style={{ background: 'rgba(239,68,68,0.08)', borderColor: 'rgba(239,68,68,0.4)' }}>
-          <div className="text-2xl font-black tracking-tight px-3 py-1 rounded-lg"
-            style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--red)' }}>
-            OUT
+      {outStatus && (() => {
+        const isInjured = outStatus === 'injured';
+        const isScratch = outStatus === 'scratch';
+        const label = isInjured ? 'INJURED' : isScratch ? 'SCRATCH' : 'OUT';
+        const reason = isInjured
+          ? 'Extended absence — likely on injured reserve'
+          : isScratch
+          ? 'Not in lineup — possible healthy scratch or performance decision'
+          : 'Not in lineup — short-term absence';
+        const bgColor = isInjured ? 'rgba(239,68,68,0.08)' : isScratch ? 'rgba(251,191,36,0.08)' : 'rgba(239,68,68,0.08)';
+        const borderColor = isInjured ? 'rgba(239,68,68,0.4)' : isScratch ? 'rgba(251,191,36,0.35)' : 'rgba(239,68,68,0.4)';
+        const textColor = isInjured ? 'var(--red)' : isScratch ? 'var(--amber)' : 'var(--red)';
+        return (
+          <div className="rounded-xl border px-5 py-4 flex items-center gap-4"
+            style={{ background: bgColor, borderColor }}>
+            <div className="text-xl font-black tracking-tight px-3 py-1.5 rounded-lg"
+              style={{ background: isInjured ? 'rgba(239,68,68,0.15)' : isScratch ? 'rgba(251,191,36,0.15)' : 'rgba(239,68,68,0.15)', color: textColor }}>
+              {label}
+            </div>
+            <div className="flex-1">
+              <div className="font-bold text-sm" style={{ color: textColor }}>{reason}</div>
+              <div className="text-xs mt-0.5" style={{ color: 'var(--text)' }}>
+                Last played{' '}
+                <span className="font-semibold" style={{ color: 'var(--text-bright)' }}>
+                  {lastPlayedDate
+                    ? new Date(lastPlayedDate + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                    : '—'}
+                </span>
+                {lastPlayedDaysAgo !== null && (
+                  <> · <span className="font-semibold" style={{ color: 'var(--text-bright)' }}>{lastPlayedDaysAgo} days ago</span></>
+                )}
+                {consecutiveGamesMissed !== null && consecutiveGamesMissed > 0 && (
+                  <> · <span className="font-semibold" style={{ color: 'var(--text-bright)' }}>
+                    {consecutiveGamesMissed} consecutive game{consecutiveGamesMissed !== 1 ? 's' : ''} missed
+                  </span></>
+                )}
+              </div>
+            </div>
+            {player.injury_status && (
+              <div className="text-xs px-3 py-1.5 rounded-lg font-semibold"
+                style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.3)' }}>
+                {player.injury_status}
+              </div>
+            )}
           </div>
-          <div className="flex-1">
-            <div className="font-bold text-sm" style={{ color: 'var(--red)' }}>
-              Not in lineup
-            </div>
-            <div className="text-xs mt-0.5" style={{ color: 'var(--text)' }}>
-              Last played{' '}
-              <span className="font-semibold" style={{ color: 'var(--text-bright)' }}>
-                {lastPlayedDate ? new Date(lastPlayedDate + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
-              </span>
-              {' '}·{' '}
-              <span className="font-semibold" style={{ color: 'var(--text-bright)' }}>
-                {lastPlayedDaysAgo} days ago
-              </span>
-              {gamesMissed > 0 && (
-                <> · <span className="font-semibold" style={{ color: 'var(--text-bright)' }}>{gamesMissed} team game{gamesMissed !== 1 ? 's' : ''} missed</span></>
-              )}
-            </div>
-          </div>
-          {player.injury_status && (
-            <div className="text-xs px-3 py-1.5 rounded-lg font-semibold"
-              style={{ background: 'rgba(239,68,68,0.15)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.3)' }}>
-              {player.injury_status}
-            </div>
-          )}
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Hero card ─────────────────────────────────────────────────────────── */}
       <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
@@ -251,12 +265,16 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                       <span style={{ color: 'var(--text)' }}>#{player.sweater_number}</span>
                     </>
                   )}
-                  {(isOut || player.injury_status) && (
-                    <span className="px-2 py-0.5 rounded text-xs font-bold"
-                      style={{ background: 'rgba(239,68,68,0.2)', color: 'var(--red)' }}>
-                      {player.injury_status ?? 'OUT'}
-                    </span>
-                  )}
+                  {(outStatus || player.injury_status) && (() => {
+                    const label = player.injury_status ?? (outStatus === 'injured' ? 'INJURED' : outStatus === 'scratch' ? 'SCRATCH' : 'OUT');
+                    const color = outStatus === 'scratch' ? 'var(--amber)' : 'var(--red)';
+                    const bg = outStatus === 'scratch' ? 'rgba(251,191,36,0.18)' : 'rgba(239,68,68,0.2)';
+                    return (
+                      <span className="px-2 py-0.5 rounded text-xs font-bold" style={{ background: bg, color }}>
+                        {label}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
               {rankBadge(ranked?.momentum_rank)}

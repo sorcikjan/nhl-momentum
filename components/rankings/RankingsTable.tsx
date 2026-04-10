@@ -7,6 +7,12 @@ function daysAgo(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr + 'T12:00:00Z').getTime()) / 86_400_000);
 }
 
+function outLabel(d: number): { label: string; color: string; bg: string } {
+  if (d >= 14) return { label: `INJURED · ${d}d`, color: 'var(--red)', bg: 'rgba(239,68,68,0.18)' };
+  if (d >= 7)  return { label: `OUT · ${d}d`,     color: 'var(--red)', bg: 'rgba(239,68,68,0.18)' };
+  return              { label: `SCRATCH · ${d}d`,  color: 'var(--amber)', bg: 'rgba(251,191,36,0.18)' };
+}
+
 interface Player {
   player_id: number;
   momentum_rank: number;
@@ -106,7 +112,7 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                 const energy = p.energy_bar ?? 100;
                 const energyColor = energy >= 70 ? 'var(--green)' : energy >= 40 ? 'var(--amber)' : 'var(--red)';
                 const lastPlayedDaysAgo = p.last_played_date ? daysAgo(p.last_played_date) : null;
-                const isOut = lastPlayedDaysAgo !== null && lastPlayedDaysAgo >= 5;
+                const isOut = lastPlayedDaysAgo !== null && lastPlayedDaysAgo >= 3;
 
                 return (
                   <tr key={p.player_id}
@@ -134,12 +140,20 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                         <div>
                           <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap" style={{ color: 'var(--text-bright)' }}>
                             {name}
-                            {(isOut || p.players.injury_status) && (
+                            {p.players.injury_status && (
                               <span className="text-xs px-1.5 py-0.5 rounded font-bold"
                                 style={{ background: 'rgba(239,68,68,0.18)', color: 'var(--red)' }}>
-                                {p.players.injury_status ?? `OUT · ${lastPlayedDaysAgo}d`}
+                                {p.players.injury_status}
                               </span>
                             )}
+                            {!p.players.injury_status && isOut && lastPlayedDaysAgo !== null && (() => {
+                              const { label, color, bg } = outLabel(lastPlayedDaysAgo);
+                              return (
+                                <span className="text-xs px-1.5 py-0.5 rounded font-bold" style={{ background: bg, color }}>
+                                  {label}
+                                </span>
+                              );
+                            })()}
                           </div>
                           <div className="text-xs" style={{ color: 'var(--text)' }}>
                             <Link href={teamUrl(p.players.teams.id, p.players.teams.name)}

@@ -101,6 +101,36 @@ export function daysAgo(dateStr: string): number {
   return Math.floor((Date.now() - new Date(dateStr + 'T12:00:00Z').getTime()) / 86_400_000);
 }
 
+/**
+ * Derives player out-status from absence data.
+ * Returns 'injured' | 'scratch' | null.
+ *
+ * Uses consecutive games missed as the primary signal:
+ *   1 game missed          → scratch (single-game benching, coach/perf decision)
+ *   2–4 games missed       → out (short-term absence, possible minor injury)
+ *   5+ games missed        → injured (extended absence, very likely IR)
+ *
+ * Falls back to days-based thresholds when game count is unavailable:
+ *   3–6 days               → scratch
+ *   7–13 days              → out
+ *   14+ days               → injured
+ */
+export function deriveOutStatus(
+  consecutiveGamesMissed: number | null,
+  lastPlayedDaysAgo: number | null,
+): 'injured' | 'out' | 'scratch' | null {
+  if (consecutiveGamesMissed !== null) {
+    if (consecutiveGamesMissed === 0) return null;
+    if (consecutiveGamesMissed === 1) return 'scratch';
+    if (consecutiveGamesMissed <= 4) return 'out';
+    return 'injured';
+  }
+  if (lastPlayedDaysAgo === null || lastPlayedDaysAgo < 3) return null;
+  if (lastPlayedDaysAgo <= 6) return 'scratch';
+  if (lastPlayedDaysAgo <= 13) return 'out';
+  return 'injured';
+}
+
 // ─── Rankings ─────────────────────────────────────────────────────────────────
 
 export async function fetchRankings() {
@@ -264,12 +294,21 @@ export async function fetchPlayer(id: string) {
   }
 
   const playerGameIds = new Set(recentGames.map((g: { game_id: number }) => g.game_id));
-  const gamesMissed = teamRecentGames.filter((g: { id: number }) => !playerGameIds.has(g.id)).length;
   const lastPlayedDate: string | null = recentGames.length > 0
     ? (recentGames[0]?.games?.game_date ?? null)
     : null;
 
-  return { player, metricTimeline, recentGames, gamesMissed, lastPlayedDate };
+  // Count consecutive games missed from the most recent team game backward
+  const teamGamesSorted = [...teamRecentGames].sort(
+    (a: { game_date: string }, b: { game_date: string }) => b.game_date.localeCompare(a.game_date)
+  );
+  let consecutiveGamesMissed = 0;
+  for (const g of teamGamesSorted) {
+    if (playerGameIds.has(g.id)) break;
+    consecutiveGamesMissed++;
+  }
+
+  return { player, metricTimeline, recentGames, consecutiveGamesMissed, lastPlayedDate };
 }
 
 // ─── Accuracy ─────────────────────────────────────────────────────────────────
@@ -413,13 +452,38 @@ export async function fetchTeam(id: string) {
     return true;
   }).sort((a, b) => (b.composite_ppm ?? 0) - (a.composite_ppm ?? 0));
 
-  // Attach last-played dates to roster for OUT status badges
+  // Compute consecutive games missed per player using team's recent game list
   const rosterPlayerIds = roster.map(p => p.player_id);
-  const lastPlayedMap = await getLastPlayedDates(rosterPlayerIds);
-  const rosterWithOutStatus = roster.map(p => ({
-    ...p,
-    last_played_date: lastPlayedMap.get(p.player_id) ?? null,
-  }));
+  const teamGameIds = (recentGames ?? []).map((g: { id: number }) => g.id);
+  const { data: recentPlayerStats } = teamGameIds.length
+    ? await supabaseAdmin
+        .from('game_player_stats')
+        .select('player_id, game_id')
+        .in('player_id', rosterPlayerIds)
+        .in('game_id', teamGameIds)
+    : { data: [] };
+
+  // Build set of game IDs each player appeared in
+  const playerGameSets = new Map<number, Set<number>>();
+  for (const row of recentPlayerStats ?? []) {
+    if (!playerGameSets.has(row.player_id)) playerGameSets.set(row.player_id, new Set());
+    playerGameSets.get(row.player_id)!.add(row.game_id);
+  }
+
+  // Team games sorted newest first for consecutive count
+  const teamGamesSorted = [...(recentGames ?? [])].sort(
+    (a: { game_date: string }, b: { game_date: string }) => b.game_date.localeCompare(a.game_date)
+  );
+
+  const rosterWithOutStatus = roster.map(p => {
+    const appeared = playerGameSets.get(p.player_id) ?? new Set();
+    let consecutive = 0;
+    for (const g of teamGamesSorted) {
+      if (appeared.has(g.id)) break;
+      consecutive++;
+    }
+    return { ...p, consecutive_games_missed: consecutive };
+  });
 
   return { team, roster: rosterWithOutStatus, recentGames, upcoming, seasonStats: seasonStatsResult, standing: standingResult };
 }
