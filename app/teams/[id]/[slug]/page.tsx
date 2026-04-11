@@ -107,8 +107,8 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                       const status = p.players.injury_status
                         ? 'injured'
                         : deriveOutStatus(p.consecutive_games_missed ?? null, null);
-                      const emoji = status === 'injured' ? '🔴' : status === 'out' ? '🟠' : status === 'scratch' ? '🟡' : '🟢';
-                      return <span>{emoji}</span>;
+                      const emoji = status === 'injured' ? '🏥' : status === 'out' ? '⚠️' : status === 'scratch' ? '🪑' : null;
+                      return emoji ? <span>{emoji}</span> : null;
                     })()}
                     {p.players.first_name} {p.players.last_name}
                     {(() => {

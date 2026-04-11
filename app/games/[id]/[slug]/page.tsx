@@ -492,7 +492,7 @@ function LineupCard({
                   <td className="px-3 py-1.5">
                     <Link href={playerHref}
                       className="text-xs hover:opacity-80 flex items-center gap-1" style={{ color: 'var(--text-bright)' }}>
-                      <span>{p.injuryStatus ? '🔴' : '🟢'}</span>
+                      {p.injuryStatus && <span>🏥</span>}
                       {name}
                     </Link>
                     {p.injuryStatus && (

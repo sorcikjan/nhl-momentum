@@ -8,12 +8,12 @@ function daysAgo(dateStr: string): number {
 }
 
 function statusEmoji(lastPlayedDate: string | null | undefined): string {
-  if (!lastPlayedDate) return '🟢';
+  if (!lastPlayedDate) return '';
   const d = daysAgo(lastPlayedDate);
-  if (d >= 14) return '🔴';
-  if (d >= 7)  return '🟠';
-  if (d >= 3)  return '🟡';
-  return '🟢';
+  if (d >= 14) return '🏥';
+  if (d >= 7)  return '⚠️';
+  if (d >= 3)  return '🪑';
+  return '';
 }
 
 function outLabel(d: number): { label: string; color: string; bg: string } {
@@ -148,7 +148,7 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                         </div>
                         <div>
                           <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap" style={{ color: 'var(--text-bright)' }}>
-                            <span>{statusEmoji(p.last_played_date)}</span>
+                            {statusEmoji(p.last_played_date) && <span>{statusEmoji(p.last_played_date)}</span>}
                             {name}
                             {p.players.injury_status && (
                               <span className="text-xs px-1.5 py-0.5 rounded font-bold"
