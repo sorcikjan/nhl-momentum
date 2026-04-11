@@ -2,25 +2,7 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { playerUrl, teamUrl } from '@/lib/urls';
-
-function daysAgo(dateStr: string): number {
-  return Math.floor((Date.now() - new Date(dateStr + 'T12:00:00Z').getTime()) / 86_400_000);
-}
-
-function statusEmoji(lastPlayedDate: string | null | undefined): string {
-  if (!lastPlayedDate) return '';
-  const d = daysAgo(lastPlayedDate);
-  if (d >= 14) return '🏥';
-  if (d >= 7)  return '⚠️';
-  if (d >= 3)  return '🪑';
-  return '';
-}
-
-function outLabel(d: number): { label: string; color: string; bg: string } {
-  if (d >= 14) return { label: `INJURED · ${d}d`, color: 'var(--red)', bg: 'rgba(239,68,68,0.18)' };
-  if (d >= 7)  return { label: `OUT · ${d}d`,     color: 'var(--red)', bg: 'rgba(239,68,68,0.18)' };
-  return              { label: `SCRATCH · ${d}d`,  color: 'var(--amber)', bg: 'rgba(251,191,36,0.18)' };
-}
+import { deriveOutStatus, daysAgo } from '@/lib/player-status';
 
 interface Player {
   player_id: number;
@@ -36,6 +18,7 @@ interface Player {
   season_goals: number;
   season_points: number;
   last_played_date?: string | null;
+  consecutive_games_missed?: number;
   players: {
     first_name: string;
     last_name: string;
@@ -121,7 +104,16 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                 const energy = p.energy_bar ?? 100;
                 const energyColor = energy >= 70 ? 'var(--green)' : energy >= 40 ? 'var(--amber)' : 'var(--red)';
                 const lastPlayedDaysAgo = p.last_played_date ? daysAgo(p.last_played_date) : null;
-                const isOut = lastPlayedDaysAgo !== null && lastPlayedDaysAgo >= 3;
+                const outStatus = p.players.injury_status
+                  ? null
+                  : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo);
+
+                const statusBadge = p.players.injury_status
+                  ? { label: p.players.injury_status, color: 'var(--red)', bg: 'rgba(239,68,68,0.18)' }
+                  : outStatus === 'injured' ? { label: 'INJ', color: 'var(--red)', bg: 'rgba(239,68,68,0.18)' }
+                  : outStatus === 'out'     ? { label: 'OUT', color: 'var(--amber)', bg: 'rgba(245,158,11,0.18)' }
+                  : outStatus === 'scratch' ? { label: 'SCR', color: 'var(--text)', bg: 'rgba(148,163,184,0.18)' }
+                  : null;
 
                 return (
                   <tr key={p.player_id}
@@ -148,22 +140,13 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                         </div>
                         <div>
                           <div className="font-medium text-sm flex items-center gap-1.5 flex-wrap" style={{ color: 'var(--text-bright)' }}>
-                            {statusEmoji(p.last_played_date) && <span>{statusEmoji(p.last_played_date)}</span>}
                             {name}
-                            {p.players.injury_status && (
+                            {statusBadge && (
                               <span className="text-xs px-1.5 py-0.5 rounded font-bold"
-                                style={{ background: 'rgba(239,68,68,0.18)', color: 'var(--red)' }}>
-                                {p.players.injury_status}
+                                style={{ background: statusBadge.bg, color: statusBadge.color }}>
+                                {statusBadge.label}
                               </span>
                             )}
-                            {!p.players.injury_status && isOut && lastPlayedDaysAgo !== null && (() => {
-                              const { label, color, bg } = outLabel(lastPlayedDaysAgo);
-                              return (
-                                <span className="text-xs px-1.5 py-0.5 rounded font-bold" style={{ background: bg, color }}>
-                                  {label}
-                                </span>
-                              );
-                            })()}
                           </div>
                           <div className="text-xs" style={{ color: 'var(--text)' }}>
                             <Link href={teamUrl(p.players.teams.id, p.players.teams.name)}

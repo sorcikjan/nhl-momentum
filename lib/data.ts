@@ -3,6 +3,8 @@
 
 import { supabaseAdmin } from '@/lib/supabase';
 import { getGamesByDate, getGameBoxscore, getStandings, getTeamSeasonStats } from '@/lib/nhl-api';
+export { deriveOutStatus, daysAgo } from '@/lib/player-status';
+import { daysAgo } from '@/lib/player-status';
 
 // NHL CDN logo URL — works for all 32 teams
 export function teamLogoUrl(abbrev: string) {
@@ -97,39 +99,6 @@ async function getLastPlayedDates(playerIds: number[]): Promise<Map<number, stri
   return result;
 }
 
-export function daysAgo(dateStr: string): number {
-  return Math.floor((Date.now() - new Date(dateStr + 'T12:00:00Z').getTime()) / 86_400_000);
-}
-
-/**
- * Derives player out-status from absence data.
- * Returns 'injured' | 'scratch' | null.
- *
- * Uses consecutive games missed as the primary signal:
- *   1 game missed          → scratch (single-game benching, coach/perf decision)
- *   2–4 games missed       → out (short-term absence, possible minor injury)
- *   5+ games missed        → injured (extended absence, very likely IR)
- *
- * Falls back to days-based thresholds when game count is unavailable:
- *   3–6 days               → scratch
- *   7–13 days              → out
- *   14+ days               → injured
- */
-export function deriveOutStatus(
-  consecutiveGamesMissed: number | null,
-  lastPlayedDaysAgo: number | null,
-): 'injured' | 'out' | 'scratch' | null {
-  if (consecutiveGamesMissed !== null) {
-    if (consecutiveGamesMissed === 0) return null;
-    if (consecutiveGamesMissed === 1) return 'scratch';
-    if (consecutiveGamesMissed <= 4) return 'out';
-    return 'injured';
-  }
-  if (lastPlayedDaysAgo === null || lastPlayedDaysAgo < 3) return null;
-  if (lastPlayedDaysAgo <= 6) return 'scratch';
-  if (lastPlayedDaysAgo <= 13) return 'out';
-  return 'injured';
-}
 
 // ─── Rankings ─────────────────────────────────────────────────────────────────
 
@@ -184,11 +153,62 @@ export async function fetchRankings() {
     .sort((a, b) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0))
     .slice(0, 5);
 
-  // Attach last-played date to all skaters for OUT status display
-  const allSkaterIds = sortedSkaters.map((s: { player_id: number }) => s.player_id);
-  const lastPlayed = await getLastPlayedDates(allSkaterIds);
-  for (const s of sortedSkaters as Array<{ player_id: number; last_played_date?: string | null }>) {
-    s.last_played_date = lastPlayed.get(s.player_id) ?? null;
+  // Compute last-played date AND consecutive games missed for all skaters.
+  // Strategy: (1) get last game_id per player from game_player_stats,
+  // (2) fetch recent completed games for all teams, (3) for each player
+  // count team games with game_id > player's last game_id.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allSkaterIds = sortedSkaters.map((s: any) => s.player_id);
+
+  // Step 1: last game_id per player (top 1000 rows covers ~25 most recent games)
+  const { data: recentStats } = await supabaseAdmin
+    .from('game_player_stats')
+    .select('player_id, game_id')
+    .in('player_id', allSkaterIds)
+    .order('game_id', { ascending: false })
+    .limit(1000);
+
+  const lastGameIdByPlayer = new Map<number, number>();
+  for (const row of recentStats ?? []) {
+    if (!lastGameIdByPlayer.has(row.player_id)) lastGameIdByPlayer.set(row.player_id, row.game_id);
+  }
+
+  // Step 2: recent completed games for all teams (last ~45 days covers 15+ games per team)
+  const sinceDate = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
+  const { data: recentTeamGames } = await supabaseAdmin
+    .from('games')
+    .select('id, game_date, home_team_id, away_team_id')
+    .in('game_state', ['FINAL', 'OFF'])
+    .gte('game_date', sinceDate)
+    .order('game_id', { ascending: false })
+    .limit(500);
+
+  // Group games by team_id
+  const teamGameIds = new Map<number, number[]>(); // team_id → sorted game_ids desc
+  for (const g of recentTeamGames ?? []) {
+    for (const tid of [g.home_team_id, g.away_team_id]) {
+      if (!teamGameIds.has(tid)) teamGameIds.set(tid, []);
+      teamGameIds.get(tid)!.push(g.id);
+    }
+  }
+
+  // Fetch game dates for last-played date lookup
+  const lastGameIds = [...new Set(lastGameIdByPlayer.values())];
+  const { data: lastGameDates } = lastGameIds.length
+    ? await supabaseAdmin.from('games').select('id, game_date').in('id', lastGameIds)
+    : { data: [] };
+  const gameDateById = new Map((lastGameDates ?? []).map(g => [g.id, g.game_date as string]));
+
+  // Step 3: attach last_played_date + consecutive_games_missed to each skater
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const s of sortedSkaters as Array<{ player_id: number; last_played_date?: string | null; consecutive_games_missed?: number; players: { team_id: number | null } }>) {
+    const lastGid = lastGameIdByPlayer.get(s.player_id);
+    s.last_played_date = lastGid ? (gameDateById.get(lastGid) ?? null) : null;
+    const teamGids = teamGameIds.get(s.players?.team_id ?? 0) ?? [];
+    // Count team games that happened after (higher game_id than) player's last game
+    s.consecutive_games_missed = lastGid
+      ? teamGids.filter(gid => gid > lastGid).length
+      : teamGids.length; // never played → all recent team games = missed
   }
 
   return {
