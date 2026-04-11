@@ -10,11 +10,14 @@ import {
   buildGoalieLayerMetrics,
 } from '@/lib/metrics';
 import { calcSOSCoefficient } from '@/lib/sos';
-import { toiToSeconds } from '@/lib/nhl-api';
-import type { LayerMetrics } from '@/types';
 
 // GET /api/ingest/metrics
-// Reads game_player_stats from DB, computes 3-layer metrics, writes snapshots
+// Reads game_player_stats from DB, computes 3-layer metrics, writes snapshots.
+//
+// Supabase has a max_rows cap (default 1000) that silently truncates large queries.
+// With 100 skaters × 82 games = 8200 rows needed, a single query would be cut to
+// 1000 rows (~12 games per player). Fix: chunk skaterIds into groups of 10 so each
+// chunk requires at most 10 × 82 = 820 rows — safely under the 1000-row cap.
 
 export async function GET(req: NextRequest) {
   const authError = requireIngestAuth(req);
@@ -24,7 +27,7 @@ export async function GET(req: NextRequest) {
   const offset = Math.max(0, Number(req.nextUrl.searchParams.get('offset') ?? '0'));
 
   try {
-    // Fetch active skaters with pagination
+    // Fetch active players with pagination
     const { data: players, error: pErr } = await supabaseAdmin
       .from('players')
       .select('id, position_code, team_id, injury_status')
@@ -45,91 +48,36 @@ export async function GET(req: NextRequest) {
       ? goalieSnapshots.reduce((s, g) => s + (g.momentum_ppm ?? 0), 0) / goalieSnapshots.length
       : 1.0;
 
-    // Bulk-fetch recent game stats for momentum window only (last ~10 games per player).
-    // Supabase has a max_rows cap (default 1000) that silently truncates large queries,
-    // so we no longer use DB for season totals — those come from the NHL API directly.
     const skaterIds = (players ?? []).filter(p => p.position_code !== 'G').map(p => p.id);
 
-    // Fetch recent stats — capped at 900 rows to stay safely under Supabase max_rows.
-    // Ordered by game_id DESC so the most recent rows come first (newest = momentum window).
-    const { data: allStats, error: statsErr } = await supabaseAdmin
-      .from('game_player_stats')
-      .select('player_id,goals,assists,shots_on_goal,toi_seconds,hits,blocked_shots,plus_minus,pim,pp_goals,pp_points,sh_goals,sh_points,sh_toi_seconds,game_winning_goals,ot_goals,game_id')
-      .in('player_id', skaterIds)
-      .order('game_id', { ascending: false })
-      .limit(900);
+    // Fetch all game stats chunked to stay under Supabase max_rows (default 1000).
+    // Each chunk of 10 skaters × 82 games = 820 rows — safely under the cap.
+    // Ordered game_id DESC so newest rows come first (momentum window = slice(0,5)).
+    const CHUNK = 10;
+    const statsByPlayer = new Map<number, {
+      player_id: number; goals: number; assists: number; shots_on_goal: number;
+      toi_seconds: number; hits: number; blocked_shots: number; plus_minus: number;
+      pim: number; pp_goals: number; pp_points: number; sh_goals: number;
+      sh_points: number; sh_toi_seconds: number; game_winning_goals: number;
+      ot_goals: number; game_id: number;
+    }[]>();
 
-    if (statsErr) throw statsErr;
-
-    // Fetch NHL API season totals concurrently — authoritative, no row-limit issues.
-    // This replaces the DB-derived season layer which was silently truncated.
-    const CONCURRENCY = 20;
-    const seasonTotalsByPlayer = new Map<number, LayerMetrics>();
-    for (let ci = 0; ci < skaterIds.length; ci += CONCURRENCY) {
-      const chunk = skaterIds.slice(ci, ci + CONCURRENCY);
-      const results = await Promise.all(
-        chunk.map(async (playerId) => {
-          try {
-            const res = await fetch(
-              `https://api-web.nhle.com/v1/player/${playerId}/landing`,
-              { cache: 'no-store' }
-            );
-            if (!res.ok) return null;
-            const data = await res.json();
-            const sub = data?.featuredStats?.regularSeason?.subSeason;
-            if (!sub) return null;
-
-            const gp      = sub.gamesPlayed ?? 0;
-            const goals   = sub.goals       ?? 0;
-            const assists = sub.assists      ?? 0;
-            const shots   = sub.shots        ?? 0;
-            const avgToi  = toiToSeconds(sub.avgTimeOnIce   ?? '0:00');
-            const avgShToi = toiToSeconds(sub.avgTimeOnIceSH ?? '0:00');
-            const totalToi   = avgToi   * gp;
-            const totalShToi = avgShToi * gp;
-            const points = goals + assists;
-
-            const metrics: LayerMetrics = {
-              gamesPlayed:           gp,
-              goals,
-              assists,
-              points,
-              toiSeconds:            totalToi,
-              ppm:                   totalToi > 0 ? points / (totalToi / 60) : 0,
-              shotsOnGoal:           shots,
-              shootingPct:           shots > 0 ? goals / shots : 0,
-              hits:                  0, // not available from landing endpoint
-              blockedShots:          0,
-              plusMinus:             sub.plusMinus          ?? 0,
-              pim:                   sub.pim                ?? 0,
-              powerPlayGoals:        sub.powerPlayGoals     ?? 0,
-              powerPlayPoints:       sub.powerPlayPoints    ?? 0,
-              shorthandedGoals:      sub.shorthandedGoals   ?? 0,
-              shorthandedPoints:     sub.shorthandedPoints  ?? 0,
-              gameWinningGoals:      sub.gameWinningGoals   ?? 0,
-              otGoals:               sub.otGoals            ?? 0,
-              shorthandedToiSeconds: totalShToi,
-            };
-            return { playerId, metrics };
-          } catch {
-            return null;
-          }
-        })
-      );
-      for (const r of results) {
-        if (r) seasonTotalsByPlayer.set(r.playerId, r.metrics);
+    for (let ci = 0; ci < skaterIds.length; ci += CHUNK) {
+      const chunk = skaterIds.slice(ci, ci + CHUNK);
+      const { data: chunkStats, error: chunkErr } = await supabaseAdmin
+        .from('game_player_stats')
+        .select('player_id,goals,assists,shots_on_goal,toi_seconds,hits,blocked_shots,plus_minus,pim,pp_goals,pp_points,sh_goals,sh_points,sh_toi_seconds,game_winning_goals,ot_goals,game_id')
+        .in('player_id', chunk)
+        .order('game_id', { ascending: false })
+        .limit(chunk.length * 100);
+      if (chunkErr) throw chunkErr;
+      for (const row of chunkStats ?? []) {
+        if (!statsByPlayer.has(row.player_id)) statsByPlayer.set(row.player_id, []);
+        statsByPlayer.get(row.player_id)!.push(row);
       }
     }
 
-    // Group by player_id in memory (rows already sorted newest-first)
-    const statsByPlayer = new Map<number, NonNullable<typeof allStats>>();
-    for (const row of allStats ?? []) {
-      if (!statsByPlayer.has(row.player_id)) statsByPlayer.set(row.player_id, []);
-      statsByPlayer.get(row.player_id)!.push(row);
-    }
-
-    // Carry forward existing energy_bar — energy phase writes this separately;
-    // inserting 100 here would overwrite a valid fatigue value.
+    // Carry forward existing energy_bar — energy phase writes this separately
     const { data: existingSnaps } = await supabaseAdmin
       .from('player_metric_snapshots')
       .select('player_id, energy_bar')
@@ -144,29 +92,25 @@ export async function GET(req: NextRequest) {
     const snapshots = [];
 
     for (const player of players ?? []) {
-      if (player.position_code === 'G') continue; // Goalies handled separately
+      if (player.position_code === 'G') continue;
 
       const playerStats = statsByPlayer.get(player.id);
       if (!playerStats?.length) continue;
 
-      const last5 = playerStats.slice(0, 5); // newest-first, top 5 = momentum window
+      const last5      = playerStats.slice(0, 5); // newest-first → top 5 = momentum
+      const fullSeason = playerStats;              // all rows = full season
 
-      const momentum = buildLayerMetrics(last5);
-      // Season: use NHL API totals (authoritative, avoids DB row-limit truncation).
-      // Fall back to DB aggregate only if the API call failed for this player.
-      const season = seasonTotalsByPlayer.get(player.id) ?? buildLayerMetrics(playerStats);
-      // Career = season for now (we'll expand when we have multi-season data)
-      const career = season;
+      const momentum  = buildLayerMetrics(last5);
+      const season    = buildLayerMetrics(fullSeason);
+      const career    = season;
       const composite = compositeLayer(momentum, season, career);
 
-      // SOS: use league avg as placeholder (will refine once we have opponent mapping)
       const sosCoefficient = calcSOSCoefficient([], leagueAvgGoaliePPM);
       const breakoutDelta  = calcBreakoutDelta(momentum.ppm, season.ppm);
       const rankScore      = calcMomentumRankScore(momentum.ppm, momentum.shootingPct, sosCoefficient);
 
       snapshots.push({
         player_id:                    player.id,
-        // Momentum layer
         momentum_games:               momentum.gamesPlayed,
         momentum_goals:               momentum.goals,
         momentum_assists:             momentum.assists,
@@ -182,7 +126,6 @@ export async function GET(req: NextRequest) {
         momentum_shots:               momentum.shotsOnGoal,
         momentum_hits:                momentum.hits,
         momentum_blocked_shots:       momentum.blockedShots,
-        // Season layer
         season_games:                 season.gamesPlayed,
         season_goals:                 season.goals,
         season_assists:               season.assists,
@@ -201,26 +144,21 @@ export async function GET(req: NextRequest) {
         season_shots:                 season.shotsOnGoal,
         season_hits:                  season.hits,
         season_blocked_shots:         season.blockedShots,
-        // Career / composite
         career_games:                 career.gamesPlayed,
         career_ppm:                   career.ppm,
         composite_ppm:                composite.ppm,
         sos_coefficient:              sosCoefficient,
         energy_bar:                   existingEnergyByPlayer.get(player.id) ?? 100,
-        momentum_rank:                0,   // will be set after ranking
+        momentum_rank:                0,
         breakout_delta:               breakoutDelta,
       });
     }
 
-    // Rank by composite_ppm (weighted blend: 50% momentum + 35% season + 15% career)
-    // This is stable and correct. The old calcMomentumRankScore was broken because
-    // sosCoefficient=1.0 for everyone (adds a constant) and raw shootingPct (0-1)
-    // dwarfs PPM (0.01-0.15), causing fluke small-sample shooting to dominate.
+    // Rank by composite_ppm
     const ranked = snapshots
       .sort((a, b) => b.composite_ppm - a.composite_ppm)
       .map((s, i) => ({ ...s, momentum_rank: i + 1 }));
 
-    // Batch upsert snapshots
     const BATCH = 50;
     let inserted = 0;
     for (let i = 0; i < ranked.length; i += BATCH) {
