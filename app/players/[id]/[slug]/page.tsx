@@ -180,7 +180,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {outStatus && (() => {
         const isInjured = outStatus === 'injured';
         const isScratch = outStatus === 'scratch';
-        const label = isInjured ? 'INJURED' : isScratch ? 'SCRATCH' : 'OUT';
+        const label = isInjured ? 'INJURED' : isScratch ? 'SCRATCHED' : 'OUT';
         const reason = isInjured
           ? 'Extended absence — likely on injured reserve'
           : isScratch

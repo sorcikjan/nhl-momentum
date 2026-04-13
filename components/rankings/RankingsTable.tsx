@@ -109,10 +109,10 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                   : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo);
 
                 const statusBadge = p.players.injury_status
-                  ? { label: p.players.injury_status, color: 'var(--red)', bg: 'rgba(239,68,68,0.18)' }
-                  : outStatus === 'injured' ? { label: 'INJ', color: 'var(--red)', bg: 'rgba(239,68,68,0.18)' }
-                  : outStatus === 'out'     ? { label: 'OUT', color: 'var(--amber)', bg: 'rgba(245,158,11,0.18)' }
-                  : outStatus === 'scratch' ? { label: 'SCR', color: 'var(--text)', bg: 'rgba(148,163,184,0.18)' }
+                  ? { label: 'INJURED', color: 'var(--red)', bg: 'rgba(239,68,68,0.18)' }
+                  : outStatus === 'injured' ? { label: 'INJURED',   color: 'var(--red)',   bg: 'rgba(239,68,68,0.18)' }
+                  : outStatus === 'out'     ? { label: 'OUT',       color: 'var(--amber)', bg: 'rgba(245,158,11,0.18)' }
+                  : outStatus === 'scratch' ? { label: 'SCRATCHED', color: 'var(--amber)', bg: 'rgba(245,158,11,0.18)' }
                   : null;
 
                 return (

@@ -103,22 +103,15 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                 }
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-semibold flex items-center gap-1.5 flex-wrap" style={{ color: 'var(--text-bright)' }}>
-                    {(() => {
-                      const status = p.players.injury_status
-                        ? 'injured'
-                        : deriveOutStatus(p.consecutive_games_missed ?? null, null);
-                      const emoji = status === 'injured' ? '🏥' : status === 'out' ? '⚠️' : status === 'scratch' ? '🪑' : null;
-                      return emoji ? <span>{emoji}</span> : null;
-                    })()}
                     {p.players.first_name} {p.players.last_name}
                     {(() => {
                       const status = p.players.injury_status
                         ? 'injured'
                         : deriveOutStatus(p.consecutive_games_missed ?? null, null);
                       if (!status) return null;
-                      const label = p.players.injury_status ?? (status === 'injured' ? 'INJURED' : status === 'scratch' ? 'SCRATCH' : 'OUT');
-                      const color = status === 'scratch' ? 'var(--amber)' : 'var(--red)';
-                      const bg    = status === 'scratch' ? 'rgba(251,191,36,0.18)' : 'rgba(239,68,68,0.18)';
+                      const label = status === 'injured' ? 'INJURED' : status === 'scratch' ? 'SCRATCHED' : 'OUT';
+                      const color = status === 'injured' ? 'var(--red)' : 'var(--amber)';
+                      const bg    = status === 'injured' ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.18)';
                       return (
                         <span className="text-xs px-1.5 py-0.5 rounded font-bold" style={{ background: bg, color }}>
                           {label}

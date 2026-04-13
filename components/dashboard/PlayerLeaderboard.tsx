@@ -3,15 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { playerUrl } from '@/lib/urls';
-
-function statusEmoji(lastPlayedDate: string | null | undefined): string {
-  if (!lastPlayedDate) return '';
-  const d = Math.floor((Date.now() - new Date(lastPlayedDate + 'T12:00:00Z').getTime()) / 86_400_000);
-  if (d >= 14) return '🏥';
-  if (d >= 7)  return '⚠️';
-  if (d >= 3)  return '🪑';
-  return '';
-}
+import { daysAgo, deriveOutStatus } from '@/lib/player-status';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyPlayer = Record<string, any> & {
@@ -124,11 +116,31 @@ export default function PlayerLeaderboard({
                 }
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate flex items-center gap-1"
-                  style={{ color: 'var(--text-bright)' }}>
-                  {statusEmoji(p.last_played_date) && <span>{statusEmoji(p.last_played_date)}</span>}
-                  {name}
-                </div>
+                {(() => {
+                  const lastPlayedDaysAgo = p.last_played_date ? daysAgo(p.last_played_date) : null;
+                  const outStatus = p.players?.injury_status
+                    ? 'injured'
+                    : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo);
+                  const badge = p.players?.injury_status || outStatus === 'injured'
+                    ? { label: 'INJURED',   color: 'var(--red)',   bg: 'rgba(239,68,68,0.18)' }
+                    : outStatus === 'out'
+                    ? { label: 'OUT',       color: 'var(--amber)', bg: 'rgba(245,158,11,0.18)' }
+                    : outStatus === 'scratch'
+                    ? { label: 'SCRATCHED', color: 'var(--amber)', bg: 'rgba(245,158,11,0.18)' }
+                    : null;
+                  return (
+                    <div className="text-sm font-medium truncate flex items-center gap-1"
+                      style={{ color: 'var(--text-bright)' }}>
+                      {name}
+                      {badge && (
+                        <span className="text-xs px-1 py-0.5 rounded font-bold flex-shrink-0"
+                          style={{ background: badge.bg, color: badge.color }}>
+                          {badge.label}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
                 <div className="text-xs" style={{ color: 'var(--text)' }}>
                   {p.players.teams.abbrev} · {p.players.position_code}
                 </div>

@@ -3,15 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { playerUrl } from '@/lib/urls';
-
-function statusEmoji(lastPlayedDate: string | null | undefined): string {
-  if (!lastPlayedDate) return '';
-  const d = Math.floor((Date.now() - new Date(lastPlayedDate + 'T12:00:00Z').getTime()) / 86_400_000);
-  if (d >= 14) return '🏥';
-  if (d >= 7)  return '⚠️';
-  if (d >= 3)  return '🪑';
-  return '';
-}
+import { daysAgo, deriveOutStatus } from '@/lib/player-status';
 
 interface Player {
   player_id: number;
@@ -19,11 +11,13 @@ interface Player {
   momentum_ppm: number;
   season_ppm: number;
   last_played_date?: string | null;
+  consecutive_games_missed?: number | null;
   players: {
     first_name: string;
     last_name: string;
     headshot_url: string | null;
     position_code: string;
+    injury_status?: string | null;
     teams: { abbrev: string };
   };
 }
@@ -91,9 +85,22 @@ export default function BreakoutWatch({
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-sm font-medium truncate flex items-center gap-1" style={{ color: 'var(--text-bright)' }}>
-                    {statusEmoji(p.last_played_date) && <span>{statusEmoji(p.last_played_date)}</span>}
+                  <span className="text-sm font-medium truncate flex items-center gap-1.5" style={{ color: 'var(--text-bright)' }}>
                     {name}
+                    {(() => {
+                      const lastPlayedDaysAgo = p.last_played_date ? daysAgo(p.last_played_date) : null;
+                      const outStatus = p.players?.injury_status
+                        ? 'injured'
+                        : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo);
+                      if (!outStatus) return null;
+                      const label = outStatus === 'injured' ? 'INJURED' : outStatus === 'scratch' ? 'SCRATCHED' : 'OUT';
+                      const color = outStatus === 'injured' ? 'var(--red)' : 'var(--amber)';
+                      const bg    = outStatus === 'injured' ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.18)';
+                      return (
+                        <span className="text-xs px-1 py-0.5 rounded font-bold flex-shrink-0"
+                          style={{ background: bg, color }}>{label}</span>
+                      );
+                    })()}
                   </span>
                   <span className="text-xs font-mono font-semibold ml-2 flex-shrink-0" style={{ color: 'var(--amber)' }}>
                     {pctAbove >= 0 ? '+' : ''}{pctAbove}% vs avg

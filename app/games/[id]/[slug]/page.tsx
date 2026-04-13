@@ -492,12 +492,14 @@ function LineupCard({
                   <td className="px-3 py-1.5">
                     <Link href={playerHref}
                       className="text-xs hover:opacity-80 flex items-center gap-1" style={{ color: 'var(--text-bright)' }}>
-                      {p.injuryStatus && <span>🏥</span>}
                       {name}
+                      {p.injuryStatus && (
+                        <span className="text-xs px-1 py-0.5 rounded font-bold"
+                          style={{ background: 'rgba(239,68,68,0.18)', color: 'var(--red)' }}>
+                          INJURED
+                        </span>
+                      )}
                     </Link>
-                    {p.injuryStatus && (
-                      <span className="ml-1 text-xs" style={{ color: 'var(--red)' }}>IR</span>
-                    )}
                   </td>
                   {isLive
                     ? <>
