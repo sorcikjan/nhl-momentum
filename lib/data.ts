@@ -227,18 +227,30 @@ export async function fetchGames(date: string) {
     latestModelVersion(),
   ]);
   const gameIds = (games as { id: number }[]).map(g => g.id);
-  const [{ data: predictions }, { data: odds }] = await Promise.all([
+  const [{ data: allPredictions }, { data: odds }] = await Promise.all([
     supabaseAdmin
       .from('predictions')
       .select('*, prediction_outcomes(*)')
       .in('game_id', gameIds)
-      .eq('model_version', activeModel),
+      .order('created_at', { ascending: false }),
     supabaseAdmin
       .from('external_odds')
       .select('*')
       .in('game_id', gameIds)
       .order('fetched_at', { ascending: false }),
   ]);
+
+  // Deduplicate: one prediction per game, prefer active model over older versions
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const predByGame = new Map<number, any>();
+  for (const p of (allPredictions ?? [])) {
+    const existing = predByGame.get(p.game_id);
+    if (!existing || p.model_version === activeModel) {
+      predByGame.set(p.game_id, p);
+    }
+  }
+  const predictions = Array.from(predByGame.values());
+
   return { games, predictions, odds };
 }
 
@@ -528,7 +540,7 @@ export async function fetchMatch(id: string) {
 
   // All DB reads are now independent — run in parallel
   const [
-    { data: predictions },
+    { data: allPredictions },
     { data: snapshots },
     { data: playerStats },
     { data: goalieStats },
@@ -538,7 +550,6 @@ export async function fetchMatch(id: string) {
       .from('predictions')
       .select('*, prediction_outcomes(*)')
       .eq('game_id', id)
-      .eq('model_version', activeModel)
       .order('created_at', { ascending: false }),
     supabaseAdmin
       .from('game_team_snapshots')
@@ -559,6 +570,13 @@ export async function fetchMatch(id: string) {
       .eq('game_id', id)
       .order('fetched_at', { ascending: false }),
   ]);
+
+  // Sort: active model version first, fall back to most recent if active model has no prediction
+  const predictions = (allPredictions ?? []).sort((a, b) => {
+    if (a.model_version === activeModel && b.model_version !== activeModel) return -1;
+    if (b.model_version === activeModel && a.model_version !== activeModel) return 1;
+    return 0;
+  });
 
   return { game, liveData, predictions, snapshots, playerStats, goalieStats, externalOdds };
 }
