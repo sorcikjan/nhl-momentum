@@ -16,6 +16,11 @@ export default async function handler() {
   const log: string[] = [];
 
   try {
+    // 0. Backfill — retroactively generate predictions for the past 2 days
+    //    in case yesterday's pipeline failed or games were missed.
+    const backfill = await fetch(`${base}/api/ingest/predictions-backfill?days=2`, { headers }).then(r => r.json());
+    log.push(`backfill: ${backfill.data?.total_predictions ?? `error: ${backfill.error}`} predictions from past 2 days`);
+
     // 1. Outcomes
     const outcomes = await fetch(`${base}/api/ingest/daily?phase=outcomes`, { headers }).then(r => r.json());
     log.push(`outcomes: ${outcomes.data?.outcomes_recorded ?? `error: ${outcomes.error}`} recorded`);

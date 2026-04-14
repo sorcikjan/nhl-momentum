@@ -11,6 +11,10 @@ export default async function handler() {
   const log: string[] = [];
 
   try {
+    // Backfill any predictions missed in the past 3 days (catches cron failures)
+    const backfill = await fetch(`${base}/api/ingest/predictions-backfill?days=3`, { headers }).then(r => r.json());
+    log.push(`backfill: ${backfill.data?.total_predictions ?? `error: ${backfill.error}`} predictions`);
+
     // Today's games
     let snapOffset = 0, totalSnaps = 0, totalPreds = 0;
     for (;;) {
