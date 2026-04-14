@@ -14,24 +14,29 @@ export async function GET(req: NextRequest) {
   const authError = requireIngestAuth(req);
   if (authError) return authError;
 
+  const offset = Math.max(0, Number(req.nextUrl.searchParams.get('offset') ?? '0'));
+  const limit  = Math.min(200, Math.max(10, Number(req.nextUrl.searchParams.get('limit') ?? '200')));
+
   const log: string[] = [];
   let outcomesUpserted = 0;
   let gamesProcessed = 0;
 
-  // Fetch all completed games with final scores (whole season)
-  const { data: completedGames, error: gErr } = await supabaseAdmin
+  // Fetch completed games with final scores (paginated)
+  const { data: completedGames, error: gErr, count } = await supabaseAdmin
     .from('games')
-    .select('id, home_score, away_score')
+    .select('id, home_score, away_score', { count: 'exact' })
     .in('game_state', ['FINAL', 'OFF'])
     .not('home_score', 'is', null)
     .not('away_score', 'is', null)
-    .order('id', { ascending: false });
+    .order('id', { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (gErr) return NextResponse.json({ data: null, error: gErr.message }, { status: 500 });
 
-  log.push(`Found ${completedGames?.length ?? 0} completed games`);
+  const totalGames = count ?? 0;
+  log.push(`Processing games ${offset}–${offset + limit - 1} of ${totalGames} total`);
 
-  // Process in batches of 50 games to avoid timeouts
+  // Process in batches of 50 games to stay within timeout
   const games = completedGames ?? [];
   const BATCH = 50;
 
@@ -79,8 +84,16 @@ export async function GET(req: NextRequest) {
 
   log.push(`Upserted ${outcomesUpserted} outcome records across ${gamesProcessed} games`);
 
+  const hasMore = offset + limit < totalGames;
   return NextResponse.json({
-    data: { games_processed: gamesProcessed, outcomes_upserted: outcomesUpserted, log },
+    data: {
+      games_processed: gamesProcessed,
+      outcomes_upserted: outcomesUpserted,
+      total_games: totalGames,
+      has_more: hasMore,
+      next_offset: hasMore ? offset + limit : null,
+      log,
+    },
     error: null,
   });
 }
