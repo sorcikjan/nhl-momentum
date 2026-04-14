@@ -352,25 +352,56 @@ export async function fetchPlayer(id: string) {
 
 // ─── Accuracy ─────────────────────────────────────────────────────────────────
 
-export async function fetchAccuracy(modelVersion?: string) {
-  const VERSIONS_TO_FETCH = modelVersion
-    ? [modelVersion]
-    : ['v1.0', 'v1.1', 'v1.2', 'v1.3', 'v1.4', 'v1.5', 'v1.6', 'v1.7'];
+export async function fetchAccuracy() {
+  const VERSIONS = ['v1.0', 'v1.1', 'v1.2', 'v1.3', 'v1.4', 'v1.5', 'v1.6', 'v1.7'];
 
-  // Fetch model versions metadata + all predictions in a single query
-  const [{ data: accuracy, error: accErr }, { data: rawPredictions }] = await Promise.all([
+  // Three independent queries running in parallel:
+  // 1. Model version metadata
+  // 2. Total prediction counts per version (count-only — no row transfer, no limit issues)
+  // 3. All outcome records joined to model_version (outcomes table is far smaller than
+  //    predictions: ~1 row per completed game × 8 versions ≈ a few thousand rows max)
+  // 4. Recent predictions for the per-game comparison table (most recent 100 games × 8 versions)
+  const [
+    { data: modelVersionsMeta, error: mvErr },
+    predCounts,
+    { data: outcomeRows },
+    { data: recentPredRows },
+  ] = await Promise.all([
     supabaseAdmin
       .from('model_versions')
       .select('version, description, created_at, is_active'),
+
+    // Count total predictions per version without fetching rows
+    Promise.all(
+      VERSIONS.map(v =>
+        supabaseAdmin
+          .from('predictions')
+          .select('*', { count: 'exact', head: true })
+          .eq('model_version', v)
+          .then(({ count }) => ({ version: v, total: count ?? 0 }))
+      )
+    ),
+
+    // Fetch ALL outcome records with linked model_version — this is the authoritative
+    // source for resolved predictions. With ~1 outcome per game per version,
+    // limit 20000 covers 2500 completed games across all 8 versions with room to spare.
+    supabaseAdmin
+      .from('prediction_outcomes')
+      .select(`
+        correct_winner, home_score_error, away_score_error,
+        predictions!inner ( model_version )
+      `)
+      .limit(20000),
+
+    // Recent predictions for the comparison table — most recent 100 games only
     supabaseAdmin
       .from('predictions')
       .select(`
         id, game_id, model_version, predicted_home_score, predicted_away_score,
-        home_win_probability, away_win_probability, ot_probability,
-        home_energy_bar, away_energy_bar, created_at,
+        home_win_probability, away_win_probability, created_at,
         prediction_outcomes (
           actual_home_score, actual_away_score,
-          home_score_error, away_score_error, correct_winner, recorded_at
+          home_score_error, away_score_error, correct_winner
         ),
         games (
           game_date,
@@ -378,51 +409,45 @@ export async function fetchAccuracy(modelVersion?: string) {
           away_team:teams!games_away_team_id_fkey ( abbrev )
         )
       `)
-      .in('model_version', VERSIONS_TO_FETCH)
+      .in('model_version', VERSIONS)
       .order('created_at', { ascending: false })
-      .limit(4000),
+      .limit(800), // 100 games × 8 versions
   ]);
 
-  if (accErr) throw accErr;
+  if (mvErr) throw mvErr;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const predictions: any[] = rawPredictions ?? [];
-
-  const stats: Record<string, {
-    total: number; withOutcome: number; correctWinner: number;
-    totalHomeErr: number; totalAwayErr: number;
-  }> = {};
-
-  for (const p of predictions) {
-    const v = p.model_version;
-    if (!stats[v]) stats[v] = { total: 0, withOutcome: 0, correctWinner: 0, totalHomeErr: 0, totalAwayErr: 0 };
-    stats[v].total++;
+  // Build stats from outcome rows (accurate counts for the full season)
+  const outcomeStats: Record<string, { withOutcome: number; correctWinner: number; totalHomeErr: number; totalAwayErr: number }> = {};
+  for (const row of (outcomeRows ?? [])) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const outcome = (p.prediction_outcomes as any)?.[0];
-    if (outcome) {
-      stats[v].withOutcome++;
-      if (outcome.correct_winner) stats[v].correctWinner++;
-      stats[v].totalHomeErr += outcome.home_score_error ?? 0;
-      stats[v].totalAwayErr += outcome.away_score_error ?? 0;
-    }
+    const version = (row.predictions as any)?.model_version;
+    if (!version) continue;
+    if (!outcomeStats[version]) outcomeStats[version] = { withOutcome: 0, correctWinner: 0, totalHomeErr: 0, totalAwayErr: 0 };
+    outcomeStats[version].withOutcome++;
+    if (row.correct_winner) outcomeStats[version].correctWinner++;
+    outcomeStats[version].totalHomeErr += row.home_score_error ?? 0;
+    outcomeStats[version].totalAwayErr += row.away_score_error ?? 0;
   }
 
-  const modelStats = Object.entries(stats).map(([version, s]) => ({
-    version,
-    totalPredictions: s.total,
-    withOutcome: s.withOutcome,
-    winnerAccuracyPct: s.withOutcome > 0
-      ? Math.round((s.correctWinner / s.withOutcome) * 1000) / 10
-      : null,
-    avgHomeError: s.withOutcome > 0
-      ? Math.round((s.totalHomeErr / s.withOutcome) * 100) / 100
-      : null,
-    avgAwayError: s.withOutcome > 0
-      ? Math.round((s.totalAwayErr / s.withOutcome) * 100) / 100
-      : null,
-  }));
+  const modelStats = predCounts.map(({ version, total }) => {
+    const o = outcomeStats[version] ?? { withOutcome: 0, correctWinner: 0, totalHomeErr: 0, totalAwayErr: 0 };
+    return {
+      version,
+      totalPredictions: total,
+      withOutcome: o.withOutcome,
+      winnerAccuracyPct: o.withOutcome > 0
+        ? Math.round((o.correctWinner / o.withOutcome) * 1000) / 10
+        : null,
+      avgHomeError: o.withOutcome > 0
+        ? Math.round((o.totalHomeErr / o.withOutcome) * 100) / 100
+        : null,
+      avgAwayError: o.withOutcome > 0
+        ? Math.round((o.totalAwayErr / o.withOutcome) * 100) / 100
+        : null,
+    };
+  });
 
-  return { modelVersions: accuracy, predictions, modelStats };
+  return { modelVersions: modelVersionsMeta, predictions: recentPredRows ?? [], modelStats };
 }
 
 // ─── Team ─────────────────────────────────────────────────────────────────────
