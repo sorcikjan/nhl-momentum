@@ -160,28 +160,35 @@ export async function fetchRankings() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allSkaterIds = sortedSkaters.map((s: any) => s.player_id);
 
-  // Step 1: last game_id per player (top 1000 rows covers ~25 most recent games)
-  const { data: recentStats } = await supabaseAdmin
-    .from('game_player_stats')
-    .select('player_id, game_id')
-    .in('player_id', allSkaterIds)
-    .order('game_id', { ascending: false })
-    .limit(1000);
-
+  // Step 1: last game_id per player.
+  // Chunked into groups of 50 × limit 250 = safely under Supabase's 1000-row cap.
+  // Covers ~5 recent game-days per player — enough for any active player.
+  // Injured players who don't appear fall back to teamGids.length in step 3.
   const lastGameIdByPlayer = new Map<number, number>();
-  for (const row of recentStats ?? []) {
-    if (!lastGameIdByPlayer.has(row.player_id)) lastGameIdByPlayer.set(row.player_id, row.game_id);
+  const STAT_CHUNK = 50;
+  for (let ci = 0; ci < allSkaterIds.length; ci += STAT_CHUNK) {
+    const chunk = allSkaterIds.slice(ci, ci + STAT_CHUNK);
+    const { data: chunkStats } = await supabaseAdmin
+      .from('game_player_stats')
+      .select('player_id, game_id')
+      .in('player_id', chunk)
+      .order('game_id', { ascending: false })
+      .limit(chunk.length * 5);
+    for (const row of chunkStats ?? []) {
+      if (!lastGameIdByPlayer.has(row.player_id)) lastGameIdByPlayer.set(row.player_id, row.game_id);
+    }
   }
 
-  // Step 2: recent completed games for all teams (last ~45 days covers 15+ games per team)
+  // Step 2: recent completed games for all teams (last ~45 days covers 15+ games per team).
+  // NOTE: the games table PK is `id`, not `game_id`.
   const sinceDate = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
   const { data: recentTeamGames } = await supabaseAdmin
     .from('games')
     .select('id, game_date, home_team_id, away_team_id')
     .in('game_state', ['FINAL', 'OFF'])
     .gte('game_date', sinceDate)
-    .order('game_id', { ascending: false })
-    .limit(500);
+    .order('id', { ascending: false })
+    .limit(700);
 
   // Group games by team_id
   const teamGameIds = new Map<number, number[]>(); // team_id → sorted game_ids desc
