@@ -3,7 +3,7 @@ import { cache } from 'react';
 import type { Metadata } from 'next';
 import PlayerLeaderboard, { type LeaderboardConfig } from '@/components/dashboard/PlayerLeaderboard';
 import SpotlightGames from '@/components/dashboard/SpotlightGames';
-import { fetchRankings, fetchGames } from '@/lib/data';
+import { fetchRankings, fetchGames, fetchPipelineStatus } from '@/lib/data';
 
 export const revalidate = 60;
 
@@ -359,6 +359,67 @@ async function PlayerMetrics() {
   );
 }
 
+// ── Pipeline Status ───────────────────────────────────────────────────────────
+
+function relTime(ts: string | null): { label: string; status: 'ok' | 'warn' | 'stale' } {
+  if (!ts) return { label: 'never', status: 'stale' };
+  const mins = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+  const label =
+    mins < 1     ? 'just now'
+    : mins < 60  ? `${mins}m ago`
+    : mins < 1440 ? `${Math.floor(mins / 60)}h ago`
+    : `${Math.floor(mins / 1440)}d ago`;
+  const status = mins < 25 * 60 ? 'ok' : mins < 48 * 60 ? 'warn' : 'stale';
+  return { label, status };
+}
+
+async function PipelineStatus() {
+  const s = await fetchPipelineStatus();
+
+  const rows: { label: string; ts: string | null }[] = [
+    { label: 'Gamelogs',    ts: s.gamelogs    },
+    { label: 'Metrics',     ts: s.metrics     },
+    { label: 'Predictions', ts: s.predictions },
+    { label: 'Outcomes',    ts: s.outcomes    },
+    { label: 'Snapshots',   ts: s.snapshots   },
+  ];
+
+  const dotColor = { ok: '#22c55e', warn: '#f59e0b', stale: '#ef4444' };
+
+  return (
+    <details className="mb-6 rounded-lg border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <summary className="cursor-pointer select-none px-3 py-2 text-xs font-semibold flex items-center justify-between"
+        style={{ color: 'var(--text)', listStyle: 'none' }}>
+        <span style={{ color: 'var(--text-bright)' }}>Pipeline Status</span>
+        <span style={{ color: 'var(--text)', opacity: 0.5 }}>expand</span>
+      </summary>
+      <div className="px-3 pb-3 pt-1">
+        <table className="w-full text-xs" style={{ borderCollapse: 'collapse' }}>
+          <tbody>
+            {rows.map(({ label, ts }) => {
+              const { label: age, status } = relTime(ts);
+              return (
+                <tr key={label} style={{ borderTop: '1px solid var(--border)' }}>
+                  <td className="py-1.5 font-medium w-28" style={{ color: 'var(--text-bright)' }}>{label}</td>
+                  <td className="py-1.5" style={{ color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
+                    {ts ? new Date(ts).toISOString().replace('T', ' ').slice(0, 16) + ' UTC' : '—'}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    <span className="inline-flex items-center gap-1" style={{ color: dotColor[status] }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor[status], display: 'inline-block' }} />
+                      {age}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  );
+}
+
 // ── Skeletons ─────────────────────────────────────────────────────────────────
 
 function StatSkeleton() {
@@ -439,6 +500,11 @@ export default function DashboardPage() {
       {/* Stat bar */}
       <Suspense fallback={<StatSkeleton />}>
         <DashboardStats today={today} />
+      </Suspense>
+
+      {/* Pipeline status log */}
+      <Suspense fallback={null}>
+        <PipelineStatus />
       </Suspense>
 
       {/* Spotlight games */}

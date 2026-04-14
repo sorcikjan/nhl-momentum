@@ -612,3 +612,25 @@ export async function fetchMatch(id: string) {
 
   return { game, liveData, predictions, snapshots, playerStats, goalieStats, externalOdds };
 }
+
+// ─── Pipeline Status ──────────────────────────────────────────────────────────
+// Returns the most-recent timestamp for each pipeline stage — used on the
+// homepage to let you quickly spot stale or broken sync jobs.
+
+export async function fetchPipelineStatus() {
+  const [gamelogs, metrics, predictions, outcomes, snapshots] = await Promise.all([
+    supabaseAdmin.from('game_player_stats').select('recorded_at').order('recorded_at', { ascending: false }).limit(1).single(),
+    supabaseAdmin.from('player_metric_snapshots').select('calculated_at').order('calculated_at', { ascending: false }).limit(1).single(),
+    supabaseAdmin.from('predictions').select('created_at').order('created_at', { ascending: false }).limit(1).single(),
+    supabaseAdmin.from('prediction_outcomes').select('recorded_at').order('recorded_at', { ascending: false }).limit(1).single(),
+    supabaseAdmin.from('game_team_snapshots').select('captured_at').order('captured_at', { ascending: false }).limit(1).single(),
+  ]);
+
+  return {
+    gamelogs:    gamelogs.data?.recorded_at    ?? null,
+    metrics:     metrics.data?.calculated_at   ?? null,
+    predictions: predictions.data?.created_at  ?? null,
+    outcomes:    outcomes.data?.recorded_at    ?? null,
+    snapshots:   snapshots.data?.captured_at   ?? null,
+  };
+}
