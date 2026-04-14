@@ -31,102 +31,98 @@ export async function GET(req: NextRequest) {
   let goalieRows = 0;
   const errors: string[] = [];
 
-  for (const player of players ?? []) {
-    try {
-      const res = await fetch(
-        `https://api-web.nhle.com/v1/player/${player.id}/game-log/${season}/2`,
-        { cache: 'no-store' }
-      );
-      if (!res.ok) continue;
-      const json = await res.json();
-      const logs = json.gameLog ?? [];
+  // Fetch all players' game logs in parallel — previously sequential (50 calls × 300ms = 15s+)
+  // which exceeded Netlify's 10s function limit. Parallel fetches complete in ~500ms total.
+  const results = await Promise.allSettled(
+    (players ?? []).map(async player => {
+      const ac = new AbortController();
+      const timer = setTimeout(() => ac.abort(), 8000); // 8s per player
+      try {
+        const res = await fetch(
+          `https://api-web.nhle.com/v1/player/${player.id}/game-log/${season}/2`,
+          { cache: 'no-store', signal: ac.signal }
+        );
+        if (!res.ok) return { player, logs: [] };
+        const json = await res.json();
+        return { player, logs: json.gameLog ?? [] };
+      } finally {
+        clearTimeout(timer);
+      }
+    })
+  );
 
-      if (player.position_code === 'G') {
-        // Goalie stats
-        const rows = logs.map((g: {
-          gameId: number;
-          gameDate: string;
-          shotsAgainst: number;
-          goalsAgainst: number;
-          savePctg: number;
-          decision: string | null;
-          toi: string;
-        }) => ({
-          game_id:      g.gameId,
-          player_id:    player.id,
-          team_id:      player.team_id,
+  // Build DB rows from fetched logs
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const skaterBatch: any[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const goalieBatch: any[] = [];
+
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      errors.push(`fetch error: ${result.reason}`);
+      continue;
+    }
+    const { player, logs } = result.value;
+
+    if (player.position_code === 'G') {
+      for (const g of logs) {
+        goalieBatch.push({
+          game_id:       g.gameId,
+          player_id:     player.id,
+          team_id:       player.team_id,
           shots_against: g.shotsAgainst ?? 0,
           goals_against: g.goalsAgainst ?? 0,
           save_pct:      g.savePctg ?? 0,
           decision:      g.decision ?? null,
           toi_seconds:   toiToSeconds(g.toi),
-        }));
-
-        if (rows.length > 0) {
-          const { error } = await supabaseAdmin
-            .from('game_goalie_stats')
-            .upsert(rows, { onConflict: 'game_id,player_id' });
-          if (error) errors.push(`goalie ${player.id}: ${error.message}`);
-          else goalieRows += rows.length;
-        }
-      } else {
-        // Skater stats
-        const rows = logs.map((g: {
-          gameId: number;
-          gameDate: string;
-          goals: number;
-          assists: number;
-          plusMinus: number;
-          pim: number;
-          hits: number;
-          blockedShots: number;
-          shots: number;
-          toi: string;
-          powerPlayGoals: number;
-          powerPlayPoints: number;
-          powerPlayToi: string;
-          shorthandedGoals: number;
-          shorthandedPoints: number;
-          shorthandedToi: string;
-          gameWinningGoals: number;
-          otGoals: number;
-        }) => ({
-          game_id:             g.gameId,
-          player_id:           player.id,
-          team_id:             player.team_id,
-          goals:               g.goals              ?? 0,
-          assists:             g.assists             ?? 0,
-          plus_minus:          g.plusMinus           ?? 0,
-          pim:                 g.pim                 ?? 0,
-          hits:                g.hits                ?? 0,
-          blocked_shots:       g.blockedShots        ?? 0,
-          shots_on_goal:       g.shots               ?? 0,
-          toi_seconds:         toiToSeconds(g.toi),
-          pp_goals:            g.powerPlayGoals      ?? 0,
-          pp_points:           g.powerPlayPoints     ?? 0,
-          pp_toi_seconds:      toiToSeconds(g.powerPlayToi),
-          sh_goals:            g.shorthandedGoals    ?? 0,
-          sh_points:           g.shorthandedPoints   ?? 0,
-          sh_toi_seconds:      toiToSeconds(g.shorthandedToi),
-          game_winning_goals:  g.gameWinningGoals    ?? 0,
-          ot_goals:            g.otGoals             ?? 0,
-        }));
-
-        if (rows.length > 0) {
-          const { error } = await supabaseAdmin
-            .from('game_player_stats')
-            .upsert(rows, { onConflict: 'game_id,player_id' });
-          if (error) errors.push(`skater ${player.id}: ${error.message}`);
-          else skaterRows += rows.length;
-        }
+        });
       }
-    } catch (err) {
-      errors.push(`player ${player.id}: ${(err as Error).message}`);
+    } else {
+      for (const g of logs) {
+        skaterBatch.push({
+          game_id:            g.gameId,
+          player_id:          player.id,
+          team_id:            player.team_id,
+          goals:              g.goals             ?? 0,
+          assists:            g.assists            ?? 0,
+          plus_minus:         g.plusMinus          ?? 0,
+          pim:                g.pim                ?? 0,
+          hits:               g.hits               ?? 0,
+          blocked_shots:      g.blockedShots       ?? 0,
+          shots_on_goal:      g.shots              ?? 0,
+          toi_seconds:        toiToSeconds(g.toi),
+          pp_goals:           g.powerPlayGoals     ?? 0,
+          pp_points:          g.powerPlayPoints    ?? 0,
+          pp_toi_seconds:     toiToSeconds(g.powerPlayToi),
+          sh_goals:           g.shorthandedGoals   ?? 0,
+          sh_points:          g.shorthandedPoints  ?? 0,
+          sh_toi_seconds:     toiToSeconds(g.shorthandedToi),
+          game_winning_goals: g.gameWinningGoals   ?? 0,
+          ot_goals:           g.otGoals            ?? 0,
+        });
+      }
     }
   }
 
+  // Upsert in batches of 200 to stay within PostgREST limits
+  const BATCH = 200;
+  for (let i = 0; i < skaterBatch.length; i += BATCH) {
+    const { error } = await supabaseAdmin
+      .from('game_player_stats')
+      .upsert(skaterBatch.slice(i, i + BATCH), { onConflict: 'game_id,player_id' });
+    if (error) errors.push(`skater upsert batch ${i}: ${error.message}`);
+    else skaterRows += Math.min(BATCH, skaterBatch.length - i);
+  }
+  for (let i = 0; i < goalieBatch.length; i += BATCH) {
+    const { error } = await supabaseAdmin
+      .from('game_goalie_stats')
+      .upsert(goalieBatch.slice(i, i + BATCH), { onConflict: 'game_id,player_id' });
+    if (error) errors.push(`goalie upsert batch ${i}: ${error.message}`);
+    else goalieRows += Math.min(BATCH, goalieBatch.length - i);
+  }
+
   return NextResponse.json({
-    data: { skaterRows, goalieRows, errors },
+    data: { skaterRows, goalieRows, playersProcessed: (players ?? []).length, errors },
     error: errors.length > 0 ? `${errors.length} errors` : null,
   });
 }
