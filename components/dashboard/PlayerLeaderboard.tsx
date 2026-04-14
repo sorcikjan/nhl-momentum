@@ -8,11 +8,13 @@ import { daysAgo, deriveOutStatus } from '@/lib/player-status';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyPlayer = Record<string, any> & {
   player_id: number;
+  consecutive_games_missed?: number | null;
   players: {
     first_name: string;
     last_name: string;
     headshot_url: string | null;
     position_code: string;
+    injury_status?: string | null;
     teams: { abbrev: string };
   };
 };
