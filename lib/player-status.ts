@@ -8,14 +8,19 @@ export function daysAgo(dateStr: string): number {
  * Derives player out-status from absence data.
  * Returns 'injured' | 'out' | 'scratch' | null.
  *
- * Uses consecutive games missed as the primary signal:
- *   1 game missed     → scratch
- *   2–4 games missed  → out
- *   5+ games missed   → injured
+ * When game count is available, cross-checks with days to avoid false positives
+ * from pipeline lag, end-of-season schedule gaps, or single-game rest decisions.
+ * A badge only fires when BOTH signals agree the player is genuinely absent.
  *
- * Falls back to days when game count is unavailable:
- *   3–6 days   → scratch
- *   7–13 days  → out
+ *   Games missed + days absent:
+ *     < 3 days regardless            → null  (too recent to flag)
+ *     1–2 games + 3–5 days           → scratch
+ *     3–4 games + 3–9 days           → out
+ *     5+ games  + 3+ days            → injured
+ *
+ * Falls back to days only when game count is unavailable:
+ *   3–5 days   → scratch
+ *   6–13 days  → out
  *   14+ days   → injured
  */
 export function deriveOutStatus(
@@ -24,12 +29,16 @@ export function deriveOutStatus(
 ): 'injured' | 'out' | 'scratch' | null {
   if (consecutiveGamesMissed !== null) {
     if (consecutiveGamesMissed === 0) return null;
-    if (consecutiveGamesMissed === 1) return 'scratch';
-    if (consecutiveGamesMissed <= 4) return 'out';
-    return 'injured';
+    // Require the player to also be absent for 3+ days — prevents false
+    // positives from pipeline lag, single-game rest, or schedule gaps.
+    if (lastPlayedDaysAgo !== null && lastPlayedDaysAgo < 3) return null;
+    if (consecutiveGamesMissed >= 5) return 'injured';
+    if (consecutiveGamesMissed >= 3) return 'out';
+    return 'scratch'; // 1–2 games missed + 3+ days absent
   }
+  // Days-only fallback (no game count available)
   if (lastPlayedDaysAgo === null || lastPlayedDaysAgo < 3) return null;
-  if (lastPlayedDaysAgo <= 6) return 'scratch';
+  if (lastPlayedDaysAgo <= 5) return 'scratch';
   if (lastPlayedDaysAgo <= 13) return 'out';
   return 'injured';
 }
