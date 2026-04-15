@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { getGamesByDate } from '@/lib/nhl-api';
+import { getGamesByDate, getGameLanding, getGameRightRail } from '@/lib/nhl-api';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 import { calculatePlayerEnergy, GOALIE_DRAIN_PER_MIN, type GameRecord } from '@/lib/energy';
 import { MODEL_REGISTRY } from '@/lib/prediction-models';
@@ -120,6 +120,28 @@ export async function GET(req: NextRequest) {
     }
 
     log.push(`Outcomes recorded: ${outcomesRecorded} from ${completedGames.length} completed games`);
+
+    // Fetch three stars + team box score stats for completed games and persist them
+    let extrasUpdated = 0;
+    await Promise.all(completedGames.map(async g => {
+      try {
+        const [landing, rail] = await Promise.all([
+          getGameLanding(g.id).catch(() => null),
+          getGameRightRail(g.id).catch(() => null),
+        ]);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const threeStars = (landing as any)?.summary?.threeStars ?? null;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const teamGameStats = (rail as any)?.teamGameStats ?? null;
+        if (!threeStars && !teamGameStats) return;
+        const { error } = await supabaseAdmin
+          .from('games')
+          .update({ three_stars: threeStars, team_game_stats: teamGameStats })
+          .eq('id', g.id);
+        if (!error) extrasUpdated++;
+      } catch { /* non-fatal */ }
+    }));
+    if (extrasUpdated > 0) log.push(`Game extras (three stars + box score) updated: ${extrasUpdated}`);
     } // end phase 1
 
     // ── Phase 2: Capture team snapshots + predictions for today's games ────────

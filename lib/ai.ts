@@ -1,11 +1,15 @@
 // AI-generated insights using Gemini.
-// Results are cached via Next.js unstable_cache:
-//   - Player bio:        per player, 48h TTL (career/identity info changes rarely)
-//   - Player perf eval:  per player, 6h TTL (current form changes daily)
-//   - Nightly stories:   per date,   24h TTL
+//
+// Caching strategy:
+//   - Player bio + perf_eval: stored in Supabase `ai_player_insights` table
+//       bio refreshes every 48h, perf_eval every 6h
+//   - Nightly stories: Next.js unstable_cache, 24h TTL per date
+//
+// Using gemini-2.5-flash-lite — higher free-tier quota than gemini-2.5-flash.
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { unstable_cache } from 'next/cache';
+import { supabaseAdmin } from '@/lib/supabase';
 
 function getClient() {
   const key = process.env.GEMINI_API_KEY;
@@ -17,9 +21,9 @@ async function ask(prompt: string): Promise<string | null> {
   const client = getClient();
   if (!client) return null;
   try {
-    const model = client.getGenerativeModel({ model: 'gemini-2.5-flash' });
+    const model = client.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
     const result = await model.generateContent(prompt);
-    return result.response.text() ?? null;
+    return result.response.text()?.trim() ?? null;
   } catch {
     return null;
   }
@@ -30,15 +34,14 @@ async function ask(prompt: string): Promise<string | null> {
 export interface PlayerAIInput {
   name: string;
   team: string;
-  position: string;      // C / LW / RW / D / G
-  rank: number | null;   // global momentum rank
-  // Bio fields
+  position: string;
+  rank: number | null;
   birthCity: string | null;
   birthCountry: string | null;
   age: number | null;
   heightInches: number | null;
   weightPounds: number | null;
-  shootsCatches: string | null;  // 'L' | 'R'
+  shootsCatches: string | null;
   draftYear: number | null;
   draftRound: number | null;
   draftPick: number | null;
@@ -47,24 +50,21 @@ export interface PlayerAIInput {
   careerGoals: number;
   careerAssists: number;
   careerPlusMinus: number | null;
-  // Season stats
   seaGames: number;
   seaGoals: number;
   seaAssists: number;
   seaPoints: number;
   seaPpm: number;
-  seaShootPct: number;   // 0-1 fraction
+  seaShootPct: number;
   seaToiMin: number;
-  // Momentum (last 5 games)
   momGames: number;
   momGoals: number;
   momAssists: number;
   momPpm: number;
-  momShootPct: number;   // 0-1 fraction
+  momShootPct: number;
   momToiMin: number;
   energyBar: number;
   breakoutDelta: number;
-  // Last 5 game log
   recentGames: Array<{
     date: string;
     opponent: string;
@@ -76,19 +76,17 @@ export interface PlayerAIInput {
 }
 
 // ─── Player bio / character ───────────────────────────────────────────────────
-// Who is this player? Background, archetype, defining style of play.
 
-async function _generatePlayerBio(input: PlayerAIInput): Promise<string | null> {
+function buildBioPrompt(input: PlayerAIInput): string {
   const goalsPerGame = input.careerGames > 0 ? (input.careerGoals / input.careerGames).toFixed(2) : '—';
   const assistsPerGame = input.careerGames > 0 ? (input.careerAssists / input.careerGames).toFixed(2) : '—';
   const careerPoints = input.careerGoals + input.careerAssists;
   const heightFt = input.heightInches ? `${Math.floor(input.heightInches / 12)}′${input.heightInches % 12}″` : null;
-
   const draftLine = input.draftYear
     ? `Drafted ${input.draftYear}, Round ${input.draftRound}, Pick #${input.draftPick}${input.draftTeam ? ` by ${input.draftTeam}` : ''}`
     : 'Undrafted';
 
-  const prompt = `You are an NHL scout writing a player identity card for an analytics platform. Your job is to characterize who this player IS as a hockey player — their archetype, style, and role — based on the data.
+  return `You are an NHL scout writing a player identity card for an analytics platform. Characterize who this player IS as a hockey player — their archetype, style, and role — based on the data.
 
 Player: ${input.name} (${input.team}, ${input.position})
 ${input.age ? `Age: ${input.age}` : ''}${input.birthCity ? ` · From: ${input.birthCity}, ${input.birthCountry}` : ''}
@@ -99,21 +97,12 @@ ${draftLine}
 Career (${input.careerGames} GP): ${input.careerGoals}G ${input.careerAssists}A ${careerPoints}pts | ${goalsPerGame} G/game | ${assistsPerGame} A/game${input.careerPlusMinus != null ? ` | ${input.careerPlusMinus > 0 ? '+' : ''}${input.careerPlusMinus} +/-` : ''}
 Current season (${input.seaGames} GP): ${input.seaGoals}G ${input.seaAssists}A | ${input.seaToiMin.toFixed(1)} min/game
 
-Write 2–3 sentences describing who this player is. What type of player is he — a sniper, a playmaker, a two-way forward, a physical presence, a power play specialist, a shutdown defender? Let the goals/assists ratio, ice time, career production rate, and physical profile guide the characterization. Be direct and specific. No generic praise. Third person.`;
-
-  return ask(prompt);
+Write 2–3 sentences describing who this player is. What type of contributor — sniper, playmaker, two-way forward, physical presence, power play specialist, shutdown defender? Let the goals/assists ratio, ice time, and career rate guide the characterization. Direct and specific. No generic praise. Third person.`;
 }
 
-export const generatePlayerBio = unstable_cache(
-  _generatePlayerBio,
-  ['player-ai-bio-v2'],
-  { revalidate: 60 * 60 * 48 }, // 48 hours — career data changes rarely
-);
+// ─── Player performance eval ──────────────────────────────────────────────────
 
-// ─── Player performance evaluation ───────────────────────────────────────────
-// How is he playing RIGHT NOW vs who he typically is?
-
-async function _generatePlayerPerfEval(input: PlayerAIInput): Promise<string | null> {
+function buildPerfEvalPrompt(input: PlayerAIInput): string {
   const sign = (n: number) => n >= 0 ? `+${n}` : String(n);
   const ppmDeltaPct = input.seaPpm > 0
     ? ((input.momPpm - input.seaPpm) / input.seaPpm * 100).toFixed(0)
@@ -125,19 +114,13 @@ async function _generatePlayerPerfEval(input: PlayerAIInput): Promise<string | n
     `  ${g.date}: vs ${g.opponent} — ${g.goals}G ${g.assists}A (${sign(g.plusMinus)}), ${g.toiMin.toFixed(1)} min`
   ).join('\n');
 
-  // Derive a plain-language season context for the model
-  const careerPpm = input.careerGames > 0
-    ? ((input.careerGoals + input.careerAssists) / input.careerGames / (input.seaToiMin > 0 ? input.seaToiMin : 18) * 60).toFixed(4)
-    : null;
-
-  const prompt = `You are an NHL performance analyst. Your job is to evaluate a player's current form relative to their season baseline and their identity as a player.
+  return `You are an NHL performance analyst evaluating a player's current form vs their season baseline and identity.
 
 Player: ${input.name} (${input.team}, ${input.position})${input.rank ? ` · Global rank #${input.rank}` : ''}
 
 Season baseline (${input.seaGames} games): ${input.seaGoals}G ${input.seaAssists}A ${input.seaPoints}pts | PPM ${input.seaPpm.toFixed(4)} | Shot% ${(input.seaShootPct * 100).toFixed(1)}% | ${input.seaToiMin.toFixed(1)} min/game
-${careerPpm ? `Career PPM (est.): ~${careerPpm}` : ''}
 
-Last ${input.momGames} games (momentum window): ${input.momGoals}G ${input.momAssists}A | PPM ${input.momPpm.toFixed(4)}${ppmDeltaPct ? ` (${Number(ppmDeltaPct) >= 0 ? '+' : ''}${ppmDeltaPct}% vs season)` : ''} | Shot% ${(input.momShootPct * 100).toFixed(1)}% (${Number(shootDeltaPpt) >= 0 ? '+' : ''}${shootDeltaPpt}pp) | ${input.momToiMin.toFixed(1)} min/game (${Number(toiDelta) >= 0 ? '+' : ''}${toiDelta} vs season)
+Last ${input.momGames} games: ${input.momGoals}G ${input.momAssists}A | PPM ${input.momPpm.toFixed(4)}${ppmDeltaPct ? ` (${Number(ppmDeltaPct) >= 0 ? '+' : ''}${ppmDeltaPct}% vs season)` : ''} | Shot% ${(input.momShootPct * 100).toFixed(1)}% (${Number(shootDeltaPpt) >= 0 ? '+' : ''}${shootDeltaPpt}pp) | ${input.momToiMin.toFixed(1)} min/game (${Number(toiDelta) >= 0 ? '+' : ''}${toiDelta} vs season)
 
 Energy bar: ${input.energyBar}/100
 Breakout delta: ${sign(Number(input.breakoutDelta.toFixed(4)))} PPM
@@ -145,16 +128,64 @@ Breakout delta: ${sign(Number(input.breakoutDelta.toFixed(4)))} PPM
 Recent game log:
 ${gameLogLines || '  No recent games'}
 
-Evaluate this player's current form in 2–3 sentences. Answer: is he playing above or below his season baseline right now? Is this a surge, a slump, or consistency? Connect it to the type of player he is — if he's a scorer in a cold streak, say so; if an assist-first player is suddenly finishing, say so. Be direct, data-backed, no fluff. Third person.`;
-
-  return ask(prompt);
+Evaluate this player's current form in 2–3 sentences. Is he above or below his season baseline? Surge or slump? Connect it to the type of player he is — if a scorer is cold, say so; if a playmaker is suddenly finishing, say so. Direct, data-backed. Third person.`;
 }
 
-export const generatePlayerPerfEval = unstable_cache(
-  _generatePlayerPerfEval,
-  ['player-ai-perf-eval-v2'],
-  { revalidate: 60 * 60 * 6 }, // 6 hours
-);
+// ─── Supabase-cached player insights ─────────────────────────────────────────
+// Reads from ai_player_insights; generates + stores if stale or missing.
+
+export async function getPlayerInsights(
+  playerId: number,
+  input: PlayerAIInput,
+): Promise<{ bio: string | null; perfEval: string | null }> {
+  const BIO_TTL_H   = 48;
+  const PERF_TTL_H  = 6;
+
+  // Load existing row
+  const { data: row } = await supabaseAdmin
+    .from('ai_player_insights')
+    .select('bio, perf_eval, generated_at')
+    .eq('player_id', playerId)
+    .single();
+
+  const now = Date.now();
+  const ageH = row?.generated_at
+    ? (now - new Date(row.generated_at).getTime()) / 3_600_000
+    : Infinity;
+
+  const needsBio  = !row?.bio  || ageH > BIO_TTL_H;
+  const needsPerf = !row?.perf_eval || ageH > PERF_TTL_H;
+
+  if (!needsBio && !needsPerf) {
+    return { bio: row!.bio, perfEval: row!.perf_eval };
+  }
+
+  // Generate only what's stale — run in parallel if both needed
+  const [newBio, newPerf] = await Promise.all([
+    needsBio  ? ask(buildBioPrompt(input))      : Promise.resolve(null),
+    needsPerf ? ask(buildPerfEvalPrompt(input)) : Promise.resolve(null),
+  ]);
+
+  const upsertData = {
+    player_id:    playerId,
+    bio:          needsBio  ? (newBio  ?? row?.bio  ?? null) : row?.bio,
+    perf_eval:    needsPerf ? (newPerf ?? row?.perf_eval ?? null) : row?.perf_eval,
+    generated_at: new Date().toISOString(),
+  };
+
+  await supabaseAdmin
+    .from('ai_player_insights')
+    .upsert(upsertData, { onConflict: 'player_id' });
+
+  return {
+    bio:      upsertData.bio,
+    perfEval: upsertData.perf_eval,
+  };
+}
+
+// Keep old exports for backwards compat (used in page.tsx)
+export const generatePlayerBio = async (input: PlayerAIInput) => ask(buildBioPrompt(input));
+export const generatePlayerPerfEval = async (input: PlayerAIInput) => ask(buildPerfEvalPrompt(input));
 
 // ─── Nightly stories ──────────────────────────────────────────────────────────
 
@@ -210,6 +241,6 @@ Write 3–5 sentences covering the most compelling stories from last night. Lead
 
 export const generateNightlyStories = unstable_cache(
   _generateNightlyStories,
-  ['nightly-stories'],
+  ['nightly-stories-v2'],
   { revalidate: 60 * 60 * 24 },
 );

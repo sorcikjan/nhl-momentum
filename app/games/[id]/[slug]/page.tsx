@@ -57,6 +57,16 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const outcome    = prediction?.prediction_outcomes?.[0] ?? null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const threeStars: any[] = (game as any)?.three_stars ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const teamGameStats: any[] = (game as any)?.team_game_stats ?? [];
+
+  // Construct NHL.com gamecenter link
+  const nhlUrl = game?.id && gameDate
+    ? `https://www.nhl.com/gamecenter/${awayAbbrev.toLowerCase()}-vs-${homeAbbrev.toLowerCase()}/${gameDate.replaceAll('-', '/')}/${game.id}`
+    : null;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const homeSnap = (snapshots ?? []).find((s: any) => s.is_home);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const awaySnap = (snapshots ?? []).find((s: any) => !s.is_home);
@@ -297,6 +307,98 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           </div>
         );
       })()}
+
+      {/* Three Stars — only shown for completed games with data */}
+      {isFinal && threeStars.length > 0 && (
+        <div className="rounded-xl border p-4 mb-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>Three Stars</h2>
+            {nhlUrl && (
+              <a href={nhlUrl} target="_blank" rel="noopener noreferrer"
+                className="text-xs px-3 py-1 rounded-full font-medium hover:opacity-80 transition-opacity"
+                style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                Watch on NHL.com ↗
+              </a>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {threeStars.map((star) => (
+              <a key={star.star} href={star.playerId ? `/players/${star.playerId}` : '#'}
+                className="flex flex-col items-center gap-1.5 p-2 rounded-lg hover:opacity-80 transition-opacity"
+                style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                <span className="text-xs font-mono" style={{ color: 'var(--amber)' }}>#{star.star} Star</span>
+                {star.headshot && (
+                  <img src={star.headshot} alt={star.name?.default ?? ''} className="w-12 h-12 rounded-full object-cover" />
+                )}
+                <span className="text-xs font-semibold text-center leading-tight" style={{ color: 'var(--text-bright)' }}>
+                  {star.name?.default ?? ''}
+                </span>
+                <span className="text-xs" style={{ color: 'var(--text)' }}>
+                  {star.position === 'G'
+                    ? `${star.savePctg !== undefined ? (star.savePctg * 100).toFixed(1) + '% SV' : ''}`
+                    : `${star.points ?? 0}pts (${star.goals ?? 0}G ${star.assists ?? 0}A)`}
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Team Box Score — only shown for completed games with data */}
+      {isFinal && teamGameStats.length > 0 && (
+        <div className="rounded-xl border p-4 mb-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>Team Stats</h2>
+            <div className="flex items-center gap-4 text-xs font-semibold" style={{ color: 'var(--text)' }}>
+              <span style={{ color: 'var(--silver)' }}>{awayAbbrev}</span>
+              <span style={{ color: 'var(--neon)' }}>{homeAbbrev}</span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            {teamGameStats
+              .filter(s => ['sog', 'hits', 'faceoffWinningPctg', 'powerPlay', 'blockedShots', 'giveaways', 'takeaways'].includes(s.category))
+              .map((stat) => {
+                const label: Record<string, string> = {
+                  sog: 'Shots on Goal', hits: 'Hits', faceoffWinningPctg: 'Faceoff %',
+                  powerPlay: 'Power Play', blockedShots: 'Blocked Shots',
+                  giveaways: 'Giveaways', takeaways: 'Takeaways',
+                };
+                const awayVal = stat.category === 'faceoffWinningPctg'
+                  ? `${Math.round(stat.awayValue * 100)}%`
+                  : String(stat.awayValue);
+                const homeVal = stat.category === 'faceoffWinningPctg'
+                  ? `${Math.round(stat.homeValue * 100)}%`
+                  : String(stat.homeValue);
+                return (
+                  <div key={stat.category} className="flex items-center gap-3 text-xs">
+                    <span className="font-mono w-10 text-right" style={{ color: 'var(--silver)' }}>{awayVal}</span>
+                    <div className="flex-1 text-center" style={{ color: 'var(--text)' }}>{label[stat.category]}</div>
+                    <span className="font-mono w-10 text-left" style={{ color: 'var(--neon)' }}>{homeVal}</span>
+                  </div>
+                );
+              })}
+          </div>
+          {!nhlUrl && null}
+          {!threeStars.length && nhlUrl && (
+            <a href={nhlUrl} target="_blank" rel="noopener noreferrer"
+              className="mt-3 inline-block text-xs px-3 py-1 rounded-full font-medium hover:opacity-80 transition-opacity"
+              style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+              Watch on NHL.com ↗
+            </a>
+          )}
+        </div>
+      )}
+
+      {/* NHL.com link fallback — shown for final games with no stars/stats yet */}
+      {isFinal && threeStars.length === 0 && teamGameStats.length === 0 && nhlUrl && (
+        <div className="mb-4">
+          <a href={nhlUrl} target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-xs px-4 py-2 rounded-full font-medium hover:opacity-80 transition-opacity"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+            Watch highlights on NHL.com ↗
+          </a>
+        </div>
+      )}
 
       {/* Side-by-side lineups */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

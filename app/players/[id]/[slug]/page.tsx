@@ -3,7 +3,7 @@ import PlayerRadarChart from '@/components/players/RadarChart';
 import PPMTimeline from '@/components/players/PPMTimeline';
 import EnergyBar from '@/components/players/EnergyBar';
 import { fetchPlayer, fetchRankings, fetchLeagueAverages, daysAgo, deriveOutStatus } from '@/lib/data';
-import { generatePlayerBio, generatePlayerPerfEval } from '@/lib/ai';
+import { getPlayerInsights } from '@/lib/ai';
 import type { PlayerAIInput } from '@/lib/ai';
 import { teamUrl } from '@/lib/urls';
 import Link from 'next/link';
@@ -235,10 +235,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     }),
   };
 
-  const [aiBio, aiPerfEval] = await Promise.all([
-    generatePlayerBio(aiInput).catch(() => null),
-    generatePlayerPerfEval(aiInput).catch(() => null),
-  ]);
+  const { bio: aiBio, perfEval: aiPerfEval } = await getPlayerInsights(Number(id), aiInput).catch(() => ({ bio: null, perfEval: null }));
 
   return (
     <div className="max-w-5xl mx-auto pb-20 md:pb-0 space-y-4">
