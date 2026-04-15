@@ -33,7 +33,7 @@ const handler: BackgroundHandler = async (event) => {
   }
 
   const body = event.body ? JSON.parse(event.body) : {};
-  const phases: string[] = body.phases ?? ['backfill', 'outcomes', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy'];
+  const phases: string[] = body.phases ?? ['backfill', 'outcomes', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy', 'recap'];
   const dateParam: string = body.date ?? '';
   const dateSuffix = dateParam ? `&date=${dateParam}` : '';
 
@@ -152,6 +152,15 @@ const handler: BackgroundHandler = async (event) => {
       }
       log.push(`extras: ${updated} games updated, ${ytFound} YouTube highlights found`);
     } catch (e) { log.push(`extras: exception ${e}`); }
+  }
+
+  // 8. Daily recap article — generated after outcomes/gamelogs are fresh
+  if (phases.includes('recap')) {
+    try {
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const r = await call(`${base}/api/ingest/recap?date=${yesterday}`, h);
+      log.push(`recap: ${r.data?.skipped ? `skipped (${r.data.reason})` : r.data?.title ?? `err: ${r.error}`}`);
+    } catch (e) { log.push(`recap: exception ${e}`); }
   }
 
   console.log('[daily-worker] complete:', log.join(' | '));

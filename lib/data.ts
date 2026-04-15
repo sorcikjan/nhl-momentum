@@ -386,6 +386,107 @@ export async function fetchNightlyStoryData(date: string) {
   return { games, topPerformers: sorted };
 }
 
+// ─── Daily Recap Data ─────────────────────────────────────────────────────────
+
+export async function fetchRecapData(date: string) {
+  const modelVersion = await latestModelVersion();
+
+  const [{ data: games }, { data: predictions }] = await Promise.all([
+    supabaseAdmin
+      .from('games')
+      .select(`
+        id, game_date, home_score, away_score,
+        home_team:teams!games_home_team_id_fkey(abbrev, name),
+        away_team:teams!games_away_team_id_fkey(abbrev, name)
+      `)
+      .eq('game_date', date)
+      .in('game_state', ['FINAL', 'OFF']),
+    supabaseAdmin
+      .from('predictions')
+      .select('game_id, home_win_probability, predicted_home_score, predicted_away_score, prediction_outcomes(home_win)')
+      .eq('model_version', modelVersion),
+  ]);
+
+  if (!games?.length) return null;
+
+  const gameIds = games.map((g: { id: number }) => g.id);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const predMap = new Map<number, any>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const p of (predictions ?? []) as any[]) {
+    if (gameIds.includes(p.game_id)) predMap.set(p.game_id, p);
+  }
+
+  // Top skater performers enriched with momentum snapshot
+  const { data: stats } = await supabaseAdmin
+    .from('game_player_stats')
+    .select(`
+      player_id, game_id, goals, assists, plus_minus, toi_seconds, shots_on_goal,
+      players(first_name, last_name, position_code),
+      teams(abbrev)
+    `)
+    .in('game_id', gameIds)
+    .neq('players.position_code', 'G');
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const topPerformers = (stats as any[] ?? [])
+    .filter(s => s.players)
+    .sort((a, b) => (b.goals + b.assists) - (a.goals + a.assists))
+    .slice(0, 8);
+
+  // Momentum context for top performers
+  const topIds = topPerformers.map((p: { player_id: number }) => p.player_id);
+  const { data: snapshots } = topIds.length ? await supabaseAdmin
+    .from('player_metric_snapshots')
+    .select('player_id, momentum_ppm, season_ppm, momentum_rank')
+    .in('player_id', topIds)
+    .order('calculated_at', { ascending: false })
+    .limit(topIds.length * 2) : { data: [] };
+
+  const snapMap = new Map<number, { momentum_ppm: number; season_ppm: number; momentum_rank: number }>();
+  for (const s of snapshots ?? []) {
+    if (!snapMap.has(s.player_id)) snapMap.set(s.player_id, s);
+  }
+
+  // Goalie shutouts
+  const { data: goalieStats } = await supabaseAdmin
+    .from('game_goalie_stats')
+    .select(`player_id, game_id, goals_against, saves: shots_against, toi_seconds, decision, players(first_name, last_name), teams(abbrev)`)
+    .in('game_id', gameIds)
+    .eq('goals_against', 0)
+    .gt('toi_seconds', 3000); // at least 50 min — full game
+
+  return {
+    games,
+    predMap,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    topPerformers: topPerformers.map((p: any) => ({
+      ...p,
+      snapshot: snapMap.get(p.player_id) ?? null,
+    })),
+    shutouts: goalieStats ?? [],
+  };
+}
+
+export async function fetchRecentRecaps(limit = 30) {
+  const { data } = await supabaseAdmin
+    .from('daily_recaps')
+    .select('date, title, summary, games_count, generated_at')
+    .order('date', { ascending: false })
+    .limit(limit);
+  return data ?? [];
+}
+
+export async function fetchRecap(date: string) {
+  const { data } = await supabaseAdmin
+    .from('daily_recaps')
+    .select('*')
+    .eq('date', date)
+    .single();
+  return data ?? null;
+}
+
 // ─── Accuracy ─────────────────────────────────────────────────────────────────
 
 export async function fetchAccuracy() {

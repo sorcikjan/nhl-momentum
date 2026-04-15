@@ -244,3 +244,113 @@ export const generateNightlyStories = unstable_cache(
   ['nightly-stories-v2'],
   { revalidate: 60 * 60 * 24 },
 );
+
+// ─── Daily recap article ──────────────────────────────────────────────────────
+
+export interface RecapGame {
+  awayTeam: string;
+  homeTeam: string;
+  awayScore: number;
+  homeScore: number;
+  predictedCorrectly: boolean | null;
+  homeWinProbability: number | null;
+}
+
+export interface RecapPerformer {
+  name: string;
+  team: string;
+  position: string;
+  goals: number;
+  assists: number;
+  plusMinus: number;
+  toiMin: number;
+  momentumPpm: number | null;
+  seasonPpm: number | null;
+  momentumRank: number | null;
+}
+
+export interface RecapShutout {
+  name: string;
+  team: string;
+  saves: number;
+}
+
+export interface DailyRecapInput {
+  date: string;        // YYYY-MM-DD
+  dateLabel: string;   // e.g. "Tuesday, April 15, 2026"
+  games: RecapGame[];
+  topPerformers: RecapPerformer[];
+  shutouts: RecapShutout[];
+}
+
+export interface DailyRecapOutput {
+  title: string;
+  summary: string;
+  content: string;
+}
+
+export async function generateDailyRecap(input: DailyRecapInput): Promise<DailyRecapOutput | null> {
+  const sign = (n: number) => n >= 0 ? `+${n}` : String(n);
+
+  const gameLines = input.games.map(g => {
+    const winner = g.awayScore > g.homeScore ? g.awayTeam : g.homeTeam;
+    const pred = g.predictedCorrectly === true ? '✓ (predicted)' : g.predictedCorrectly === false ? '✗ (upset)' : '';
+    return `  ${g.awayTeam} ${g.awayScore} @ ${g.homeTeam} ${g.homeScore}${pred ? ' — ' + pred : ''}${g.homeWinProbability != null ? ` [model gave ${winner} ${g.awayScore > g.homeScore ? (100 - g.homeWinProbability * 100).toFixed(0) : (g.homeWinProbability * 100).toFixed(0)}% win probability]` : ''}`;
+  }).join('\n');
+
+  const performerLines = input.topPerformers.slice(0, 8).map(p => {
+    const pts = p.goals + p.assists;
+    const momContext = p.momentumPpm && p.seasonPpm && p.seasonPpm > 0
+      ? ` [momentum PPM ${p.momentumPpm.toFixed(4)}, ${((p.momentumPpm - p.seasonPpm) / p.seasonPpm * 100).toFixed(0)}% ${p.momentumPpm > p.seasonPpm ? 'above' : 'below'} season avg]`
+      : '';
+    return `  ${p.name} (${p.team}, ${p.position}): ${p.goals}G ${p.assists}A = ${pts}pts, ${sign(p.plusMinus)}, ${p.toiMin.toFixed(1)} min${momContext}`;
+  }).join('\n');
+
+  const shutoutLines = input.shutouts.length
+    ? '\nShutouts:\n' + input.shutouts.map(s => `  ${s.name} (${s.team}): ${s.saves} saves`).join('\n')
+    : '';
+
+  const modelAccuracy = input.games.filter(g => g.predictedCorrectly !== null);
+  const correct = modelAccuracy.filter(g => g.predictedCorrectly === true).length;
+  const modelLine = modelAccuracy.length > 0
+    ? `\nModel accuracy last night: ${correct}/${modelAccuracy.length} games predicted correctly`
+    : '';
+
+  const prompt = `You are a sports writer for NHL Momentum, a hockey analytics platform known for data-driven insights. Write a daily NHL recap article for ${input.dateLabel}.
+
+${input.games.length} games played:
+${gameLines}
+${shutoutLines}
+${modelLine}
+
+Top performers:
+${performerLines}
+
+Write a compelling, SEO-friendly recap article. The unique angle of NHL Momentum is momentum analytics — highlight when performers were already showing hot momentum data before the game, or call out any upsets where the model was wrong.
+
+Respond with valid JSON (no markdown, no code blocks):
+{
+  "title": "NHL Recap [${input.dateLabel}]: [compelling headline mentioning top story, key player or upset — max 70 chars]",
+  "summary": "One or two sentences for SEO meta description. Include date, key players, teams. Max 160 chars.",
+  "content": "Full article with 4-6 paragraphs separated by \\n\\n. Open with the biggest story. Cover key games and standout performances with specific numbers. Include a 'Momentum Watch' paragraph noting players whose analytics data flagged before the game. Close with a forward-looking line about upcoming games. Analytical but accessible tone. No clichés."
+}`;
+
+  const raw = await ask(prompt);
+  if (!raw) return null;
+
+  try {
+    // Strip any accidental markdown code fences
+    const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    const parsed = JSON.parse(cleaned) as DailyRecapOutput;
+    if (!parsed.title || !parsed.content) return null;
+    return parsed;
+  } catch {
+    // Fallback: treat whole response as content
+    const lines = raw.trim().split('\n');
+    return {
+      title: lines[0]?.replace(/^#+\s*/, '').slice(0, 100) ?? `NHL Recap — ${input.dateLabel}`,
+      summary: lines[1]?.slice(0, 160) ?? '',
+      content: raw,
+    };
+  }
+}

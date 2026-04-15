@@ -8,6 +8,7 @@ const NAV = [
   { href: '/games',      label: 'Games',       icon: '🏒' },
   { href: '/rankings',   label: 'Rankings',    icon: '⚡' },
   { href: '/teams',      label: 'Teams',       icon: '🛡' },
+  { href: '/recaps',     label: 'Recaps',      icon: '📰' },
   { href: '/accuracy',   label: 'Accuracy',    icon: '🎯' },
   { href: '/search',     label: 'Search',      icon: '🔍' },
 ];
