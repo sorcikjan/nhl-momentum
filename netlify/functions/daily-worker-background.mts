@@ -137,6 +137,23 @@ const handler: BackgroundHandler = async (event) => {
     } catch (e) { log.push(`energy: exception ${e}`); }
   }
 
+  // 7. Game extras — three stars, team box score, YouTube highlights for recent completed games
+  if (phases.includes('extras')) {
+    try {
+      let offset = 0, updated = 0, ytFound = 0;
+      for (;;) {
+        const r = await call(`${base}/api/ingest/game-extras?days=7&offset=${offset}&limit=20`, h);
+        if (r.error && !r.data) { log.push(`extras err: ${r.error}`); break; }
+        updated += r.data?.updated ?? 0;
+        ytFound += r.data?.youtubeFound ?? 0;
+        if ((r.data?.processed ?? 0) < 20) break;
+        offset += 20;
+        if (offset > 200) break;
+      }
+      log.push(`extras: ${updated} games updated, ${ytFound} YouTube highlights found`);
+    } catch (e) { log.push(`extras: exception ${e}`); }
+  }
+
   console.log('[daily-worker] complete:', log.join(' | '));
 };
 

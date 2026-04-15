@@ -60,6 +60,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const threeStars: any[] = (game as any)?.three_stars ?? [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const teamGameStats: any[] = (game as any)?.team_game_stats ?? [];
+  const youtubeId: string | null = (game as any)?.youtube_highlight_id ?? null;
 
   // Construct NHL.com gamecenter link
   const nhlUrl = game?.id && gameDate
@@ -126,6 +127,20 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           </Link>
         </div>
       </div>
+
+      {/* YouTube highlight embed — shown for completed games once NHL posts the video */}
+      {isFinal && youtubeId && (
+        <div className="rounded-xl overflow-hidden mb-4" style={{ aspectRatio: '16/9' }}>
+          <iframe
+            width="100%" height="100%"
+            src={`https://www.youtube.com/embed/${youtubeId}?rel=0&modestbranding=1`}
+            title={`${awayAbbrev} vs ${homeAbbrev} Highlights`}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+            style={{ display: 'block' }}
+          />
+        </div>
+      )}
 
       {/* Prediction breakdown */}
       {prediction && (
@@ -312,7 +327,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         <div className="rounded-xl border p-4 mb-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>Three Stars</h2>
-            {nhlUrl && (
+            {nhlUrl && !youtubeId && (
               <a href={nhlUrl} target="_blank" rel="noopener noreferrer"
                 className="text-xs px-3 py-1 rounded-full font-medium hover:opacity-80 transition-opacity"
                 style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
