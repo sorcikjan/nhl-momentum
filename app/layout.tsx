@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import Script from 'next/script';
 import './globals.css';
 import Sidebar from '@/components/layout/Sidebar';
 
@@ -33,6 +34,15 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <Script async src="https://www.googletagmanager.com/gtag/js?id=G-Z7EWZE1NGP" strategy="afterInteractive" />
+        <Script id="gtag-init" strategy="afterInteractive">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-Z7EWZE1NGP');
+        `}</Script>
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}>
         <div className="flex min-h-screen">
           <Sidebar />
