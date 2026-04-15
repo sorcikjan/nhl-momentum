@@ -31,20 +31,29 @@ export async function GET(req: NextRequest) {
   let goalieRows = 0;
   const errors: string[] = [];
 
-  // Fetch all players' game logs in parallel — previously sequential (50 calls × 300ms = 15s+)
-  // which exceeded Netlify's 10s function limit. Parallel fetches complete in ~500ms total.
+  // Fetch regular season (type 2) AND playoff (type 3) game logs in parallel per player.
+  // Before playoffs: type 3 returns empty — no overhead. After playoffs start: both are populated.
+  // Deduplication by gameId ensures no double-counting if a game ID ever appears in both.
   const results = await Promise.allSettled(
     (players ?? []).map(async player => {
       const ac = new AbortController();
       const timer = setTimeout(() => ac.abort(), 8000); // 8s per player
       try {
-        const res = await fetch(
-          `https://api-web.nhle.com/v1/player/${player.id}/game-log/${season}/2`,
-          { cache: 'no-store', signal: ac.signal }
-        );
-        if (!res.ok) return { player, logs: [] };
-        const json = await res.json();
-        return { player, logs: json.gameLog ?? [] };
+        const [regRes, playoffRes] = await Promise.all([
+          fetch(`https://api-web.nhle.com/v1/player/${player.id}/game-log/${season}/2`, { cache: 'no-store', signal: ac.signal }),
+          fetch(`https://api-web.nhle.com/v1/player/${player.id}/game-log/${season}/3`, { cache: 'no-store', signal: ac.signal }),
+        ]);
+        const regJson     = regRes.ok     ? await regRes.json()     : { gameLog: [] };
+        const playoffJson = playoffRes.ok ? await playoffRes.json() : { gameLog: [] };
+
+        // Merge regular season + playoff logs, dedup by gameId
+        const seen = new Set<number>();
+        const logs = [...(regJson.gameLog ?? []), ...(playoffJson.gameLog ?? [])].filter(g => {
+          if (seen.has(g.gameId)) return false;
+          seen.add(g.gameId);
+          return true;
+        });
+        return { player, logs };
       } finally {
         clearTimeout(timer);
       }
