@@ -3,25 +3,22 @@
 //   - Player summaries: per player_id, 6-hour TTL
 //   - Nightly stories: per date, 24-hour TTL
 
-import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { unstable_cache } from 'next/cache';
 
 function getClient() {
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
-  return new Anthropic({ apiKey: key });
+  return new GoogleGenerativeAI(key);
 }
 
 async function ask(prompt: string): Promise<string | null> {
   const client = getClient();
   if (!client) return null;
   try {
-    const msg = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 400,
-      messages: [{ role: 'user', content: prompt }],
-    });
-    return (msg.content[0] as { type: string; text: string }).text ?? null;
+    const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const result = await model.generateContent(prompt);
+    return result.response.text() ?? null;
   } catch {
     return null;
   }
