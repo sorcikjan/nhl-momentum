@@ -87,17 +87,11 @@ export default function GameCard({
   // Pre-compute market implied probs
   let mktHp: number | null = null;
   let mktAp: number | null = null;
-  let mktOp: number | null = null;
-  let delta: number | null = null;
 
   if (bestOdds?.home_odds && bestOdds?.away_odds) {
     const prob = decimalToNormProb(bestOdds.home_odds, bestOdds.away_odds, bestOdds.draw_odds);
     mktHp = Math.round(prob.home * 100);
     mktAp = Math.round(prob.away * 100);
-    mktOp = prob.draw ? Math.round(prob.draw * 100) : 0;
-    if (prediction) {
-      delta = mktHp - Math.round(prediction.home_win_probability * 100);
-    }
   }
 
   const showMarket = bestOdds && mktHp !== null && mktAp !== null && !isFinal;
@@ -161,52 +155,20 @@ export default function GameCard({
         />
       )}
 
-      {/* Model vs Market — who wins, side by side */}
-      {showMarket && bestOdds && mktHp !== null && mktAp !== null && prediction && (() => {
-        const modelH = Math.round(prediction.home_win_probability * 100);
-        const modelA = Math.round(prediction.away_win_probability * 100);
-        const modelFav = modelH >= modelA ? game.homeTeam.abbrev : game.awayTeam.abbrev;
-        const modelFavPct = Math.max(modelH, modelA);
-        const mktFav = mktHp >= mktAp ? game.homeTeam.abbrev : game.awayTeam.abbrev;
-        const mktFavPct = Math.max(mktHp, mktAp);
-        const agree = modelFav === mktFav;
-
-        return (
-          <div className="pt-2 border-t" style={{ borderColor: 'var(--border)' }}>
-            <div className="grid grid-cols-2 gap-2">
-              {/* Momentum pick */}
-              <div className="rounded-lg p-2.5 text-center"
-                style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                <div className="text-xs mb-1" style={{ color: 'var(--text)' }}>Momentum</div>
-                <div className="text-base font-bold" style={{ color: 'var(--neon)' }}>{modelFav} wins</div>
-                <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text)' }}>{modelFavPct}% confidence</div>
-              </div>
-
-              {/* Pinnacle pick */}
-              <div className="rounded-lg p-2.5 text-center"
-                style={{ background: 'var(--bg)', border: `1px solid ${agree ? 'var(--border)' : 'rgba(239,68,68,0.3)'}` }}>
-                <div className="text-xs mb-1 flex items-center justify-center gap-1">
-                  <span style={{ color: 'var(--amber)' }}>◆</span>
-                  <span style={{ color: 'var(--text)' }}>{formatBookmaker(bestOdds.bookmaker)}</span>
-                </div>
-                <div className="text-base font-bold"
-                  style={{ color: agree ? 'var(--neon)' : 'var(--red)' }}>
-                  {mktFav} wins
-                </div>
-                <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text)' }}>{mktFavPct}% implied</div>
-              </div>
-            </div>
-
-            {/* Agreement / disagreement */}
-            <div className="text-xs text-center mt-2 font-semibold"
-              style={{ color: agree ? 'var(--green)' : 'var(--red)' }}>
-              {agree
-                ? `✓ Both pick ${modelFav}`
-                : `✗ Split — Momentum: ${modelFav} · Market: ${mktFav}`}
-            </div>
-          </div>
-        );
-      })()}
+      {/* Market odds — FYI footnote, not a competing prediction */}
+      {showMarket && bestOdds && mktHp !== null && mktAp !== null && (
+        <div className="flex items-center justify-between pt-2 border-t text-xs"
+          style={{ borderColor: 'var(--border)' }}>
+          <span style={{ color: 'var(--text)', opacity: 0.6 }}>
+            {formatBookmaker(bestOdds.bookmaker)} odds
+          </span>
+          <span className="font-mono" style={{ color: 'var(--text)' }}>
+            {game.awayTeam.abbrev} {bestOdds.away_odds?.toFixed(2)}
+            <span style={{ opacity: 0.4 }}> · </span>
+            {game.homeTeam.abbrev} {bestOdds.home_odds?.toFixed(2)}
+          </span>
+        </div>
+      )}
 
       {/* Outcome badge */}
       {isFinal && outcome && (

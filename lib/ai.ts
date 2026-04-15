@@ -106,7 +106,7 @@ Write 2–3 sentences describing who this player is. What type of player is he �
 
 export const generatePlayerBio = unstable_cache(
   _generatePlayerBio,
-  ['player-ai-bio'],
+  ['player-ai-bio-v2'],
   { revalidate: 60 * 60 * 48 }, // 48 hours — career data changes rarely
 );
 
@@ -152,7 +152,7 @@ Evaluate this player's current form in 2–3 sentences. Answer: is he playing ab
 
 export const generatePlayerPerfEval = unstable_cache(
   _generatePlayerPerfEval,
-  ['player-ai-perf-eval'],
+  ['player-ai-perf-eval-v2'],
   { revalidate: 60 * 60 * 6 }, // 6 hours
 );
 
