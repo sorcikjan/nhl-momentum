@@ -282,22 +282,21 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                     const op = decimalToNormProb(o.home_odds, o.away_odds, o.draw_odds);
                     const oH = Math.round(op.home * 100);
                     const oA = Math.round(op.away * 100);
-                    return (
-                  <div key={o.id} className="rounded-lg p-2.5 flex flex-col gap-1 cursor-default"
-                    style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
-                    title={`${awayAbbrev} ${o.away_odds.toFixed(2)}${o.draw_odds ? ` · OT ${o.draw_odds.toFixed(2)}` : ''} · ${homeAbbrev} ${o.home_odds.toFixed(2)}`}
-                  >
-                    <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>
-                      {formatBookmaker(o.bookmaker)}
-                    </span>
-                    <div className="flex justify-between text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.8 }}>
-                      <span>{awayAbbrev} {oA}%</span>
-                      <span>{homeAbbrev} {oH}%</span>
+                  return (
+                    <div key={o.id} className="rounded-lg p-2.5 flex flex-col gap-1 cursor-default"
+                      style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
+                      title={`${awayAbbrev} ${o.away_odds.toFixed(2)}${o.draw_odds ? ` · OT ${o.draw_odds.toFixed(2)}` : ''} · ${homeAbbrev} ${o.home_odds.toFixed(2)}`}
+                    >
+                      <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>
+                        {formatBookmaker(o.bookmaker)}
+                      </span>
+                      <div className="flex justify-between text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.8 }}>
+                        <span>{awayAbbrev} {oA}%</span>
+                        <span>{homeAbbrev} {oH}%</span>
+                      </div>
                     </div>
-                  </div>
-                    );
-                  }
-                ))}
+                  );
+                })}
               </div>
             )}
 
