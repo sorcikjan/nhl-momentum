@@ -243,8 +243,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                     </span>
                   )}
                 </span>
-                <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.7 }}>
-                  implied win %
+                <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.5 }}>
+                  hover for odds
                 </span>
               </div>
               <div className="flex items-center gap-2 mb-1.5">
@@ -254,17 +254,13 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                 </div>
                 <img src={homeLogo} alt={homeAbbrev} className="w-5 h-5 object-contain flex-shrink-0" />
               </div>
-              <div className="flex justify-between text-xs font-mono">
+              <div
+                className="flex justify-between text-xs font-mono cursor-default"
+                title={`${awayAbbrev} ${pinnacle.away_odds.toFixed(2)}${pinnacle.draw_odds ? ` · OT ${pinnacle.draw_odds.toFixed(2)}` : ''} · ${homeAbbrev} ${pinnacle.home_odds.toFixed(2)}`}
+              >
                 <span style={{ color: 'var(--text)' }}>{awayAbbrev} {pinA}%</span>
                 {pinOT > 0 && <span style={{ color: 'var(--text)', opacity: 0.5 }}>OT {pinOT}%</span>}
                 <span style={{ color: 'var(--text)' }}>{homeAbbrev} {pinH}%</span>
-              </div>
-              {/* Decimal odds */}
-              <div className="flex justify-between text-xs font-mono mt-2 pt-2 border-t"
-                style={{ borderColor: 'var(--border)', color: 'var(--text)', opacity: 0.6 }}>
-                <span>{pinnacle.away_odds.toFixed(2)}</span>
-                {pinnacle.draw_odds && <span>{pinnacle.draw_odds.toFixed(2)}</span>}
-                <span>{pinnacle.home_odds.toFixed(2)}</span>
               </div>
             </div>
 
@@ -272,24 +268,31 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
             {otherBooks.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                {otherBooks.map((o: any) => (
-                  <div key={o.id} className="rounded-lg p-2.5 flex flex-col gap-1"
-                    style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                {otherBooks.map((o: any) => {
+                    const op = decimalToNormProb(o.home_odds, o.away_odds, o.draw_odds);
+                    const oH = Math.round(op.home * 100);
+                    const oA = Math.round(op.away * 100);
+                    return (
+                  <div key={o.id} className="rounded-lg p-2.5 flex flex-col gap-1 cursor-default"
+                    style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
+                    title={`${awayAbbrev} ${o.away_odds.toFixed(2)}${o.draw_odds ? ` · OT ${o.draw_odds.toFixed(2)}` : ''} · ${homeAbbrev} ${o.home_odds.toFixed(2)}`}
+                  >
                     <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>
                       {formatBookmaker(o.bookmaker)}
                     </span>
                     <div className="flex justify-between text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.8 }}>
-                      <span>{o.away_odds.toFixed(2)}</span>
-                      {o.draw_odds ? <span style={{ opacity: 0.6 }}>{o.draw_odds.toFixed(2)}</span> : <span />}
-                      <span>{o.home_odds.toFixed(2)}</span>
+                      <span>{awayAbbrev} {oA}%</span>
+                      <span>{homeAbbrev} {oH}%</span>
                     </div>
                   </div>
+                    );
+                  }
                 ))}
               </div>
             )}
 
             <p className="text-xs mt-3" style={{ color: 'var(--text)', opacity: 0.4 }}>
-              Implied % removes bookmaker margin
+              Win % removes bookmaker margin · hover for decimal odds
             </p>
           </div>
         );

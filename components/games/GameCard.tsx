@@ -160,12 +160,16 @@ export default function GameCard({
         <div className="flex items-center justify-between pt-2 border-t text-xs"
           style={{ borderColor: 'var(--border)' }}>
           <span style={{ color: 'var(--text)', opacity: 0.6 }}>
-            {formatBookmaker(bestOdds.bookmaker)} odds
+            {formatBookmaker(bestOdds.bookmaker)}
           </span>
-          <span className="font-mono" style={{ color: 'var(--text)' }}>
-            {game.awayTeam.abbrev} {bestOdds.away_odds?.toFixed(2)}
+          <span
+            className="font-mono cursor-default"
+            style={{ color: 'var(--text)' }}
+            title={`${game.awayTeam.abbrev} ${bestOdds.away_odds?.toFixed(2)} · ${game.homeTeam.abbrev} ${bestOdds.home_odds?.toFixed(2)}`}
+          >
+            {game.awayTeam.abbrev} {mktAp}%
             <span style={{ opacity: 0.4 }}> · </span>
-            {game.homeTeam.abbrev} {bestOdds.home_odds?.toFixed(2)}
+            {game.homeTeam.abbrev} {mktHp}%
           </span>
         </div>
       )}
