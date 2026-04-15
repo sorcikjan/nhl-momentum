@@ -268,9 +268,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                 className="flex justify-between text-xs font-mono cursor-default"
                 title={`${awayAbbrev} ${pinnacle.away_odds.toFixed(2)}${pinnacle.draw_odds ? ` · OT ${pinnacle.draw_odds.toFixed(2)}` : ''} · ${homeAbbrev} ${pinnacle.home_odds.toFixed(2)}`}
               >
-                <span style={{ color: 'var(--text)' }}>{awayAbbrev} {pinA}%</span>
+                <span style={{ color: pinA >= pinH ? 'var(--neon)' : 'var(--text)', opacity: pinA >= pinH ? 1 : 0.4, fontWeight: pinA >= pinH ? 600 : 400 }}>{awayAbbrev} {pinA}%</span>
                 {pinOT > 0 && <span style={{ color: 'var(--text)', opacity: 0.5 }}>OT {pinOT}%</span>}
-                <span style={{ color: 'var(--text)' }}>{homeAbbrev} {pinH}%</span>
+                <span style={{ color: pinH > pinA ? 'var(--neon)' : 'var(--text)', opacity: pinH > pinA ? 1 : 0.4, fontWeight: pinH > pinA ? 600 : 400 }}>{homeAbbrev} {pinH}%</span>
               </div>
             </div>
 
@@ -290,9 +290,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                       <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>
                         {formatBookmaker(o.bookmaker)}
                       </span>
-                      <div className="flex justify-between text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.8 }}>
-                        <span>{awayAbbrev} {oA}%</span>
-                        <span>{homeAbbrev} {oH}%</span>
+                      <div className="flex justify-between text-xs font-mono">
+                        <span style={{ color: oA >= oH ? 'var(--neon)' : 'var(--text)', opacity: oA >= oH ? 1 : 0.4, fontWeight: oA >= oH ? 600 : 400 }}>{awayAbbrev} {oA}%</span>
+                        <span style={{ color: oH > oA ? 'var(--neon)' : 'var(--text)', opacity: oH > oA ? 1 : 0.4, fontWeight: oH > oA ? 600 : 400 }}>{homeAbbrev} {oH}%</span>
                       </div>
                     </div>
                   );

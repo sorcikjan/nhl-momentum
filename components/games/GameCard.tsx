@@ -163,13 +163,16 @@ export default function GameCard({
             {formatBookmaker(bestOdds.bookmaker)}
           </span>
           <span
-            className="font-mono cursor-default"
-            style={{ color: 'var(--text)' }}
+            className="font-mono cursor-default flex items-center gap-1.5"
             title={`${game.awayTeam.abbrev} ${bestOdds.away_odds?.toFixed(2)} · ${game.homeTeam.abbrev} ${bestOdds.home_odds?.toFixed(2)}`}
           >
-            {game.awayTeam.abbrev} {mktAp}%
-            <span style={{ opacity: 0.4 }}> · </span>
-            {game.homeTeam.abbrev} {mktHp}%
+            <span style={{ color: mktAp >= mktHp ? 'var(--neon)' : 'var(--text)', opacity: mktAp >= mktHp ? 1 : 0.4, fontWeight: mktAp >= mktHp ? 600 : 400 }}>
+              {game.awayTeam.abbrev} {mktAp}%
+            </span>
+            <span style={{ opacity: 0.25 }}>·</span>
+            <span style={{ color: mktHp > mktAp ? 'var(--neon)' : 'var(--text)', opacity: mktHp > mktAp ? 1 : 0.4, fontWeight: mktHp > mktAp ? 600 : 400 }}>
+              {game.homeTeam.abbrev} {mktHp}%
+            </span>
           </span>
         </div>
       )}
