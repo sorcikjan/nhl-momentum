@@ -447,6 +447,78 @@ function runModelV1_7(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   };
 }
 
+// v1.8 — calibrated xG anchored to NHL league average (~5.5 goals/game total)
+// Win probability logic is identical to v1.7.
+// xG values are post-hoc scaled so both teams' totals match the league average,
+// preserving the team-strength ratio while producing realistic goal projections (2.0–4.0 range).
+function runModelV1_8(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
+  const GOAL_SCALE = 100;
+  const MIN_SPG = 12;
+  const MAX_SPG = 40;
+  const REGRESSION = 0.6;
+  const MOMENTUM_W = 0.2;
+  const SEASON_W = 0.8;
+  const B2B_PENALTY = 0.92;
+  // NHL regular-season average: ~5.5 total goals/game (2025 season ≈ 5.52)
+  const LEAGUE_AVG_TOTAL = 5.5;
+
+  function effectivePPM(s: SkaterSnap): number {
+    if (s.momentumPpm !== undefined && s.seasonPpm !== undefined) {
+      return MOMENTUM_W * s.momentumPpm + SEASON_W * s.seasonPpm;
+    }
+    return s.compositePpm;
+  }
+
+  function offPotential(snap: TeamSnap) {
+    const activeSkaters = snap.skaters.filter(s => !s.injuryStatus);
+    const totalPPM = activeSkaters.reduce((sum, s) => sum + Math.max(0, effectivePPM(s)), 0);
+    const recentForm = snap.goalie.teamRecentForm ?? 1.0;
+    const b2bMult = snap.goalie.isBackToBack ? B2B_PENALTY : 1.0;
+    return totalPPM * snap.sosMultiplier * recentForm * energyMultiplierFromBar(snap.energyBar) * b2bMult;
+  }
+
+  function defFilter(snap: TeamSnap) {
+    const spg = snap.goalie.seasonShotsPerGoal ?? snap.goalie.momentumShotsPerGoal;
+    return Math.min(MAX_SPG, Math.max(MIN_SPG, spg || 22))
+      * goalieEnergyPenaltyFromBar(snap.goalie.energyBar ?? 100);
+  }
+
+  const homeOff = offPotential(homeSnap);
+  const awayOff = offPotential(awaySnap);
+  const homeDef = defFilter(homeSnap);
+  const awayDef = defFilter(awaySnap);
+
+  // Raw xG (same formula as v1.7, still tiny absolute values)
+  const rawHomeXG = awayDef > 0 ? (homeOff * GOAL_SCALE) / awayDef : 0;
+  const rawAwayXG = homeDef > 0 ? (awayOff * GOAL_SCALE) / homeDef : 0;
+  const rawTotal = rawHomeXG + rawAwayXG;
+
+  if (rawTotal === 0) return { homeXG: 0, awayXG: 0, homeWin: 0.5, awayWin: 0.5, homeOff, awayOff, homeDef, awayDef };
+
+  // Calibrate: scale both teams so total equals league average, preserving ratio
+  const calibration = LEAGUE_AVG_TOTAL / rawTotal;
+  const homeXG = rawHomeXG * calibration;
+  const awayXG = rawAwayXG * calibration;
+
+  // Win probability from ratio (unchanged vs v1.7)
+  const homeBase = rawHomeXG / rawTotal;
+  const awayBase = rawAwayXG / rawTotal;
+  const rawHomeWin = homeBase / (homeBase + awayBase); // same as homeBase since they sum to 1
+  const homeWin = 0.5 + (rawHomeWin - 0.5) * REGRESSION;
+
+  return {
+    homeXG: Math.round(homeXG * 10) / 10,
+    awayXG: Math.round(awayXG * 10) / 10,
+    homeWin: Math.round(homeWin * 1000) / 1000,
+    awayWin: Math.round((1 - homeWin) * 1000) / 1000,
+
+    homeOff: Math.round(homeOff * GOAL_SCALE * 10) / 10,
+    awayOff: Math.round(awayOff * GOAL_SCALE * 10) / 10,
+    homeDef: Math.round(homeDef * 10) / 10,
+    awayDef: Math.round(awayDef * 10) / 10,
+  };
+}
+
 // Registry of all model versions — add new versions here
 export const MODEL_REGISTRY: Record<string, (home: TeamSnap, away: TeamSnap) => ModelResult> = {
   'v1.0': runModelV1,
@@ -457,4 +529,5 @@ export const MODEL_REGISTRY: Record<string, (home: TeamSnap, away: TeamSnap) => 
   'v1.5': runModelV1_5,
   'v1.6': runModelV1_6,
   'v1.7': runModelV1_7,
+  'v1.8': runModelV1_8,
 };
