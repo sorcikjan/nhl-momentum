@@ -13,6 +13,9 @@ import { requireIngestAuth } from '@/lib/ingest-auth';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
+  const authError = requireIngestAuth(req);
+  if (authError) return authError;
+
   const apiKey = process.env.ODDS_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: 'ODDS_API_KEY not configured' }, { status: 500 });

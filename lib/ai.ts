@@ -16,7 +16,7 @@ async function ask(prompt: string): Promise<string | null> {
   const client = getClient();
   if (!client) return null;
   try {
-    const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = client.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const result = await model.generateContent(prompt);
     return result.response.text() ?? null;
   } catch {
