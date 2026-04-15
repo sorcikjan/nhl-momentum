@@ -3,6 +3,7 @@ import { cache } from 'react';
 import type { Metadata } from 'next';
 import PlayerLeaderboard, { type LeaderboardConfig } from '@/components/dashboard/PlayerLeaderboard';
 import SpotlightGames from '@/components/dashboard/SpotlightGames';
+import NightlyStories from '@/components/dashboard/NightlyStories';
 import { fetchRankings, fetchGames, fetchPipelineStatus } from '@/lib/data';
 
 export const revalidate = 60;
@@ -436,6 +437,25 @@ function StatSkeleton() {
   );
 }
 
+function StoriesSkeleton() {
+  return (
+    <div className="rounded-xl border p-4 mb-6 animate-pulse"
+      style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <div className="h-3 w-40 rounded mb-1" style={{ background: 'var(--border)' }} />
+      <div className="h-2.5 w-28 rounded mb-3" style={{ background: 'var(--border)' }} />
+      <div className="flex gap-2 mb-4">
+        {[1, 2, 3].map(i => <div key={i} className="h-7 w-24 rounded-lg" style={{ background: 'var(--bg)' }} />)}
+      </div>
+      <div className="rounded-lg px-4 py-3 mb-4" style={{ background: 'var(--bg)' }}>
+        <div className="h-2.5 rounded mb-2 w-full" style={{ background: 'var(--border)' }} />
+        <div className="h-2.5 rounded mb-2 w-5/6" style={{ background: 'var(--border)' }} />
+        <div className="h-2.5 rounded w-3/4" style={{ background: 'var(--border)' }} />
+      </div>
+      {[1, 2, 3].map(i => <div key={i} className="h-10 rounded-lg mb-1.5" style={{ background: 'var(--bg)' }} />)}
+    </div>
+  );
+}
+
 function GamesSkeleton() {
   return (
     <div className="rounded-xl border p-4 animate-pulse"
@@ -505,6 +525,11 @@ export default function DashboardPage() {
       {/* Pipeline status log */}
       <Suspense fallback={null}>
         <PipelineStatus />
+      </Suspense>
+
+      {/* Last night's stories */}
+      <Suspense fallback={<StoriesSkeleton />}>
+        <NightlyStories />
       </Suspense>
 
       {/* Spotlight games */}

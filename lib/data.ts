@@ -350,6 +350,42 @@ export async function fetchPlayer(id: string) {
   return { player, metricTimeline, recentGames, consecutiveGamesMissed, lastPlayedDate };
 }
 
+// ─── Nightly Story Data ───────────────────────────────────────────────────────
+
+export async function fetchNightlyStoryData(date: string) {
+  const { data: games } = await supabaseAdmin
+    .from('games')
+    .select(`
+      id, game_date, home_score, away_score,
+      home_team:teams!games_home_team_id_fkey(abbrev),
+      away_team:teams!games_away_team_id_fkey(abbrev)
+    `)
+    .eq('game_date', date)
+    .in('game_state', ['FINAL', 'OFF']);
+
+  if (!games?.length) return null;
+
+  const gameIds = games.map((g: { id: number }) => g.id);
+
+  const { data: stats } = await supabaseAdmin
+    .from('game_player_stats')
+    .select(`
+      player_id, game_id, goals, assists, plus_minus, toi_seconds,
+      players(first_name, last_name, position_code),
+      teams(abbrev)
+    `)
+    .in('game_id', gameIds)
+    .neq('players.position_code', 'G');
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sorted = (stats as any[] ?? [])
+    .filter(s => s.players)
+    .sort((a, b) => (b.goals + b.assists) - (a.goals + a.assists))
+    .slice(0, 10);
+
+  return { games, topPerformers: sorted };
+}
+
 // ─── Accuracy ─────────────────────────────────────────────────────────────────
 
 export async function fetchAccuracy() {

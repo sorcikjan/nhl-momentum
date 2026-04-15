@@ -3,6 +3,8 @@ import PlayerRadarChart from '@/components/players/RadarChart';
 import PPMTimeline from '@/components/players/PPMTimeline';
 import EnergyBar from '@/components/players/EnergyBar';
 import { fetchPlayer, fetchRankings, fetchLeagueAverages, daysAgo, deriveOutStatus } from '@/lib/data';
+import { generatePlayerSummary } from '@/lib/ai';
+import type { PlayerAIInput } from '@/lib/ai';
 import { teamUrl } from '@/lib/urls';
 import Link from 'next/link';
 
@@ -173,6 +175,49 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     energy: leagueAvg.energyBar,
   } : undefined;
 
+  // ── AI summary ───────────────────────────────────────────────────────────────
+  const playerTeamAbbrev = player.teams?.abbrev ?? '';
+  const aiInput: PlayerAIInput = {
+    name,
+    team:          playerTeamAbbrev,
+    position:      player.position_code ?? '',
+    rank:          ranked?.momentum_rank ?? null,
+    seaGames,
+    seaGoals,
+    seaAssists,
+    seaPoints:     seaGoals + seaAssists,
+    seaPpm,
+    seaShootPct,
+    seaToiMin:     Number(latestSnapshot.season_toi_sec ?? 0) / 60 / Math.max(1, seaGames),
+    momGames,
+    momGoals,
+    momAssists,
+    momPpm,
+    momShootPct,
+    momToiMin:     Number(latestSnapshot.momentum_toi_sec ?? 0) / 60 / Math.max(1, momGames),
+    energyBar,
+    breakoutDelta: Number(latestSnapshot.breakout_delta ?? 0),
+    careerGames:   player.career_games   ?? 0,
+    careerGoals:   player.career_goals   ?? 0,
+    careerAssists: player.career_assists ?? 0,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recentGames:   (recentGames as any[]).slice(0, 5).map((g: any) => {
+      const homeAbbrev = g.games?.home_team?.abbrev ?? '';
+      const awayAbbrev = g.games?.away_team?.abbrev ?? '';
+      const isHome = g.games?.home_team_id === player.team_id;
+      const opponent = isHome ? awayAbbrev : homeAbbrev;
+      return {
+        date:      g.games?.game_date ?? '',
+        opponent,
+        goals:     g.goals     ?? 0,
+        assists:   g.assists   ?? 0,
+        plusMinus: g.plus_minus ?? 0,
+        toiMin:    (g.toi_seconds ?? 0) / 60,
+      };
+    }),
+  };
+  const aiSummary = await generatePlayerSummary(aiInput).catch(() => null);
+
   return (
     <div className="max-w-5xl mx-auto pb-20 md:pb-0 space-y-4">
 
@@ -334,6 +379,25 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                 sub={`${player.career_games} GP · ${player.career_goals ?? 0}G ${player.career_assists ?? 0}A`} />
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── AI Analysis ─────────────────────────────────────────────────────────── */}
+      {aiSummary && (
+        <div className="rounded-xl border p-4"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold uppercase tracking-wider"
+              style={{ color: 'var(--neon)' }}>
+              Player Analysis
+            </span>
+            <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.5 }}>
+              AI-generated
+            </span>
+          </div>
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-bright)' }}>
+            {aiSummary}
+          </p>
         </div>
       )}
 
