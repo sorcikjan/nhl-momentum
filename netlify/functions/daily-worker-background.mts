@@ -121,7 +121,15 @@ const handler: BackgroundHandler = async (event) => {
     } catch (e) { log.push(`snapshots: exception ${e}`); }
   }
 
-  // 5. Energy — full sweep
+  // 5. Odds — fetch from The Odds API (runs after snapshots so game IDs are in DB)
+  if (phases.includes('odds')) {
+    try {
+      const r = await call(`${base}/api/ingest/odds`, h);
+      log.push(`odds: ${r.matched ?? 0} matched, ${r.upserted ?? 0} upserted${r.error ? ` err: ${r.error}` : ''}`);
+    } catch (e) { log.push(`odds: exception ${e}`); }
+  }
+
+  // 6. Energy — full sweep
   if (phases.includes('energy')) {
     try {
       const r = await call(`${base}/api/ingest/daily?phase=energy`, h);
