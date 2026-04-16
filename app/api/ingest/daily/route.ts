@@ -362,6 +362,7 @@ export async function GET(req: NextRequest) {
             sh_toi_percentile: 0.5,
             skater_snapshots: skaterSnaps,
             goalie_snapshot: goalieSnap,
+            captured_at: new Date().toISOString(),
           }, { onConflict: 'game_id,team_id' });
 
         if (!snapErr) snapshotsSaved++;

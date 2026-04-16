@@ -769,16 +769,21 @@ export async function fetchPipelineStatus() {
   const [gamelogs, metrics, predictions, outcomes, snapshots] = await Promise.all([
     supabaseAdmin.from('game_player_stats').select('recorded_at').order('recorded_at', { ascending: false }).limit(1).single(),
     supabaseAdmin.from('player_metric_snapshots').select('calculated_at').order('calculated_at', { ascending: false }).limit(1).single(),
-    supabaseAdmin.from('predictions').select('created_at').order('created_at', { ascending: false }).limit(1).single(),
+    // Use input_snapshot->>'captured_at' — this is written on every upsert, unlike
+    // created_at which Postgres never updates on a conflict-update.
+    supabaseAdmin.from('predictions').select('input_snapshot').order('created_at', { ascending: false }).limit(1).single(),
     supabaseAdmin.from('prediction_outcomes').select('recorded_at').order('recorded_at', { ascending: false }).limit(1).single(),
     supabaseAdmin.from('game_team_snapshots').select('captured_at').order('captured_at', { ascending: false }).limit(1).single(),
   ]);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const predTimestamp = (predictions.data?.input_snapshot as any)?.captured_at ?? null;
+
   return {
-    gamelogs:    gamelogs.data?.recorded_at    ?? null,
-    metrics:     metrics.data?.calculated_at   ?? null,
-    predictions: predictions.data?.created_at  ?? null,
-    outcomes:    outcomes.data?.recorded_at    ?? null,
-    snapshots:   snapshots.data?.captured_at   ?? null,
+    gamelogs:    gamelogs.data?.recorded_at  ?? null,
+    metrics:     metrics.data?.calculated_at ?? null,
+    predictions: predTimestamp,
+    outcomes:    outcomes.data?.recorded_at  ?? null,
+    snapshots:   snapshots.data?.captured_at ?? null,
   };
 }
