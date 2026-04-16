@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { fetchNewsFeed } from '@/lib/data';
 
 export const revalidate = 1800; // 30 min
@@ -46,23 +47,16 @@ export default async function NewsPage() {
         <div className="flex flex-col gap-2">
           {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
           {signals.map((s: any) => (
-            <div key={s.id}
-              className="rounded-xl border p-4"
+            <Link key={s.id} href={`/news/${s.id}`}
+              className="block rounded-xl border p-4 transition-opacity hover:opacity-80"
               style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
-                  {s.url ? (
-                    <a href={s.url} target="_blank" rel="noopener noreferrer"
-                      className="text-sm font-medium leading-snug hover:underline"
-                      style={{ color: 'var(--text-bright)' }}>
-                      {s.title}
-                    </a>
-                  ) : (
-                    <p className="text-sm font-medium leading-snug"
-                      style={{ color: 'var(--text-bright)' }}>
-                      {s.title}
-                    </p>
-                  )}
+                  <Link href={`/news/${s.id}`}
+                    className="text-sm font-medium leading-snug hover:underline"
+                    style={{ color: 'var(--text-bright)' }}>
+                    {s.title}
+                  </Link>
                   {s.content && (
                     <p className="text-xs mt-1 line-clamp-2" style={{ color: 'var(--text)' }}>
                       {s.content}
@@ -78,7 +72,7 @@ export default async function NewsPage() {
                   <span>{timeAgo(s.published_at ?? s.fetched_at)}</span>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

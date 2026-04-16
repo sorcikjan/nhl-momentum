@@ -17,7 +17,7 @@ function getClient() {
   return new GoogleGenerativeAI(key);
 }
 
-async function ask(prompt: string): Promise<string | null> {
+export async function ask(prompt: string): Promise<string | null> {
   const client = getClient();
   if (!client) return null;
   try {

@@ -4,6 +4,7 @@ import type { Metadata } from 'next';
 import PlayerLeaderboard, { type LeaderboardConfig } from '@/components/dashboard/PlayerLeaderboard';
 import SpotlightGames from '@/components/dashboard/SpotlightGames';
 import NightlyStories from '@/components/dashboard/NightlyStories';
+import RecentRecaps from '@/components/dashboard/RecentRecaps';
 import { fetchRankings, fetchGames, fetchPipelineStatus } from '@/lib/data';
 
 export const revalidate = 60;
@@ -530,6 +531,11 @@ export default function DashboardPage() {
       {/* Last night's stories */}
       <Suspense fallback={<StoriesSkeleton />}>
         <NightlyStories />
+      </Suspense>
+
+      {/* Recent recap articles */}
+      <Suspense fallback={null}>
+        <RecentRecaps />
       </Suspense>
 
       {/* Spotlight games */}

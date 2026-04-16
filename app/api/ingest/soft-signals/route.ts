@@ -81,7 +81,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: { inserted: 0, skipped: signals.length }, error: null });
   }
 
-  const { error } = await supabaseAdmin.from('soft_signals').insert(fresh);
+  // Expand each fresh signal into a proper article using Gemini
+  const expanded = await Promise.all(fresh.map(async s => {
+    const snippet = s.content ? ` Context: ${s.content}` : '';
+    const article = await ask(
+      `Write a 3-4 sentence NHL news article based on this headline.${snippet}\n\nHeadline: "${s.title}"\n\nBe factual and direct. No intro phrases like "In a recent development". Third person. Plain text only.`
+    ).catch(() => null);
+    return { ...s, content: article ?? s.content };
+  }));
+
+  const { error } = await supabaseAdmin.from('soft_signals').insert(expanded);
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 500 });
 
   return NextResponse.json({

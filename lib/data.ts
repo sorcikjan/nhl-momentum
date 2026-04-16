@@ -489,6 +489,15 @@ export async function fetchNewsFeed(limit = 50) {
   return data ?? [];
 }
 
+export async function fetchSignalById(id: number) {
+  const { data } = await supabaseAdmin
+    .from('soft_signals')
+    .select('id, type, title, content, url, source, published_at, fetched_at')
+    .eq('id', id)
+    .single();
+  return data ?? null;
+}
+
 export async function fetchRecentRecaps(limit = 30) {
   const { data } = await supabaseAdmin
     .from('daily_recaps')
