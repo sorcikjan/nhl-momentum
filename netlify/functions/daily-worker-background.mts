@@ -33,7 +33,7 @@ const handler: BackgroundHandler = async (event) => {
   }
 
   const body = event.body ? JSON.parse(event.body) : {};
-  const phases: string[] = body.phases ?? ['backfill', 'outcomes', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy', 'recap'];
+  const phases: string[] = body.phases ?? ['backfill', 'outcomes', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy', 'signals', 'recap'];
   const dateParam: string = body.date ?? '';
   const dateSuffix = dateParam ? `&date=${dateParam}` : '';
 
@@ -154,7 +154,15 @@ const handler: BackgroundHandler = async (event) => {
     } catch (e) { log.push(`extras: exception ${e}`); }
   }
 
-  // 8. Daily recap article — generated after outcomes/gamelogs are fresh
+  // 8. Soft signals — NHL RSS + Newsdata.io news ingestion
+  if (phases.includes('signals')) {
+    try {
+      const r = await call(`${base}/api/ingest/soft-signals?type=all`, h);
+      log.push(`signals: ${r.data?.inserted ?? 0} inserted, ${r.data?.skipped ?? 0} skipped${r.error ? ` err: ${r.error}` : ''}`);
+    } catch (e) { log.push(`signals: exception ${e}`); }
+  }
+
+  // 9. Daily recap article — generated after outcomes/gamelogs are fresh
   if (phases.includes('recap')) {
     try {
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);

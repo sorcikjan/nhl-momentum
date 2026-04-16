@@ -469,6 +469,17 @@ export async function fetchRecapData(date: string) {
   };
 }
 
+export async function fetchRecentSoftSignals(withinHours = 48, limit = 15) {
+  const since = new Date(Date.now() - withinHours * 3_600_000).toISOString();
+  const { data } = await supabaseAdmin
+    .from('soft_signals')
+    .select('type, title, content, source, published_at')
+    .gte('fetched_at', since)
+    .order('published_at', { ascending: false })
+    .limit(limit);
+  return data ?? [];
+}
+
 export async function fetchRecentRecaps(limit = 30) {
   const { data } = await supabaseAdmin
     .from('daily_recaps')

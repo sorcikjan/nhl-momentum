@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 import { supabaseAdmin } from '@/lib/supabase';
-import { fetchRecapData } from '@/lib/data';
+import { fetchRecapData, fetchRecentSoftSignals } from '@/lib/data';
 import { generateDailyRecap } from '@/lib/ai';
 import type { RecapGame, RecapPerformer, RecapShutout } from '@/lib/ai';
 
@@ -93,7 +93,15 @@ export async function GET(req: NextRequest) {
     saves: (s.saves ?? 0) - (s.goals_against ?? 0),
   }));
 
-  const result = await generateDailyRecap({ date, dateLabel, games, topPerformers, shutouts });
+  // Pull recent news signals to enrich the recap narrative
+  const signals = await fetchRecentSoftSignals(48, 10).catch(() => []);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const newsContext = (signals as any[]).length
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ? (signals as any[]).map((s: any) => `- ${s.title}${s.content ? ': ' + s.content.slice(0, 120) : ''} (${s.source})`).join('\n')
+    : null;
+
+  const result = await generateDailyRecap({ date, dateLabel, games, topPerformers, shutouts, newsContext });
 
   if (!result) {
     return NextResponse.json({ data: null, error: 'AI generation failed' }, { status: 500 });

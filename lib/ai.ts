@@ -276,11 +276,12 @@ export interface RecapShutout {
 }
 
 export interface DailyRecapInput {
-  date: string;        // YYYY-MM-DD
-  dateLabel: string;   // e.g. "Tuesday, April 15, 2026"
+  date: string;
+  dateLabel: string;
   games: RecapGame[];
   topPerformers: RecapPerformer[];
   shutouts: RecapShutout[];
+  newsContext?: string | null;  // recent headlines from RSS/Newsdata
 }
 
 export interface DailyRecapOutput {
@@ -316,7 +317,11 @@ export async function generateDailyRecap(input: DailyRecapInput): Promise<DailyR
     ? `\nModel accuracy last night: ${correct}/${modelAccuracy.length} games predicted correctly`
     : '';
 
-  const prompt = `You are a sports writer for NHL Momentum, a hockey analytics platform known for data-driven insights. Write a daily NHL recap article for ${input.dateLabel}.
+  const newsSection = input.newsContext
+    ? `\nRecent NHL news context (use only if directly relevant to last night's games):\n${input.newsContext}\n`
+    : '';
+
+  const prompt = `You are a sports writer for NHL Momentum, a hockey analytics platform known for data-driven insights. Write a daily NHL recap article for ${input.dateLabel}.${newsSection}
 
 ${input.games.length} games played:
 ${gameLines}
