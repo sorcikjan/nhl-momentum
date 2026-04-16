@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 import { supabaseAdmin } from '@/lib/supabase';
+import { ask } from '@/lib/ai';
 import Parser from 'rss-parser';
 
 // GET /api/ingest/soft-signals?type=rss|newsdata|all

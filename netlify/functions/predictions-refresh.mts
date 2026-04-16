@@ -11,7 +11,7 @@ export default async function handler() {
   const res = await fetch(`${base}/.netlify/functions/daily-worker-background`, {
     method: 'POST',
     headers: { 'x-api-key': ingestKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phases: ['backfill', 'snapshots'] }),
+    body: JSON.stringify({ phases: ['backfill', 'snapshots', 'odds'] }),
   });
 
   console.log('[predictions-refresh] triggered background worker, status:', res.status);
