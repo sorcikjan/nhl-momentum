@@ -54,9 +54,10 @@ export async function GET(req: NextRequest) {
 
   const type = req.nextUrl.searchParams.get('type') ?? 'all';
 
-  const fetchers: Promise<typeof rssFmt>[] = [];
-  if (type === 'rss' || type === 'all')      fetchers.push(fetchRssSignals().catch(() => []));
-  if (type === 'newsdata' || type === 'all') fetchers.push(fetchNewsdataSignals().catch(() => []));
+  type Signal = typeof rssFmt;
+  const fetchers: Promise<Signal[]>[] = [];
+  if (type === 'rss' || type === 'all')      fetchers.push(fetchRssSignals().catch((): Signal[] => []));
+  if (type === 'newsdata' || type === 'all') fetchers.push(fetchNewsdataSignals().catch((): Signal[] => []));
 
   const results = await Promise.all(fetchers);
   const signals = results.flat().filter(s => s.title);
