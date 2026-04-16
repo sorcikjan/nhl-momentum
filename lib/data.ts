@@ -480,6 +480,15 @@ export async function fetchRecentSoftSignals(withinHours = 48, limit = 15) {
   return data ?? [];
 }
 
+export async function fetchNewsFeed(limit = 50) {
+  const { data } = await supabaseAdmin
+    .from('soft_signals')
+    .select('id, type, title, content, url, source, published_at, fetched_at')
+    .order('published_at', { ascending: false })
+    .limit(limit);
+  return data ?? [];
+}
+
 export async function fetchRecentRecaps(limit = 30) {
   const { data } = await supabaseAdmin
     .from('daily_recaps')
