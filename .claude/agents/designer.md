@@ -52,6 +52,63 @@ Hockey gives you rich visual language to work with:
 
 ---
 
+## Inspiration from the best sports data sites
+
+Study these four platforms before designing anything significant. Each teaches a different lesson.
+
+### HLTV.org — data density done right for a passionate niche community
+
+HLTV is the CS2/esports equivalent of what we're building for hockey. Their design is what a truly fan-built sports data site looks like at scale:
+
+- **Dark theme as a statement of identity**, not just aesthetics. The dark background tells the user: this is a serious tool for people who care. Neon green accents (nearly identical to our `var(--neon)`) signal live, current, important data. This is not a coincidence — it's the right visual language for real-time data in a dark setting.
+- **The HLTV Rating** is displayed as the single authoritative number on every player page — just like market value on Transfermarkt. One number. Big. Explained once and then trusted. Our PPM composite should be presented the same way on player pages: prominent, explained, trusted.
+- **Match pages are layered**: result → team aggregate stats → map-by-map breakdown → individual player performance. The user can stop at any layer. This is progressive disclosure done right — casual fans get the result, data nerds can dig to individual stats.
+- **Rankings create return visits.** HLTV updates team rankings regularly and fans come back specifically to see movement. Our momentum rankings should feel the same — "who moved this week?" is a return-visit trigger.
+- **"Top 20 of the Year"** annual feature creates massive debate and engagement. End-of-season content is underbuilt for us.
+- Their site feels like it was built by people who watch every match. That authenticity reads through the design — copy uses community language, the data depth implies obsession.
+
+**What to steal:** the single-number prominence on player pages, the layered match/game page structure, the weekly return-visit rhythm from rankings movement.
+
+### EliteProspects — the depth of a true encyclopedia
+
+EliteProspects has the most comprehensive hockey player database in the world. Their player profiles are the destination for anyone who wants to understand a player's full story:
+
+- **Career timeline across every team and league** — a player's full journey from junior to NHL is visible at a glance. Our player pages show recent stats and current form but not the arc. The career history section in `players` table (`draft_year`, `draft_round`, `draft_pick`, `draft_team_abbrev`, `career_games`, `career_goals`, `career_assists`) is underused.
+- **Draft history is prominently featured.** Hockey fans care deeply about where a player was picked. "2015 Round 1 #3 overall by Edmonton" tells you the player's ceiling expectations. We have this data and barely surface it.
+- **Achievement and award badges** on player profiles — quick visual recognition that this player won something meaningful. Builds narrative. A player page without career context is just a stats table.
+- **Hockey Connections** — related players (same agent, same draft class, same team, family). This is advanced but it points toward a principle: player pages should tell a story, not just display rows.
+- **Game-by-game logs** are a high-engagement feature for data enthusiasts. We have `game_player_stats` — we should build a clean game log table on every player page below the summary stats.
+- The site is dense and sometimes dated in its visual design, but **the data depth keeps people coming back despite the UX friction**. We should have both the depth and the UX.
+
+**What to steal:** career context prominence (draft info, career stats), achievement/award display, game-by-game logs, career timeline visualization.
+
+### Transfermarkt — market value as narrative, not just a number
+
+Transfermarkt built an empire on a single metric: market value. Every player has one. It's displayed prominently, tracked over time, and debated passionately. Their design teaches:
+
+- **One authoritative number, big, at the top of every player page.** For us: the composite momentum score / PPM rank should be equally prominent. Not buried in a table — the hero stat.
+- **Market value history chart** — a line chart showing peaks, dips, recovery. Spikes when a player broke out, dips after injuries, plateaus for veterans. This chart tells the player's career story better than any text. We have `player_metric_snapshots` with timestamps — **a PPM history sparkline is one of the highest-value features we're not building yet.**
+- **Transfer history timeline** — every club with dates, transfer fees, loan spells. We have team data. A "career path" timeline below the player stats would add enormous context.
+- **Comparison tool** — fans love putting two players side by side. "McDavid vs Draisaitl momentum right now" is exactly the kind of feature that drives shares and debate.
+- Their "form" indicator (5 colored dots = last 5 results) maps directly to our momentum concept. 5 dots, colored hot/cold, is instantly readable on mobile.
+- Transfermarkt is visually dated. **We should have their data depth with dramatically better design.** That gap is our opportunity.
+
+**What to steal:** PPM history sparkline/chart on player pages, the "form dots" indicator for recent performance, comparison tool concept, career timeline.
+
+### NHL.com — the baseline, but also the ceiling for live experience
+
+NHL.com is the reference point every hockey fan uses. It's the floor we must beat on depth, and the ceiling we should approach on live game experience:
+
+- **Game center is the best live game UI in sports.** Period updates, goal sequences, penalty summaries, shot maps — all in real-time. Our game pages are static (ISR at 60s). We should design game pages that feel as close to a live experience as ISR allows: last period score, key performers, prediction status.
+- **Video is a retention tool.** Every significant goal has a highlight clip. We already have `youtube_highlight_id` in the DB for games — this is underused. On completed game pages, this is the most engaging element.
+- **Stats filters and columns** on their skaters page are comprehensive but not opinionated. They show everything. We should show less but make what we show more meaningful — context-rich, not just complete.
+- **Playoff bracket** — during April–June, this is what every fan wants to see. The visual bracket with series progress is among the most-visited sports UI patterns during playoff season. We don't have it. It's a future priority.
+- **Schedule as a first-class feature** — NHL.com's schedule is well-designed. Our game page and homepage games section should feel similarly authoritative.
+
+**What to steal:** game page live-feel design (even with ISR), video highlight prominence on completed game pages, playoff bracket (future), schedule design patterns.
+
+---
+
 ## Design philosophy
 
 **Urgency over elegance.** Sports design should make the user feel like they're missing something if they don't look. A stock portfolio dashboard can be calm. An NHL momentum tracker should feel alive. Use neon sparingly and purposefully — it communicates "this is happening right now."

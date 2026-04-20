@@ -28,6 +28,39 @@ nhl-momentum is a free, data-driven NHL analytics platform. Our core proposition
 - **Natural Stat Trick / Money Puck** — excellent xG and shot-quality analytics for hardcore stats nerds, no casual-friendly surface, no predictions, no momentum framing. We can own the fan who's one level below that.
 - **The Athletic** — great storytelling, paywalled, no real-time data, no predictions. Complementary, not competitive.
 - **ESPN / NHL.com** — huge distribution, surface-level stats, no analytical edge, no momentum. We should aspire to the depth they can't provide.
+- **EliteProspects** — the best hockey player database in the world. Deep profiles, career timelines, draft history, multi-league support. We're not trying to be them, but their player page depth is an aspiration for our player profiles.
+- **HLTV.org** (esports, not hockey) — the gold standard for a niche sports data community. Their HLTV Rating 2.0 is trusted the same way we want PPM to be trusted. Their match pages, player rankings, and "Top 20 of the Year" content drive massive repeat visits. Study them obsessively.
+- **Transfermarkt** — football's market value platform. Their "market value over time" chart on every player page is one of the most-visited features in sports data. A player's value history tells their career story visually. We should build a momentum history chart that does the same thing for NHL players.
+
+---
+
+## What the best sites in sports data get right — and what we should steal
+
+**From HLTV.org:**
+- Their rating (HLTV Rating 2.0) is the single metric the community trusts and rallies around. Fans argue about it, analysts cite it, pros obsess over it. This is what PPM needs to become for NHL fans — the number everyone references.
+- Their weekly rankings update is a return-visit trigger. Fans come back every Monday to see movement. Our momentum rankings should create the same habit: "who moved up this week?"
+- Their "Top 20 players of the year" annual feature creates massive engagement and debate. We should build an end-of-season momentum leaders feature.
+- Match pages show deep context layered progressively — result first, then team stats, then individual performance. Users can go as deep as they want.
+- The site feels like it was built by fans for fans. That authenticity matters.
+
+**From EliteProspects:**
+- Career timeline across multiple teams and leagues — a player's journey told visually. Our player pages show recent games but not the full arc. This is a gap.
+- Draft history as a prominent feature — hockey fans care deeply about where a player was drafted. We have `draft_year`, `draft_round`, `draft_pick`, `draft_team_abbrev` in our DB and barely surface it.
+- Achievement/award badges on player profiles — quick visual recognition of career highlights. Builds the story of a player.
+- The prospect pipeline concept (tracking players before they reach the NHL) is beyond our current scope, but the career context model applies to current players.
+- Watchlists — fans want to track specific players. This is a future engagement feature worth planning for.
+
+**From Transfermarkt:**
+- Market value as a single prominently displayed number on every player page — one authoritative figure that tells you everything. Our PPM composite score should be equally prominent and explained.
+- **Market value history chart** — a line chart showing a player's value over time, with dips for injuries and spikes for breakout seasons. We have `player_metric_snapshots` with `calculated_at` timestamps. We should build a PPM history sparkline or chart on every player page. This is one of the highest-value, highest-engagement features we're not building yet.
+- Transfer timeline — every club a player has been with, with dates. We have team history data. A career timeline below the stats is underbuilt.
+- The comparison tool — put two players side by side. Fans love comparing. "Who has more momentum right now, McDavid or Draisaitl?"
+
+**From NHL.com:**
+- Live game center — the definitive real-time game experience. We're not building this, but our game pages should feel inspired by it: score prominence, period context, key performers.
+- Video integration — they embed highlights for every significant moment. Our YouTube highlight integration (already in the DB) should be more prominent on game pages.
+- Official standings and schedule as baseline — we reference their API. Our presentation should go further than their surface-level display.
+- Playoff bracket visualization — during April–June this is what every fan wants to see. We don't have it. It's worth planning.
 
 **Our market position:** the bridge between casual fan and advanced analytics. Someone who watches games, cares about who's hot, wants more than the standings but isn't going to learn Corsi/Fenwick from scratch. That person has nowhere good to go. We should own that audience.
 
