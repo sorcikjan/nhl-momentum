@@ -181,18 +181,12 @@ export async function fetchRankings() {
 
   // Step 2: recent completed games for all teams (last ~45 days covers 15+ games per team).
   // NOTE: the games table PK is `id`, not `game_id`.
-  // Exclude games from the last 24h — gamelogs pipeline can't be guaranteed to have
-  // ingested player stats for very recent games yet (outcomes runs before gamelogs,
-  // and the NHL API can take hours to publish stats after a game ends). Counting a
-  // game as "missed" before gamelogs catch up causes false scratch/out badges.
   const sinceDate = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
-  const cutoffDate = new Date(Date.now() - 24 * 3_600_000).toISOString().slice(0, 10);
   const { data: recentTeamGames } = await supabaseAdmin
     .from('games')
     .select('id, game_date, home_team_id, away_team_id')
     .in('game_state', ['FINAL', 'OFF'])
     .gte('game_date', sinceDate)
-    .lte('game_date', cutoffDate)
     .order('id', { ascending: false })
     .limit(700);
 
