@@ -18,3 +18,8 @@ export function gameUrl(id: number | string, awayAbbrev: string, homeAbbrev: str
   const datePart = date ? `-${date.slice(5).replace('-', '')}` : '';
   return `/games/${id}/${awayAbbrev.toLowerCase()}-at-${homeAbbrev.toLowerCase()}${datePart}`;
 }
+
+export function recapUrl(date: string, title: string) {
+  const cleaned = title.replace(/^NHL Recap[^:]*:\s*/i, '');
+  return `/recaps/${date}/${slugify(cleaned)}`;
+}

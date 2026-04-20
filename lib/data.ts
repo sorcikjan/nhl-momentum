@@ -395,7 +395,7 @@ export async function fetchRecapData(date: string) {
     supabaseAdmin
       .from('games')
       .select(`
-        id, game_date, home_score, away_score,
+        id, game_date, home_score, away_score, youtube_highlight_id,
         home_team:teams!games_home_team_id_fkey(abbrev, name),
         away_team:teams!games_away_team_id_fkey(abbrev, name)
       `)

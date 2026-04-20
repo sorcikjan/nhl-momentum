@@ -321,23 +321,45 @@ export async function generateDailyRecap(input: DailyRecapInput): Promise<DailyR
     ? `\nRecent NHL news context (use only if directly relevant to last night's games):\n${input.newsContext}\n`
     : '';
 
-  const prompt = `You are a sports writer for NHL Momentum, a hockey analytics platform known for data-driven insights. Write a daily NHL recap article for ${input.dateLabel}.${newsSection}
+  const gameHeaders = input.games.map(g => {
+    const awayWon = g.awayScore > g.homeScore;
+    const winner = awayWon ? g.awayTeam : g.homeTeam;
+    const margin = Math.abs(g.awayScore - g.homeScore);
+    const context = g.predictedCorrectly === false ? 'UPSET' : margin >= 4 ? 'BLOWOUT' : margin === 1 ? 'ONE-GOAL GAME' : '';
+    return `${g.awayTeam} ${g.awayScore} @ ${g.homeTeam} ${g.homeScore}${context ? ` [${context}]` : ''}${g.predictedCorrectly !== null ? ` [model: ${g.predictedCorrectly ? '✓' : '✗'}]` : ''}${g.homeWinProbability != null ? ` [gave ${winner} ${awayWon ? ((1 - g.homeWinProbability) * 100).toFixed(0) : (g.homeWinProbability * 100).toFixed(0)}% win prob]` : ''}`;
+  }).join('\n');
 
-${input.games.length} games played:
-${gameLines}
+  const prompt = `You are a senior hockey writer for NHL Momentum, a data-driven analytics platform. Write a daily recap article for ${input.dateLabel} that reads like real sports journalism — not a data dump, not a press release. Analytical fans read this; they love numbers but they want them woven into narrative, not listed.${newsSection}
+
+GAMES (${input.games.length}):
+${gameHeaders}
 ${shutoutLines}
 ${modelLine}
 
-Top performers:
+TOP PERFORMERS (goals+assists):
 ${performerLines}
 
-Write a compelling, SEO-friendly recap article. The unique angle of NHL Momentum is momentum analytics — highlight when performers were already showing hot momentum data before the game, or call out any upsets where the model was wrong.
+ARTICLE STRUCTURE — follow this exactly:
+
+1. LEDE (1 paragraph): Open with the night's most compelling story. Don't start with "Tonight" or "Last night". Lead with what was surprising, dramatic, or analytically interesting. One specific number in the first sentence.
+
+2. GAME SECTIONS: One section per game, ordered from most to least interesting. Each section must start with EXACTLY this header format on its own line:
+### {AWAY_ABBREV} {AWAY_SCORE} @ {HOME_ABBREV} {HOME_SCORE}
+Then 2-3 sentences of specific, narrative recap. Name players. Use exact stats from the data. If the model got it wrong, say why it was hard to call. If a performer had hot momentum data going in, mention it.
+
+3. MOMENTUM WATCH section (start with "### Momentum Watch"):
+2-3 sentences connecting pre-game momentum data to what happened on the ice. Which players' PPM signals were validated tonight? Who outperformed or underperformed their momentum trend? Be specific — use the % above/below season avg figures from the performer data.
+
+4. LOOKING AHEAD section (start with "### Looking Ahead"):
+1-2 sentences only. One forward-looking observation — back-to-backs, playoff implications, a player to watch in the next game. Concrete, not generic.
+
+TONE: Write like a beat writer who watches every game and trusts the data. Direct sentences. Active verbs. No clichés ("lit the lamp", "finding the back of the net", "putting pucks on net"). No filler phrases ("it was a night of", "fans were treated to"). Every sentence earns its place.
 
 Respond with valid JSON (no markdown, no code blocks):
 {
-  "title": "NHL Recap [${input.dateLabel}]: [compelling headline mentioning top story, key player or upset — max 70 chars]",
-  "summary": "One or two sentences for SEO meta description. Include date, key players, teams. Max 160 chars.",
-  "content": "Full article with 4-6 paragraphs separated by \\n\\n. Open with the biggest story. Cover key games and standout performances with specific numbers. Include a 'Momentum Watch' paragraph noting players whose analytics data flagged before the game. Close with a forward-looking line about upcoming games. Analytical but accessible tone. No clichés."
+  "title": "NHL Recap ${input.dateLabel}: [headline max 70 chars — lead with the biggest story, name a team or player]",
+  "summary": "2 sentences max 160 chars total. Name date, key players, teams. Written for Google snippet.",
+  "content": "[lede paragraph]\\n\\n### {AWAY} {score} @ {HOME} {score}\\n\\n[game paragraph]\\n\\n[repeat for each game]\\n\\n### Momentum Watch\\n\\n[paragraph]\\n\\n### Looking Ahead\\n\\n[paragraph]"
 }`;
 
   const raw = await ask(prompt);

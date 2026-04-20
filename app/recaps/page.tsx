@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { fetchRecentRecaps } from '@/lib/data';
+import { recapUrl } from '@/lib/urls';
 
 export const revalidate = 3600;
 
@@ -39,7 +40,7 @@ export default async function RecapsPage() {
               weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
             });
             return (
-              <Link key={r.date} href={`/recaps/${r.date}`}
+              <Link key={r.date} href={recapUrl(r.date, r.title ?? '')}
                 className="rounded-xl border p-4 transition-opacity hover:opacity-80"
                 style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
                 <div className="flex items-start justify-between gap-4">
