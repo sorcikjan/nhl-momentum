@@ -19,12 +19,13 @@ function getClient() {
 
 export async function ask(prompt: string): Promise<string | null> {
   const client = getClient();
-  if (!client) return null;
+  if (!client) { console.error('[ai] ask: GEMINI_API_KEY not set'); return null; }
   try {
     const model = client.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
     const result = await model.generateContent(prompt);
     return result.response.text()?.trim() ?? null;
-  } catch {
+  } catch (err) {
+    console.error('[ai] ask error:', err);
     return null;
   }
 }

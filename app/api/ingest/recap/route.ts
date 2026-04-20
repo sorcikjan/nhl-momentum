@@ -131,10 +131,15 @@ export async function GET(req: NextRequest) {
     ? (signals as any[]).map((s: any) => `- ${s.title}${s.content ? ': ' + s.content.slice(0, 120) : ''} (${s.source})`).join('\n')
     : null;
 
+  const hasGeminiKey = !!process.env.GEMINI_API_KEY;
+  if (!hasGeminiKey) {
+    return NextResponse.json({ data: null, error: 'GEMINI_API_KEY not configured' }, { status: 500 });
+  }
+
   const result = await generateDailyRecap({ date, dateLabel, games, topPerformers, shutouts, newsContext });
 
   if (!result) {
-    return NextResponse.json({ data: null, error: 'AI generation failed' }, { status: 500 });
+    return NextResponse.json({ data: null, error: 'AI generation failed — check Netlify function logs for [ai] ask error' }, { status: 500 });
   }
 
   // Fetch a hero image from Pixabay (Pixabay License — free commercial use, no attribution required)
