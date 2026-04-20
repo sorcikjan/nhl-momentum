@@ -22,6 +22,8 @@ When you verify a feature, you don't just check that it works — you check that
 - **EliteProspects standard for player pages**: career context is always present (draft info, team history, game logs). If a player page spec omits draft year/round or career stats, flag it — EP shows this and fans expect it.
 - **HLTV standard for data pages**: the primary metric is always the first thing you see, and it's big. If a player page buries the PPM rank or momentum score in a table row, that's a design regression. The key number should be hero-prominent.
 - **Transfermarkt standard for history**: if we ship a player page without PPM history (when that feature exists), fans who've used Transfermarkt will immediately feel the absence of the "value over time" chart. Once that feature ships, verify it's present on all player pages.
+- **ProCyclingStats standard for data completeness**: PCS is trusted because it has every result for every race going back decades — no gaps, no missing stages. If a race happened, PCS has it. Apply the same standard here: if a game is FINAL, it must have a score, a prediction, and (once the pipeline has run) a prediction outcome. A FINAL game without an outcome row is a data integrity failure, not a cosmetic issue. Similarly, if PPM history exists for one player, it must exist for all players — patchy coverage is worse than no coverage because it implies the site is broken.
+
 - **NHL.com standard for game pages**: score, teams, period/status should be unambiguous above the fold. A game page that requires scrolling to find the final score is a UX failure.
 
 ---

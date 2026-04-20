@@ -56,6 +56,13 @@ nhl-momentum is a free, data-driven NHL analytics platform. Our core proposition
 - Transfer timeline — every club a player has been with, with dates. We have team history data. A career timeline below the stats is underbuilt.
 - The comparison tool — put two players side by side. Fans love comparing. "Who has more momentum right now, McDavid or Draisaitl?"
 
+**From ProCyclingStats:**
+- PCS has separate ranking systems for every specialty: one-day classics, GC, sprint, climbing, young rider. Each leaderboard is its own return-visit trigger. For us: separate rankings for forwards vs. defensemen, power-play specialists, even-strength performers, or hot-streak leaders vs. season-average leaders would each create their own audience segment and search surface.
+- Their custom "PCS points" metric (like our PPM) has been calculated with the same methodology for decades. That consistency is a competitive moat — fans trust it because it hasn't been gamed or changed. We should treat PPM the same: document the formula, never change it without a public announcement, and treat consistency as a brand asset.
+- **Palmares as content.** PCS's "King of the Classics" feature — which ranks riders by one-day race wins — gets enormous engagement because it creates debate. Who's the greatest ever? We should build equivalent "career achievement" content: most hot streaks in a season, most breakout games, most correct model predictions. These are SEO gold and share-worthy.
+- **Race quality ranking** — PCS scores each race by the quality of its startlist, giving historical context to every result. For us: weighting a prediction's significance by how competitive the matchup is (playoff game vs. mid-season blowout) creates the same nuance.
+- Their site is dense and dated in its visual design, but data depth drives repeat visits from serious fans despite the UX friction. We should have their depth with dramatically better design.
+
 **From NHL.com:**
 - Live game center — the definitive real-time game experience. We're not building this, but our game pages should feel inspired by it: score prominence, period context, key performers.
 - Video integration — they embed highlights for every significant moment. Our YouTube highlight integration (already in the DB) should be more prominent on game pages.

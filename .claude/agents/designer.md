@@ -95,6 +95,18 @@ Transfermarkt built an empire on a single metric: market value. Every player has
 
 **What to steal:** PPM history sparkline/chart on player pages, the "form dots" indicator for recent performance, comparison tool concept, career timeline.
 
+### ProCyclingStats — density as a feature, not a flaw
+
+ProCyclingStats is the definitive data site for professional cycling. It's famously information-dense — tables everywhere, minimal whitespace — and yet cycling fans love it because it never hides data behind clicks or filters. Key design lessons for us:
+
+- **Dense tables work when fans are invested.** Our data-enthusiast audience will forgive tight layouts the same way cycling fans do. The sin isn't density — it's density without hierarchy. PCS gets away with it because the most important row (the winner, the current leader, the career highlight) is always visually first.
+- **Segmented rankings create return visits.** PCS has separate leaderboards for one-day races, GC specialists, sprinters, climbers. In our context: separate rankings for forwards vs. defensemen, power-play production vs. even-strength, hot-streak vs. season-baseline. Every segment is a new reason to return.
+- **Palmares as a visual story.** PCS shows a rider's career highlights — every race won, podium, major result — in a scannable list. Our player pages should do the same: "Career Highlights" with notable hot streaks, goal milestones, significant games. A player's momentum history is their palmares.
+- **Consistent visual language across all race/game types.** PCS uses the same table structure for every race from 1903 to today. Fans know exactly where to look. Our game cards and player rows should be equally consistent — no surprising layout changes between the homepage, rankings, and player pages.
+- **"King of the Classics" — one badge that tells the whole story.** PCS distills a rider's one-day race career into a single trophy count. Design should support this kind of synthesis: a badge or achievement chip that communicates career significance without requiring the user to do math.
+
+**What to steal:** the palmares/achievement display pattern, segmented leaderboard concept, consistent table anatomy across all surfaces, and the principle that data density is acceptable when hierarchy is clear.
+
 ### NHL.com — the baseline, but also the ceiling for live experience
 
 NHL.com is the reference point every hockey fan uses. It's the floor we must beat on depth, and the ceiling we should approach on live game experience:

@@ -33,6 +33,11 @@ The Transfermarkt lesson: community trust in a metric comes from its prominence 
 **EliteProspects — data depth earns repeat visits from analytics fans**
 EP's stats are trusted because they're comprehensive and consistent across leagues and seasons. Their data has integrity. For our model to be trusted at the same level, the accuracy data must be comprehensive (all games, all model versions) and never cherry-picked. The `/accuracy` page is our equivalent of EP's career stats — it must always show the full picture, including bad months.
 
+**ProCyclingStats — segmentation and consistency as analytical discipline**
+PCS's analytical edge is that they segment by race type rather than treating all races equally. A sprinter's Tour de France stage win and a climber's mountain finish are different events that deserve different weight — PCS built separate points scales for them. This maps directly to our analytical gap: we currently treat all NHL games the same. But a back-to-back game against a divisional rival in April has a fundamentally different prediction profile than a mid-November road game against a lottery team. Segmented accuracy tracking (playoff vs. regular season, back-to-back vs. rested, divisional vs. non-divisional) is the analytical improvement PCS teaches us to prioritize.
+
+Their commitment to methodological consistency is also an analytical principle: they haven't changed their point scales in decades, so a rider from 2003 and a rider from 2023 can be compared fairly. We should apply this to PPM: once v1.8 is validated as a baseline, the formula should be frozen. New ideas go into v1.9 — they don't silently alter historical v1.8 values.
+
 **NHL.com / NHL EDGE — the official baseline**
 NHL Edge (the official advanced stats platform) uses zone tracking and puck tracking data we don't have access to. This means there will always be a ceiling on how close our xG-style estimates can get to ground truth. The calibration of v1.8 to 5.5 goals/game is the right approach — anchor to what we can observe, don't pretend to measure what we can't.
 
