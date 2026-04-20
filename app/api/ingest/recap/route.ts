@@ -5,6 +5,36 @@ import { fetchRecapData, fetchRecentSoftSignals } from '@/lib/data';
 import { generateDailyRecap } from '@/lib/ai';
 import type { RecapGame, RecapPerformer, RecapShutout } from '@/lib/ai';
 
+// Fetch a free hockey photo from Pixabay (Pixabay License — no attribution required).
+// Uses a date-seeded page offset so each recap gets a different image.
+async function fetchPixabayHockeyImage(date: string): Promise<string | null> {
+  const apiKey = process.env.PIXABAY_API_KEY;
+  if (!apiKey) return null;
+
+  // Seed page from date so different recaps get different images (1–100)
+  const seed = (parseInt(date.replace(/-/g, ''), 10) % 100) + 1;
+
+  try {
+    const url = new URL('https://pixabay.com/api/');
+    url.searchParams.set('key', apiKey);
+    url.searchParams.set('q', 'ice hockey');
+    url.searchParams.set('image_type', 'photo');
+    url.searchParams.set('orientation', 'horizontal');
+    url.searchParams.set('min_width', '1200');
+    url.searchParams.set('safesearch', 'true');
+    url.searchParams.set('per_page', '3');
+    url.searchParams.set('page', String(seed));
+
+    const res = await fetch(url.toString(), { next: { revalidate: 0 } });
+    if (!res.ok) return null;
+
+    const json = await res.json() as { hits?: { largeImageURL?: string }[] };
+    return json.hits?.[0]?.largeImageURL ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // POST /api/ingest/recap?date=YYYY-MM-DD
 // Generates and stores a daily recap article for the given date (default: yesterday).
 // Skips if a fresh recap already exists (< 12h old) unless ?force=1.
@@ -107,15 +137,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: null, error: 'AI generation failed' }, { status: 500 });
   }
 
+  // Fetch a hero image from Pixabay (Pixabay License — free commercial use, no attribution required)
+  const heroImageUrl = await fetchPixabayHockeyImage(date);
+
   const { error: upsertErr } = await supabaseAdmin
     .from('daily_recaps')
     .upsert({
       date,
-      title:       result.title,
-      summary:     result.summary,
-      content:     result.content,
-      games_count: games.length,
-      generated_at: new Date().toISOString(),
+      title:          result.title,
+      summary:        result.summary,
+      content:        result.content,
+      games_count:    games.length,
+      hero_image_url: heroImageUrl,
+      generated_at:   new Date().toISOString(),
     }, { onConflict: 'date' });
 
   if (upsertErr) {

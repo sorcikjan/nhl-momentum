@@ -6,20 +6,6 @@ import { recapUrl, gameUrl } from '@/lib/urls';
 
 export const revalidate = 3600;
 
-// Rotate through hockey image searches so each date gets a different shot
-const HERO_QUERIES = [
-  'ice-hockey,nhl,arena',
-  'nhl,hockey,stadium',
-  'ice-hockey,crowd,game',
-  'hockey,rink,sport',
-  'nhl,playoffs,hockey',
-  'ice-hockey,action',
-];
-
-function heroImageUrl(date: string) {
-  const seed = parseInt(date.replace(/-/g, '')) % HERO_QUERIES.length;
-  return `https://source.unsplash.com/1200x500/?${HERO_QUERIES[seed]}`;
-}
 
 export async function generateMetadata(
   { params }: { params: Promise<{ date: string; slug: string }> }
@@ -43,13 +29,13 @@ export async function generateMetadata(
       description: recap.summary ?? undefined,
       type: 'article',
       publishedTime: recap.generated_at,
-      images: [{ url: heroImageUrl(date), width: 1200, height: 500, alt: recap.title }],
+      ...(recap.hero_image_url && { images: [{ url: recap.hero_image_url, width: 1200, height: 500, alt: recap.title }] }),
     },
     twitter: {
       card: 'summary_large_image',
       title: recap.title,
       description: recap.summary ?? undefined,
-      images: [heroImageUrl(date)],
+      ...(recap.hero_image_url && { images: [recap.hero_image_url] }),
     },
   };
 }
@@ -130,7 +116,7 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
     description: recap.summary,
     datePublished: recap.generated_at,
     dateModified: recap.generated_at,
-    image: heroImageUrl(date),
+    ...(recap.hero_image_url && { image: recap.hero_image_url }),
     author: { '@type': 'Organization', name: 'NHL Momentum' },
     publisher: {
       '@type': 'Organization',
@@ -187,12 +173,14 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
         {/* Hero image */}
         <div className="relative w-full rounded-xl overflow-hidden mb-8"
           style={{ aspectRatio: '12/5', background: 'linear-gradient(135deg, #0d1117 0%, #1a1f35 100%)' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={heroImageUrl(date)}
-            alt={cleanTitle}
-            className="absolute inset-0 w-full h-full object-cover opacity-50"
-          />
+          {recap.hero_image_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={recap.hero_image_url}
+              alt={cleanTitle}
+              className="absolute inset-0 w-full h-full object-cover opacity-50"
+            />
+          )}
           {/* Gradient overlay */}
           <div className="absolute inset-0"
             style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.1) 60%, rgba(0,0,0,0.3) 100%)' }} />
