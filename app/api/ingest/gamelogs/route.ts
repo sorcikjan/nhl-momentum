@@ -3,64 +3,110 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { currentSeason, toiToSeconds } from '@/lib/nhl-api';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 
-// GET /api/ingest/gamelogs?limit=30&offset=0
-// Pulls game logs for active players and upserts into game_player_stats / game_goalie_stats
-// Use offset to paginate: run with offset=0, 30, 60, ... until exhausted
+// GET /api/ingest/gamelogs?since=YYYY-MM-DD   ← preferred: only teams that played since date
+// GET /api/ingest/gamelogs?limit=50&offset=0  ← full sweep: all active players paginated
+//
+// The ?since= mode is the correct path for nightly syncs. It filters to only players
+// on teams that have played since the given date — typically 100–200 players during
+// playoffs vs 500+ for the full sweep. This stays well within the NHL API rate limit.
+//
+// The full sweep (no since) is for weekly historical refreshes only.
+//
+// NHL API rate limit: ~90 req burst. We fire (sub_batch_size × 2) requests per batch.
+// Sub-batch of 3 with 300ms gaps = 6 parallel requests, ~2 req/s sustained — safe.
 
 export async function GET(req: NextRequest) {
   const authError = requireIngestAuth(req);
   if (authError) return authError;
 
-  const limit  = Math.min(200, Math.max(1, Number(req.nextUrl.searchParams.get('limit')  ?? '30')));
+  const sinceParam = req.nextUrl.searchParams.get('since');
+  const limit  = Math.min(200, Math.max(1, Number(req.nextUrl.searchParams.get('limit')  ?? '50')));
   const offset = Math.max(0, Number(req.nextUrl.searchParams.get('offset') ?? '0'));
   const season = currentSeason();
 
-  // Fetch active players from DB with pagination
-  const { data: players, error: playerErr } = await supabaseAdmin
-    .from('players')
-    .select('id, position_code, team_id')
-    .eq('is_active', true)
-    .order('id')
-    .range(offset, offset + limit - 1);
+  let players: { id: number; position_code: string; team_id: number | null }[] | null = null;
 
-  if (playerErr) {
-    return NextResponse.json({ data: null, error: playerErr.message }, { status: 500 });
+  if (sinceParam) {
+    // Targeted mode: only players on teams that played since `sinceParam`.
+    // Find all teams with completed/live games since that date.
+    const { data: recentGames } = await supabaseAdmin
+      .from('games')
+      .select('home_team_id, away_team_id')
+      .in('game_state', ['FINAL', 'OFF', 'LIVE', 'CRIT'])
+      .gte('game_date', sinceParam);
+
+    const activeTeamIds = new Set<number>();
+    for (const g of recentGames ?? []) {
+      if (g.home_team_id) activeTeamIds.add(g.home_team_id);
+      if (g.away_team_id) activeTeamIds.add(g.away_team_id);
+    }
+
+    if (activeTeamIds.size === 0) {
+      return NextResponse.json({ data: { skaterRows: 0, goalieRows: 0, playersProcessed: 0, rateLimited: 0, errors: [] }, error: null });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('players')
+      .select('id, position_code, team_id')
+      .eq('is_active', true)
+      .in('team_id', [...activeTeamIds])
+      .order('id');
+
+    if (error) return NextResponse.json({ data: null, error: error.message }, { status: 500 });
+    players = data ?? [];
+  } else {
+    // Full sweep mode: paginate through all active players.
+    const { data, error } = await supabaseAdmin
+      .from('players')
+      .select('id, position_code, team_id')
+      .eq('is_active', true)
+      .order('id')
+      .range(offset, offset + limit - 1);
+
+    if (error) return NextResponse.json({ data: null, error: error.message }, { status: 500 });
+    players = data ?? [];
   }
 
   let skaterRows = 0;
   let goalieRows = 0;
+  let rateLimited = 0;
   const errors: string[] = [];
 
-  // Fetch regular season (type 2) AND playoff (type 3) game logs.
-  // Before playoffs: type 3 returns empty — no overhead. After playoffs start: both populated.
-  // Deduplication by gameId ensures no double-counting if a game ID ever appears in both.
-  //
-  // NHL API rate-limits aggressively (~90 req burst cap). Fetching all players simultaneously
-  // causes silent HTML responses for mid-run players. Use micro-batches of 5 with 150ms gaps
-  // to stay under the limit while still completing a 30-player page in ~1s.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const results: PromiseSettledResult<{ player: NonNullable<typeof players>[0]; logs: any[] }>[] = [];
-  const SUB_BATCH = 5;
-  for (let si = 0; si < (players ?? []).length; si += SUB_BATCH) {
-    const sub = (players ?? []).slice(si, si + SUB_BATCH);
+  const results: PromiseSettledResult<{ player: typeof players[0]; logs: any[]; rateLimitHits: number }>[] = [];
+
+  // Sub-batch of 3 with 300ms gaps:
+  //   - fires 6 parallel requests per batch (3 players × 2 game types)
+  //   - ~2 req/s sustained — well under the NHL API ~90 req/burst limit
+  //   - previous value of 5 players / 150ms was firing 10 req per 150ms = ~67 req/s, causing silent failures
+  const SUB_BATCH = 3;
+  const SUB_DELAY = 300;
+
+  for (let si = 0; si < players.length; si += SUB_BATCH) {
+    const sub = players.slice(si, si + SUB_BATCH);
     const subResults = await Promise.allSettled(
       sub.map(async player => {
         const ac = new AbortController();
-        const timer = setTimeout(() => ac.abort(), 8000); // 8s per player
+        const timer = setTimeout(() => ac.abort(), 8000);
+        let rateLimitHits = 0;
         try {
           const [regRes, playoffRes] = await Promise.all([
             fetch(`https://api-web.nhle.com/v1/player/${player.id}/game-log/${season}/2`, { cache: 'no-store', signal: ac.signal }),
             fetch(`https://api-web.nhle.com/v1/player/${player.id}/game-log/${season}/3`, { cache: 'no-store', signal: ac.signal }),
           ]);
-          // Safe JSON parse — NHL API may return HTML on rate-limit even with 200 status
+
+          // Detect rate limiting: NHL API returns HTML with 200 status when throttled.
+          // Check Content-Type — if not JSON, the response is an error page.
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const safeJson = async (res: Response): Promise<{ gameLog?: any[] }> => {
-            if (!res.ok) return { gameLog: [] };
-            try { return await res.json(); } catch { return { gameLog: [] }; }
+            if (!res.ok) { rateLimitHits++; return { gameLog: [] }; }
+            const ct = res.headers.get('content-type') ?? '';
+            if (!ct.includes('json')) { rateLimitHits++; return { gameLog: [] }; }
+            try { return await res.json(); } catch { rateLimitHits++; return { gameLog: [] }; }
           };
+
           const [regJson, playoffJson] = await Promise.all([safeJson(regRes), safeJson(playoffRes)]);
 
-          // Merge regular season + playoff logs, dedup by gameId
           const seen = new Set<number>();
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const logs = [...(regJson.gameLog ?? []), ...(playoffJson.gameLog ?? [])].filter((g: any) => {
@@ -68,20 +114,18 @@ export async function GET(req: NextRequest) {
             seen.add(g.gameId);
             return true;
           });
-          return { player, logs };
+          return { player, logs, rateLimitHits };
         } finally {
           clearTimeout(timer);
         }
       })
     );
     results.push(...subResults);
-    // 150ms pause between sub-batches to stay under NHL API rate limit
-    if (si + SUB_BATCH < (players ?? []).length) {
-      await new Promise(r => setTimeout(r, 150));
+    if (si + SUB_BATCH < players.length) {
+      await new Promise(r => setTimeout(r, SUB_DELAY));
     }
   }
 
-  // Build DB rows from fetched logs
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const skaterBatch: any[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -92,7 +136,8 @@ export async function GET(req: NextRequest) {
       errors.push(`fetch error: ${result.reason}`);
       continue;
     }
-    const { player, logs } = result.value;
+    const { player, logs, rateLimitHits: rh } = result.value;
+    rateLimited += rh;
 
     if (player.position_code === 'G') {
       for (const g of logs) {
@@ -134,7 +179,6 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Upsert in batches of 200 to stay within PostgREST limits
   const BATCH = 200;
   for (let i = 0; i < skaterBatch.length; i += BATCH) {
     const { error } = await supabaseAdmin
@@ -152,7 +196,7 @@ export async function GET(req: NextRequest) {
   }
 
   return NextResponse.json({
-    data: { skaterRows, goalieRows, playersProcessed: (players ?? []).length, errors },
-    error: errors.length > 0 ? `${errors.length} errors` : null,
+    data: { skaterRows, goalieRows, playersProcessed: players.length, rateLimited, errors },
+    error: errors.length > 0 ? `${errors.length} errors` : rateLimited > 0 ? `${rateLimited} rate-limited responses` : null,
   });
 }

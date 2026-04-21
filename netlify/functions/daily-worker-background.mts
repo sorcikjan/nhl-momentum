@@ -6,6 +6,8 @@ import type { BackgroundHandler } from '@netlify/functions';
 // If no phases, runs the full daily pipeline.
 
 const CALL_TIMEOUT_MS = 25_000;
+// Gamelogs fetches from NHL API per player — allow more time when processing large rosters
+const GAMELOGS_TIMEOUT_MS = 120_000;
 // Gemini generation can take 20-30s on slow days — use a longer timeout for AI routes
 const AI_CALL_TIMEOUT_MS = 55_000;
 
@@ -68,20 +70,32 @@ const handler: BackgroundHandler = async (event) => {
     } catch (e) { log.push(`outcomes-backfill: exception ${e}`); }
   }
 
-  // 2. Gamelogs — paginated, all players
+  // 2. Gamelogs — targeted by teams that played in last 3 days (avoids NHL API rate limits)
+  // Uses ?since= to fetch only players on recently-active teams (~100–200 players during playoffs)
+  // instead of paginating through all 500+ active players which silently fails past player 100.
   if (phases.includes('gamelogs')) {
+    try {
+      const since = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
+      const r = await call(`${base}/api/ingest/gamelogs?since=${since}`, h, GAMELOGS_TIMEOUT_MS);
+      const rateLimitWarn = (r.data?.rateLimited ?? 0) > 0 ? ` (${r.data.rateLimited} rate-limited)` : '';
+      log.push(`gamelogs: ${(r.data?.skaterRows ?? 0) + (r.data?.goalieRows ?? 0)} rows, ${r.data?.playersProcessed ?? 0} players${rateLimitWarn}${r.error && !r.data?.rateLimited ? ` err: ${r.error}` : ''}`);
+    } catch (e) { log.push(`gamelogs: exception ${e}`); }
+  }
+
+  // 2b. Gamelogs full sweep — only run when explicitly requested (e.g. weekly historical refresh)
+  if (phases.includes('gamelogs-full')) {
     try {
       let offset = 0, rows = 0;
       for (;;) {
-        const r = await call(`${base}/api/ingest/gamelogs?offset=${offset}&limit=50`, h);
-        if (r.error) { log.push(`gamelogs err: ${r.error}`); break; }
+        const r = await call(`${base}/api/ingest/gamelogs?offset=${offset}&limit=50`, h, GAMELOGS_TIMEOUT_MS);
+        if (r.error && !r.data) { log.push(`gamelogs-full err: ${r.error}`); break; }
         rows += (r.data?.skaterRows ?? 0) + (r.data?.goalieRows ?? 0);
-        if ((r.data?.playersProcessed ?? r.data?.skaterRows ?? 0) < 50) break;
+        if ((r.data?.playersProcessed ?? 0) < 50) break;
         offset += 50;
         if (offset > 2000) break;
       }
-      log.push(`gamelogs: ${rows} rows`);
-    } catch (e) { log.push(`gamelogs: exception ${e}`); }
+      log.push(`gamelogs-full: ${rows} rows`);
+    } catch (e) { log.push(`gamelogs-full: exception ${e}`); }
   }
 
   // 3. Metrics — paginated, all players
