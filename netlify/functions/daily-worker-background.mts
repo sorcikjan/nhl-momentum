@@ -6,10 +6,12 @@ import type { BackgroundHandler } from '@netlify/functions';
 // If no phases, runs the full daily pipeline.
 
 const CALL_TIMEOUT_MS = 25_000;
+// Gemini generation can take 20-30s on slow days — use a longer timeout for AI routes
+const AI_CALL_TIMEOUT_MS = 55_000;
 
-async function call(url: string, headers: Record<string, string>) {
+async function call(url: string, headers: Record<string, string>, timeoutMs = CALL_TIMEOUT_MS) {
   const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), CALL_TIMEOUT_MS);
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
     const res = await fetch(url, { headers, signal: ac.signal });
     return await res.json();
@@ -166,7 +168,7 @@ const handler: BackgroundHandler = async (event) => {
   if (phases.includes('recap')) {
     try {
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-      const r = await call(`${base}/api/ingest/recap?date=${yesterday}`, h);
+      const r = await call(`${base}/api/ingest/recap?date=${yesterday}`, h, AI_CALL_TIMEOUT_MS);
       log.push(`recap: ${r.data?.skipped ? `skipped (${r.data.reason})` : r.data?.title ?? `err: ${r.error}`}`);
     } catch (e) { log.push(`recap: exception ${e}`); }
   }
