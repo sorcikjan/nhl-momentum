@@ -78,11 +78,11 @@ const handler: BackgroundHandler = async (event) => {
       const since = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
       let offset = 0, rows = 0, rateLimitTotal = 0;
       for (;;) {
-        const r = await call(`${base}/api/ingest/gamelogs?since=${since}&offset=${offset}&limit=50`, h, GAMELOGS_TIMEOUT_MS);
+        const r = await call(`${base}/api/ingest/gamelogs?since=${since}&offset=${offset}&limit=20`, h, GAMELOGS_TIMEOUT_MS);
         if (r.error && !r.data) { log.push(`gamelogs err: ${r.error}`); break; }
         rows += (r.data?.skaterRows ?? 0) + (r.data?.goalieRows ?? 0);
         rateLimitTotal += r.data?.rateLimited ?? 0;
-        if ((r.data?.playersProcessed ?? 0) < 50) break;
+        if ((r.data?.playersProcessed ?? 0) < 20) break;
         offset += 50;
         if (offset > 1000) break;
       }

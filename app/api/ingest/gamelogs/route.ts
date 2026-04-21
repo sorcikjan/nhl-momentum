@@ -20,7 +20,10 @@ export async function GET(req: NextRequest) {
   if (authError) return authError;
 
   const sinceParam = req.nextUrl.searchParams.get('since');
-  const limit  = Math.min(200, Math.max(1, Number(req.nextUrl.searchParams.get('limit')  ?? '50')));
+  // since= mode uses smaller pages (20) — fully sequential processing at 1 req/s
+  // takes ~22s for 20 players, safely within Netlify's 26s function limit.
+  const defaultLimit = sinceParam ? 20 : 50;
+  const limit  = Math.min(200, Math.max(1, Number(req.nextUrl.searchParams.get('limit')  ?? defaultLimit)));
   const offset = Math.max(0, Number(req.nextUrl.searchParams.get('offset') ?? '0'));
   const season = currentSeason();
 
@@ -81,12 +84,12 @@ export async function GET(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const results: PromiseSettledResult<{ player: typeof players[0]; logs: any[]; rateLimitHits: number }>[] = [];
 
-  // Sub-batch of 2 with 500ms gaps:
-  //   - fires 4 parallel requests per batch (2 players × 2 game types)
-  //   - ~1.5 req/s sustained — safely under NHL API rate limit
-  //   - empirically tested: sub-batch=3 / 300ms still caused 47% rate-limit failures
-  const SUB_BATCH = 2;
-  const SUB_DELAY = 500;
+  // Sub-batch of 1 with 600ms gaps (fully sequential per player):
+  //   - fires 2 parallel requests per step (type-2 + type-3 for one player)
+  //   - ~1 req/s sustained — empirically required; sub-batch=2/500ms still hit 29% failures
+  //   - 20 players per call × ~1.1s each = ~22s, safely within Netlify's 26s function limit
+  const SUB_BATCH = 1;
+  const SUB_DELAY = 600;
 
   for (let si = 0; si < players.length; si += SUB_BATCH) {
     const sub = players.slice(si, si + SUB_BATCH);
