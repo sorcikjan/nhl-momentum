@@ -131,11 +131,13 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
       },
     };
   }
-  const showBoxscore = (isLive || isFinal) && liveBoxscore != null;
-  const homeBoxPlayers = showBoxscore ? normPlayers(liveBoxscore.homeTeam, homeId) : null;
-  const awayBoxPlayers = showBoxscore ? normPlayers(liveBoxscore.awayTeam, awayId) : null;
-  const homeBoxGoalie  = showBoxscore ? normGoalie(liveBoxscore.homeTeam?.goalies ?? [], homeId) : null;
-  const awayBoxGoalie  = showBoxscore ? normGoalie(liveBoxscore.awayTeam?.goalies ?? [], awayId) : null;
+  // Normalize boxscore whenever available — used as primary source for live games
+  // and as fallback for final games where the pipeline hasn't run yet.
+  const hasBoxscore = liveBoxscore != null;
+  const homeBoxPlayers = hasBoxscore ? normPlayers(liveBoxscore.homeTeam, homeId) : null;
+  const awayBoxPlayers = hasBoxscore ? normPlayers(liveBoxscore.awayTeam, awayId) : null;
+  const homeBoxGoalie  = hasBoxscore ? normGoalie(liveBoxscore.homeTeam?.goalies ?? [], homeId) : null;
+  const awayBoxGoalie  = hasBoxscore ? normGoalie(liveBoxscore.awayTeam?.goalies ?? [], awayId) : null;
 
   return (
     <div className="max-w-5xl mx-auto pb-20 md:pb-0">
@@ -476,9 +478,17 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           abbrev={awayAbbrev}
           teamName={awayName}
           logo={awayLogo}
-          skaters={showBoxscore ? (awayBoxPlayers ?? awayStats ?? awaySkaters) : awaySkaters}
-          goalie={showBoxscore ? (awayBoxGoalie ?? awayGoalie) : null}
-          isLive={showBoxscore}
+          skaters={
+            isLive  ? (awayBoxPlayers ?? awaySkaters) :          // live: API always
+            isFinal ? (awayStats.length ? awayStats : (awayBoxPlayers ?? awaySkaters)) : // final: DB, fallback API
+            awaySkaters                                           // pre-game: snapshots
+          }
+          goalie={
+            isLive  ? awayBoxGoalie :
+            isFinal ? (awayGoalie ?? awayBoxGoalie) :
+            null
+          }
+          isLive={isLive || isFinal}
           teamId={awayId}
         />
 
@@ -487,9 +497,17 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           abbrev={homeAbbrev}
           teamName={homeName}
           logo={homeLogo}
-          skaters={showBoxscore ? (homeBoxPlayers ?? homeStats ?? homeSkaters) : homeSkaters}
-          goalie={showBoxscore ? (homeBoxGoalie ?? homeGoalie) : null}
-          isLive={showBoxscore}
+          skaters={
+            isLive  ? (homeBoxPlayers ?? homeSkaters) :
+            isFinal ? (homeStats.length ? homeStats : (homeBoxPlayers ?? homeSkaters)) :
+            homeSkaters
+          }
+          goalie={
+            isLive  ? homeBoxGoalie :
+            isFinal ? (homeGoalie ?? homeBoxGoalie) :
+            null
+          }
+          isLive={isLive || isFinal}
           teamId={homeId}
         />
       </div>
