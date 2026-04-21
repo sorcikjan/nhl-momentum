@@ -227,6 +227,46 @@ export async function fetchRankings() {
 
 // ─── Games ────────────────────────────────────────────────────────────────────
 
+// Recent completed games from the DB — used on the homepage "Last Night" section.
+// Returns up to `limit` games from the past `days` days, newest first.
+// Also returns one prediction per game (active model preferred).
+export async function fetchRecentCompletedGames(days = 3, limit = 20) {
+  const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+
+  const { data: games } = await supabaseAdmin
+    .from('games')
+    .select(`
+      id, game_date, home_score, away_score, game_state,
+      home_team:teams!games_home_team_id_fkey(id, abbrev, name),
+      away_team:teams!games_away_team_id_fkey(id, abbrev, name)
+    `)
+    .gte('game_date', since)
+    .in('game_state', ['FINAL', 'OFF'])
+    .order('game_date', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(limit);
+
+  if (!games?.length) return { games: [], predMap: new Map() };
+
+  const gameIds = games.map(g => g.id);
+  const activeModel = await latestModelVersion();
+
+  const { data: preds } = await supabaseAdmin
+    .from('predictions')
+    .select('game_id, home_win_probability, model_version, prediction_outcomes(home_win)')
+    .in('game_id', gameIds)
+    .order('created_at', { ascending: false });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const predMap = new Map<number, any>();
+  for (const p of (preds ?? [])) {
+    const existing = predMap.get(p.game_id);
+    if (!existing || p.model_version === activeModel) predMap.set(p.game_id, p);
+  }
+
+  return { games, predMap };
+}
+
 export async function fetchGames(date: string) {
   // NHL API and model version can run in parallel
   const [games, activeModel] = await Promise.all([

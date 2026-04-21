@@ -3,6 +3,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { playerUrl, teamUrl } from '@/lib/urls';
 import { deriveOutStatus, daysAgo } from '@/lib/player-status';
+import { ppmToHeat } from '@/lib/heat';
 
 interface Player {
   player_id: number;
@@ -84,13 +85,13 @@ export default function RankingsTable({ players }: { players: Player[] }) {
           <table className="w-full text-sm">
             <thead style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
               <tr>
+                <th className="w-1 p-0" />
                 <th className="px-2 md:px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider w-8 md:w-12"
                   style={{ color: 'var(--text)' }}>#</th>
                 <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider"
                   style={{ color: 'var(--text)' }}>Player</th>
-                {th('M.PPM', 'momentum_ppm')}
-                {th('S.PPM', 'season_ppm')}
-                {th('Delta', 'breakout_delta')}
+                {th('Heat', 'momentum_ppm')}
+                {th('Δ Avg', 'breakout_delta')}
                 {th('SOS', 'sos_coefficient', true)}
                 {th('Energy', 'energy_bar', true)}
                 <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell"
@@ -115,6 +116,9 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                   : outStatus === 'scratch' ? { label: 'SCRATCHED', color: 'var(--amber)', bg: 'rgba(245,158,11,0.18)' }
                   : null;
 
+                const heat = ppmToHeat(p.momentum_ppm);
+                const heatOpacity = Math.max(0.15, heat / 100);
+
                 return (
                   <tr key={p.player_id}
                     className="border-t transition-colors"
@@ -125,6 +129,13 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                     onMouseLeave={e => (e.currentTarget.style.background = i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)')}
                   >
+                    {/* Heat stripe */}
+                    <td className="w-1 p-0">
+                      <div className="w-1 h-full min-h-[40px]" style={{
+                        background: 'var(--heat)',
+                        opacity: heatOpacity,
+                      }} />
+                    </td>
                     <td className="px-2 md:px-3 py-2.5 font-mono text-xs w-8 md:w-12" style={{ color: 'var(--text)' }}>
                       {p.momentum_rank}
                     </td>
@@ -159,15 +170,12 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                         </div>
                       </Link>
                     </td>
-                    <td className="px-2 py-2.5 font-mono text-xs md:text-sm font-semibold" style={{ color: 'var(--neon)' }}>
-                      {(p.momentum_ppm ?? 0).toFixed(4)}
-                    </td>
-                    <td className="px-2 py-2.5 font-mono text-xs md:text-sm" style={{ color: 'var(--silver)' }}>
-                      {(p.season_ppm ?? 0).toFixed(4)}
+                    <td className="px-2 py-2.5 font-mono text-xs md:text-sm font-bold" style={{ color: heat >= 72 ? 'var(--heat)' : heat >= 50 ? 'var(--amber)' : 'var(--text)' }}>
+                      {heat}
                     </td>
                     <td className="px-2 py-2.5 font-mono text-xs md:text-sm"
-                      style={{ color: delta > 0 ? 'var(--green)' : delta < 0 ? 'var(--red)' : 'var(--text)' }}>
-                      {delta > 0 ? '+' : ''}{delta.toFixed(4)}
+                      style={{ color: delta > 0 ? 'var(--heat)' : delta < 0 ? 'var(--silver)' : 'var(--text)' }}>
+                      {delta > 0 ? '+' : ''}{delta > 0 || delta < 0 ? `${(delta / (p.season_ppm || 0.001) * 100).toFixed(0)}%` : '—'}
                     </td>
                     <td className="px-3 py-2.5 font-mono text-xs hidden md:table-cell" style={{ color: 'var(--text)' }}>
                       {(p.sos_coefficient ?? 1).toFixed(2)}
