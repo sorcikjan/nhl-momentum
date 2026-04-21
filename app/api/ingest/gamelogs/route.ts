@@ -81,12 +81,12 @@ export async function GET(req: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const results: PromiseSettledResult<{ player: typeof players[0]; logs: any[]; rateLimitHits: number }>[] = [];
 
-  // Sub-batch of 3 with 300ms gaps:
-  //   - fires 6 parallel requests per batch (3 players × 2 game types)
-  //   - ~2 req/s sustained — well under the NHL API ~90 req/burst limit
-  //   - previous value of 5 players / 150ms was firing 10 req per 150ms = ~67 req/s, causing silent failures
-  const SUB_BATCH = 3;
-  const SUB_DELAY = 300;
+  // Sub-batch of 2 with 500ms gaps:
+  //   - fires 4 parallel requests per batch (2 players × 2 game types)
+  //   - ~1.5 req/s sustained — safely under NHL API rate limit
+  //   - empirically tested: sub-batch=3 / 300ms still caused 47% rate-limit failures
+  const SUB_BATCH = 2;
+  const SUB_DELAY = 500;
 
   for (let si = 0; si < players.length; si += SUB_BATCH) {
     const sub = players.slice(si, si + SUB_BATCH);
