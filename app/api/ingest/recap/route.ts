@@ -7,29 +7,33 @@ import type { RecapGame, RecapPerformer, RecapShutout } from '@/lib/ai';
 
 // Fetch a free hockey photo from Pixabay (Pixabay License — no attribution required).
 // Uses a date-seeded page offset so each recap gets a different image.
-async function fetchPixabayHockeyImage(date: string): Promise<string | null> {
+async function fetchPixabayHockeyImage(date: string, query: string): Promise<string | null> {
   const apiKey = process.env.PIXABAY_API_KEY;
   if (!apiKey) return null;
 
-  // Seed page from date so different recaps get different images (1–100)
-  const seed = (parseInt(date.replace(/-/g, ''), 10) % 100) + 1;
+  // Seed page from date so different recaps get different images (1–50)
+  const seed = (parseInt(date.replace(/-/g, ''), 10) % 50) + 1;
 
-  try {
+  const tryQuery = async (q: string) => {
     const url = new URL('https://pixabay.com/api/');
     url.searchParams.set('key', apiKey);
-    url.searchParams.set('q', 'ice hockey');
+    url.searchParams.set('q', q);
     url.searchParams.set('image_type', 'photo');
     url.searchParams.set('orientation', 'horizontal');
     url.searchParams.set('min_width', '1200');
     url.searchParams.set('safesearch', 'true');
-    url.searchParams.set('per_page', '3');
+    url.searchParams.set('per_page', '5');
     url.searchParams.set('page', String(seed));
 
     const res = await fetch(url.toString(), { next: { revalidate: 0 } });
     if (!res.ok) return null;
-
     const json = await res.json() as { hits?: { largeImageURL?: string }[] };
     return json.hits?.[0]?.largeImageURL ?? null;
+  };
+
+  try {
+    // Try AI-suggested query first, fall back to generic if no results
+    return (await tryQuery(query)) ?? (await tryQuery('ice hockey arena'));
   } catch {
     return null;
   }
@@ -142,8 +146,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: null, error: 'AI generation failed — check Netlify function logs for [ai] ask error' }, { status: 500 });
   }
 
-  // Fetch a hero image from Pixabay (Pixabay License — free commercial use, no attribution required)
-  const heroImageUrl = await fetchPixabayHockeyImage(date);
+  // Fetch a hero image from Pixabay using the AI-suggested query
+  const pixabayQuery = result.pixabayQuery ?? 'ice hockey arena';
+  const heroImageUrl = await fetchPixabayHockeyImage(date, pixabayQuery);
 
   const { error: upsertErr } = await supabaseAdmin
     .from('daily_recaps')

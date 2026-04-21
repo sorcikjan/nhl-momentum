@@ -289,6 +289,7 @@ export interface DailyRecapOutput {
   title: string;
   summary: string;
   content: string;
+  pixabayQuery?: string;  // 2-3 keywords for a Pixabay stock photo search
 }
 
 export async function generateDailyRecap(input: DailyRecapInput): Promise<DailyRecapOutput | null> {
@@ -360,7 +361,8 @@ Respond with valid JSON (no markdown, no code blocks):
 {
   "title": "NHL Recap ${input.dateLabel}: [headline max 70 chars — lead with the biggest story, name a team or player]",
   "summary": "2 sentences max 160 chars total. Name date, key players, teams. Written for Google snippet.",
-  "content": "[lede paragraph]\\n\\n### {AWAY} {score} @ {HOME} {score}\\n\\n[game paragraph]\\n\\n[repeat for each game]\\n\\n### Momentum Watch\\n\\n[paragraph]\\n\\n### Looking Ahead\\n\\n[paragraph]"
+  "content": "[lede paragraph]\\n\\n### {AWAY} {score} @ {HOME} {score}\\n\\n[game paragraph]\\n\\n[repeat for each game]\\n\\n### Momentum Watch\\n\\n[paragraph]\\n\\n### Looking Ahead\\n\\n[paragraph]",
+  "pixabayQuery": "2-3 word Pixabay stock photo search matching tonight's biggest story. Use visual concepts not team names. Examples: 'hockey goalie save', 'ice hockey celebration crowd', 'hockey overtime fans', 'hockey arena full', 'ice rink action'. Pick what fits best."
 }`;
 
   const raw = await ask(prompt);
