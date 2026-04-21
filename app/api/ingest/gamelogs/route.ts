@@ -48,12 +48,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ data: { skaterRows: 0, goalieRows: 0, playersProcessed: 0, rateLimited: 0, errors: [] }, error: null });
     }
 
+    // Still paginate — each call must complete within Netlify's 26s function limit.
+    // The filtered team set keeps total players low (~200 playoffs) but we still chunk.
     const { data, error } = await supabaseAdmin
       .from('players')
       .select('id, position_code, team_id')
       .eq('is_active', true)
       .in('team_id', [...activeTeamIds])
-      .order('id');
+      .order('id')
+      .range(offset, offset + limit - 1);
 
     if (error) return NextResponse.json({ data: null, error: error.message }, { status: 500 });
     players = data ?? [];

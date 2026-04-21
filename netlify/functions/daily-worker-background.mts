@@ -76,9 +76,18 @@ const handler: BackgroundHandler = async (event) => {
   if (phases.includes('gamelogs')) {
     try {
       const since = new Date(Date.now() - 3 * 86_400_000).toISOString().slice(0, 10);
-      const r = await call(`${base}/api/ingest/gamelogs?since=${since}`, h, GAMELOGS_TIMEOUT_MS);
-      const rateLimitWarn = (r.data?.rateLimited ?? 0) > 0 ? ` (${r.data.rateLimited} rate-limited)` : '';
-      log.push(`gamelogs: ${(r.data?.skaterRows ?? 0) + (r.data?.goalieRows ?? 0)} rows, ${r.data?.playersProcessed ?? 0} players${rateLimitWarn}${r.error && !r.data?.rateLimited ? ` err: ${r.error}` : ''}`);
+      let offset = 0, rows = 0, rateLimitTotal = 0;
+      for (;;) {
+        const r = await call(`${base}/api/ingest/gamelogs?since=${since}&offset=${offset}&limit=50`, h, GAMELOGS_TIMEOUT_MS);
+        if (r.error && !r.data) { log.push(`gamelogs err: ${r.error}`); break; }
+        rows += (r.data?.skaterRows ?? 0) + (r.data?.goalieRows ?? 0);
+        rateLimitTotal += r.data?.rateLimited ?? 0;
+        if ((r.data?.playersProcessed ?? 0) < 50) break;
+        offset += 50;
+        if (offset > 1000) break;
+      }
+      const warn = rateLimitTotal > 0 ? ` (${rateLimitTotal} rate-limited)` : '';
+      log.push(`gamelogs: ${rows} rows${warn}`);
     } catch (e) { log.push(`gamelogs: exception ${e}`); }
   }
 
