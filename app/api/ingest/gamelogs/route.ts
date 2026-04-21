@@ -29,11 +29,14 @@ export async function GET(req: NextRequest) {
   if (sinceParam) {
     // Targeted mode: only players on teams that played since `sinceParam`.
     // Find all teams with completed/live games since that date.
+    // No game_state filter — any game in the DB for this date range means that team played.
+    // State values vary (OFF, FINAL, LIVE, FUT, PRE, CRIT) and change over time;
+    // filtering by state here would silently exclude teams whose games have unexpected states.
     const { data: recentGames } = await supabaseAdmin
       .from('games')
       .select('home_team_id, away_team_id')
-      .in('game_state', ['FINAL', 'OFF', 'LIVE', 'CRIT'])
-      .gte('game_date', sinceParam);
+      .gte('game_date', sinceParam)
+      .limit(500);
 
     const activeTeamIds = new Set<number>();
     for (const g of recentGames ?? []) {
