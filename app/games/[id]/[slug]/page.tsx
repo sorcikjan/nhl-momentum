@@ -77,11 +77,65 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const awaySkaters = (awaySnap?.skater_snapshots as any[]) ?? [];
 
-  // Split player stats by team
+  // Split player stats by team (DB — fallback when boxscore unavailable)
   const homeStats = (playerStats ?? []).filter((p: { team_id: number }) => p.team_id === homeId);
   const awayStats = (playerStats ?? []).filter((p: { team_id: number }) => p.team_id === awayId);
   const homeGoalie = (goalieStats ?? []).find((g: { team_id: number }) => g.team_id === homeId);
   const awayGoalie = (goalieStats ?? []).find((g: { team_id: number }) => g.team_id === awayId);
+
+  // Live boxscore stats — available for LIVE, CRIT, and FINAL games directly from the NHL API.
+  // This is the primary data source for game stats: it updates every 5 min via the fetch cache,
+  // so live games show current stats without waiting for the nightly pipeline.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const liveBoxscore = (live?.playerByGameStats as any) ?? null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function normPlayers(teamPlayers: any, teamId: number): any[] {
+    return [
+      ...(teamPlayers?.forwards ?? []),
+      ...(teamPlayers?.defense ?? []),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ].map((p: any) => {
+      const full: string = p.name?.default ?? '';
+      const sp = full.indexOf(' ');
+      return {
+        player_id: p.playerId,
+        team_id: teamId,
+        goals: p.goals ?? 0,
+        assists: p.assists ?? 0,
+        plus_minus: p.plusMinus ?? 0,
+        players: {
+          first_name: sp > 0 ? full.slice(0, sp) : '',
+          last_name: sp > 0 ? full.slice(sp + 1) : full,
+          position_code: p.position,
+        },
+      };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    }).sort((a: any, b: any) => (b.goals + b.assists) - (a.goals + a.assists));
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function normGoalie(goalies: any[], teamId: number): any | null {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const g = (goalies ?? []).find((x: any) => x.starter) ?? goalies?.[0] ?? null;
+    if (!g) return null;
+    const full: string = g.name?.default ?? '';
+    const sp = full.indexOf(' ');
+    return {
+      player_id: g.playerId,
+      team_id: teamId,
+      shots_against: g.shotsAgainst ?? 0,
+      goals_against: g.goalsAgainst ?? 0,
+      save_pct: (g.shotsAgainst ?? 0) > 0 ? (g.saves ?? 0) / g.shotsAgainst : null,
+      players: {
+        first_name: sp > 0 ? full.slice(0, sp) : '',
+        last_name: sp > 0 ? full.slice(sp + 1) : full,
+      },
+    };
+  }
+  const showBoxscore = (isLive || isFinal) && liveBoxscore != null;
+  const homeBoxPlayers = showBoxscore ? normPlayers(liveBoxscore.homeTeam, homeId) : null;
+  const awayBoxPlayers = showBoxscore ? normPlayers(liveBoxscore.awayTeam, awayId) : null;
+  const homeBoxGoalie  = showBoxscore ? normGoalie(liveBoxscore.homeTeam?.goalies ?? [], homeId) : null;
+  const awayBoxGoalie  = showBoxscore ? normGoalie(liveBoxscore.awayTeam?.goalies ?? [], awayId) : null;
 
   return (
     <div className="max-w-5xl mx-auto pb-20 md:pb-0">
@@ -422,9 +476,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           abbrev={awayAbbrev}
           teamName={awayName}
           logo={awayLogo}
-          skaters={isFinal ? awayStats : awaySkaters}
-          goalie={isFinal ? awayGoalie : null}
-          isLive={isFinal}
+          skaters={showBoxscore ? (awayBoxPlayers ?? awayStats ?? awaySkaters) : awaySkaters}
+          goalie={showBoxscore ? (awayBoxGoalie ?? awayGoalie) : null}
+          isLive={showBoxscore}
           teamId={awayId}
         />
 
@@ -433,9 +487,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           abbrev={homeAbbrev}
           teamName={homeName}
           logo={homeLogo}
-          skaters={isFinal ? homeStats : homeSkaters}
-          goalie={isFinal ? homeGoalie : null}
-          isLive={isFinal}
+          skaters={showBoxscore ? (homeBoxPlayers ?? homeStats ?? homeSkaters) : homeSkaters}
+          goalie={showBoxscore ? (homeBoxGoalie ?? homeGoalie) : null}
+          isLive={showBoxscore}
           teamId={homeId}
         />
       </div>
