@@ -35,7 +35,7 @@ const handler: BackgroundHandler = async (event) => {
   }
 
   const body = event.body ? JSON.parse(event.body) : {};
-  const phases: string[] = body.phases ?? ['backfill', 'outcomes', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy', 'extras'];
+  const phases: string[] = body.phases ?? ['backfill', 'outcomes', 'outcomes-backfill', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy', 'extras'];
   const dateParam: string = body.date ?? '';
   const dateSuffix = dateParam ? `&date=${dateParam}` : '';
 
@@ -50,12 +50,22 @@ const handler: BackgroundHandler = async (event) => {
     } catch (e) { log.push(`backfill: exception ${e}`); }
   }
 
-  // 1. Outcomes — record yesterday's results
+  // 1. Outcomes — record yesterday's results (schedule-API-based, fast path)
   if (phases.includes('outcomes')) {
     try {
       const r = await call(`${base}/api/ingest/daily?phase=outcomes${dateSuffix}`, h);
       log.push(`outcomes: ${r.data?.outcomes_recorded ?? `err: ${r.error}`}`);
     } catch (e) { log.push(`outcomes: exception ${e}`); }
+  }
+
+  // 1b. Outcomes backfill — DB-based sweep for any FINAL games whose prediction_outcomes
+  //     were missed by phase 1 (e.g. schedule-API cache returned stale LIVE state).
+  //     Reads scores from the games table directly — no NHL API dependency.
+  if (phases.includes('outcomes-backfill')) {
+    try {
+      const r = await call(`${base}/api/ingest/outcomes-backfill?limit=100`, h);
+      log.push(`outcomes-backfill: ${r.data?.outcomes_upserted ?? 0} upserted across ${r.data?.games_processed ?? 0} games${r.error ? ` err: ${r.error}` : ''}`);
+    } catch (e) { log.push(`outcomes-backfill: exception ${e}`); }
   }
 
   // 2. Gamelogs — paginated, all players
