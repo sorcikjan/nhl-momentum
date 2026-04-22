@@ -115,7 +115,7 @@ export async function fetchRankings() {
       sos_coefficient, calculated_at,
       players (
         id, first_name, last_name, position_code, team_id,
-        headshot_url, injury_status,
+        headshot_url, injury_status, sweater_number,
         teams ( id, abbrev, name )
       )
     `)

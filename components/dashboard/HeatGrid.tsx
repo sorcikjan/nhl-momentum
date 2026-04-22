@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { playerUrl } from '@/lib/urls';
-import { ppmToHeat, heatColor, heatLabel } from '@/lib/heat';
+import { ppmToHeat, heatColor } from '@/lib/heat';
 
 interface Player {
   player_id: number;
@@ -13,117 +13,229 @@ interface Player {
     last_name: string;
     headshot_url: string | null;
     position_code: string;
+    sweater_number?: number | null;
     teams: { abbrev: string };
   };
 }
 
-function HeatTile({ p, rank }: { p: Player; rank: number }) {
+const TEAM_BADGE_COLORS: Record<string, string> = {
+  ANA: '#F47A38', ARI: '#8C2633', UTA: '#71AFE5',
+  BOS: '#FFB81C', BUF: '#003087', CGY: '#C8102E',
+  CAR: '#CC0000', CHI: '#CF0A2C', COL: '#6F263D',
+  CBJ: '#002654', DAL: '#006847', DET: '#CE1126',
+  EDM: '#FF4C00', FLA: '#041E42', LAK: '#A2AAAD',
+  MIN: '#154734', MTL: '#AF1E2D', NSH: '#FFB81C',
+  NJD: '#CE1126', NYI: '#003087', NYR: '#0038A8',
+  OTT: '#C2912C', PHI: '#F74902', PIT: '#FCB514',
+  SEA: '#99D9D9', SJS: '#006D75', STL: '#002F87',
+  TBL: '#002868', TOR: '#003E7E', VAN: '#00843D',
+  VGK: '#B4975A', WSH: '#C8102E', WPG: '#041E42',
+};
+
+function TeamBadge({ abbrev }: { abbrev: string }) {
+  return (
+    <span
+      style={{
+        background: TEAM_BADGE_COLORS[abbrev] ?? '#333',
+        color: '#fff',
+        padding: '2px 5px',
+        borderRadius: '4px',
+        fontSize: '0.6rem',
+        fontWeight: 700,
+        lineHeight: 1,
+        display: 'inline-block',
+      }}
+    >
+      {abbrev}
+    </span>
+  );
+}
+
+function heatBg(heat: number): string {
+  const t = heat / 100;
+  const r = Math.round(13 + t * 120);
+  const g = Math.round(15 + t * 20);
+  const b = Math.round(20 - t * 10);
+  return `rgb(${r},${g},${b})`;
+}
+
+function PlayerCard({ p, rank }: { p: Player; rank: number }) {
   const heat = ppmToHeat(p.momentum_ppm);
   const color = heatColor(heat);
-  const label = heatLabel(heat);
-  const pct = p.season_ppm > 0
-    ? Math.round(((p.momentum_ppm - p.season_ppm) / p.season_ppm) * 100)
-    : 0;
-  const isHot = heat >= 72;
+  const abbrev = p.players.teams.abbrev;
+  const pos = p.players.position_code;
+  const num = p.players.sweater_number;
 
   return (
     <Link
       href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
-      className="relative flex-shrink-0 rounded-2xl overflow-hidden hover:opacity-90 transition-opacity"
-      style={{ width: '140px', height: '190px' }}
+      className="relative rounded-xl overflow-hidden hover:opacity-90 transition-opacity block"
+      style={{
+        background: `linear-gradient(135deg, ${heatBg(heat)} 0%, #0d0f14 80%)`,
+        aspectRatio: '3 / 4',
+        minWidth: 0,
+      }}
     >
-      {/* Headshot photo background */}
-      {p.players.headshot_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={p.players.headshot_url}
-          alt={p.players.last_name}
-          className="absolute inset-0 w-full h-full object-cover object-top"
-          loading="lazy"
-        />
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center text-4xl font-black"
-          style={{ background: 'var(--bg-card)', color: 'var(--border)' }}>
-          {p.players.first_name[0]}
-        </div>
-      )}
-
-      {/* Bottom gradient */}
-      <div className="absolute inset-0"
-        style={{ background: 'linear-gradient(to top, rgba(13,15,20,0.97) 0%, rgba(13,15,20,0.6) 55%, rgba(13,15,20,0.15) 100%)' }} />
-
-      {/* Heat glow at top for hot players */}
-      {isHot && (
-        <div className="absolute inset-0 pointer-events-none"
-          style={{ background: `radial-gradient(ellipse at 50% -10%, ${color}30 0%, transparent 60%)` }} />
-      )}
-
-      {/* Rank badge — top left */}
-      <span className="absolute top-2.5 left-3 text-xs font-mono font-bold"
-        style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.6rem' }}>
-        #{rank}
-      </span>
-
-      {/* Hot label — top right */}
-      {label && (
-        <span className="absolute top-2 right-2 text-xs font-bold px-1.5 py-0.5 rounded"
-          style={{ background: `${color}22`, color, border: `1px solid ${color}44`, fontSize: '0.6rem', letterSpacing: '0.05em' }}>
-          {label}
-        </span>
-      )}
-
-      {/* Bottom content */}
-      <div className="absolute bottom-0 left-0 right-0 p-3 flex flex-col gap-0.5">
-        {/* Heat score */}
-        <div className="flex items-baseline gap-1">
-          <span className="text-2xl font-black font-mono leading-none" style={{ color }}>
-            {heat}
-          </span>
-          {pct !== 0 && (
-            <span className="text-xs font-mono" style={{ color: pct > 0 ? 'var(--heat)' : 'var(--silver)', opacity: 0.8, fontSize: '0.6rem' }}>
-              {pct > 0 ? '+' : ''}{pct}%
-            </span>
-          )}
-        </div>
-
-        {/* Name */}
-        <span className="text-sm font-bold leading-tight truncate" style={{ color: 'var(--text-bright)' }}>
-          {p.players.last_name}
-        </span>
-
-        {/* Team · Position */}
-        <span className="text-xs" style={{ color: 'var(--silver)', opacity: 0.6, fontSize: '0.65rem' }}>
-          {p.players.teams.abbrev} · {p.players.position_code}
+      {/* Top row: team badge (left) + heat score (right) */}
+      <div className="absolute top-0 left-0 right-0 flex items-start justify-between p-1.5">
+        <TeamBadge abbrev={abbrev} />
+        <span
+          className="font-bold leading-none"
+          style={{ color, fontSize: '1rem', lineHeight: 1 }}
+        >
+          {heat}
         </span>
       </div>
 
-      {/* Heat stripe at very bottom */}
-      <div className="absolute bottom-0 left-0 right-0 h-0.5"
-        style={{ background: color, opacity: heat >= 55 ? 0.7 : 0.2 }} />
+      {/* Bottom content */}
+      <div className="absolute bottom-0 left-0 right-0 p-1.5 flex flex-col gap-0.5">
+        {/* Position · jersey */}
+        <span
+          style={{
+            color: 'var(--silver)',
+            opacity: 0.6,
+            fontSize: '0.58rem',
+            lineHeight: 1.2,
+          }}
+        >
+          {pos}{num != null ? ` · #${num}` : ''}
+        </span>
+        {/* Last name */}
+        <span
+          className="font-semibold truncate"
+          style={{ color: 'var(--text-bright)', fontSize: '0.7rem', lineHeight: 1.2 }}
+        >
+          {p.players.last_name}
+        </span>
+      </div>
+
+      {/* Rank watermark */}
+      <span
+        className="absolute font-mono font-bold"
+        style={{
+          color: 'rgba(255,255,255,0.12)',
+          fontSize: '0.55rem',
+          bottom: '1.6rem',
+          left: '0.4rem',
+        }}
+      >
+        #{rank}
+      </span>
     </Link>
   );
 }
 
 export default function HeatGrid({ players }: { players: Player[] }) {
-  const top = players.slice(0, 20);
+  const top15 = players.slice(0, 15);
+  const top3 = players.slice(0, 3);
+  const totalCount = players.length;
 
   return (
-    <section>
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text)', opacity: 0.5 }}>
-          Who&apos;s burning?
+    <section className="flex flex-col gap-4">
+      {/* 1. Section header */}
+      <div>
+        <h2
+          className="font-editorial"
+          style={{ fontSize: '1.75rem', lineHeight: 1.1, fontWeight: 700 }}
+        >
+          <span style={{ color: 'var(--text-bright)' }}>Who&apos;s </span>
+          <span style={{ color: 'var(--heat)' }}>burning?</span>
         </h2>
-        <Link href="/rankings" className="text-xs hover:underline" style={{ color: 'var(--silver)' }}>
-          All rankings →
-        </Link>
+        <p style={{ color: 'var(--silver)', opacity: 0.55, fontSize: '0.78rem', marginTop: '0.25rem' }}>
+          {totalCount} skaters, scored 0–100 on their last 5 games.
+        </p>
       </div>
 
-      {/* Horizontal scroll strip */}
-      <div className="flex gap-3 overflow-x-auto pb-2"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-        {top.map((p, i) => (
-          <HeatTile key={p.player_id} p={p} rank={i + 1} />
+      {/* 2. Top 3 podium */}
+      <div
+        className="rounded-2xl overflow-hidden"
+        style={{ background: '#0d0f14', border: '1px solid var(--border)' }}
+      >
+        <div className="grid grid-cols-3">
+          {top3.map((p, i) => {
+            const heat = ppmToHeat(p.momentum_ppm);
+            const color = heatColor(heat);
+            const rank = i + 1;
+            return (
+              <Link
+                key={p.player_id}
+                href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
+                className="flex flex-col gap-1 p-3 hover:bg-white/5 transition-colors"
+                style={{
+                  borderRight: i < 2 ? '1px solid var(--border)' : undefined,
+                }}
+              >
+                {/* Rank + team badge */}
+                <div className="flex items-center gap-1.5">
+                  <span style={{ color: 'var(--silver)', opacity: 0.5, fontSize: '0.65rem', fontWeight: 500 }}>
+                    #{rank}
+                  </span>
+                  <TeamBadge abbrev={p.players.teams.abbrev} />
+                </div>
+                {/* Last name */}
+                <span
+                  className="font-bold truncate"
+                  style={{ color: 'var(--text-bright)', fontSize: '0.95rem', lineHeight: 1.2 }}
+                >
+                  {p.players.last_name}
+                </span>
+                {/* Heat score */}
+                <span
+                  className="font-bold"
+                  style={{ color, fontSize: '1.1rem', lineHeight: 1 }}
+                >
+                  {heat}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 3. 4-column grid of 15 player cards */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: '8px',
+        }}
+      >
+        {top15.map((p, i) => (
+          <PlayerCard key={p.player_id} p={p} rank={i + 1} />
         ))}
+      </div>
+
+      {/* 4. Legend */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <span
+            style={{
+              color: 'var(--silver)',
+              opacity: 0.5,
+              fontSize: '0.6rem',
+              fontWeight: 600,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase',
+              flexShrink: 0,
+            }}
+          >
+            HEAT
+          </span>
+          <div
+            style={{
+              flex: 1,
+              height: '6px',
+              borderRadius: '3px',
+              background: 'linear-gradient(to right, #1e2232, var(--heat))',
+            }}
+          />
+          <span style={{ color: 'var(--silver)', opacity: 0.45, fontSize: '0.6rem', fontFamily: 'monospace' }}>0</span>
+          <span style={{ color: 'var(--silver)', opacity: 0.45, fontSize: '0.6rem', fontFamily: 'monospace' }}>50</span>
+          <span style={{ color: 'var(--silver)', opacity: 0.45, fontSize: '0.6rem', fontFamily: 'monospace' }}>100</span>
+        </div>
+        <p style={{ color: 'var(--silver)', opacity: 0.4, fontSize: '0.65rem' }}>
+          Heat = a player&apos;s last-5-game pace, scored 0–100. Higher = hotter recent form.
+        </p>
       </div>
     </section>
   );
