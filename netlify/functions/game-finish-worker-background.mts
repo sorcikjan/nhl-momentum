@@ -3,16 +3,19 @@ import type { BackgroundHandler } from '@netlify/functions';
 // Event-driven background worker — triggered by game-finished-poller when games
 // transition to FINAL in the NHL API but haven't been processed in our DB yet.
 //
-// POST body JSON: { gameIds: number[], teamIds: number[] }
-//   gameIds — just-finished NHL game IDs (for outcomes-backfill targeting)
-//   teamIds — home + away team IDs (for targeted gamelogs)
+// POST body JSON: { gameIds, teamIds, gameRecords }
+//   gameIds     — just-finished NHL game IDs
+//   teamIds     — home + away team IDs (for targeted gamelogs)
+//   gameRecords — full game data from the NHL API (scores, teams, state)
+//                 written to games table as step 0 so outcomes-backfill can find them
 //
-// Pipeline order (same race-condition safety as postgame-sync):
-//   1. gamelogs  — ingest player stats for finished teams before writing games
-//   2. outcomes-backfill — score predictions from DB scores (no NHL API cache issues)
-//   3. metrics   — full recalculation so global rankings stay correct
-//   4. energy    — update energy bars for affected players
-//   5. extras    — three stars + highlights for the just-finished games
+// Pipeline order:
+//   0. record-games     — write final scores to games table (enables outcomes-backfill)
+//   1. gamelogs         — ingest player stats for finished teams only (~40–50 players)
+//   2. outcomes-backfill — score predictions from DB scores (immune to NHL API cache)
+//   3. metrics          — full recalculation so global rankings stay correct
+//   4. energy           — update energy bars
+//   5. extras           — three stars + highlights for the just-finished games
 
 const CALL_TIMEOUT_MS = 25_000;
 const GAMELOGS_TIMEOUT_MS = 120_000;
@@ -22,6 +25,24 @@ async function call(url: string, headers: Record<string, string>, timeoutMs = CA
   const timer = setTimeout(() => ac.abort(), timeoutMs);
   try {
     const res = await fetch(url, { headers, signal: ac.signal });
+    return await res.json();
+  } catch (err) {
+    return { error: String(err), data: null };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function post(url: string, headers: Record<string, string>, body: unknown, timeoutMs = CALL_TIMEOUT_MS) {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: ac.signal,
+    });
     return await res.json();
   } catch (err) {
     return { error: String(err), data: null };
@@ -45,6 +66,7 @@ const handler: BackgroundHandler = async (event) => {
   const body = event.body ? JSON.parse(event.body) : {};
   const teamIds: number[] = body.teamIds ?? [];
   const gameIds: number[] = body.gameIds ?? [];
+  const gameRecords: unknown[] = body.gameRecords ?? [];
 
   if (teamIds.length === 0 && gameIds.length === 0) {
     console.error('[game-finish-worker] called with no teamIds or gameIds — nothing to do');
@@ -53,6 +75,17 @@ const handler: BackgroundHandler = async (event) => {
 
   const log: string[] = [];
   console.log('[game-finish-worker] start — games:', gameIds.join(','), 'teams:', teamIds.join(','));
+
+  // 0. Write final game scores to games table.
+  //    Critical: outcomes-backfill reads from games WHERE game_state IN ('FINAL','OFF').
+  //    The poller only fires when a game is FINAL in NHL API but NOT yet in our DB,
+  //    so without this step outcomes-backfill would find nothing to score.
+  if (gameRecords.length > 0) {
+    try {
+      const r = await post(`${base}/api/ingest/record-games`, h, { games: gameRecords });
+      log.push(`record-games: ${r.data?.upserted ?? 0} upserted${r.error ? ` err: ${r.error}` : ''}`);
+    } catch (e) { log.push(`record-games: exception ${e}`); }
+  }
 
   // 1. Gamelogs — targeted to just the finished teams (40–50 players vs 200+)
   if (teamIds.length > 0) {
@@ -64,8 +97,8 @@ const handler: BackgroundHandler = async (event) => {
     } catch (e) { log.push(`gamelogs: exception ${e}`); }
   }
 
-  // 2. Outcomes backfill — DB-based, immune to NHL API cache. Scores predictions for
-  //    the just-finished games (and any others that were missed).
+  // 2. Outcomes backfill — DB-based, immune to NHL API cache. Now that games table
+  //    has the final scores (step 0), this will find and score the predictions.
   try {
     const r = await call(`${base}/api/ingest/outcomes-backfill?limit=100`, h);
     log.push(`outcomes-backfill: ${r.data?.outcomes_upserted ?? 0} upserted across ${r.data?.games_processed ?? 0} games${r.error ? ` err: ${r.error}` : ''}`);

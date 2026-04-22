@@ -82,9 +82,19 @@ export default async function handler() {
     return;
   }
 
-  // Collect unique team IDs from newly-finished games
+  // Collect unique team IDs and full game records from newly-finished games.
+  // Pass scores directly from the NHL API response so the worker can write them
+  // to the games table before running outcomes-backfill (which reads from that table).
   const teamIds = new Set<number>();
   const gameIds: number[] = [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gameRecords: Array<{
+    id: number; game_date: string; start_time_utc: string | null;
+    home_team_id: number; away_team_id: number;
+    home_score: number | null; away_score: number | null;
+    game_state: string; venue: string | null; season: string;
+  }> = [];
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const g of newlyFinished) {
     gameIds.push(g.id);
@@ -92,6 +102,18 @@ export default async function handler() {
     const awayId = g.awayTeam?.id;
     if (homeId) teamIds.add(homeId);
     if (awayId) teamIds.add(awayId);
+    gameRecords.push({
+      id: g.id,
+      game_date: g.gameDate ?? today,
+      start_time_utc: g.startTimeUTC ?? null,
+      home_team_id: homeId,
+      away_team_id: awayId,
+      home_score: g.homeTeam?.score ?? null,
+      away_score: g.awayTeam?.score ?? null,
+      game_state: g.gameState,
+      venue: g.venue?.default ?? null,
+      season: '20252026',
+    });
   }
 
   console.log(
@@ -102,7 +124,7 @@ export default async function handler() {
   const res = await fetch(`${base}/.netlify/functions/game-finish-worker-background`, {
     method: 'POST',
     headers: { 'x-api-key': ingestKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ gameIds, teamIds: [...teamIds] }),
+    body: JSON.stringify({ gameIds, teamIds: [...teamIds], gameRecords }),
   });
 
   console.log('[game-finished-poller] triggered game-finish-worker, status:', res.status);
