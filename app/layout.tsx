@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Geist, Geist_Mono, Playfair_Display } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
 import Sidebar from '@/components/layout/Sidebar';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
+const playfair = Playfair_Display({ variable: '--font-playfair', subsets: ['latin'], style: ['normal', 'italic'] });
 
 const siteUrl = 'https://nhl-momentum.netlify.app';
 
@@ -43,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           gtag('config', 'G-Z7EWZE1NGP');
         `}</Script>
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased min-h-screen`}>
         <div className="flex min-h-screen">
           <Sidebar />
           <main className="flex-1 ml-0 md:ml-56 p-4 md:p-6">

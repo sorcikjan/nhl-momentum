@@ -541,7 +541,7 @@ export async function fetchSignalById(id: number) {
 export async function fetchRecentRecaps(limit = 30) {
   const { data } = await supabaseAdmin
     .from('daily_recaps')
-    .select('date, title, summary, games_count, generated_at')
+    .select('date, title, summary, games_count, generated_at, hero_image_url')
     .order('date', { ascending: false })
     .limit(limit);
   return data ?? [];
