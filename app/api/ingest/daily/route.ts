@@ -479,10 +479,10 @@ export async function GET(req: NextRequest) {
       // never updated on upsert conflict, so it reflects original ingest time, not game date.
       const [{ data: eSkaterStats }, { data: eGoalieStats }] = await Promise.all([
         recentGameIds.length
-          ? supabaseAdmin.from('game_player_stats').select('player_id, game_id, toi_seconds').in('game_id', recentGameIds)
+          ? supabaseAdmin.from('game_player_stats').select('player_id, game_id, toi_seconds').in('game_id', recentGameIds).limit(50000)
           : Promise.resolve({ data: [] }),
         recentGameIds.length
-          ? supabaseAdmin.from('game_goalie_stats').select('player_id, game_id, toi_seconds').in('game_id', recentGameIds)
+          ? supabaseAdmin.from('game_goalie_stats').select('player_id, game_id, toi_seconds').in('game_id', recentGameIds).limit(50000)
           : Promise.resolve({ data: [] }),
       ]);
 
