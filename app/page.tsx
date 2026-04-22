@@ -1,10 +1,10 @@
 import { Suspense } from 'react';
 import { cache } from 'react';
 import type { Metadata } from 'next';
-import RecapHero from '@/components/dashboard/RecapHero';
+import RecapFeed from '@/components/dashboard/RecapFeed';
 import TonightSection from '@/components/dashboard/TonightSection';
 import HeatGrid from '@/components/dashboard/HeatGrid';
-import { fetchRankings, fetchGames, fetchRecentRecaps, fetchRecentCompletedGames } from '@/lib/data';
+import { fetchRankings, fetchGames, fetchRecentRecaps } from '@/lib/data';
 
 export const revalidate = 60;
 
@@ -21,25 +21,14 @@ const getRankings = cache(() => fetchRankings().catch(() => null));
 const getTodayGames = cache((date: string) =>
   fetchGames(date).catch(() => ({ games: [], predictions: [], odds: [] }))
 );
-const getRecentRecaps = cache(() => fetchRecentRecaps(1).catch(() => []));
-const getRecentGames = cache(() => fetchRecentCompletedGames(2, 30).catch(() => ({ games: [], predMap: new Map() })));
+const getRecentRecaps = cache(() => fetchRecentRecaps(5).catch(() => []));
 
-// ── Section: Last Night (recap hero card) ─────────────────────────────────────
+// ── Section: Last Night (recap feed — hero + 4 compact stories) ───────────────
 
 async function LastNightSection() {
-  const [recaps, { games }] = await Promise.all([
-    getRecentRecaps(),
-    getRecentGames(),
-  ]);
-
-  const recap = recaps[0] ?? null;
-  if (!recap) return null;
-
-  // Games that match the recap date
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const gamesForDate = (games as any[]).filter(g => g.game_date === recap.date);
-
-  return <RecapHero recap={recap} gamesForDate={gamesForDate} />;
+  const recaps = await getRecentRecaps();
+  if (!recaps.length) return null;
+  return <RecapFeed recaps={recaps} />;
 }
 
 // ── Section: Tonight (upcoming / live games) ──────────────────────────────────
@@ -76,7 +65,16 @@ async function BurningSection() {
 // ── Skeletons ─────────────────────────────────────────────────────────────────
 
 function HeroSkeleton() {
-  return <div className="rounded-2xl animate-pulse" style={{ background: 'var(--bg-card)', minHeight: '260px' }} />;
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-2xl animate-pulse" style={{ background: 'var(--bg-card)', minHeight: '280px' }} />
+      <div className="flex flex-col gap-2">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function GameSkeleton() {
