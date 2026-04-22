@@ -5,20 +5,22 @@ import type { Config } from '@netlify/functions';
 // background worker timeout, etc.), this retries it independently.
 // The recap route skips generation if a fresh recap already exists (< 12h old),
 // so running this when recap already succeeded is a no-op.
+//
+// IMPORTANT: calls the background worker (not the recap API directly).
+// Gemini generation takes 30–50s — a sync Netlify function (26s limit) would
+// always timeout before receiving the response. The background worker has 15 min.
 
 export default async function handler() {
   const base = process.env.URL ?? 'https://nhl-momentum.netlify.app';
   const ingestKey = process.env.INGEST_API_KEY ?? '';
 
-  // Yesterday in UTC — same date the games were played
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-
-  const res = await fetch(`${base}/api/ingest/recap?date=${yesterday}`, {
-    headers: { 'x-api-key': ingestKey },
+  const res = await fetch(`${base}/.netlify/functions/daily-worker-background`, {
+    method: 'POST',
+    headers: { 'x-api-key': ingestKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phases: ['recap'] }),
   });
 
-  const body = await res.json().catch(() => ({}));
-  console.log('[recap-cron] date:', yesterday, 'result:', JSON.stringify(body));
+  console.log('[recap-cron] triggered background worker, status:', res.status);
 }
 
 export const config: Config = {
