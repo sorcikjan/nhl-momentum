@@ -209,10 +209,10 @@ function FeaturedGameCard({ game, pred }: { game: Game; pred: Game }) {
           style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.3) 100%)' }}
         />
 
-        {/* Confidence bars at very bottom */}
+        {/* Confidence bar at very bottom — heat orange for favored */}
         <div className="absolute bottom-0 left-0 right-0 h-1 flex">
-          <div style={{ width: `${awayConf}%`, background: 'rgba(255,255,255,0.4)' }} />
-          <div style={{ width: `${homeConf}%`, background: 'rgba(255,255,255,0.25)' }} />
+          <div style={{ width: `${awayConf}%`, background: favorHome === false ? 'var(--heat)' : 'rgba(255,255,255,0.18)' }} />
+          <div style={{ width: `${homeConf}%`, background: favorHome ? 'var(--heat)' : 'rgba(255,255,255,0.18)' }} />
         </div>
 
         {/* Content */}
@@ -316,8 +316,8 @@ function RegularGameCard({ game, pred }: { game: Game; pred: Game }) {
   const homeConf = homeProb != null ? Math.round(homeProb * 100) : null;
   const favorHome = homeProb != null ? homeProb >= 0.5 : null;
   const isRivalry = RIVALRY_PAIRS.has(`${home}-${away}`);
-  const venue = (game.venue?.default ?? '').slice(0, 30);
-  const borderColor = isRivalry ? 'rgba(249,115,22,0.25)' : 'var(--border)';
+  const venue = (game.venue?.default ?? '').slice(0, 28);
+  const borderColor = isRivalry ? 'rgba(249,115,22,0.3)' : 'var(--border)';
 
   return (
     <Link
@@ -325,76 +325,81 @@ function RegularGameCard({ game, pred }: { game: Game; pred: Game }) {
       className="block rounded-xl hover:opacity-80 transition-opacity"
       style={{ background: 'var(--bg-card)', border: `1px solid ${borderColor}` }}
     >
-      {/* Row 1: badges + bar */}
-      <div className="flex items-center gap-2 px-3 pt-3 pb-1">
-        {/* Away */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <TeamBadge abbrev={away} />
-          {awayConf != null && (
-            <span
-              className="font-bold text-sm"
-              style={{ color: '#fff', fontWeight: favorHome === false ? 700 : 400 }}
-            >
-              {awayConf}%
-            </span>
-          )}
+      {/* Main row: logo + abbrev + % · bar · % + abbrev + logo */}
+      <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+
+        {/* Away side */}
+        <div className="flex items-center gap-2.5 flex-shrink-0" style={{ minWidth: '90px' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`https://assets.nhle.com/logos/nhl/svg/${away}_light.svg`}
+            alt={away}
+            style={{ width: '36px', height: '36px', flexShrink: 0 }}
+          />
+          <div className="flex flex-col">
+            <span className="font-black text-sm leading-none" style={{ color: '#fff' }}>{away}</span>
+            {awayConf != null && (
+              <span
+                className="font-mono text-xs mt-0.5"
+                style={{ color: favorHome === false ? 'var(--heat)' : 'var(--silver)', fontWeight: favorHome === false ? 700 : 400 }}
+              >
+                {awayConf}%
+              </span>
+            )}
+          </div>
         </div>
 
-        {/* Confidence bar */}
+        {/* Confidence bar — centre */}
         {awayConf != null && homeConf != null ? (
-          <div
-            className="flex-1 flex rounded-full overflow-hidden mx-2"
-            style={{ height: '5px' }}
-          >
-            <div
-              style={{
-                width: `${awayConf}%`,
-                background: favorHome === false ? '#22c55e' : 'rgba(255,255,255,0.15)',
-                height: '100%',
-              }}
-            />
-            <div
-              style={{
-                width: `${homeConf}%`,
-                background: favorHome ? '#22c55e' : 'rgba(255,255,255,0.15)',
-                height: '100%',
-              }}
-            />
+          <div className="flex-1 flex rounded-full overflow-hidden" style={{ height: '5px', background: 'var(--border)' }}>
+            <div style={{ width: `${awayConf}%`, background: favorHome === false ? 'var(--heat)' : 'rgba(255,255,255,0.18)', height: '100%', transition: 'width 0.3s' }} />
+            <div style={{ width: `${homeConf}%`, background: favorHome ? 'var(--heat)' : 'rgba(255,255,255,0.18)', height: '100%', transition: 'width 0.3s' }} />
           </div>
         ) : (
           <div className="flex-1" />
         )}
 
-        {/* Home */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {homeConf != null && (
-            <span
-              className="font-bold text-sm"
-              style={{ color: '#fff', fontWeight: favorHome ? 700 : 400 }}
-            >
-              {homeConf}%
-            </span>
-          )}
-          <TeamBadge abbrev={home} />
+        {/* Home side */}
+        <div className="flex items-center gap-2.5 flex-shrink-0 justify-end" style={{ minWidth: '90px' }}>
+          <div className="flex flex-col items-end">
+            <span className="font-black text-sm leading-none" style={{ color: '#fff' }}>{home}</span>
+            {homeConf != null && (
+              <span
+                className="font-mono text-xs mt-0.5"
+                style={{ color: favorHome ? 'var(--heat)' : 'var(--silver)', fontWeight: favorHome ? 700 : 400 }}
+              >
+                {homeConf}%
+              </span>
+            )}
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`https://assets.nhle.com/logos/nhl/svg/${home}_light.svg`}
+            alt={home}
+            style={{ width: '36px', height: '36px', flexShrink: 0 }}
+          />
         </div>
       </div>
 
-      {/* Row 2: time/rivalry + venue */}
-      <div className="flex items-center justify-between gap-2 px-3 pb-3 pt-0">
-        <div className="flex flex-col">
+      {/* Bottom row: time + rivalry tag + venue */}
+      <div
+        className="flex items-center justify-between px-4 pb-3"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
+      >
+        <div className="flex items-center gap-2 pt-2">
           {game.startTimeUTC && (
-            <span className="text-xs" style={{ color: 'var(--silver)', opacity: 0.6 }}>
+            <span className="text-xs font-mono" style={{ color: 'var(--silver)', opacity: 0.55 }}>
               {formatTime(game.startTimeUTC)}
             </span>
           )}
           {isRivalry && (
-            <span className="text-xs" style={{ color: 'var(--heat)' }}>· rivalry</span>
+            <span className="text-xs font-semibold" style={{ color: 'var(--heat)' }}>· rivalry</span>
           )}
         </div>
         {venue && (
           <span
-            className="text-xs text-right"
-            style={{ color: 'var(--silver)', opacity: 0.45, maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            className="text-xs pt-2"
+            style={{ color: 'var(--silver)', opacity: 0.35, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '140px' }}
           >
             {venue}
           </span>
