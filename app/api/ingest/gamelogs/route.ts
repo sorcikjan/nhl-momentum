@@ -3,8 +3,12 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { currentSeason, toiToSeconds } from '@/lib/nhl-api';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 
-// GET /api/ingest/gamelogs?since=YYYY-MM-DD   ← preferred: only teams that played since date
+// GET /api/ingest/gamelogs?teamIds=1,2,3      ← fastest: only players on specific teams (event-driven)
+// GET /api/ingest/gamelogs?since=YYYY-MM-DD   ← targeted: only teams that played since date
 // GET /api/ingest/gamelogs?limit=50&offset=0  ← full sweep: all active players paginated
+//
+// The ?teamIds= mode is for event-driven post-game processing — pass exactly the 2 teams
+// from a just-finished game, typically 40–50 players total. No DB date lookup needed.
 //
 // The ?since= mode is the correct path for nightly syncs. It filters to only players
 // on teams that have played since the given date — typically 100–200 players during
@@ -19,7 +23,9 @@ export async function GET(req: NextRequest) {
   const authError = requireIngestAuth(req);
   if (authError) return authError;
 
+  const teamIdsParam = req.nextUrl.searchParams.get('teamIds');
   const sinceParam = req.nextUrl.searchParams.get('since');
+  // teamIds= mode loads all players for those teams in one shot (no pagination needed)
   // since= mode uses smaller pages (20) — fully sequential processing at 1 req/s
   // takes ~22s for 20 players, safely within Netlify's 26s function limit.
   const defaultLimit = sinceParam ? 20 : 50;
@@ -29,7 +35,22 @@ export async function GET(req: NextRequest) {
 
   let players: { id: number; position_code: string; team_id: number | null }[] | null = null;
 
-  if (sinceParam) {
+  if (teamIdsParam) {
+    // Event-driven mode: target exactly the teams from a just-finished game.
+    // Parses comma-separated team IDs (e.g. "1,17") — no DB date lookup, no pagination.
+    const targetIds = teamIdsParam.split(',').map(s => Number(s.trim())).filter(n => n > 0);
+    if (targetIds.length === 0) {
+      return NextResponse.json({ data: { skaterRows: 0, goalieRows: 0, playersProcessed: 0, rateLimited: 0, errors: [] }, error: null });
+    }
+    const { data, error } = await supabaseAdmin
+      .from('players')
+      .select('id, position_code, team_id')
+      .eq('is_active', true)
+      .in('team_id', targetIds)
+      .order('id');
+    if (error) return NextResponse.json({ data: null, error: error.message }, { status: 500 });
+    players = data ?? [];
+  } else if (sinceParam) {
     // Targeted mode: only players on teams that played since `sinceParam`.
     // Find all teams with completed/live games since that date.
     // No game_state filter — any game in the DB for this date range means that team played.
