@@ -1,8 +1,10 @@
 // Heat score: momentum_ppm normalized to 0–100.
 // The scale is calibrated so elite multi-point-per-game stretches hit ~95–100.
-// PPM_MAX = 0.065 means a player scoring 0.065 pts/min in 5 games = 100 Heat.
+// PPM_MAX = 0.12 means a player scoring 0.12 pts/min in 5 games = 100 Heat.
+// Raised from 0.065 (too low — 37/100 top players were incorrectly capped at Heat 100).
+// At 0.12: Zuccarello (0.1152 ppm) → Heat 96, McDavid (0.084) → Heat 70.
 
-export const PPM_MAX = 0.065;
+export const PPM_MAX = 0.12;
 
 export function ppmToHeat(ppm: number | null | undefined): number {
   if (!ppm || ppm <= 0) return 0;
