@@ -83,7 +83,7 @@ const handler: BackgroundHandler = async (event) => {
         rows += (r.data?.skaterRows ?? 0) + (r.data?.goalieRows ?? 0);
         rateLimitTotal += r.data?.rateLimited ?? 0;
         if ((r.data?.playersProcessed ?? 0) < 20) break;
-        offset += 50;
+        offset += 20;
         if (offset > 1000) break;
       }
       const warn = rateLimitTotal > 0 ? ` (${rateLimitTotal} rate-limited)` : '';
