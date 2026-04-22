@@ -65,36 +65,87 @@ function PlayerCard({ p, rank }: { p: Player; rank: number }) {
   const abbrev = p.players.teams.abbrev;
   const pos = p.players.position_code;
   const num = p.players.sweater_number;
+  const headshotUrl = p.players.headshot_url;
 
   return (
     <Link
       href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
       className="relative rounded-xl overflow-hidden hover:opacity-90 transition-opacity block"
       style={{
-        background: `linear-gradient(135deg, ${heatBg(heat)} 0%, #0d0f14 80%)`,
+        background: headshotUrl ? '#0d0f14' : `linear-gradient(135deg, ${heatBg(heat)} 0%, #0d0f14 80%)`,
         aspectRatio: '3 / 4',
         minWidth: 0,
       }}
     >
-      {/* Top row: team badge (left) + heat score (right) */}
+      {/* Headshot background image */}
+      {headshotUrl && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={headshotUrl}
+          alt=""
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'top',
+          }}
+        />
+      )}
+
+      {/* Top heat-glow gradient overlay */}
+      {headshotUrl && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: `radial-gradient(ellipse at 50% 0%, ${heatBg(heat)}88 0%, transparent 60%)`,
+          }}
+        />
+      )}
+
+      {/* Bottom-up dark gradient overlay */}
+      {headshotUrl && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'linear-gradient(to top, rgba(8,8,12,0.97) 0%, rgba(8,8,12,0.7) 40%, rgba(8,8,12,0.15) 75%, transparent 100%)',
+          }}
+        />
+      )}
+
+      {/* Top row: team logo (left) + heat score (right) */}
       <div className="absolute top-0 left-0 right-0 flex items-start justify-between p-1.5">
-        <TeamBadge abbrev={abbrev} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`https://assets.nhle.com/logos/nhl/svg/${abbrev}_light.svg`}
+          alt={abbrev}
+          style={{ width: '22px', height: '22px', filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.8))' }}
+        />
         <span
-          className="font-bold leading-none"
-          style={{ color, fontSize: '1rem', lineHeight: 1 }}
+          className="leading-none"
+          style={{
+            color,
+            fontSize: '1.15rem',
+            fontWeight: 900,
+            fontFamily: 'monospace',
+            lineHeight: 1,
+            textShadow: `0 0 12px ${color}88`,
+          }}
         >
           {heat}
         </span>
       </div>
 
       {/* Bottom content */}
-      <div className="absolute bottom-0 left-0 right-0 p-1.5 flex flex-col gap-0.5">
+      <div className="absolute bottom-0 left-0 right-0 p-2 flex flex-col gap-0.5">
         {/* Position · jersey */}
         <span
           style={{
-            color: 'var(--silver)',
-            opacity: 0.6,
-            fontSize: '0.58rem',
+            color: 'rgba(255,255,255,0.45)',
+            fontSize: '0.6rem',
             lineHeight: 1.2,
           }}
         >
@@ -102,8 +153,15 @@ function PlayerCard({ p, rank }: { p: Player; rank: number }) {
         </span>
         {/* Last name */}
         <span
-          className="font-semibold truncate"
-          style={{ color: 'var(--text-bright)', fontSize: '0.7rem', lineHeight: 1.2 }}
+          className="truncate"
+          style={{
+            color: '#ffffff',
+            fontSize: '0.85rem',
+            fontWeight: 800,
+            lineHeight: 1.2,
+            textShadow: '0 1px 6px rgba(0,0,0,0.9)',
+            letterSpacing: '-0.01em',
+          }}
         >
           {p.players.last_name}
         </span>
