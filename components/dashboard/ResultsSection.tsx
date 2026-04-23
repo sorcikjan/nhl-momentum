@@ -78,8 +78,14 @@ function ResultCard({ game, pred }: { game: Game; pred: Pred }) {
           </div>
         </div>
 
-        {/* Centre: FINAL */}
-        <div className="flex-1 flex flex-col items-center">
+        {/* Centre: verdict + FINAL */}
+        <div className="flex-1 flex flex-col items-center gap-1">
+          {correct === true && (
+            <span className="text-sm font-bold" style={{ color: '#22c55e' }}>✓</span>
+          )}
+          {correct === false && (
+            <span className="text-sm font-bold" style={{ color: 'var(--red)' }}>✗</span>
+          )}
           <span className="text-xs font-mono font-semibold"
             style={{ color: 'var(--silver)', opacity: 0.4, letterSpacing: '0.05em' }}>
             FINAL
@@ -107,36 +113,29 @@ function ResultCard({ game, pred }: { game: Game; pred: Pred }) {
         </div>
       </div>
 
-      {/* Prediction row */}
+      {/* Pick row */}
       {pickedAbbrev != null && (
         <div
-          className="flex items-center justify-between px-4 pb-3 pt-2"
+          className="flex items-center gap-2 px-4 pb-3 pt-2"
           style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
         >
           <span className="text-xs font-mono" style={{ color: 'var(--silver)', opacity: 0.35 }}>
             picked
           </span>
-          <div className="flex items-center gap-2">
-            <span style={{
-              background: TEAM_BADGE_COLORS[pickedAbbrev] ?? '#333',
-              color: '#fff', padding: '1px 6px', borderRadius: '3px',
-              fontSize: '0.6rem', fontWeight: 700, lineHeight: 1,
-            }}>
-              {pickedAbbrev}
-            </span>
-            {correct === true && (
-              <span className="text-xs font-bold px-1.5 py-0.5 rounded"
-                style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}>
-                ✓ correct
-              </span>
-            )}
-            {correct === false && (
-              <span className="text-xs font-bold px-1.5 py-0.5 rounded"
-                style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.25)' }}>
-                ✗ wrong
-              </span>
-            )}
-          </div>
+          <span style={{
+            background: TEAM_BADGE_COLORS[pickedAbbrev] ?? '#333',
+            color: '#fff', padding: '2px 8px', borderRadius: '4px',
+            fontSize: '0.7rem', fontWeight: 800, lineHeight: 1,
+            letterSpacing: '0.03em',
+          }}>
+            {pickedAbbrev}
+          </span>
+          {correct === true && (
+            <span className="text-xs font-semibold" style={{ color: '#22c55e' }}>correct</span>
+          )}
+          {correct === false && (
+            <span className="text-xs font-semibold" style={{ color: 'var(--red)' }}>wrong</span>
+          )}
         </div>
       )}
     </Link>
