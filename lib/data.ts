@@ -253,7 +253,7 @@ export async function fetchRecentCompletedGames(days = 3, limit = 20) {
 
   const { data: preds } = await supabaseAdmin
     .from('predictions')
-    .select('game_id, home_win_probability, model_version, prediction_outcomes(home_win)')
+    .select('game_id, home_win_probability, away_win_probability, predicted_home_score, predicted_away_score, model_version, prediction_outcomes(home_win, correct_winner)')
     .in('game_id', gameIds)
     .order('created_at', { ascending: false });
 

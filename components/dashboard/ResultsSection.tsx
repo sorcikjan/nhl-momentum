@@ -40,19 +40,18 @@ function ResultCard({ game, pred }: { game: Game; pred: Pred }) {
 
   // Prediction data
   const homeProb = pred?.home_win_probability ?? null;
-  const awayConf = homeProb != null ? Math.round((1 - homeProb) * 100) : null;
+  const awayProb = pred?.away_win_probability ?? (homeProb != null ? 1 - homeProb : null);
+  const awayConf = awayProb != null ? Math.round(awayProb * 100) : null;
   const homeConf = homeProb != null ? Math.round(homeProb * 100) : null;
   const predictedHomeWin = homeProb != null ? homeProb >= 0.5 : null;
+  const xgAway: number | null = pred?.predicted_away_score ?? null;
+  const xgHome: number | null = pred?.predicted_home_score ?? null;
+  const modelVersion: string | null = pred?.model_version ?? null;
 
-  // Outcome — prediction_outcomes is a single object (nested join)
+  // Outcome
   const outcome = pred?.prediction_outcomes;
-  const actualHomeWin: boolean | null = outcome?.home_win ?? null;
-  const correct: boolean | null = actualHomeWin != null && predictedHomeWin != null
-    ? predictedHomeWin === actualHomeWin
-    : null;
-
+  const correct: boolean | null = outcome?.correct_winner ?? null;
   const pickedAbbrev = predictedHomeWin === true ? home : predictedHomeWin === false ? away : null;
-  const pickedConf = predictedHomeWin === true ? homeConf : awayConf;
 
   return (
     <Link
@@ -60,7 +59,7 @@ function ResultCard({ game, pred }: { game: Game; pred: Pred }) {
       className="block rounded-xl hover:opacity-80 transition-opacity"
       style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
     >
-      {/* Main row: logo + team + score · score + team + logo */}
+      {/* Score row */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
 
         {/* Away side */}
@@ -83,26 +82,23 @@ function ResultCard({ game, pred }: { game: Game; pred: Pred }) {
           </div>
         </div>
 
-        {/* Centre: confidence bar (pre-game prediction) */}
-        <div className="flex-1 flex flex-col items-center gap-1.5">
-          {awayConf != null && homeConf != null ? (
-            <>
-              <div className="w-full flex rounded-full overflow-hidden" style={{ height: '4px', background: 'var(--border)' }}>
-                <div style={{
-                  width: `${awayConf}%`, height: '100%',
-                  background: predictedHomeWin === false ? 'var(--heat)' : 'rgba(255,255,255,0.18)',
-                }} />
-                <div style={{
-                  width: `${homeConf}%`, height: '100%',
-                  background: predictedHomeWin === true ? 'var(--heat)' : 'rgba(255,255,255,0.18)',
-                }} />
-              </div>
-              <span className="text-xs font-mono" style={{ color: 'var(--silver)', opacity: 0.4 }}>
-                pre-game
-              </span>
-            </>
-          ) : (
-            <span className="text-xs" style={{ color: 'var(--silver)', opacity: 0.3 }}>–</span>
+        {/* Centre: FINAL + correct/wrong */}
+        <div className="flex-1 flex flex-col items-center gap-1">
+          <span className="text-xs font-mono font-semibold"
+            style={{ color: 'var(--silver)', opacity: 0.4, letterSpacing: '0.05em' }}>
+            FINAL
+          </span>
+          {correct === true && (
+            <span className="text-xs font-bold px-1.5 py-0.5 rounded"
+              style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}>
+              ✓ correct
+            </span>
+          )}
+          {correct === false && (
+            <span className="text-xs font-bold px-1.5 py-0.5 rounded"
+              style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.25)' }}>
+              ✗ wrong
+            </span>
           )}
         </div>
 
@@ -127,46 +123,75 @@ function ResultCard({ game, pred }: { game: Game; pred: Pred }) {
         </div>
       </div>
 
-      {/* Bottom row: FINAL label + prediction result */}
-      <div
-        className="flex items-center justify-between px-4 pb-3 pt-2"
-        style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
-      >
-        <span className="text-xs font-mono font-semibold"
-          style={{ color: 'var(--silver)', opacity: 0.4, letterSpacing: '0.05em' }}>
-          FINAL
-        </span>
-
-        {/* Prediction outcome */}
-        {pickedAbbrev != null && (
-          <div className="flex items-center gap-1.5">
-            {/* Team badge of picked team */}
-            <span style={{
-              background: TEAM_BADGE_COLORS[pickedAbbrev] ?? '#333',
-              color: '#fff', padding: '1px 5px', borderRadius: '3px',
-              fontSize: '0.6rem', fontWeight: 700, lineHeight: 1,
-            }}>
-              {pickedAbbrev}
+      {/* Prediction block */}
+      {pred != null && (
+        <div
+          className="px-4 pb-4 pt-3 flex flex-col gap-2"
+          style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
+        >
+          {/* Header row */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-mono" style={{ color: 'var(--silver)', opacity: 0.35 }}>
+              prediction{modelVersion ? ` · ${modelVersion}` : ''}
             </span>
-            <span className="text-xs" style={{ color: 'var(--silver)', opacity: 0.5 }}>
-              {pickedConf}%
-            </span>
-            {/* Correct / wrong badge */}
-            {correct === true && (
-              <span className="text-xs font-bold px-1.5 py-0.5 rounded"
-                style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}>
-                ✓
-              </span>
-            )}
-            {correct === false && (
-              <span className="text-xs font-bold px-1.5 py-0.5 rounded"
-                style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.25)' }}>
-                ✗
-              </span>
+            {pickedAbbrev != null && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs" style={{ color: 'var(--silver)', opacity: 0.5 }}>picked</span>
+                <span style={{
+                  background: TEAM_BADGE_COLORS[pickedAbbrev] ?? '#333',
+                  color: '#fff', padding: '1px 6px', borderRadius: '3px',
+                  fontSize: '0.6rem', fontWeight: 700, lineHeight: 1,
+                }}>
+                  {pickedAbbrev}
+                </span>
+              </div>
             )}
           </div>
-        )}
-      </div>
+
+          {/* xG scores */}
+          {xgAway != null && xgHome != null && (
+            <div className="flex items-center justify-between">
+              <div className="text-center">
+                <span className="text-base font-bold font-mono" style={{ color: 'var(--silver)' }}>
+                  {xgAway.toFixed(1)}
+                </span>
+                <span className="text-xs block" style={{ color: 'var(--silver)', opacity: 0.4 }}>xG {away}</span>
+              </div>
+              <span className="text-xs" style={{ color: 'var(--silver)', opacity: 0.3 }}>Expected score</span>
+              <div className="text-center">
+                <span className="text-base font-bold font-mono" style={{ color: 'var(--text-bright)' }}>
+                  {xgHome.toFixed(1)}
+                </span>
+                <span className="text-xs block" style={{ color: 'var(--silver)', opacity: 0.4 }}>xG {home}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Win probability bar */}
+          {awayConf != null && homeConf != null && (
+            <div>
+              <div className="flex justify-between text-xs mb-1">
+                <span style={{ color: predictedHomeWin === false ? 'var(--heat)' : 'var(--silver)', opacity: predictedHomeWin === false ? 1 : 0.5 }}>
+                  {away} {awayConf}%
+                </span>
+                <span style={{ color: predictedHomeWin === true ? 'var(--heat)' : 'var(--silver)', opacity: predictedHomeWin === true ? 1 : 0.5 }}>
+                  {home} {homeConf}%
+                </span>
+              </div>
+              <div className="flex rounded-full overflow-hidden" style={{ height: '5px' }}>
+                <div style={{
+                  flexGrow: awayConf,
+                  background: predictedHomeWin === false ? 'var(--heat)' : 'rgba(255,255,255,0.15)',
+                }} />
+                <div style={{
+                  flexGrow: homeConf,
+                  background: predictedHomeWin === true ? 'var(--heat)' : 'rgba(255,255,255,0.15)',
+                }} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </Link>
   );
 }
