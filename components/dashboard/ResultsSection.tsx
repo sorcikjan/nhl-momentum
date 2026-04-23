@@ -48,8 +48,10 @@ function ResultCard({ game, pred }: { game: Game; pred: Pred }) {
   const xgHome: number | null = pred?.predicted_home_score ?? null;
   const modelVersion: string | null = pred?.model_version ?? null;
 
-  // Outcome
-  const outcome = pred?.prediction_outcomes;
+  // Outcome — prediction_outcomes is an array from the join (same as game page)
+  const outcome = Array.isArray(pred?.prediction_outcomes)
+    ? pred.prediction_outcomes[0]
+    : pred?.prediction_outcomes;
   const correct: boolean | null = outcome?.correct_winner ?? null;
   const pickedAbbrev = predictedHomeWin === true ? home : predictedHomeWin === false ? away : null;
 
