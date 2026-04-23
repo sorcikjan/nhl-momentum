@@ -23,7 +23,7 @@ const getTodayGames = cache((date: string) =>
   fetchGames(date).catch(() => ({ games: [], predictions: [], odds: [] }))
 );
 const getRecentRecaps = cache(() => fetchRecentRecaps(5).catch(() => []));
-const getRecentGames = cache(() => fetchRecentCompletedGames(4, 40).catch(() => ({ games: [], predMap: new Map() })));
+const getRecentGames = cache(() => fetchRecentCompletedGames(2, 15).catch(() => ({ games: [], predMap: new Map() })));
 
 // ── Section: Last Night (recap feed — hero + 4 compact stories) ───────────────
 

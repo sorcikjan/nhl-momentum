@@ -23,13 +23,8 @@ const TEAM_BADGE_COLORS: Record<string, string> = {
   VGK: '#B4975A', WSH: '#C8102E', WPG: '#041E42',
 };
 
-function formatDateLabel(dateStr: string): string {
+function formatNightLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00Z');
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const diff = Math.round((today.getTime() - d.getTime()) / 86_400_000);
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Yesterday';
   return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
 }
 
@@ -188,46 +183,31 @@ export default function ResultsSection({
   const completed = games.filter((g: Game) => ['FINAL', 'OFF'].includes(g.game_state));
   if (!completed.length) return null;
 
-  // Group by date, newest first
-  const byDate = new Map<string, Game[]>();
-  for (const g of completed) {
-    const d = g.game_date as string;
-    if (!byDate.has(d)) byDate.set(d, []);
-    byDate.get(d)!.push(g);
-  }
-  const dates = [...byDate.keys()].sort((a, b) => b.localeCompare(a));
+  // Show only the most recent night
+  const lastNight = completed.reduce((max: string, g: Game) =>
+    (g.game_date as string) > max ? (g.game_date as string) : max, '');
+  const lastNightGames = completed.filter((g: Game) => g.game_date === lastNight);
 
   return (
     <section>
       <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-xs font-semibold uppercase tracking-widest"
-          style={{ color: 'var(--text)', opacity: 0.5 }}>
-          Recent results
-        </h2>
-        <span className="text-xs" style={{ color: 'var(--silver)' }}>
-          {completed.length} game{completed.length !== 1 ? 's' : ''}
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-widest"
+            style={{ color: 'var(--text)', opacity: 0.5 }}>
+            Last night
+          </h2>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--silver)', opacity: 0.35 }}>
+            {formatNightLabel(lastNight)}
+          </p>
+        </div>
+        <span className="text-xs" style={{ color: 'var(--silver)', opacity: 0.4 }}>
+          {lastNightGames.length} game{lastNightGames.length !== 1 ? 's' : ''}
         </span>
       </div>
 
-      <div className="flex flex-col gap-4">
-        {dates.map(date => (
-          <div key={date} className="flex flex-col gap-2">
-            {/* Date label */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold" style={{ color: 'var(--silver)', opacity: 0.45 }}>
-                {formatDateLabel(date)}
-              </span>
-              <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
-              <span className="text-xs font-mono" style={{ color: 'var(--silver)', opacity: 0.3 }}>
-                {byDate.get(date)!.length} games
-              </span>
-            </div>
-
-            {/* Game cards for this date */}
-            {byDate.get(date)!.map((g: Game) => (
-              <ResultCard key={g.id} game={g} pred={predMap.get(g.id) ?? null} />
-            ))}
-          </div>
+      <div className="flex flex-col gap-2">
+        {lastNightGames.map((g: Game) => (
+          <ResultCard key={g.id} game={g} pred={predMap.get(g.id) ?? null} />
         ))}
       </div>
     </section>
