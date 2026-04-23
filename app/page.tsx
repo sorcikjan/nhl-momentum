@@ -3,8 +3,9 @@ import { cache } from 'react';
 import type { Metadata } from 'next';
 import RecapFeed from '@/components/dashboard/RecapFeed';
 import TonightSection from '@/components/dashboard/TonightSection';
+import ResultsSection from '@/components/dashboard/ResultsSection';
 import HeatGrid from '@/components/dashboard/HeatGrid';
-import { fetchRankings, fetchGames, fetchRecentRecaps } from '@/lib/data';
+import { fetchRankings, fetchGames, fetchRecentRecaps, fetchRecentCompletedGames } from '@/lib/data';
 
 export const revalidate = 60;
 
@@ -22,6 +23,7 @@ const getTodayGames = cache((date: string) =>
   fetchGames(date).catch(() => ({ games: [], predictions: [], odds: [] }))
 );
 const getRecentRecaps = cache(() => fetchRecentRecaps(5).catch(() => []));
+const getRecentGames = cache(() => fetchRecentCompletedGames(4, 40).catch(() => ({ games: [], predMap: new Map() })));
 
 // ── Section: Last Night (recap feed — hero + 4 compact stories) ───────────────
 
@@ -48,6 +50,14 @@ async function TonightSlate({ today }: { today: string }) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return <TonightSection games={games as any[]} predMap={predMap} oddsMap={oddsMap} />;
+}
+
+// ── Section: Recent results ───────────────────────────────────────────────────
+
+async function RecentResultsSection() {
+  const { games, predMap } = await getRecentGames();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return <ResultsSection games={games as any[]} predMap={predMap} />;
 }
 
 // ── Section: Who's burning (Heat scroll) ─────────────────────────────────────
@@ -88,6 +98,16 @@ function GameSkeleton() {
   );
 }
 
+function ResultsSkeleton() {
+  return (
+    <div className="flex flex-col gap-2">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="h-24 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
+      ))}
+    </div>
+  );
+}
+
 function HeatScrollSkeleton() {
   return (
     <div className="flex gap-3 overflow-x-hidden">
@@ -117,7 +137,12 @@ export default function DashboardPage() {
         <TonightSlate today={today} />
       </Suspense>
 
-      {/* 3. Who's burning — horizontal heat scroll */}
+      {/* 3. Recent results — completed games with prediction outcomes */}
+      <Suspense fallback={<ResultsSkeleton />}>
+        <RecentResultsSection />
+      </Suspense>
+
+      {/* 4. Who's burning — horizontal heat scroll */}
       <Suspense fallback={<HeatScrollSkeleton />}>
         <BurningSection />
       </Suspense>

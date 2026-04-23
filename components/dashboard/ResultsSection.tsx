@@ -1,0 +1,235 @@
+'use client';
+
+import Link from 'next/link';
+import { gameUrl } from '@/lib/urls';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Game = any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Pred = any;
+
+// Mirrors TonightSection's TEAM_BADGE_COLORS exactly
+const TEAM_BADGE_COLORS: Record<string, string> = {
+  ANA: '#F47A38', ARI: '#8C2633', UTA: '#71AFE5',
+  BOS: '#FFB81C', BUF: '#003087', CGY: '#C8102E',
+  CAR: '#CC0000', CHI: '#CF0A2C', COL: '#6F263D',
+  CBJ: '#002654', DAL: '#006847', DET: '#CE1126',
+  EDM: '#FF4C00', FLA: '#C8102E', LAK: '#A2AAAD',
+  MIN: '#154734', MTL: '#AF1E2D', NSH: '#FFB81C',
+  NJD: '#CE1126', NYI: '#003087', NYR: '#0038A8',
+  OTT: '#C2912C', PHI: '#F74902', PIT: '#FCB514',
+  SEA: '#99D9D9', SJS: '#006D75', STL: '#002F87',
+  TBL: '#002868', TOR: '#003E7E', VAN: '#00843D',
+  VGK: '#B4975A', WSH: '#C8102E', WPG: '#041E42',
+};
+
+function formatDateLabel(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00Z');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.round((today.getTime() - d.getTime()) / 86_400_000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Yesterday';
+  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+}
+
+// ── Single result card — mirrors RegularGameCard anatomy ──────────────────────
+
+function ResultCard({ game, pred }: { game: Game; pred: Pred }) {
+  const away = game.away_team?.abbrev ?? '???';
+  const home = game.home_team?.abbrev ?? '???';
+  const awayScore = game.away_score ?? 0;
+  const homeScore = game.home_score ?? 0;
+  const awayWon = awayScore > homeScore;
+  const homeWon = homeScore > awayScore;
+
+  // Prediction data
+  const homeProb = pred?.home_win_probability ?? null;
+  const awayConf = homeProb != null ? Math.round((1 - homeProb) * 100) : null;
+  const homeConf = homeProb != null ? Math.round(homeProb * 100) : null;
+  const predictedHomeWin = homeProb != null ? homeProb >= 0.5 : null;
+
+  // Outcome — prediction_outcomes is a single object (nested join)
+  const outcome = pred?.prediction_outcomes;
+  const actualHomeWin: boolean | null = outcome?.home_win ?? null;
+  const correct: boolean | null = actualHomeWin != null && predictedHomeWin != null
+    ? predictedHomeWin === actualHomeWin
+    : null;
+
+  const pickedAbbrev = predictedHomeWin === true ? home : predictedHomeWin === false ? away : null;
+  const pickedConf = predictedHomeWin === true ? homeConf : awayConf;
+
+  return (
+    <Link
+      href={gameUrl(game.id, away, home, game.game_date ?? '')}
+      className="block rounded-xl hover:opacity-80 transition-opacity"
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+    >
+      {/* Main row: logo + team + score · score + team + logo */}
+      <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+
+        {/* Away side */}
+        <div className="flex items-center gap-2.5 flex-shrink-0" style={{ minWidth: '90px' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`https://assets.nhle.com/logos/nhl/svg/${away}_light.svg`}
+            alt={away}
+            style={{ width: '36px', height: '36px', flexShrink: 0, opacity: homeWon ? 0.45 : 1 }}
+          />
+          <div className="flex flex-col">
+            <span className="font-black text-sm leading-none"
+              style={{ color: awayWon ? '#fff' : 'var(--silver)' }}>
+              {away}
+            </span>
+            <span className="font-black text-xl font-mono leading-tight"
+              style={{ color: awayWon ? '#fff' : 'var(--silver)', opacity: awayWon ? 1 : 0.5 }}>
+              {awayScore}
+            </span>
+          </div>
+        </div>
+
+        {/* Centre: confidence bar (pre-game prediction) */}
+        <div className="flex-1 flex flex-col items-center gap-1.5">
+          {awayConf != null && homeConf != null ? (
+            <>
+              <div className="w-full flex rounded-full overflow-hidden" style={{ height: '4px', background: 'var(--border)' }}>
+                <div style={{
+                  width: `${awayConf}%`, height: '100%',
+                  background: predictedHomeWin === false ? 'var(--heat)' : 'rgba(255,255,255,0.18)',
+                }} />
+                <div style={{
+                  width: `${homeConf}%`, height: '100%',
+                  background: predictedHomeWin === true ? 'var(--heat)' : 'rgba(255,255,255,0.18)',
+                }} />
+              </div>
+              <span className="text-xs font-mono" style={{ color: 'var(--silver)', opacity: 0.4 }}>
+                pre-game
+              </span>
+            </>
+          ) : (
+            <span className="text-xs" style={{ color: 'var(--silver)', opacity: 0.3 }}>–</span>
+          )}
+        </div>
+
+        {/* Home side */}
+        <div className="flex items-center gap-2.5 flex-shrink-0 justify-end" style={{ minWidth: '90px' }}>
+          <div className="flex flex-col items-end">
+            <span className="font-black text-sm leading-none"
+              style={{ color: homeWon ? '#fff' : 'var(--silver)' }}>
+              {home}
+            </span>
+            <span className="font-black text-xl font-mono leading-tight"
+              style={{ color: homeWon ? '#fff' : 'var(--silver)', opacity: homeWon ? 1 : 0.5 }}>
+              {homeScore}
+            </span>
+          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`https://assets.nhle.com/logos/nhl/svg/${home}_light.svg`}
+            alt={home}
+            style={{ width: '36px', height: '36px', flexShrink: 0, opacity: awayWon ? 0.45 : 1 }}
+          />
+        </div>
+      </div>
+
+      {/* Bottom row: FINAL label + prediction result */}
+      <div
+        className="flex items-center justify-between px-4 pb-3 pt-2"
+        style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
+      >
+        <span className="text-xs font-mono font-semibold"
+          style={{ color: 'var(--silver)', opacity: 0.4, letterSpacing: '0.05em' }}>
+          FINAL
+        </span>
+
+        {/* Prediction outcome */}
+        {pickedAbbrev != null && (
+          <div className="flex items-center gap-1.5">
+            {/* Team badge of picked team */}
+            <span style={{
+              background: TEAM_BADGE_COLORS[pickedAbbrev] ?? '#333',
+              color: '#fff', padding: '1px 5px', borderRadius: '3px',
+              fontSize: '0.6rem', fontWeight: 700, lineHeight: 1,
+            }}>
+              {pickedAbbrev}
+            </span>
+            <span className="text-xs" style={{ color: 'var(--silver)', opacity: 0.5 }}>
+              {pickedConf}%
+            </span>
+            {/* Correct / wrong badge */}
+            {correct === true && (
+              <span className="text-xs font-bold px-1.5 py-0.5 rounded"
+                style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}>
+                ✓
+              </span>
+            )}
+            {correct === false && (
+              <span className="text-xs font-bold px-1.5 py-0.5 rounded"
+                style={{ background: 'rgba(239,68,68,0.12)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                ✗
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+// ── Main section ──────────────────────────────────────────────────────────────
+
+export default function ResultsSection({
+  games,
+  predMap,
+}: {
+  games: Game[];
+  predMap: Map<number, Pred>;
+}) {
+  const completed = games.filter((g: Game) => ['FINAL', 'OFF'].includes(g.game_state));
+  if (!completed.length) return null;
+
+  // Group by date, newest first
+  const byDate = new Map<string, Game[]>();
+  for (const g of completed) {
+    const d = g.game_date as string;
+    if (!byDate.has(d)) byDate.set(d, []);
+    byDate.get(d)!.push(g);
+  }
+  const dates = [...byDate.keys()].sort((a, b) => b.localeCompare(a));
+
+  return (
+    <section>
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-xs font-semibold uppercase tracking-widest"
+          style={{ color: 'var(--text)', opacity: 0.5 }}>
+          Recent results
+        </h2>
+        <span className="text-xs" style={{ color: 'var(--silver)' }}>
+          {completed.length} game{completed.length !== 1 ? 's' : ''}
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        {dates.map(date => (
+          <div key={date} className="flex flex-col gap-2">
+            {/* Date label */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold" style={{ color: 'var(--silver)', opacity: 0.45 }}>
+                {formatDateLabel(date)}
+              </span>
+              <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
+              <span className="text-xs font-mono" style={{ color: 'var(--silver)', opacity: 0.3 }}>
+                {byDate.get(date)!.length} games
+              </span>
+            </div>
+
+            {/* Game cards for this date */}
+            {byDate.get(date)!.map((g: Game) => (
+              <ResultCard key={g.id} game={g} pred={predMap.get(g.id) ?? null} />
+            ))}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
