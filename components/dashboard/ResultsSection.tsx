@@ -56,9 +56,9 @@ function ResultCard({ game, pred }: { game: Game; pred: Pred }) {
       style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
     >
       {/* Score row */}
-      <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+      <div className="flex items-center gap-3 px-4 py-4">
 
-        {/* Away side */}
+        {/* Away side — underline if picked */}
         <div className="flex items-center gap-2.5 flex-shrink-0" style={{ minWidth: '90px' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -67,10 +67,15 @@ function ResultCard({ game, pred }: { game: Game; pred: Pred }) {
             style={{ width: '36px', height: '36px', flexShrink: 0, opacity: homeWon ? 0.45 : 1 }}
           />
           <div className="flex flex-col">
-            <span className="font-black text-sm leading-none"
-              style={{ color: awayWon ? '#fff' : 'var(--silver)' }}>
-              {away}
-            </span>
+            <div className="flex items-center gap-1">
+              <span className="font-black text-sm leading-none"
+                style={{ color: awayWon ? '#fff' : 'var(--silver)' }}>
+                {away}
+              </span>
+              {pickedAbbrev === away && (
+                <span className="text-xs" style={{ color: 'var(--silver)', opacity: 0.4 }}>◂</span>
+              )}
+            </div>
             <span className="font-black text-xl font-mono leading-tight"
               style={{ color: awayWon ? '#fff' : 'var(--silver)', opacity: awayWon ? 1 : 0.5 }}>
               {awayScore}
@@ -78,27 +83,38 @@ function ResultCard({ game, pred }: { game: Game; pred: Pred }) {
           </div>
         </div>
 
-        {/* Centre: verdict + FINAL */}
-        <div className="flex-1 flex flex-col items-center gap-1">
-          {correct === true && (
-            <span className="text-sm font-bold" style={{ color: '#22c55e' }}>✓</span>
+        {/* Centre: verdict */}
+        <div className="flex-1 flex flex-col items-center gap-0.5">
+          {correct === true ? (
+            <>
+              <span className="font-bold text-base leading-none" style={{ color: '#22c55e' }}>✓</span>
+              <span className="text-xs font-semibold" style={{ color: '#22c55e', opacity: 0.8 }}>correct</span>
+            </>
+          ) : correct === false ? (
+            <>
+              <span className="font-bold text-base leading-none" style={{ color: 'var(--red)' }}>✗</span>
+              <span className="text-xs font-semibold" style={{ color: 'var(--red)', opacity: 0.8 }}>wrong</span>
+            </>
+          ) : (
+            <span className="text-xs font-mono font-semibold"
+              style={{ color: 'var(--silver)', opacity: 0.4, letterSpacing: '0.05em' }}>
+              FINAL
+            </span>
           )}
-          {correct === false && (
-            <span className="text-sm font-bold" style={{ color: 'var(--red)' }}>✗</span>
-          )}
-          <span className="text-xs font-mono font-semibold"
-            style={{ color: 'var(--silver)', opacity: 0.4, letterSpacing: '0.05em' }}>
-            FINAL
-          </span>
         </div>
 
-        {/* Home side */}
+        {/* Home side — arrow if picked */}
         <div className="flex items-center gap-2.5 flex-shrink-0 justify-end" style={{ minWidth: '90px' }}>
           <div className="flex flex-col items-end">
-            <span className="font-black text-sm leading-none"
-              style={{ color: homeWon ? '#fff' : 'var(--silver)' }}>
-              {home}
-            </span>
+            <div className="flex items-center gap-1">
+              {pickedAbbrev === home && (
+                <span className="text-xs" style={{ color: 'var(--silver)', opacity: 0.4 }}>▸</span>
+              )}
+              <span className="font-black text-sm leading-none"
+                style={{ color: homeWon ? '#fff' : 'var(--silver)' }}>
+                {home}
+              </span>
+            </div>
             <span className="font-black text-xl font-mono leading-tight"
               style={{ color: homeWon ? '#fff' : 'var(--silver)', opacity: homeWon ? 1 : 0.5 }}>
               {homeScore}
@@ -112,32 +128,6 @@ function ResultCard({ game, pred }: { game: Game; pred: Pred }) {
           />
         </div>
       </div>
-
-      {/* Pick row */}
-      {pickedAbbrev != null && (
-        <div
-          className="flex items-center gap-2 px-4 pb-3 pt-2"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
-        >
-          <span className="text-xs font-mono" style={{ color: 'var(--silver)', opacity: 0.35 }}>
-            picked
-          </span>
-          <span style={{
-            background: TEAM_BADGE_COLORS[pickedAbbrev] ?? '#333',
-            color: '#fff', padding: '2px 8px', borderRadius: '4px',
-            fontSize: '0.7rem', fontWeight: 800, lineHeight: 1,
-            letterSpacing: '0.03em',
-          }}>
-            {pickedAbbrev}
-          </span>
-          {correct === true && (
-            <span className="text-xs font-semibold" style={{ color: '#22c55e' }}>correct</span>
-          )}
-          {correct === false && (
-            <span className="text-xs font-semibold" style={{ color: 'var(--red)' }}>wrong</span>
-          )}
-        </div>
-      )}
     </Link>
   );
 }
