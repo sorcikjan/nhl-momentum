@@ -107,11 +107,11 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                     {(() => {
                       const status = p.players.injury_status
                         ? 'injured'
-                        : deriveOutStatus(p.consecutive_games_missed ?? null, null);
+                        : deriveOutStatus(p.consecutive_games_missed ?? null, null, p.players.in_minors ?? false);
                       if (!status) return null;
-                      const label = status === 'injured' ? 'INJURED' : status === 'scratch' ? 'SCRATCHED' : 'OUT';
-                      const color = status === 'injured' ? 'var(--red)' : 'var(--amber)';
-                      const bg    = status === 'injured' ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.18)';
+                      const label = status === 'minors' ? 'MINORS' : status === 'injured' ? 'INJURED' : status === 'scratch' ? 'SCRATCHED' : 'OUT';
+                      const color = status === 'minors' ? 'var(--neon)' : status === 'injured' ? 'var(--red)' : 'var(--amber)';
+                      const bg    = status === 'minors' ? 'rgba(99,179,237,0.15)' : status === 'injured' ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.18)';
                       return (
                         <span className="text-xs px-1.5 py-0.5 rounded font-bold" style={{ background: bg, color }}>
                           {label}

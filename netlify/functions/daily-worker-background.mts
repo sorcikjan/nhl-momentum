@@ -37,7 +37,7 @@ const handler: BackgroundHandler = async (event) => {
   }
 
   const body = event.body ? JSON.parse(event.body) : {};
-  const phases: string[] = body.phases ?? ['backfill', 'outcomes', 'outcomes-backfill', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy', 'extras'];
+  const phases: string[] = body.phases ?? ['backfill', 'outcomes', 'outcomes-backfill', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy', 'extras', 'assignments'];
   const dateParam: string = body.date ?? '';
   const dateSuffix = dateParam ? `&date=${dateParam}` : '';
 
@@ -189,7 +189,15 @@ const handler: BackgroundHandler = async (event) => {
     } catch (e) { log.push(`extras: exception ${e}`); }
   }
 
-  // 8. Soft signals — NHL RSS + Newsdata.io news ingestion
+  // 8. Player assignments — detect AHL/minor league assignments
+  if (phases.includes('assignments')) {
+    try {
+      const r = await call(`${base}/api/ingest/player-assignments`, h, GAMELOGS_TIMEOUT_MS);
+      log.push(`assignments: ${r.data?.flagged_in_minors ?? 0} in minors, ${r.data?.unflagged ?? 0} recalled, checked ${r.data?.checked ?? 0}${r.error ? ` err: ${r.error}` : ''}`);
+    } catch (e) { log.push(`assignments: exception ${e}`); }
+  }
+
+  // 9. Soft signals — NHL RSS + Newsdata.io news ingestion
   if (phases.includes('signals')) {
     try {
       const r = await call(`${base}/api/ingest/soft-signals?type=all`, h);

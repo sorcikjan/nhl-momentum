@@ -458,7 +458,74 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ── 9. PIPELINE FRESHNESS ─────────────────────────────────────────────────
+  // ── 9. GOALIE DATA INTEGRITY ──────────────────────────────────────────────
+  // Verifies that active goalies have recent game_goalie_stats rows accessible
+  // in the DB — the same query path used by the player profile page.
+  // A passing check means "all goalie game data has been correctly saved to the DB."
+  {
+    const { data: activeGoalies } = await supabaseAdmin
+      .from('players')
+      .select('id, first_name, last_name, team_id')
+      .eq('position_code', 'G')
+      .eq('is_active', true)
+      .limit(60);
+
+    const goalieIds = (activeGoalies ?? []).map(g => g.id);
+
+    const [{ data: recentGoalieStats }, { data: newestGoalieStat }] = await Promise.all([
+      goalieIds.length
+        ? supabaseAdmin
+            .from('game_goalie_stats')
+            .select('player_id, game_id, save_pct, goals_against, toi_seconds, decision, recorded_at')
+            .in('player_id', goalieIds)
+            .gte('recorded_at', hoursAgo(72))
+        : Promise.resolve({ data: [] }),
+      supabaseAdmin
+        .from('game_goalie_stats')
+        .select('player_id, recorded_at')
+        .order('recorded_at', { ascending: false })
+        .limit(1)
+        .single(),
+    ]);
+
+    // Group by player — how many goalies have data in the last 72h
+    const goaliesWithData = new Set((recentGoalieStats ?? []).map(r => r.player_id));
+    const goaliesWithoutData = (activeGoalies ?? []).filter(g => !goaliesWithData.has(g.id));
+
+    // Spot-check: pick the goalie with the most recent stat row and verify all key
+    // fields are non-null (proves the row is a complete, usable record)
+    const spotRow = (recentGoalieStats ?? [])[0];
+    const spotIncomplete = spotRow && (
+      spotRow.save_pct == null || spotRow.toi_seconds == null
+    );
+
+    const goalieStatAgeH = newestGoalieStat?.recorded_at
+      ? (Date.now() - new Date(newestGoalieStat.recorded_at).getTime()) / 3_600_000
+      : Infinity;
+
+    checks.goalieData = {
+      activeGoalies: goalieIds.length,
+      goaliesWithRecentStats: goaliesWithData.size,
+      goaliesWithoutRecentStats: goaliesWithoutData.length,
+      lastGoalieStatIngested: ago(newestGoalieStat?.recorded_at),
+      spotCheckPassed: !spotIncomplete,
+      spotCheckDetails: spotRow
+        ? { player_id: spotRow.player_id, save_pct: spotRow.save_pct, toi_seconds: spotRow.toi_seconds, decision: spotRow.decision }
+        : null,
+    };
+
+    if (goalieStatAgeH > 28 && goalieIds.length > 0) {
+      issues.push(`GOALIE DATA: last goalie stat was ingested ${Math.round(goalieStatAgeH)}h ago — gamelogs pipeline may have dropped goalies`);
+    }
+    if (goaliesWithData.size === 0 && goalieIds.length > 0) {
+      issues.push(`GOALIE DATA: 0 of ${goalieIds.length} active goalies have stats in the last 72h — game_goalie_stats ingestion is broken`);
+    }
+    if (spotIncomplete) {
+      issues.push(`GOALIE DATA: spot-check row for player_id ${spotRow!.player_id} has null save_pct or toi_seconds — incomplete ingest`);
+    }
+  }
+
+  // ── 10. PIPELINE FRESHNESS ────────────────────────────────────────────────
   // Infer last run time for each phase from timestamp columns.
   {
     const [

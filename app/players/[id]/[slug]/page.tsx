@@ -85,7 +85,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const energyLabel = energyBar >= 70 ? 'HIGH PERFORMANCE' : energyBar >= 40 ? 'MODERATE' : 'DRAINED';
 
   const lastPlayedDaysAgo = lastPlayedDate ? daysAgo(lastPlayedDate) : null;
-  const outStatus = deriveOutStatus(consecutiveGamesMissed ?? null, lastPlayedDaysAgo);
+  const outStatus = deriveOutStatus(consecutiveGamesMissed ?? null, lastPlayedDaysAgo, player.in_minors ?? false);
 
   const lgPpm    = leagueAvg?.seasonPpm      ?? 0;
   const lgG      = leagueAvg?.goalsPerGame   ?? 0;
@@ -242,22 +242,25 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
       {/* ── OUT / Injury banner ───────────────────────────────────────────────── */}
       {outStatus && (() => {
+        const isMinors  = outStatus === 'minors';
         const isInjured = outStatus === 'injured';
         const isScratch = outStatus === 'scratch';
-        const label = isInjured ? 'INJURED' : isScratch ? 'SCRATCHED' : 'OUT';
-        const reason = isInjured
+        const label = isMinors ? 'MINORS' : isInjured ? 'INJURED' : isScratch ? 'SCRATCHED' : 'OUT';
+        const reason = isMinors
+          ? 'Assigned to AHL affiliate — not on active NHL roster'
+          : isInjured
           ? 'Extended absence — likely on injured reserve'
           : isScratch
           ? 'Not in lineup — possible healthy scratch or performance decision'
           : 'Not in lineup — short-term absence';
-        const bgColor = isInjured ? 'rgba(239,68,68,0.08)' : isScratch ? 'rgba(251,191,36,0.08)' : 'rgba(239,68,68,0.08)';
-        const borderColor = isInjured ? 'rgba(239,68,68,0.4)' : isScratch ? 'rgba(251,191,36,0.35)' : 'rgba(239,68,68,0.4)';
-        const textColor = isInjured ? 'var(--red)' : isScratch ? 'var(--amber)' : 'var(--red)';
+        const bgColor    = isMinors ? 'rgba(99,179,237,0.08)' : isInjured ? 'rgba(239,68,68,0.08)' : isScratch ? 'rgba(251,191,36,0.08)' : 'rgba(239,68,68,0.08)';
+        const borderColor = isMinors ? 'rgba(99,179,237,0.4)' : isInjured ? 'rgba(239,68,68,0.4)' : isScratch ? 'rgba(251,191,36,0.35)' : 'rgba(239,68,68,0.4)';
+        const textColor  = isMinors ? 'var(--neon)' : isInjured ? 'var(--red)' : isScratch ? 'var(--amber)' : 'var(--red)';
         return (
           <div className="rounded-xl border px-4 py-4 flex flex-col sm:flex-row sm:items-center gap-3"
             style={{ background: bgColor, borderColor }}>
             <div className="text-xl font-black tracking-tight px-3 py-1.5 rounded-lg"
-              style={{ background: isInjured ? 'rgba(239,68,68,0.15)' : isScratch ? 'rgba(251,191,36,0.15)' : 'rgba(239,68,68,0.15)', color: textColor }}>
+              style={{ background: isMinors ? 'rgba(99,179,237,0.15)' : isInjured ? 'rgba(239,68,68,0.15)' : isScratch ? 'rgba(251,191,36,0.15)' : 'rgba(239,68,68,0.15)', color: textColor }}>
               {label}
             </div>
             <div className="flex-1">
@@ -330,9 +333,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                     </>
                   )}
                   {(outStatus || player.injury_status) && (() => {
-                    const label = player.injury_status ?? (outStatus === 'injured' ? 'INJURED' : outStatus === 'scratch' ? 'SCRATCH' : 'OUT');
-                    const color = outStatus === 'scratch' ? 'var(--amber)' : 'var(--red)';
-                    const bg = outStatus === 'scratch' ? 'rgba(251,191,36,0.18)' : 'rgba(239,68,68,0.2)';
+                    const label = player.injury_status ?? (outStatus === 'minors' ? 'MINORS' : outStatus === 'injured' ? 'INJURED' : outStatus === 'scratch' ? 'SCRATCH' : 'OUT');
+                    const color = outStatus === 'minors' ? 'var(--neon)' : outStatus === 'scratch' ? 'var(--amber)' : 'var(--red)';
+                    const bg    = outStatus === 'minors' ? 'rgba(99,179,237,0.15)' : outStatus === 'scratch' ? 'rgba(251,191,36,0.18)' : 'rgba(239,68,68,0.2)';
                     return (
                       <span className="px-2 py-0.5 rounded text-xs font-bold" style={{ background: bg, color }}>
                         {label}

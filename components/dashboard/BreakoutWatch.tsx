@@ -18,6 +18,7 @@ interface Player {
     headshot_url: string | null;
     position_code: string;
     injury_status?: string | null;
+    in_minors?: boolean | null;
     teams: { abbrev: string };
   };
 }
@@ -91,11 +92,11 @@ export default function BreakoutWatch({
                       const lastPlayedDaysAgo = p.last_played_date ? daysAgo(p.last_played_date) : null;
                       const outStatus = p.players?.injury_status
                         ? 'injured'
-                        : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo);
+                        : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo, p.players?.in_minors ?? false);
                       if (!outStatus) return null;
-                      const label = outStatus === 'injured' ? 'INJURED' : outStatus === 'scratch' ? 'SCRATCHED' : 'OUT';
-                      const color = outStatus === 'injured' ? 'var(--red)' : 'var(--amber)';
-                      const bg    = outStatus === 'injured' ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.18)';
+                      const label = outStatus === 'minors' ? 'MINORS' : outStatus === 'injured' ? 'INJURED' : outStatus === 'scratch' ? 'SCRATCHED' : 'OUT';
+                      const color = outStatus === 'minors' ? 'var(--neon)' : outStatus === 'injured' ? 'var(--red)' : 'var(--amber)';
+                      const bg    = outStatus === 'minors' ? 'rgba(99,179,237,0.15)' : outStatus === 'injured' ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.18)';
                       return (
                         <span className="text-xs px-1 py-0.5 rounded font-bold flex-shrink-0"
                           style={{ background: bg, color }}>{label}</span>

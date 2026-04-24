@@ -122,9 +122,11 @@ export default function PlayerLeaderboard({
                   const lastPlayedDaysAgo = p.last_played_date ? daysAgo(p.last_played_date) : null;
                   const outStatus = p.players?.injury_status
                     ? 'injured'
-                    : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo);
+                    : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo, p.players?.in_minors ?? false);
                   const badge = p.players?.injury_status || outStatus === 'injured'
                     ? { label: 'INJURED',   color: 'var(--red)',   bg: 'rgba(239,68,68,0.18)' }
+                    : outStatus === 'minors'
+                    ? { label: 'MINORS',    color: 'var(--neon)',  bg: 'rgba(99,179,237,0.15)' }
                     : outStatus === 'out'
                     ? { label: 'OUT',       color: 'var(--amber)', bg: 'rgba(245,158,11,0.18)' }
                     : outStatus === 'scratch'

@@ -6,7 +6,9 @@ export function daysAgo(dateStr: string): number {
 
 /**
  * Derives player out-status from absence data.
- * Returns 'injured' | 'out' | 'scratch' | null.
+ * Returns 'minors' | 'injured' | 'out' | 'scratch' | null.
+ *
+ * When inMinors is true and the player has missed games, returns 'minors' immediately.
  *
  * When game count is available, cross-checks with days to avoid false positives
  * from pipeline lag, end-of-season schedule gaps, or single-game rest decisions.
@@ -26,12 +28,14 @@ export function daysAgo(dateStr: string): number {
 export function deriveOutStatus(
   consecutiveGamesMissed: number | null,
   lastPlayedDaysAgo: number | null,
-): 'injured' | 'out' | 'scratch' | null {
+  inMinors = false,
+): 'minors' | 'injured' | 'out' | 'scratch' | null {
   if (consecutiveGamesMissed !== null) {
     if (consecutiveGamesMissed === 0) return null;
     // Require the player to also be absent for 3+ days — prevents false
     // positives from pipeline lag, single-game rest, or schedule gaps.
     if (lastPlayedDaysAgo !== null && lastPlayedDaysAgo < 3) return null;
+    if (inMinors) return 'minors';
     if (consecutiveGamesMissed >= 5) return 'injured';
     if (consecutiveGamesMissed >= 3) return 'out';
     return 'scratch'; // 1–2 games missed + 3+ days absent

@@ -115,7 +115,7 @@ export async function fetchRankings() {
       sos_coefficient, calculated_at,
       players (
         id, first_name, last_name, position_code, team_id,
-        headshot_url, injury_status, sweater_number,
+        headshot_url, injury_status, sweater_number, in_minors,
         teams ( id, abbrev, name )
       )
     `)
@@ -304,38 +304,45 @@ export async function fetchGames(date: string) {
 // ─── Player ───────────────────────────────────────────────────────────────────
 
 export async function fetchPlayer(id: string) {
-  // Player info, metric timeline, and recent game stats are all independent
-  const [
-    { data: player, error: pErr },
-    { data: metricTimelineDesc },
-    { data: rawGameStats },
-  ] = await Promise.all([
-    supabaseAdmin
-      .from('players')
-      .select(`
-        *, teams(id, abbrev, name, logo_url),
-        birth_date, birth_city, birth_state_province, birth_country,
-        height_inches, weight_pounds, shoots_catches,
-        draft_year, draft_round, draft_pick, draft_team_abbrev,
-        career_games, career_goals, career_assists, career_points, career_plus_minus
-      `)
-      .eq('id', id)
-      .single(),
+  // Fetch player info first — position_code determines which stats table to query
+  const { data: player, error: pErr } = await supabaseAdmin
+    .from('players')
+    .select(`
+      *, teams(id, abbrev, name, logo_url),
+      birth_date, birth_city, birth_state_province, birth_country,
+      height_inches, weight_pounds, shoots_catches,
+      draft_year, draft_round, draft_pick, draft_team_abbrev,
+      career_games, career_goals, career_assists, career_points, career_plus_minus
+    `)
+    .eq('id', id)
+    .single();
+
+  if (pErr) throw pErr;
+
+  const isGoalie = player?.position_code === 'G';
+
+  // Metric timeline and game stats are independent of each other
+  const [{ data: metricTimelineDesc }, { data: rawGameStats }] = await Promise.all([
     supabaseAdmin
       .from('player_metric_snapshots')
       .select('*')
       .eq('player_id', id)
       .order('calculated_at', { ascending: false })
       .limit(30),
-    supabaseAdmin
-      .from('game_player_stats')
-      .select('*')
-      .eq('player_id', id)
-      .order('game_id', { ascending: false })
-      .limit(20),
+    isGoalie
+      ? supabaseAdmin
+          .from('game_goalie_stats')
+          .select('game_id, save_pct, goals_against, shots_against, toi_seconds, decision')
+          .eq('player_id', id)
+          .order('game_id', { ascending: false })
+          .limit(20)
+      : supabaseAdmin
+          .from('game_player_stats')
+          .select('*')
+          .eq('player_id', id)
+          .order('game_id', { ascending: false })
+          .limit(20),
   ]);
-
-  if (pErr) throw pErr;
 
   // Newest first → reverse for timeline chart
   const metricTimeline = (metricTimelineDesc ?? []).slice().reverse();
@@ -680,7 +687,7 @@ export async function fetchTeam(id: string) {
       .select(`
         player_id, momentum_rank, composite_ppm, momentum_ppm, season_ppm, breakout_delta,
         energy_bar, momentum_goals, momentum_assists, momentum_points,
-        players!inner ( id, first_name, last_name, position_code, headshot_url, injury_status, team_id )
+        players!inner ( id, first_name, last_name, position_code, headshot_url, injury_status, in_minors, team_id )
       `)
       .eq('players.team_id', team.id)
       .order('calculated_at', { ascending: false })
