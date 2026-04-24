@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { fetchRecap, fetchRecapData, teamLogoUrl } from '@/lib/data';
@@ -38,6 +39,50 @@ export async function generateMetadata(
       ...(recap.hero_image_url && { images: [recap.hero_image_url] }),
     },
   };
+}
+
+// Linkify plain text: replace player last names and team abbreviations with anchor tags.
+// Returns an array of strings and <a> elements for use in JSX.
+function linkifyText(
+  text: string,
+  playerLinks: Map<string, string>,  // lastName (lower) → href
+  teamLinks: Map<string, string>,    // abbrev (upper) → href
+): React.ReactNode[] {
+  // Build a combined regex: team abbrevs (word-boundary) | player last names (word-boundary)
+  const abbrevs = [...teamLinks.keys()].map(a => a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const names   = [...playerLinks.keys()].map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  if (!abbrevs.length && !names.length) return [text];
+
+  // Match longest first to avoid partial matches
+  const pattern = [...abbrevs, ...names]
+    .sort((a, b) => b.length - a.length)
+    .join('|');
+  const regex = new RegExp(`\\b(${pattern})\\b`, 'gi');
+
+  const parts: React.ReactNode[] = [];
+  let last = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > last) parts.push(text.slice(last, match.index));
+    const word = match[0];
+    const href = teamLinks.get(word.toUpperCase()) ?? playerLinks.get(word.toLowerCase());
+    if (href) {
+      parts.push(
+        <a key={match.index} href={href}
+          style={{ color: 'var(--neon)', textDecoration: 'none', borderBottom: '1px solid rgba(99,202,183,0.3)' }}
+          onMouseOver={e => (e.currentTarget.style.borderBottomColor = 'var(--neon)')}
+          onMouseOut={e => (e.currentTarget.style.borderBottomColor = 'rgba(99,202,183,0.3)')}>
+          {word}
+        </a>
+      );
+    } else {
+      parts.push(word);
+    }
+    last = match.index + word.length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
 }
 
 // Parse article content into sections.
@@ -105,6 +150,26 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
   for (const g of games) {
     const key = `${g.away_team?.abbrev}:${g.home_team?.abbrev}`;
     gameByTeams.set(key, g);
+  }
+
+  // Build player last-name → playerUrl map (for article body linkification)
+  const playerLinks = new Map<string, string>();
+  for (const p of topPerformers) {
+    if (p.player_id && p.players?.last_name) {
+      playerLinks.set(
+        p.players.last_name.toLowerCase(),
+        playerUrl(p.player_id, p.players.first_name ?? '', p.players.last_name)
+      );
+    }
+  }
+
+  // Build team abbrev → teamUrl map from games data
+  const teamLinks = new Map<string, string>();
+  for (const g of games) {
+    if (g.away_team?.id && g.away_team?.abbrev)
+      teamLinks.set(g.away_team.abbrev, teamUrl(g.away_team.id, g.away_team.name ?? g.away_team.abbrev));
+    if (g.home_team?.id && g.home_team?.abbrev)
+      teamLinks.set(g.home_team.abbrev, teamUrl(g.home_team.id, g.home_team.name ?? g.home_team.abbrev));
   }
 
   const sections = parseArticle(recap.content);
@@ -274,7 +339,7 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
               return (
                 <p key={i} className="text-sm leading-relaxed mb-5"
                   style={{ color: i === 0 ? 'var(--text-bright)' : 'var(--text)' }}>
-                  {section.body}
+                  {linkifyText(section.body, playerLinks, teamLinks)}
                 </p>
               );
             }
@@ -319,7 +384,7 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
 
                 {section.body && (
                   <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>
-                    {section.body}
+                    {linkifyText(section.body, playerLinks, teamLinks)}
                   </p>
                 )}
               </div>
@@ -347,12 +412,23 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-mono font-bold w-4 text-center" style={{ color: 'var(--neon)' }}>{i + 1}</span>
                       <div>
-                        <span className="text-sm font-medium" style={{ color: 'var(--text-bright)' }}>
+                        <Link
+                          href={playerUrl(p.player_id, p.players?.first_name ?? '', p.players?.last_name ?? '')}
+                          className="text-sm font-medium hover:underline"
+                          style={{ color: 'var(--text-bright)' }}>
                           {p.players?.first_name} {p.players?.last_name}
-                        </span>
-                        <span className="text-xs ml-1.5" style={{ color: 'var(--text)' }}>
-                          {p.teams?.abbrev} · {p.players?.position_code}
-                        </span>
+                        </Link>
+                        {p.teams?.id ? (
+                          <Link
+                            href={teamUrl(p.teams.id, p.teams.name ?? p.teams.abbrev)}
+                            className="text-xs ml-1.5 hover:underline"
+                            style={{ color: 'var(--neon)' }}>
+                            {p.teams?.abbrev}
+                          </Link>
+                        ) : (
+                          <span className="text-xs ml-1.5" style={{ color: 'var(--text)' }}>{p.teams?.abbrev}</span>
+                        )}
+                        <span className="text-xs ml-1" style={{ color: 'var(--text)' }}>· {p.players?.position_code}</span>
                       </div>
                     </div>
                     <div className="text-right">

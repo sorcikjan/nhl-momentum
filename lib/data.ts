@@ -471,8 +471,8 @@ export async function fetchRecapData(date: string) {
       .from('games')
       .select(`
         id, game_date, home_score, away_score, youtube_highlight_id,
-        home_team:teams!games_home_team_id_fkey(abbrev, name, logo_url),
-        away_team:teams!games_away_team_id_fkey(abbrev, name, logo_url)
+        home_team:teams!games_home_team_id_fkey(id, abbrev, name, logo_url),
+        away_team:teams!games_away_team_id_fkey(id, abbrev, name, logo_url)
       `)
       .eq('game_date', date)
       .in('game_state', ['FINAL', 'OFF']),
@@ -499,7 +499,7 @@ export async function fetchRecapData(date: string) {
     .select(`
       player_id, game_id, goals, assists, plus_minus, toi_seconds, shots_on_goal,
       players(first_name, last_name, position_code),
-      teams(abbrev)
+      teams(id, abbrev, name)
     `)
     .in('game_id', gameIds)
     .neq('players.position_code', 'G');
