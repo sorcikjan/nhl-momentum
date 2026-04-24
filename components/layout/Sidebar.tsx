@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import PlayerSearch from './PlayerSearch';
 
 const NAV = [
-  { href: '/',           label: 'Dashboard',   icon: '◈' },
+  { href: '/',           label: 'Home',        icon: '◈' },
   { href: '/games',      label: 'Games',       icon: '🏒' },
   { href: '/rankings',   label: 'Rankings',    icon: '⚡' },
   { href: '/teams',      label: 'Teams',       icon: '🛡' },
@@ -29,7 +29,7 @@ export default function Sidebar() {
             <span className="text-xl">🏒</span>
             <div>
               <div className="text-sm font-bold" style={{ color: 'var(--text-bright)' }}>NHL Momentum</div>
-              <div className="text-xs" style={{ color: 'var(--neon)' }}>Analytics</div>
+              <div className="text-xs font-medium" style={{ color: 'var(--heat)' }}>Hockey Intelligence, Daily.</div>
             </div>
           </div>
         </div>
@@ -58,8 +58,9 @@ export default function Sidebar() {
           })}
         </nav>
 
-        <div className="px-5 py-4 text-xs border-t" style={{ borderColor: 'var(--border)', color: 'var(--text)' }}>
-          v1.0 · Model v1.0
+        <div className="px-5 py-4 text-xs border-t flex flex-col gap-0.5" style={{ borderColor: 'var(--border)' }}>
+          <span style={{ color: 'var(--text)' }}>AI-powered · Updated live</span>
+          <span style={{ color: 'var(--text)', opacity: 0.4 }}>Model v1.8</span>
         </div>
       </aside>
 

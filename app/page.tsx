@@ -5,16 +5,24 @@ import RecapFeed from '@/components/dashboard/RecapFeed';
 import TonightSection from '@/components/dashboard/TonightSection';
 import ResultsSection from '@/components/dashboard/ResultsSection';
 import HeatGrid from '@/components/dashboard/HeatGrid';
+import DailyBrandStrip from '@/components/dashboard/DailyBrandStrip';
 import { fetchRankings, fetchGames, fetchRecentRecaps, fetchRecentCompletedGames } from '@/lib/data';
+import { playerUrl } from '@/lib/urls';
 
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: 'NHL Momentum',
-  description: 'Results, predictions, and Heat rankings for every NHL game — updated hourly.',
+  title: 'NHL Momentum — Hockey Intelligence, Daily',
+  description: 'AI-powered daily hockey hub. Stories, predictions, player rankings and live results for every NHL game — updated continuously.',
   openGraph: {
-    title: 'NHL Momentum',
-    description: 'Results, predictions, and Heat rankings for every NHL game — updated hourly.',
+    title: 'NHL Momentum — Hockey Intelligence, Daily',
+    description: 'AI-powered daily hockey hub. Stories, predictions, player rankings and live results for every NHL game.',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'NHL Momentum — Hockey Intelligence, Daily',
+    description: 'AI-powered stories, predictions and player rankings for every NHL game.',
   },
 };
 
@@ -24,6 +32,34 @@ const getTodayGames = cache((date: string) =>
 );
 const getRecentRecaps = cache(() => fetchRecentRecaps(5).catch(() => []));
 const getRecentGames = cache(() => fetchRecentCompletedGames(2, 15).catch(() => ({ games: [], predMap: new Map() })));
+
+// ── Section: Brand strip (daily masthead) ─────────────────────────────────────
+
+async function BrandStripSection({ today }: { today: string }) {
+  const [rankings, { games }] = await Promise.all([
+    getRankings(),
+    getTodayGames(today),
+  ]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const top = ((rankings?.top100 ?? []) as any[])
+    .sort((a: any, b: any) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0))[0];
+
+  const topPlayer = top ? {
+    name: `${top.players.first_name} ${top.players.last_name}`,
+    team: top.players.teams?.abbrev ?? '',
+    ppm: top.momentum_ppm ?? 0,
+    href: playerUrl(top.player_id, top.players.first_name, top.players.last_name),
+  } : null;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gameCount = (games as any[]).filter((g: any) =>
+    ['LIVE', 'CRIT', 'PRE', 'FUT', 'SCHEDULED'].includes(g.game_state ?? '') ||
+    g.game_state == null
+  ).length;
+
+  return <DailyBrandStrip topPlayer={topPlayer} gameCount={gameCount} />;
+}
 
 // ── Section: Last Night (recap feed — hero + 4 compact stories) ───────────────
 
@@ -73,6 +109,27 @@ async function BurningSection() {
 }
 
 // ── Skeletons ─────────────────────────────────────────────────────────────────
+
+function BrandStripSkeleton() {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex justify-between">
+        <div className="flex flex-col gap-1">
+          <div className="h-3 w-24 rounded animate-pulse" style={{ background: 'var(--border)' }} />
+          <div className="h-6 w-48 rounded animate-pulse" style={{ background: 'var(--border)' }} />
+          <div className="h-3 w-40 rounded animate-pulse" style={{ background: 'var(--border)' }} />
+        </div>
+        <div className="h-3 w-16 rounded animate-pulse" style={{ background: 'var(--border)' }} />
+      </div>
+      <div className="flex gap-2">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="h-12 w-32 flex-shrink-0 rounded-lg animate-pulse" style={{ background: 'var(--bg-card)' }} />
+        ))}
+      </div>
+      <div className="h-px" style={{ background: 'var(--border)' }} />
+    </div>
+  );
+}
 
 function HeroSkeleton() {
   return (
@@ -127,6 +184,11 @@ export default function DashboardPage() {
   return (
     <div className="max-w-2xl mx-auto pb-20 md:pb-0 flex flex-col gap-8">
 
+      {/* 0. Daily masthead — brand identity + story hooks */}
+      <Suspense fallback={<BrandStripSkeleton />}>
+        <BrandStripSection today={today} />
+      </Suspense>
+
       {/* 1. Last Night — cinematic recap hero */}
       <Suspense fallback={<HeroSkeleton />}>
         <LastNightSection />
@@ -147,22 +209,52 @@ export default function DashboardPage() {
         <BurningSection />
       </Suspense>
 
-      {/* 4. Explore links */}
-      <div className="grid grid-cols-2 gap-3">
-        <a href="/rankings"
-          className="rounded-xl border p-4 hover:opacity-90 transition-opacity"
-          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <p className="text-xs mb-1" style={{ color: 'var(--text)', opacity: 0.5 }}>Explore</p>
-          <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Heat Rankings</p>
-          <p className="mt-1 text-xs font-medium" style={{ color: 'var(--heat)' }}>View →</p>
-        </a>
-        <a href="/accuracy"
-          className="rounded-xl border p-4 hover:opacity-90 transition-opacity"
-          style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <p className="text-xs mb-1" style={{ color: 'var(--text)', opacity: 0.5 }}>Evaluate</p>
-          <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Prediction accuracy</p>
-          <p className="mt-1 text-xs font-medium" style={{ color: 'var(--silver)' }}>View →</p>
-        </a>
+      {/* 5. Explore — story entry points */}
+      <div className="flex flex-col gap-3">
+        <p className="text-xs font-semibold tracking-widest uppercase"
+          style={{ color: 'var(--text)', opacity: 0.4 }}>Explore</p>
+        <div className="grid grid-cols-2 gap-3">
+          <a href="/rankings"
+            className="rounded-xl border p-4 hover:opacity-90 transition-opacity group"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <div className="text-lg mb-1">⚡</div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Heat Rankings</p>
+            <p className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
+              Who's playing the best hockey right now
+            </p>
+            <p className="mt-2 text-xs font-medium" style={{ color: 'var(--heat)' }}>View rankings →</p>
+          </a>
+          <a href="/games"
+            className="rounded-xl border p-4 hover:opacity-90 transition-opacity group"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <div className="text-lg mb-1">🏒</div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Games & Predictions</p>
+            <p className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
+              AI win predictions vs bookmaker odds
+            </p>
+            <p className="mt-2 text-xs font-medium" style={{ color: 'var(--neon)' }}>See predictions →</p>
+          </a>
+          <a href="/recaps"
+            className="rounded-xl border p-4 hover:opacity-90 transition-opacity group"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <div className="text-lg mb-1">📰</div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Daily Recaps</p>
+            <p className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
+              Data-backed stories from every game night
+            </p>
+            <p className="mt-2 text-xs font-medium" style={{ color: 'var(--silver)' }}>Read stories →</p>
+          </a>
+          <a href="/teams"
+            className="rounded-xl border p-4 hover:opacity-90 transition-opacity group"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <div className="text-lg mb-1">🛡</div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Teams</p>
+            <p className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
+              Roster momentum, form and player status
+            </p>
+            <p className="mt-2 text-xs font-medium" style={{ color: 'var(--green)' }}>Browse teams →</p>
+          </a>
+        </div>
       </div>
 
     </div>
