@@ -69,10 +69,7 @@ function linkifyText(
     const href = teamLinks.get(word.toUpperCase()) ?? playerLinks.get(word.toLowerCase());
     if (href) {
       parts.push(
-        <a key={match.index} href={href}
-          style={{ color: 'var(--neon)', textDecoration: 'none', borderBottom: '1px solid rgba(99,202,183,0.3)' }}
-          onMouseOver={e => (e.currentTarget.style.borderBottomColor = 'var(--neon)')}
-          onMouseOut={e => (e.currentTarget.style.borderBottomColor = 'rgba(99,202,183,0.3)')}>
+        <a key={match.index} href={href} className="recap-inline-link">
           {word}
         </a>
       );

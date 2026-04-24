@@ -32,3 +32,12 @@ body {
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.recap-inline-link {
+  color: var(--neon);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(99,202,183,0.3);
+}
+.recap-inline-link:hover {
+  border-bottom-color: var(--neon);
+}
