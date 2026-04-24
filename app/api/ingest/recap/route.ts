@@ -47,14 +47,29 @@ export async function GET(req: NextRequest) {
   const authError = requireIngestAuth(req);
   if (authError) return authError;
 
-  const dateParam = req.nextUrl.searchParams.get('date');
-  const force     = req.nextUrl.searchParams.get('force') === '1';
+  const dateParam  = req.nextUrl.searchParams.get('date');
+  const force      = req.nextUrl.searchParams.get('force') === '1';
+  const imageOnly  = req.nextUrl.searchParams.get('image_only') === '1';
 
   const date = dateParam ?? (() => {
     const d = new Date();
     d.setUTCDate(d.getUTCDate() - 1);
     return d.toISOString().slice(0, 10);
   })();
+
+  // image_only: just refresh the hero photo for an existing recap, no AI re-run
+  if (imageOnly) {
+    const heroImageUrl = await fetchPixabayHockeyImage(date, 'ice hockey');
+    if (!heroImageUrl) {
+      return NextResponse.json({ data: { skipped: true, date, reason: 'no pixabay image found' }, error: null });
+    }
+    const { error: imgErr } = await supabaseAdmin
+      .from('daily_recaps')
+      .update({ hero_image_url: heroImageUrl })
+      .eq('date', date);
+    if (imgErr) return NextResponse.json({ data: null, error: imgErr.message }, { status: 500 });
+    return NextResponse.json({ data: { date, hero_image_url: heroImageUrl }, error: null });
+  }
 
   // Skip if fresh recap already exists
   if (!force) {
@@ -146,19 +161,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: null, error: 'AI generation failed — check Netlify function logs for [ai] ask error' }, { status: 500 });
   }
 
-  // Pick hero image: use the featured game's away team logo (always relevant,
-  // always loads). Featured = highest combined score. Falls back to Pixabay.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const featuredGame = (raw.games as any[]).reduce((best: any, g: any) => {
-    const score = (g.home_score ?? 0) + (g.away_score ?? 0);
-    const bestScore = (best?.home_score ?? 0) + (best?.away_score ?? 0);
-    return score > bestScore ? g : best;
-  }, raw.games[0] as unknown);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const heroImageUrl: string | null = (featuredGame as any)?.away_team?.logo_url
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ?? (featuredGame as any)?.home_team?.logo_url
-    ?? await fetchPixabayHockeyImage(date, 'ice hockey arena');
+  // Hero image: always Pixabay (real photo for cinematic card), never team logos.
+  const heroImageUrl: string | null = await fetchPixabayHockeyImage(date, 'ice hockey');
 
   const { error: upsertErr } = await supabaseAdmin
     .from('daily_recaps')
