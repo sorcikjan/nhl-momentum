@@ -303,6 +303,12 @@ export async function fetchGames(date: string) {
 
 // ─── Player ───────────────────────────────────────────────────────────────────
 
+export type GoalieAgg = {
+  gp: number; wins: number; losses: number; otl: number;
+  shotsAgainst: number; goalsAgainst: number; savePct: number;
+  toiSeconds: number; gaa: number;
+};
+
 export async function fetchPlayer(id: string) {
   // Fetch player info first — position_code determines which stats table to query
   const { data: player, error: pErr } = await supabaseAdmin
@@ -335,7 +341,7 @@ export async function fetchPlayer(id: string) {
           .select('game_id, save_pct, goals_against, shots_against, toi_seconds, decision')
           .eq('player_id', id)
           .order('game_id', { ascending: false })
-          .limit(20)
+          .limit(82) // full regular season + playoffs
       : supabaseAdmin
           .from('game_player_stats')
           .select('*')
@@ -394,7 +400,29 @@ export async function fetchPlayer(id: string) {
     consecutiveGamesMissed++;
   }
 
-  return { player, metricTimeline, recentGames, consecutiveGamesMissed, lastPlayedDate };
+  // Goalie season + recent aggregates (computed from all fetched game_goalie_stats rows)
+  let goalieStats: { season: GoalieAgg; recent: GoalieAgg } | null = null;
+  if (isGoalie && rawGameStats && rawGameStats.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const agg = (rows: any[]): GoalieAgg => {
+      const gp = rows.length;
+      const wins = rows.filter(r => r.decision === 'W' || r.decision === 'SOW').length;
+      const losses = rows.filter(r => r.decision === 'L').length;
+      const otl = rows.filter(r => r.decision === 'O' || r.decision === 'OT' || r.decision === 'SOL').length;
+      const shotsAgainst = rows.reduce((s: number, r: { shots_against?: number }) => s + (r.shots_against ?? 0), 0);
+      const goalsAgainst = rows.reduce((s: number, r: { goals_against?: number }) => s + (r.goals_against ?? 0), 0);
+      const savePct = gp > 0 ? rows.reduce((s: number, r: { save_pct?: number }) => s + (r.save_pct ?? 0), 0) / gp : 0;
+      const toiSeconds = rows.reduce((s: number, r: { toi_seconds?: number }) => s + (r.toi_seconds ?? 0), 0);
+      const gaa = toiSeconds > 0 ? goalsAgainst / (toiSeconds / 3600) : 0;
+      return { gp, wins, losses, otl, shotsAgainst, goalsAgainst, savePct, toiSeconds, gaa };
+    };
+    goalieStats = {
+      season: agg(rawGameStats),
+      recent: agg(rawGameStats.slice(0, 5)),
+    };
+  }
+
+  return { player, metricTimeline, recentGames, consecutiveGamesMissed, lastPlayedDate, goalieStats };
 }
 
 // ─── Nightly Story Data ───────────────────────────────────────────────────────
