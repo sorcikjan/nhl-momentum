@@ -206,6 +206,15 @@ const handler: BackgroundHandler = async (event) => {
     } catch (e) { log.push(`recap: exception ${e}`); }
   }
 
+  // Bust ISR cache so homepage/rankings/accuracy reflect new data immediately.
+  try {
+    await fetch(`${base}/api/revalidate`, {
+      method: 'POST',
+      headers: { 'x-api-key': ingestKey },
+    });
+    log.push('revalidate: ok');
+  } catch (e) { log.push(`revalidate: exception ${e}`); }
+
   console.log('[daily-worker] complete:', log.join(' | '));
 };
 

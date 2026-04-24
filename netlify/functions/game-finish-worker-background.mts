@@ -173,6 +173,16 @@ const handler: BackgroundHandler = async (event) => {
     log.push(`extras: ${r.data?.updated ?? 0} games updated, ${r.data?.youtubeFound ?? 0} YouTube highlights${r.error ? ` err: ${r.error}` : ''}`);
   } catch (e) { log.push(`extras: exception ${e}`); }
 
+  // Bust the ISR cache so the homepage shows fresh data immediately,
+  // without waiting for the next visitor to accidentally trigger a revalidation.
+  try {
+    await fetch(`${base}/api/revalidate`, {
+      method: 'POST',
+      headers: { 'x-api-key': ingestKey },
+    });
+    log.push('revalidate: ok');
+  } catch (e) { log.push(`revalidate: exception ${e}`); }
+
   console.log('[game-finish-worker] complete:', log.join(' | '));
 };
 
