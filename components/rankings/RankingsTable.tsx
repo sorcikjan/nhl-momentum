@@ -26,6 +26,7 @@ interface Player {
     headshot_url: string | null;
     position_code: string;
     injury_status: string | null;
+    in_minors?: boolean | null;
     teams: { id: number; abbrev: string; name: string };
   };
 }

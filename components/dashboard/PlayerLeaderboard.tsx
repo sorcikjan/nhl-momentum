@@ -15,6 +15,7 @@ type AnyPlayer = Record<string, any> & {
     headshot_url: string | null;
     position_code: string;
     injury_status?: string | null;
+    in_minors?: boolean | null;
     teams: { abbrev: string };
   };
 };

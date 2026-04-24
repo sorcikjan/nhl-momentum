@@ -92,7 +92,8 @@ export default function BreakoutWatch({
                       const lastPlayedDaysAgo = p.last_played_date ? daysAgo(p.last_played_date) : null;
                       const outStatus = p.players?.injury_status
                         ? 'injured'
-                        : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo, p.players?.in_minors ?? false);
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                        : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo, (p.players as any)?.in_minors ?? false);
                       if (!outStatus) return null;
                       const label = outStatus === 'minors' ? 'MINORS' : outStatus === 'injured' ? 'INJURED' : outStatus === 'scratch' ? 'SCRATCHED' : 'OUT';
                       const color = outStatus === 'minors' ? 'var(--neon)' : outStatus === 'injured' ? 'var(--red)' : 'var(--amber)';
