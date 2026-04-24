@@ -442,13 +442,14 @@ export default function TonightSection({
 
   return (
     <section>
-      <div className="flex items-baseline justify-between mb-3">
-        <h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text)', opacity: 0.5 }}>
-          Tonight&apos;s slate
+      <div className="mb-3">
+        <h2 className="font-editorial" style={{ fontSize: '1.75rem', lineHeight: 1.1, fontWeight: 700 }}>
+          <span style={{ color: 'var(--text-bright)' }}>Tonight&apos;s </span>
+          <span style={{ color: 'var(--heat)' }}>slate.</span>
         </h2>
-        <span className="text-xs" style={{ color: 'var(--silver)' }}>
-          {upcoming.length} game{upcoming.length !== 1 ? 's' : ''}
-        </span>
+        <p style={{ color: 'var(--silver)', opacity: 0.55, fontSize: '0.78rem', marginTop: '0.25rem' }}>
+          {upcoming.length} game{upcoming.length !== 1 ? 's' : ''} on the ice.
+        </p>
       </div>
 
       <div className="flex flex-col gap-2">
