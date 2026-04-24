@@ -153,17 +153,14 @@ export default function ResultsSection({
     <section>
       <div className="flex items-baseline justify-between mb-3">
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-widest"
-            style={{ color: 'var(--text)', opacity: 0.5 }}>
-            Last night
+          <h2 className="font-editorial" style={{ fontSize: '1.75rem', lineHeight: 1.1, fontWeight: 700 }}>
+            <span style={{ color: 'var(--text-bright)' }}>Last </span>
+            <span style={{ color: 'var(--heat)' }}>night.</span>
           </h2>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--silver)', opacity: 0.35 }}>
-            {formatNightLabel(lastNight)}
+          <p style={{ color: 'var(--silver)', opacity: 0.55, fontSize: '0.78rem', marginTop: '0.25rem' }}>
+            {formatNightLabel(lastNight)} · {lastNightGames.length} game{lastNightGames.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <span className="text-xs" style={{ color: 'var(--silver)', opacity: 0.4 }}>
-          {lastNightGames.length} game{lastNightGames.length !== 1 ? 's' : ''}
-        </span>
       </div>
 
       <div className="flex flex-col gap-2">
