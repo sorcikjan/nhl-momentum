@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Playfair_Display } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
 import Sidebar from '@/components/layout/Sidebar';
+import { TopLoader } from '@/components/top-loader';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         `}</Script>
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased min-h-screen`}>
+        <TopLoader />
         <div className="flex min-h-screen">
           <Sidebar />
           <main className="flex-1 ml-0 md:ml-56 p-4 md:p-6">

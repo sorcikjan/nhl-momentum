@@ -436,8 +436,8 @@ export async function fetchRecapData(date: string) {
       .from('games')
       .select(`
         id, game_date, home_score, away_score, youtube_highlight_id,
-        home_team:teams!games_home_team_id_fkey(abbrev, name),
-        away_team:teams!games_away_team_id_fkey(abbrev, name)
+        home_team:teams!games_home_team_id_fkey(abbrev, name, logo_url),
+        away_team:teams!games_away_team_id_fkey(abbrev, name, logo_url)
       `)
       .eq('game_date', date)
       .in('game_state', ['FINAL', 'OFF']),
@@ -844,4 +844,60 @@ export async function fetchPipelineStatus() {
     outcomes:    outcomes.data?.recorded_at  ?? null,
     snapshots:   snapshots.data?.captured_at ?? null,
   };
+}
+
+// ─── Goalie Rankings ─────────────────────────────────────────────────────────
+
+export async function fetchGoalieRankings() {
+  const { data: goalies } = await supabaseAdmin
+    .from('players')
+    .select('id, first_name, last_name, headshot_url, team_id, teams(id, abbrev, name)')
+    .eq('position_code', 'G')
+    .eq('is_active', true);
+
+  if (!goalies?.length) return [];
+
+  const goalieIds = goalies.map(g => g.id);
+
+  const { data: stats } = await supabaseAdmin
+    .from('game_goalie_stats')
+    .select('player_id, game_id, save_pct, goals_against, toi_seconds, decision, recorded_at')
+    .in('player_id', goalieIds)
+    .order('recorded_at', { ascending: false })
+    .limit(goalieIds.length * 7);
+
+  const statsByPlayer = new Map<number, typeof stats>();
+  for (const s of stats ?? []) {
+    const arr = statsByPlayer.get(s.player_id) ?? [];
+    if (arr.length < 5) {
+      arr.push(s);
+      statsByPlayer.set(s.player_id, arr);
+    }
+  }
+
+  return goalies
+    .map(g => {
+      const games = statsByPlayer.get(g.id) ?? [];
+      if (games.length < 2) return null;
+      const avgSavePct = games.reduce((sum, r) => sum + (r.save_pct ?? 0), 0) / games.length;
+      const avgGAA     = games.reduce((sum, r) => sum + (r.goals_against ?? 0), 0) / games.length;
+      const decisions  = games.map(r => r.decision as string | null).filter((d): d is string => !!d);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const teams = (g as any).teams as { id: number; abbrev: string; name: string } | null;
+      return {
+        id: g.id,
+        first_name: g.first_name,
+        last_name: g.last_name,
+        headshot_url: g.headshot_url,
+        team_id: g.team_id,
+        teams,
+        avgSavePct,
+        avgGAA,
+        decisions,
+        gamesPlayed: games.length,
+      };
+    })
+    .filter((g): g is NonNullable<typeof g> => g !== null)
+    .sort((a, b) => b.avgSavePct - a.avgSavePct)
+    .slice(0, 15);
 }

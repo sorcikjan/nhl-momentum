@@ -146,9 +146,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: null, error: 'AI generation failed — check Netlify function logs for [ai] ask error' }, { status: 500 });
   }
 
-  // Fetch a hero image from Pixabay using the AI-suggested query
-  const pixabayQuery = result.pixabayQuery ?? 'ice hockey arena';
-  const heroImageUrl = await fetchPixabayHockeyImage(date, pixabayQuery);
+  // Pick hero image: use the featured game's away team logo (always relevant,
+  // always loads). Featured = highest combined score. Falls back to Pixabay.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const featuredGame = (raw.games as any[]).reduce((best: any, g: any) => {
+    const score = (g.home_score ?? 0) + (g.away_score ?? 0);
+    const bestScore = (best?.home_score ?? 0) + (best?.away_score ?? 0);
+    return score > bestScore ? g : best;
+  }, raw.games[0] as unknown);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const heroImageUrl: string | null = (featuredGame as any)?.away_team?.logo_url
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ?? (featuredGame as any)?.home_team?.logo_url
+    ?? await fetchPixabayHockeyImage(date, 'ice hockey arena');
 
   const { error: upsertErr } = await supabaseAdmin
     .from('daily_recaps')
