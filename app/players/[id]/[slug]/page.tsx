@@ -58,7 +58,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     );
   }
 
-  const { player, metricTimeline, recentGames, consecutiveGamesMissed, lastPlayedDate } = data;
+  const { player, metricTimeline, recentGames, consecutiveGamesMissed, lastPlayedDate, goalieStats } = data;
+  const isGoalie = player.position_code === 'G';
   const latestSnapshot = metricTimeline?.[metricTimeline.length - 1] ?? {};
   const name = `${player.first_name} ${player.last_name}`;
 
@@ -445,7 +446,63 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       )}
 
       {/* ── Season Statistics Table ─────────────────────────────────────────────── */}
-      {seaGames > 0 && (
+      {isGoalie && goalieStats ? (
+        /* Goalie stats: GP, Record, SV%, GAA, SA, TOI/GP */
+        <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
+              Season Statistics
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
+                  <th className="px-2 md:px-3 py-2 text-left font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}></th>
+                  <th className="px-2 md:px-3 py-2 text-right font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}>GP</th>
+                  <th className="px-2 md:px-3 py-2 text-right font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}>W</th>
+                  <th className="px-2 md:px-3 py-2 text-right font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}>L</th>
+                  <th className="px-2 md:px-3 py-2 text-right font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}>OTL</th>
+                  <th className="px-2 md:px-3 py-2 text-right font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}>SV%</th>
+                  <th className="px-2 md:px-3 py-2 text-right font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}>GAA</th>
+                  <th className="hidden md:table-cell px-3 py-2 text-right font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}>SA</th>
+                  <th className="hidden md:table-cell px-3 py-2 text-right font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}>GA</th>
+                  <th className="px-2 md:px-3 py-2 text-right font-semibold uppercase tracking-wide" style={{ color: 'var(--text)', whiteSpace: 'nowrap' }}>TOI/GP</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { label: 'Season', agg: goalieStats.season, labelColor: 'var(--silver)', bg: 'var(--bg)' },
+                  { label: 'Last 5', agg: goalieStats.recent, labelColor: 'var(--neon)', bg: 'var(--bg-card)' },
+                ].map(({ label, agg, labelColor, bg }) => {
+                  const toiPerGp = agg.gp > 0 ? agg.toiSeconds / agg.gp : 0;
+                  return (
+                    <tr key={label} style={{ background: bg }}>
+                      <td className="px-2 md:px-3 py-2.5 font-semibold" style={{ color: labelColor, whiteSpace: 'nowrap' }}>{label}</td>
+                      <td className="px-2 md:px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{agg.gp}</td>
+                      <td className="px-2 md:px-3 py-2.5 text-right font-mono" style={{ color: 'var(--green)' }}>{agg.wins}</td>
+                      <td className="px-2 md:px-3 py-2.5 text-right font-mono" style={{ color: 'var(--red)' }}>{agg.losses}</td>
+                      <td className="px-2 md:px-3 py-2.5 text-right font-mono" style={{ color: 'var(--amber)' }}>{agg.otl}</td>
+                      <td className="px-2 md:px-3 py-2.5 text-right font-mono font-bold" style={{ color: 'var(--neon)' }}>
+                        {agg.savePct.toFixed(3).replace(/^0/, '')}
+                      </td>
+                      <td className="px-2 md:px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>
+                        {agg.gaa.toFixed(2)}
+                      </td>
+                      <td className="hidden md:table-cell px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{agg.shotsAgainst}</td>
+                      <td className="hidden md:table-cell px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{agg.goalsAgainst}</td>
+                      <td className="px-2 md:px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)', whiteSpace: 'nowrap' }}>
+                        {toiPerGp > 0 ? `${Math.floor(toiPerGp / 60)}:${String(Math.round(toiPerGp % 60)).padStart(2, '0')}` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : seaGames > 0 ? (
+        /* Skater stats: G, A, PTS, +/-, PPG, shots, etc. */
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
             <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
@@ -474,7 +531,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                 </tr>
               </thead>
               <tbody>
-                {/* Season row */}
                 <tr className="border-b" style={{ borderColor: 'var(--border)', background: 'var(--bg)' }}>
                   <td className="px-2 md:px-3 py-2.5 font-semibold" style={{ color: 'var(--silver)', whiteSpace: 'nowrap' }}>Season</td>
                   <td className="px-2 md:px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{seaGames}</td>
@@ -496,7 +552,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                     {seaGames > 0 ? `${Math.floor(Number(latestSnapshot.season_toi_sec ?? 0) / seaGames / 60)}:${String(Math.floor(Number(latestSnapshot.season_toi_sec ?? 0) / seaGames % 60)).padStart(2,'0')}` : '—'}
                   </td>
                 </tr>
-                {/* Momentum (Last 5) row */}
                 {momGames > 0 && (
                   <tr style={{ background: 'var(--bg-card)' }}>
                     <td className="px-2 md:px-3 py-2.5 font-semibold" style={{ color: 'var(--neon)', whiteSpace: 'nowrap' }}>Last {momGames}</td>
@@ -516,7 +571,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                     <td className="hidden md:table-cell px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{latestSnapshot.momentum_shots ?? '—'}</td>
                     <td className="hidden md:table-cell px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)' }}>{(momShootPct * 100).toFixed(1)}%</td>
                     <td className="px-2 md:px-3 py-2.5 text-right font-mono" style={{ color: 'var(--text-bright)', whiteSpace: 'nowrap' }}>
-                      {momGames > 0 ? `${Math.floor(Number(latestSnapshot.momentum_toi_sec ?? 0) / momGames / 60)}:${String(Math.floor(Number(latestSnapshot.momentum_toi_sec ?? 0) / momGames % 60)).padStart(2,'0')}` : '—'}
+                      {momGames > 0 ? `${Math.floor(Number(latestSnapshot.momentum_toi_sec ?? 0) / momGames / 60)}:${String(Math.floor(Number(latestSnapshot.momentum_toi_sec ?? 0) / momGames % 60)).padStart(2,'00')}` : '—'}
                     </td>
                   </tr>
                 )}
@@ -524,44 +579,55 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
             </table>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* ── Energy Bar ──────────────────────────────────────────────────────────── */}
       <EnergyBar value={energyBar} leagueAvg={lgEnergy} />
 
       {/* ── Radar + PPM timeline ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-              Technical Attribute Radar
-            </span>
-            <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text)' }}>
-              <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--neon)' }} />Momentum</span>
-              <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--text)' }} />Season</span>
-              {leagueAvgRadar && <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--amber)' }} />Lg Avg</span>}
+      {!isGoalie ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
+                Technical Attribute Radar
+              </span>
+              <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text)' }}>
+                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--neon)' }} />Momentum</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--text)' }} />Season</span>
+                {leagueAvgRadar && <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--amber)' }} />Lg Avg</span>}
+              </div>
             </div>
+            <PlayerRadarChart momentum={momentumRadar} season={seasonRadar} leagueMax={leagueMax} leagueAvg={leagueAvgRadar} />
           </div>
-          <PlayerRadarChart momentum={momentumRadar} season={seasonRadar} leagueMax={leagueMax} leagueAvg={leagueAvgRadar} />
+          <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
+                PPM Seasonal Evolution
+              </span>
+              {momPpm > seaPpm && (
+                <span className="text-xs px-2 py-0.5 rounded font-semibold"
+                  style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--green)' }}>
+                  Current Peak
+                </span>
+              )}
+            </div>
+            <PPMTimeline snapshots={metricTimeline ?? []} leagueAvgPpm={leagueAvg?.seasonPpm} />
+          </div>
         </div>
+      ) : (metricTimeline?.length ?? 0) > 0 && (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+          <div className="px-4 pt-3 pb-1">
             <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
               PPM Seasonal Evolution
             </span>
-            {momPpm > seaPpm && (
-              <span className="text-xs px-2 py-0.5 rounded font-semibold"
-                style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--green)' }}>
-                Current Peak
-              </span>
-            )}
           </div>
           <PPMTimeline snapshots={metricTimeline ?? []} leagueAvgPpm={leagueAvg?.seasonPpm} />
         </div>
-      </div>
+      )}
 
-      {/* ── Advanced Performance Matrix ────────────────────────────────────────── */}
-      <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      {/* ── Advanced Performance Matrix (skaters only) ───────────────────────── */}
+      {!isGoalie && <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
         <div className="px-4 py-3 border-b flex items-center justify-between"
           style={{ borderColor: 'var(--border)' }}>
           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
@@ -677,7 +743,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           );
         })}
         </div>{/* desktop grid */}
-      </div>
+      </div>}{/* end !isGoalie Advanced Performance Matrix */}
 
       {/* ── Recent Games Log ───────────────────────────────────────────────────── */}
       {(recentGames?.length ?? 0) > 0 && (
@@ -702,10 +768,15 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
               const hasResult    = teamScore !== null && oppScore !== null;
               const won          = hasResult && teamScore > oppScore;
               const lost         = hasResult && teamScore < oppScore;
-              const pts          = Number(g.goals ?? 0) + Number(g.assists ?? 0);
               const toiMin       = Math.floor(Number(g.toi_seconds ?? 0) / 60);
               const toiSec       = String(Number(g.toi_seconds ?? 0) % 60).padStart(2, '0');
               const gameDate     = String(game?.game_date ?? '').slice(5);
+
+              // Goalie decision parsing
+              const dec = g.decision ?? null;
+              const decIsWin = dec === 'W' || dec === 'SOW';
+              const decIsLoss = dec === 'L';
+              const decIsOT = dec === 'O' || dec === 'OT' || dec === 'SOL';
 
               return (
                 <div key={i} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3"
@@ -739,25 +810,54 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                     <div className="w-20 sm:w-24" />
                   )}
 
-                  {/* Stats */}
-                  <div className="flex items-center gap-2 sm:gap-4 flex-1">
-                    <StatPill label="G" value={String(g.goals ?? 0)} highlight={Number(g.goals) > 0} />
-                    <StatPill label="A" value={String(g.assists ?? 0)} highlight={Number(g.assists) > 1} />
-                    <StatPill label="PTS" value={String(pts)} highlight={pts > 1} bold />
-                    {g.plus_minus !== undefined && g.plus_minus !== null && (
-                      <StatPill label="+/-" value={`${Number(g.plus_minus) > 0 ? '+' : ''}${g.plus_minus}`}
-                        highlight={Number(g.plus_minus) > 0} />
-                    )}
-                    {Number(g.pim ?? 0) > 0 && (
-                      <StatPill label="PIM" value={String(g.pim)} />
-                    )}
-                    <span className="text-xs font-mono hidden sm:block" style={{ color: 'var(--text)' }}>
-                      {toiMin}:{toiSec} TOI
-                    </span>
-                  </div>
+                  {isGoalie ? (
+                    /* Goalie stats: Decision, SA, GA, SV%, TOI */
+                    <div className="flex items-center gap-2 sm:gap-4 flex-1">
+                      {dec && (
+                        <div className="flex flex-col items-center min-w-[2rem]">
+                          <span className="text-xs font-bold px-1.5 py-0.5 rounded"
+                            style={{
+                              background: decIsWin ? 'rgba(34,197,94,0.15)' : decIsLoss ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
+                              color: decIsWin ? 'var(--green)' : decIsLoss ? 'var(--red)' : 'var(--amber)',
+                            }}>
+                            {decIsWin ? 'W' : decIsLoss ? 'L' : 'OT'}
+                          </span>
+                          <span className="text-xs" style={{ color: 'var(--text)' }}>DEC</span>
+                        </div>
+                      )}
+                      <StatPill label="SA" value={String(g.shots_against ?? 0)} />
+                      <StatPill label="GA" value={String(g.goals_against ?? 0)} highlight={Number(g.goals_against) === 0} />
+                      <StatPill
+                        label="SV%"
+                        value={g.save_pct != null ? Number(g.save_pct).toFixed(3).replace(/^0/, '') : '—'}
+                        highlight={Number(g.save_pct ?? 0) >= 0.93}
+                        bold
+                      />
+                      <span className="text-xs font-mono hidden sm:block" style={{ color: 'var(--text)' }}>
+                        {toiMin}:{toiSec} TOI
+                      </span>
+                    </div>
+                  ) : (
+                    /* Skater stats: G, A, PTS, +/-, PIM, TOI */
+                    <div className="flex items-center gap-2 sm:gap-4 flex-1">
+                      <StatPill label="G" value={String(g.goals ?? 0)} highlight={Number(g.goals) > 0} />
+                      <StatPill label="A" value={String(g.assists ?? 0)} highlight={Number(g.assists) > 1} />
+                      <StatPill label="PTS" value={String(Number(g.goals ?? 0) + Number(g.assists ?? 0))} highlight={Number(g.goals ?? 0) + Number(g.assists ?? 0) > 1} bold />
+                      {g.plus_minus !== undefined && g.plus_minus !== null && (
+                        <StatPill label="+/-" value={`${Number(g.plus_minus) > 0 ? '+' : ''}${g.plus_minus}`}
+                          highlight={Number(g.plus_minus) > 0} />
+                      )}
+                      {Number(g.pim ?? 0) > 0 && (
+                        <StatPill label="PIM" value={String(g.pim)} />
+                      )}
+                      <span className="text-xs font-mono hidden sm:block" style={{ color: 'var(--text)' }}>
+                        {toiMin}:{toiSec} TOI
+                      </span>
+                    </div>
+                  )}
 
-                  {/* PPM badge — hidden on small screens to save space */}
-                  {g.points_per_minute !== null && g.points_per_minute !== undefined && (
+                  {/* PPM badge — skaters only */}
+                  {!isGoalie && g.points_per_minute !== null && g.points_per_minute !== undefined && (
                     <div className="hidden sm:block flex-shrink-0 text-xs font-mono px-2 py-1 rounded"
                       style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--neon)', border: '1px solid rgba(59,130,246,0.2)' }}>
                       PPM: {Number(g.points_per_minute).toFixed(2)}
