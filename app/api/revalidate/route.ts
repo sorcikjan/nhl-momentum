@@ -15,6 +15,7 @@ export async function POST(request: Request) {
   revalidatePath('/games');
   revalidatePath('/rankings');
   revalidatePath('/accuracy');
+  revalidatePath('/recaps', 'layout');
 
   return NextResponse.json({ revalidated: true, ts: new Date().toISOString() });
 }
