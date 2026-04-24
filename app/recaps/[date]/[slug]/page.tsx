@@ -3,7 +3,7 @@ import React from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { fetchRecap, fetchRecapData, teamLogoUrl } from '@/lib/data';
-import { recapUrl, gameUrl } from '@/lib/urls';
+import { recapUrl, gameUrl, playerUrl, teamUrl } from '@/lib/urls';
 
 export const revalidate = 3600;
 
