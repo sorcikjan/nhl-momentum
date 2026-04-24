@@ -65,6 +65,7 @@ export interface NHLScheduledGame {
   homeTeam: { id: number; abbrev: string; score?: number };
   awayTeam: { id: number; abbrev: string; score?: number };
   gameState: 'FUT' | 'PRE' | 'LIVE' | 'CRIT' | 'FINAL' | 'OFF';
+  gameType?: number; // 1=preseason, 2=regular season, 3=playoffs
   venue: { default: string };
 }
 

@@ -4,11 +4,11 @@ import { getSchedule } from '@/lib/nhl-api';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 
 // ─── Full Season Games Download ────────────────────────────────────────────────
-// Downloads every 2025-26 regular season game from the NHL schedule API and
-// upserts into the games table, including final scores for completed games.
+// Downloads every 2025-26 regular season AND playoff game from the NHL schedule
+// API and upserts into the games table, including final scores for completed games.
 //
 // Steps through the season in 7-day increments — each /schedule/{date} call
-// returns the full gameWeek (7 days) so 25 calls covers Oct → Mar.
+// returns the full gameWeek (7 days) so ~35 calls covers Oct → Jun.
 //
 // GET /api/ingest/season-games
 // ─────────────────────────────────────────────────────────────────────────────
@@ -45,8 +45,8 @@ export async function GET(req: NextRequest) {
       for (const day of allDays) {
         const dayDate = (day as { date: string }).date;
         for (const g of ((day as { games: NHLGame[] }).games ?? [])) {
-          // Only regular season games (gameType 2)
-          if (g.gameType !== 2) continue;
+          // Regular season (gameType 2) + playoffs (gameType 3) only — skip preseason/all-star
+          if (g.gameType !== 2 && g.gameType !== 3) continue;
 
           rows.push({
             id:            g.id,

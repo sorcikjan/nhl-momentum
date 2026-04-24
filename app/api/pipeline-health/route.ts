@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
       issues.push(`GAMES: ${missingScores.length} FINAL/OFF game(s) have null scores (IDs: ${missingScores.map(g => g.id).join(', ')})`);
     }
     if ((recentFinal?.length ?? 0) === 0) {
-      issues.push('GAMES: no FINAL games in last 3 days — season may be over or ingestion broken');
+      issues.push('GAMES: no FINAL games in last 3 days — ingestion may be broken (or off-day in playoffs)');
     }
   }
 
