@@ -99,8 +99,9 @@ export async function GET(req: NextRequest) {
   }
 
   // ── 2. GAMELOGS ───────────────────────────────────────────────────────────
-  // For each FINAL game in last 3 days, verify game_player_stats rows exist.
-  // A game with 0 stat rows means gamelogs ingestion never ran for it.
+  // For each FINAL game in last 3 days, verify both game_player_stats (skaters)
+  // and game_goalie_stats (goalies) rows exist. Checked independently — a game
+  // can pass skater coverage but have zero goalie rows (and vice versa).
   {
     const { data: finalGames } = await supabaseAdmin
       .from('games')
@@ -110,50 +111,57 @@ export async function GET(req: NextRequest) {
 
     const gameIds = (finalGames ?? []).map(g => g.id);
 
-    // Count stats rows per game in a single query
-    const { data: statCounts } = gameIds.length
-      ? await supabaseAdmin
-          .from('game_player_stats')
-          .select('game_id')
-          .in('game_id', gameIds)
-      : { data: [] };
+    // Fetch skater and goalie coverage in parallel
+    const [{ data: skaterCounts }, { data: goalieCounts }, { data: newestStat }] = await Promise.all([
+      gameIds.length
+        ? supabaseAdmin.from('game_player_stats').select('game_id').in('game_id', gameIds)
+        : Promise.resolve({ data: [] }),
+      gameIds.length
+        ? supabaseAdmin.from('game_goalie_stats').select('game_id').in('game_id', gameIds)
+        : Promise.resolve({ data: [] }),
+      supabaseAdmin.from('game_player_stats').select('recorded_at').order('recorded_at', { ascending: false }).limit(1).single(),
+    ]);
 
-    const countByGame = new Map<number, number>();
-    for (const row of statCounts ?? []) {
-      countByGame.set(row.game_id, (countByGame.get(row.game_id) ?? 0) + 1);
+    const skaterByGame = new Map<number, number>();
+    for (const row of skaterCounts ?? []) {
+      skaterByGame.set(row.game_id, (skaterByGame.get(row.game_id) ?? 0) + 1);
+    }
+    const goalieByGame = new Map<number, number>();
+    for (const row of goalieCounts ?? []) {
+      goalieByGame.set(row.game_id, (goalieByGame.get(row.game_id) ?? 0) + 1);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const gamesWithStats    = (finalGames ?? []).filter(g => (countByGame.get(g.id) ?? 0) > 0) as any[];
+    const gamesMissingSkaters = (finalGames ?? []).filter(g => (skaterByGame.get(g.id) ?? 0) === 0) as any[];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const gamesMissingStats = (finalGames ?? []).filter(g => (countByGame.get(g.id) ?? 0) === 0) as any[];
-
-    // Freshness: newest recorded_at in game_player_stats
-    const { data: newestStat } = await supabaseAdmin
-      .from('game_player_stats')
-      .select('recorded_at')
-      .order('recorded_at', { ascending: false })
-      .limit(1)
-      .single();
+    const gamesMissingGoalies = (finalGames ?? []).filter(g => (goalieByGame.get(g.id) ?? 0) === 0) as any[];
 
     checks.gamelogs = {
       finalGamesLast3Days: finalGames?.length ?? 0,
-      gamesWithStats: gamesWithStats.length,
-      gamesMissingStats: gamesMissingStats.map(g => ({
-        game_id: g.id,
-        date: g.game_date,
+      gamesWithSkaterStats: (finalGames ?? []).filter(g => (skaterByGame.get(g.id) ?? 0) > 0).length,
+      gamesWithGoalieStats: (finalGames ?? []).filter(g => (goalieByGame.get(g.id) ?? 0) > 0).length,
+      gamesMissingSkaters: gamesMissingSkaters.map(g => ({
+        game_id: g.id, date: g.game_date,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        matchup: `${(g.away_team as any)?.abbrev ?? '?'} @ ${(g.home_team as any)?.abbrev ?? '?'}`,
+      })),
+      gamesMissingGoalies: gamesMissingGoalies.map(g => ({
+        game_id: g.id, date: g.game_date,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         matchup: `${(g.away_team as any)?.abbrev ?? '?'} @ ${(g.home_team as any)?.abbrev ?? '?'}`,
       })),
       lastIngested: ago(newestStat?.recorded_at),
     };
 
-    if (gamesMissingStats.length > 0) {
-      const names = gamesMissingStats
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map(g => `${(g.away_team as any)?.abbrev ?? '?'}@${(g.home_team as any)?.abbrev ?? '?'} (${g.game_date})`)
-        .join(', ');
-      issues.push(`GAMELOGS: ${gamesMissingStats.length} FINAL game(s) have NO player stats: ${names}`);
+    if (gamesMissingSkaters.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const names = gamesMissingSkaters.map(g => `${(g.away_team as any)?.abbrev ?? '?'}@${(g.home_team as any)?.abbrev ?? '?'} (${g.game_date})`).join(', ');
+      issues.push(`GAMELOGS: ${gamesMissingSkaters.length} FINAL game(s) have NO skater stats: ${names}`);
+    }
+    if (gamesMissingGoalies.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const names = gamesMissingGoalies.map(g => `${(g.away_team as any)?.abbrev ?? '?'}@${(g.home_team as any)?.abbrev ?? '?'} (${g.game_date})`).join(', ');
+      issues.push(`GAMELOGS: ${gamesMissingGoalies.length} FINAL game(s) have NO goalie stats: ${names}`);
     }
 
     const statAgeh = newestStat?.recorded_at
