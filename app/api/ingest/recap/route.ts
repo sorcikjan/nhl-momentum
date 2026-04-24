@@ -39,6 +39,46 @@ async function fetchPixabayHockeyImage(date: string, query: string): Promise<str
   }
 }
 
+// Pick the best hero image for a recap:
+//   1. YouTube thumbnail from the highest-scoring game that has a highlight video
+//      → real match photo, game-specific, free, no API key
+//   2. Pixabay hockey photo as fallback (when highlights aren't published yet)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function pickHeroImage(date: string, games?: any[]): Promise<string | null> {
+  if (games?.length) {
+    // Prefer the game with the most goals (most exciting) that has a YouTube highlight
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const withVideo = [...games]
+      .filter((g: any) => g.youtube_highlight_id)
+      .sort((a: any, b: any) =>
+        ((b.home_score ?? 0) + (b.away_score ?? 0)) - ((a.home_score ?? 0) + (a.away_score ?? 0))
+      );
+    if (withVideo.length > 0) {
+      return `https://img.youtube.com/vi/${withVideo[0].youtube_highlight_id}/maxresdefault.jpg`;
+    }
+  }
+
+  // Fallback: fetch games for this date if not provided, try YouTube thumbnails
+  if (!games) {
+    const { data } = await supabaseAdmin
+      .from('games')
+      .select('youtube_highlight_id, home_score, away_score')
+      .eq('game_date', date)
+      .in('game_state', ['FINAL', 'OFF'])
+      .not('youtube_highlight_id', 'is', null);
+    if (data?.length) {
+      const best = data.sort((a, b) =>
+        ((b.home_score ?? 0) + (b.away_score ?? 0)) - ((a.home_score ?? 0) + (a.away_score ?? 0))
+      )[0];
+      if (best.youtube_highlight_id) {
+        return `https://img.youtube.com/vi/${best.youtube_highlight_id}/maxresdefault.jpg`;
+      }
+    }
+  }
+
+  return fetchPixabayHockeyImage(date, 'ice hockey');
+}
+
 // POST /api/ingest/recap?date=YYYY-MM-DD
 // Generates and stores a daily recap article for the given date (default: yesterday).
 // Skips if a fresh recap already exists (< 12h old) unless ?force=1.
@@ -59,9 +99,9 @@ export async function GET(req: NextRequest) {
 
   // image_only: just refresh the hero photo for an existing recap, no AI re-run
   if (imageOnly) {
-    const heroImageUrl = await fetchPixabayHockeyImage(date, 'ice hockey');
+    const heroImageUrl = await pickHeroImage(date);
     if (!heroImageUrl) {
-      return NextResponse.json({ data: { skipped: true, date, reason: 'no pixabay image found' }, error: null });
+      return NextResponse.json({ data: { skipped: true, date, reason: 'no image found' }, error: null });
     }
     const { error: imgErr } = await supabaseAdmin
       .from('daily_recaps')
@@ -161,8 +201,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: null, error: 'AI generation failed — check Netlify function logs for [ai] ask error' }, { status: 500 });
   }
 
-  // Hero image: always Pixabay (real photo for cinematic card), never team logos.
-  const heroImageUrl: string | null = await fetchPixabayHockeyImage(date, 'ice hockey');
+  const heroImageUrl: string | null = await pickHeroImage(date, raw.games);
 
   const { error: upsertErr } = await supabaseAdmin
     .from('daily_recaps')
