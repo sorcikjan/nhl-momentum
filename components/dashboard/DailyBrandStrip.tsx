@@ -1,5 +1,5 @@
 // Daily brand identity strip — sits at the top of the homepage.
-// Establishes NHL Momentum as a daily destination, not just a tool.
+// Establishes Hockey Momentum as a daily destination, not just a tool.
 
 interface Props {
   topPlayer?: { name: string; team: string; ppm: number } | null;
@@ -22,11 +22,15 @@ export default function DailyBrandStrip({ topPlayer, gameCount }: Props) {
           <div className="flex items-center gap-2">
             <span className="text-xs font-black tracking-[0.2em] uppercase"
               style={{ color: 'var(--neon)' }}>
-              NHL Momentum
+              Hockey Momentum
             </span>
             <span className="text-xs px-1.5 py-0.5 rounded font-bold tracking-wide"
               style={{ background: 'rgba(249,115,22,0.15)', color: 'var(--heat)' }}>
               DAILY
+            </span>
+            <span className="text-xs px-1.5 py-0.5 rounded font-bold tracking-wide"
+              style={{ background: 'rgba(59,130,246,0.12)', color: 'var(--neon)' }}>
+              AI
             </span>
           </div>
           <div className="mt-0.5 text-lg font-black tracking-tight leading-tight"
@@ -34,7 +38,7 @@ export default function DailyBrandStrip({ topPlayer, gameCount }: Props) {
             Hockey Intelligence,<br className="sm:hidden" /> Daily.
           </div>
           <div className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
-            Stories, predictions and rankings — powered by AI
+            Every number has a story. Our AI finds it first.
           </div>
         </div>
 

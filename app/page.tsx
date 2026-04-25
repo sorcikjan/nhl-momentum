@@ -12,17 +12,17 @@ import { playerUrl } from '@/lib/urls';
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: 'NHL Momentum — Hockey Intelligence, Daily',
-  description: 'AI-powered daily hockey hub. Stories, predictions, player rankings and live results for every NHL game — updated continuously.',
+  title: 'Hockey Momentum — AI Hockey Intelligence, Daily',
+  description: 'AI that watches every game so you don\'t have to. Daily stories, predictions and player rankings for every NHL game — updated live.',
   openGraph: {
-    title: 'NHL Momentum — Hockey Intelligence, Daily',
-    description: 'AI-powered daily hockey hub. Stories, predictions, player rankings and live results for every NHL game.',
+    title: 'Hockey Momentum — AI Hockey Intelligence, Daily',
+    description: 'AI that watches every game so you don\'t have to. Stories, predictions and rankings for every NHL game.',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'NHL Momentum — Hockey Intelligence, Daily',
-    description: 'AI-powered stories, predictions and player rankings for every NHL game.',
+    title: 'Hockey Momentum — AI Hockey Intelligence, Daily',
+    description: 'AI that watches every game so you don\'t have to. Stories, predictions and rankings — updated live.',
   },
 };
 

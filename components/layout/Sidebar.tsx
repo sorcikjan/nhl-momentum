@@ -28,8 +28,8 @@ export default function Sidebar() {
           <div className="flex items-center gap-2">
             <span className="text-xl">🏒</span>
             <div>
-              <div className="text-sm font-bold" style={{ color: 'var(--text-bright)' }}>NHL Momentum</div>
-              <div className="text-xs font-medium" style={{ color: 'var(--heat)' }}>Hockey Intelligence, Daily.</div>
+              <div className="text-sm font-bold" style={{ color: 'var(--text-bright)' }}>Hockey Momentum</div>
+              <div className="text-xs font-medium" style={{ color: 'var(--heat)' }}>AI Hockey Intelligence, Daily.</div>
             </div>
           </div>
         </div>
