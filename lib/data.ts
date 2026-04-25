@@ -132,11 +132,17 @@ export async function fetchRankings() {
     return true;
   });
 
+  // During playoffs, only show players whose team is still active.
+  const playoffTeams = await fetchPlayoffActiveTeams();
+  const isPlayoffs = playoffTeams.size > 0;
+
   // Layer 1 stability: require at least 10 season games so all derived lists
   // are built from players with a meaningful seasonal baseline.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const skaters = latest.filter((r: any) =>
-    r.players?.position_code !== 'G' && (r.season_games ?? 0) >= 10
+    r.players?.position_code !== 'G' &&
+    (r.season_games ?? 0) >= 10 &&
+    (!isPlayoffs || playoffTeams.has(r.players?.team_id))
   );
 
   // Rank globally by composite_ppm at query time — stored momentum_rank is only
@@ -467,6 +473,74 @@ export async function fetchNightlyStoryData(date: string) {
   return { games, topPerformers: sorted };
 }
 
+// ─── Playoff utilities ────────────────────────────────────────────────────────
+
+function isPlayoffGameId(id: number): boolean {
+  return Math.floor(id / 10000) % 100 === 3;
+}
+
+function parsePlayoffGameId(id: number): { round: number; series: number; gameInSeries: number } {
+  const suffix = id % 10000;
+  return { round: Math.floor(suffix / 100), series: Math.floor((suffix % 100) / 10), gameInSeries: suffix % 10 };
+}
+
+export interface SeriesInfo {
+  round: number;
+  seriesNum: number;
+  awayTeam: { id: number; abbrev: string; name: string };
+  homeTeam: { id: number; abbrev: string; name: string };
+  awayWins: number;
+  homeWins: number;
+  totalPlayed: number;
+  isComplete: boolean;
+  nextGame: { id: number; game_date: string; start_time_utc: string | null } | null;
+}
+
+export async function fetchPlayoffActiveTeams(): Promise<Set<number>> {
+  const { data } = await supabaseAdmin
+    .from('games').select('id, home_team_id, away_team_id').eq('game_state', 'FUT').limit(300);
+  const active = new Set<number>();
+  for (const g of data ?? []) {
+    if (isPlayoffGameId(g.id)) { active.add(g.home_team_id); active.add(g.away_team_id); }
+  }
+  return active;
+}
+
+export async function fetchSeriesStandings(): Promise<Map<string, SeriesInfo>> {
+  const now = new Date();
+  const seasonYear = now.getMonth() < 8 ? now.getFullYear() - 1 : now.getFullYear();
+  const idMin = seasonYear * 1000000 + 30000;
+  const idMax = seasonYear * 1000000 + 39999;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await supabaseAdmin
+    .from('games')
+    .select(`id, home_score, away_score, game_state, game_date, start_time_utc,
+      home_team:teams!games_home_team_id_fkey(id, abbrev, name),
+      away_team:teams!games_away_team_id_fkey(id, abbrev, name)`)
+    .gte('id', idMin).lte('id', idMax).order('id');
+
+  const map = new Map<string, SeriesInfo>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const g of (data ?? []) as any[]) {
+    const { round, series } = parsePlayoffGameId(g.id);
+    const key = `${round}-${series}`;
+    if (!map.has(key)) {
+      map.set(key, { round, seriesNum: series, awayTeam: g.away_team, homeTeam: g.home_team,
+        awayWins: 0, homeWins: 0, totalPlayed: 0, isComplete: false, nextGame: null });
+    }
+    const s = map.get(key)!;
+    if (g.game_state === 'FINAL' || g.game_state === 'OFF') {
+      s.totalPlayed++;
+      if ((g.away_score ?? 0) > (g.home_score ?? 0)) s.awayWins++; else s.homeWins++;
+      if (s.awayWins === 4 || s.homeWins === 4) s.isComplete = true;
+    } else if (g.game_state === 'FUT' && !s.nextGame) {
+      s.nextGame = { id: g.id, game_date: g.game_date, start_time_utc: g.start_time_utc ?? null };
+    }
+  }
+  return map;
+}
+
 // ─── Daily Recap Data ─────────────────────────────────────────────────────────
 
 export async function fetchRecapData(date: string) {
@@ -539,9 +613,33 @@ export async function fetchRecapData(date: string) {
     .eq('goals_against', 0)
     .gt('toi_seconds', 3000); // at least 50 min — full game
 
+  // Series context — only populated for playoff games
+  const seriesMap = new Map<number, string>(); // game_id → "Game N · X leads Y–Z" or "Game N · Tied Y–Y"
+  if (games?.length && isPlayoffGameId((games as any[])[0]?.id)) {
+    const allSeries = await fetchSeriesStandings();
+    for (const g of (games as any[])) {
+      const { round, series, gameInSeries } = parsePlayoffGameId(g.id);
+      const s = allSeries.get(`${round}-${series}`);
+      if (!s) continue;
+      // Series standing BEFORE this game (wins in completed games only)
+      const completedBefore = s.totalPlayed - (
+        (g.game_state === 'FINAL' || g.game_state === 'OFF') ? 1 : 0
+      );
+      const awayW = s.awayWins - ((g.game_state === 'FINAL' || g.game_state === 'OFF') && (g.away_score ?? 0) > (g.home_score ?? 0) ? 1 : 0);
+      const homeW = s.homeWins - ((g.game_state === 'FINAL' || g.game_state === 'OFF') && (g.home_score ?? 0) > (g.away_score ?? 0) ? 1 : 0);
+      const label = awayW === homeW
+        ? `Tied ${awayW}–${homeW}`
+        : awayW > homeW
+        ? `${s.awayTeam?.abbrev} leads ${awayW}–${homeW}`
+        : `${s.homeTeam?.abbrev} leads ${homeW}–${awayW}`;
+      seriesMap.set(g.id, `Game ${gameInSeries} · ${label}`);
+    }
+  }
+
   return {
     games,
     predMap,
+    seriesMap,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     topPerformers: topPerformers.map((p: any) => ({
       ...p,
@@ -891,6 +989,9 @@ export async function fetchPipelineStatus() {
 // ─── Goalie Rankings ─────────────────────────────────────────────────────────
 
 export async function fetchGoalieRankings() {
+  const playoffTeams = await fetchPlayoffActiveTeams();
+  const isPlayoffs = playoffTeams.size > 0;
+
   const { data: goalies } = await supabaseAdmin
     .from('players')
     .select('id, first_name, last_name, headshot_url, team_id, teams(id, abbrev, name)')
@@ -899,7 +1000,11 @@ export async function fetchGoalieRankings() {
 
   if (!goalies?.length) return [];
 
-  const goalieIds = goalies.map(g => g.id);
+  const filteredGoalies = isPlayoffs
+    ? goalies.filter(g => playoffTeams.has(g.team_id ?? 0))
+    : goalies;
+
+  const goalieIds = filteredGoalies.map(g => g.id);
 
   const { data: stats } = await supabaseAdmin
     .from('game_goalie_stats')
@@ -917,7 +1022,7 @@ export async function fetchGoalieRankings() {
     }
   }
 
-  return goalies
+  return filteredGoalies
     .map(g => {
       const games = statsByPlayer.get(g.id) ?? [];
       if (games.length < 3) return null;
@@ -974,13 +1079,17 @@ export async function fetchNewcomerWatch() {
     return true;
   });
 
+  const playoffTeams = await fetchPlayoffActiveTeams();
+  const isPlayoffs = playoffTeams.size > 0;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const newcomers = latest.filter((r: any) => {
     const p = r.players;
     return p
       && (p.career_games ?? 999) <= 50
       && !p.in_minors
-      && !p.injury_status;
+      && !p.injury_status
+      && (!isPlayoffs || playoffTeams.has(p.teams?.id));
   });
 
   // Sort by pts/game this season — rewards sustained production over tiny samples

@@ -177,6 +177,7 @@ export async function GET(req: NextRequest) {
       homeScore: g.home_score ?? 0,
       predictedCorrectly,
       homeWinProbability: pred?.home_win_probability ?? null,
+      seriesContext: raw.seriesMap?.get(g.id),
     };
   });
 

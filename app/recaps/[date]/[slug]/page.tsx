@@ -167,7 +167,7 @@ function StatCell({ label, away, home }: { label: string; away: string | number;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function GameCard({ game, pred, gUrl }: { game: any; pred: any; gUrl: string }) {
+function GameCard({ game, pred, gUrl, seriesContext }: { game: any; pred: any; gUrl: string; seriesContext?: string }) {
   const awayWon = (game.away_score ?? 0) > (game.home_score ?? 0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const outcome = Array.isArray(pred?.prediction_outcomes) ? (pred.prediction_outcomes as any[])[0] : pred?.prediction_outcomes;
@@ -244,9 +244,17 @@ function GameCard({ game, pred, gUrl }: { game: any; pred: any; gUrl: string }) 
           </div>
         </div>
 
+        {/* Playoff series context */}
+        {seriesContext && (
+          <div className="text-center text-xs font-semibold mt-1 mb-1 py-1 px-3 rounded-full inline-block mx-auto"
+            style={{ background: 'var(--neon)', color: '#000', display: 'table', margin: '4px auto 0' }}>
+            {seriesContext}
+          </div>
+        )}
+
         {/* Venue + time */}
         {(venue || gameTime) && (
-          <div className="text-center text-xs" style={{ color: 'var(--silver)', opacity: 0.5 }}>
+          <div className="text-center text-xs mt-1" style={{ color: 'var(--silver)', opacity: 0.5 }}>
             {[venue, gameTime].filter(Boolean).join(' · ')}
           </div>
         )}
@@ -518,6 +526,7 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
             const gameKey = isGameSection ? `${section.awayAbbrev}:${section.homeAbbrev}` : null;
             const game = gameKey ? gameByTeams.get(gameKey) : null;
             const pred = game ? raw?.predMap?.get(game.id) : null;
+            const seriesContext = game ? raw?.seriesMap?.get(game.id) : undefined;
             const gUrl = game
               ? gameUrl(game.id, game.away_team?.abbrev ?? '', game.home_team?.abbrev ?? '', game.game_date)
               : '#';
@@ -534,7 +543,7 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
 
                 {/* 1. GameCard first — acts as the section headline */}
                 {isGameSection && game && (
-                  <GameCard game={game} pred={pred} gUrl={gUrl} />
+                  <GameCard game={game} pred={pred} gUrl={gUrl} seriesContext={seriesContext} />
                 )}
                 {isGameSection && !game && (
                   <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-bright)' }}>

@@ -6,6 +6,7 @@ import PlayerSearch from './PlayerSearch';
 const NAV = [
   { href: '/',           label: 'Home',        icon: '◈' },
   { href: '/games',      label: 'Games',       icon: '🏒' },
+  { href: '/playoffs',   label: 'Playoffs',    icon: '🏆' },
   { href: '/rankings',   label: 'Rankings',    icon: '⚡' },
   { href: '/teams',      label: 'Teams',       icon: '🛡' },
   { href: '/recaps',     label: 'Recaps',      icon: '📰' },

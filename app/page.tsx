@@ -6,7 +6,8 @@ import TonightSection from '@/components/dashboard/TonightSection';
 import ResultsSection from '@/components/dashboard/ResultsSection';
 import HeatGrid from '@/components/dashboard/HeatGrid';
 import DailyBrandStrip from '@/components/dashboard/DailyBrandStrip';
-import { fetchRankings, fetchGames, fetchRecentRecaps, fetchRecentCompletedGames } from '@/lib/data';
+import { fetchRankings, fetchGames, fetchRecentRecaps, fetchRecentCompletedGames, fetchSeriesStandings, teamLogoUrl } from '@/lib/data';
+import type { SeriesInfo } from '@/lib/data';
 import { playerUrl } from '@/lib/urls';
 
 export const revalidate = 60;
@@ -108,6 +109,81 @@ async function BurningSection() {
   return <HeatGrid players={players as any[]} />;
 }
 
+// ── Section: Playoff bracket (only during playoffs) ──────────────────────────
+
+function PlayoffSeriesRow({ s }: { s: SeriesInfo }) {
+  const leaderW = Math.max(s.awayWins, s.homeWins);
+  const trailingW = Math.min(s.awayWins, s.homeWins);
+  const leaderAbbrev = s.awayWins >= s.homeWins ? s.awayTeam.abbrev : s.homeTeam.abbrev;
+
+  const statusLabel = s.isComplete
+    ? `${leaderAbbrev} wins ${leaderW}–${trailingW}`
+    : leaderW === trailingW
+    ? `Tied ${leaderW}–${trailingW}`
+    : `${leaderAbbrev} leads ${leaderW}–${trailingW}`;
+
+  return (
+    <div className="flex items-center justify-between gap-3 py-2"
+      style={{ borderBottom: '1px solid var(--border)' }}>
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={teamLogoUrl(s.awayTeam.abbrev)} alt={s.awayTeam.abbrev} className="w-6 h-6 flex-shrink-0" />
+        <span className="text-xs font-semibold" style={{ color: 'var(--text)', opacity: s.isComplete && s.awayWins < s.homeWins ? 0.4 : 1 }}>{s.awayTeam.abbrev}</span>
+        <span className="text-xs font-black font-mono tabular-nums ml-1"
+          style={{ color: s.awayWins > s.homeWins ? 'var(--text-bright)' : 'var(--text)', opacity: s.awayWins < s.homeWins ? 0.35 : 1 }}>
+          {s.awayWins}
+        </span>
+        <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.2 }}>–</span>
+        <span className="text-xs font-black font-mono tabular-nums"
+          style={{ color: s.homeWins > s.awayWins ? 'var(--text-bright)' : 'var(--text)', opacity: s.homeWins < s.awayWins ? 0.35 : 1 }}>
+          {s.homeWins}
+        </span>
+        <span className="text-xs font-semibold ml-1" style={{ color: 'var(--text)', opacity: s.isComplete && s.homeWins < s.awayWins ? 0.4 : 1 }}>{s.homeTeam.abbrev}</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={teamLogoUrl(s.homeTeam.abbrev)} alt={s.homeTeam.abbrev} className="w-6 h-6 flex-shrink-0" />
+      </div>
+      <span className="text-xs flex-shrink-0" style={{ color: s.isComplete ? 'var(--neon)' : 'var(--text)', opacity: s.isComplete ? 0.9 : 0.5 }}>
+        {statusLabel}
+      </span>
+    </div>
+  );
+}
+
+async function PlayoffBracketSection() {
+  const seriesMap = await fetchSeriesStandings().catch(() => new Map());
+  if (seriesMap.size === 0) return null;
+
+  const rounds = new Map<number, SeriesInfo[]>();
+  for (const s of seriesMap.values()) {
+    if (!rounds.has(s.round)) rounds.set(s.round, []);
+    rounds.get(s.round)!.push(s);
+  }
+
+  const ROUND_LABELS: Record<number, string> = {
+    1: 'First Round', 2: 'Second Round', 3: 'Conference Finals', 4: 'Stanley Cup Final',
+  };
+
+  return (
+    <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-semibold tracking-widest uppercase"
+          style={{ color: 'var(--text)', opacity: 0.4 }}>Stanley Cup Playoffs</p>
+        <a href="/playoffs" className="text-xs font-medium" style={{ color: 'var(--neon)' }}>Full bracket →</a>
+      </div>
+      {[...rounds.entries()].sort(([a], [b]) => a - b).map(([round, series]) => (
+        <div key={round} className="mb-4 last:mb-0">
+          <p className="text-xs font-bold mb-1" style={{ color: 'var(--text-bright)' }}>
+            {ROUND_LABELS[round] ?? `Round ${round}`}
+          </p>
+          {series.sort((a, b) => a.seriesNum - b.seriesNum).map(s => (
+            <PlayoffSeriesRow key={`${s.round}-${s.seriesNum}`} s={s} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Skeletons ─────────────────────────────────────────────────────────────────
 
 function BrandStripSkeleton() {
@@ -189,12 +265,17 @@ export default function DashboardPage() {
         <BrandStripSection today={today} />
       </Suspense>
 
-      {/* 1. Last Night — cinematic recap hero */}
+      {/* 1. Playoff bracket — only rendered during playoffs */}
+      <Suspense fallback={null}>
+        <PlayoffBracketSection />
+      </Suspense>
+
+      {/* 2. Last Night — cinematic recap hero */}
       <Suspense fallback={<HeroSkeleton />}>
         <LastNightSection />
       </Suspense>
 
-      {/* 2. Tonight — split-color prediction cards */}
+      {/* 3. Tonight — split-color prediction cards */}
       <Suspense fallback={<GameSkeleton />}>
         <TonightSlate today={today} />
       </Suspense>
@@ -243,6 +324,16 @@ export default function DashboardPage() {
               Data-backed stories from every game night
             </p>
             <p className="mt-2 text-xs font-medium" style={{ color: 'var(--silver)' }}>Read stories →</p>
+          </a>
+          <a href="/playoffs"
+            className="rounded-xl border p-4 hover:opacity-90 transition-opacity group"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <div className="text-lg mb-1">🏆</div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Playoff Bracket</p>
+            <p className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
+              Series standings round by round
+            </p>
+            <p className="mt-2 text-xs font-medium" style={{ color: 'var(--heat)' }}>View bracket →</p>
           </a>
           <a href="/teams"
             className="rounded-xl border p-4 hover:opacity-90 transition-opacity group"

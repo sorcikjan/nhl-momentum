@@ -257,6 +257,7 @@ export interface RecapGame {
   homeScore: number;
   predictedCorrectly: boolean | null;
   homeWinProbability: number | null;
+  seriesContext?: string;
 }
 
 export interface RecapPerformer {
@@ -331,7 +332,8 @@ export async function generateDailyRecap(input: DailyRecapInput): Promise<DailyR
     const winner = awayWon ? g.awayTeam : g.homeTeam;
     const margin = Math.abs(g.awayScore - g.homeScore);
     const context = g.predictedCorrectly === false ? 'UPSET' : margin >= 4 ? 'BLOWOUT' : margin === 1 ? 'ONE-GOAL GAME' : '';
-    return `${g.awayTeam} ${g.awayScore} @ ${g.homeTeam} ${g.homeScore}${context ? ` [${context}]` : ''}${g.predictedCorrectly !== null ? ` [model: ${g.predictedCorrectly ? '✓' : '✗'}]` : ''}${g.homeWinProbability != null ? ` [gave ${winner} ${awayWon ? ((1 - g.homeWinProbability) * 100).toFixed(0) : (g.homeWinProbability * 100).toFixed(0)}% win prob]` : ''}`;
+    const seriesPart = g.seriesContext ? ` [PLAYOFF: ${g.seriesContext}]` : '';
+    return `${g.awayTeam} ${g.awayScore} @ ${g.homeTeam} ${g.homeScore}${context ? ` [${context}]` : ''}${seriesPart}${g.predictedCorrectly !== null ? ` [model: ${g.predictedCorrectly ? '✓' : '✗'}]` : ''}${g.homeWinProbability != null ? ` [gave ${winner} ${awayWon ? ((1 - g.homeWinProbability) * 100).toFixed(0) : (g.homeWinProbability * 100).toFixed(0)}% win prob]` : ''}`;
   }).join('\n');
 
   const prompt = `You are a senior sports writer at Hockey Momentum. Your voice is ESPN energy meets data credibility — you love the game, you trust the numbers, and you know how to make both come alive on the page. Write a daily recap article for ${input.dateLabel} that reads like real sports journalism. Not a data dump. Not a press release. A story.${newsSection}
