@@ -9,6 +9,7 @@ interface Player {
   player_id: number;
   momentum_rank: number;
   momentum_ppm: number;
+  momentum_games: number;
   season_ppm: number;
   breakout_delta: number;
   sos_coefficient: number;
@@ -41,7 +42,10 @@ export default function RankingsTable({ players }: { players: Player[] }) {
 
   const filtered = useMemo(() =>
     players
-      .filter(p => pos === 'ALL' || p.players.position_code === pos)
+      .filter(p =>
+        (pos === 'ALL' || p.players.position_code === pos) &&
+        (p.momentum_games ?? 0) >= 3
+      )
       .sort((a, b) => {
         if (sort === 'momentum_rank') return (a.momentum_rank ?? 999) - (b.momentum_rank ?? 999);
         if (sort === 'energy_bar') return (b.energy_bar ?? 0) - (a.energy_bar ?? 0);

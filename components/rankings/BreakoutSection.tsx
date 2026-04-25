@@ -12,7 +12,8 @@ export function BreakoutSection({ players }: { players: Player[] }) {
   const underdogs = players
     .filter((p: Player) =>
       (p.momentum_games ?? 0) >= 3 &&
-      (p.season_ppm ?? 0) < ELITE_SEASON_PPM_THRESHOLD &&
+      (p.season_games  ?? 0) >= 20 &&
+      (p.season_ppm    ?? 0) < ELITE_SEASON_PPM_THRESHOLD &&
       (p.breakout_delta ?? 0) > 0
     )
     .slice(0, 10);

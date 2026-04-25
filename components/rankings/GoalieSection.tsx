@@ -27,7 +27,7 @@ function formatSavePct(pct: number) {
 }
 
 export function GoalieSection({ goalies }: { goalies: GoalieRanking[] }) {
-  const eligible = goalies.filter(g => g.gamesPlayed >= 2);
+  const eligible = goalies.filter(g => g.gamesPlayed >= 3);
   if (!eligible.length) return null;
 
   return (

@@ -13,7 +13,7 @@ const rankStyle = (rank: number): { number: string; accent: string } => {
 };
 
 export function BurningSection({ players }: { players: Player[] }) {
-  const top10 = players.slice(0, 10);
+  const top10 = players.filter((p: Player) => (p.momentum_games ?? 0) >= 3).slice(0, 10);
   if (!top10.length) return null;
 
   const topHeat = ppmToHeat(top10[0]?.momentum_ppm ?? 0);

@@ -132,8 +132,12 @@ export async function fetchRankings() {
     return true;
   });
 
+  // Layer 1 stability: require at least 10 season games so all derived lists
+  // are built from players with a meaningful seasonal baseline.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const skaters = latest.filter((r: any) => r.players?.position_code !== 'G');
+  const skaters = latest.filter((r: any) =>
+    r.players?.position_code !== 'G' && (r.season_games ?? 0) >= 10
+  );
 
   // Rank globally by composite_ppm at query time — stored momentum_rank is only
   // valid within each ingest batch and cannot be trusted for cross-batch ordering.
@@ -144,7 +148,9 @@ export async function fetchRankings() {
   const breakoutWatch = [...skaters]
     .sort((a, b) => (b.breakout_delta ?? 0) - (a.breakout_delta ?? 0))
     .slice(0, 10);
+  // Layer 2: momentum window floor — at least 3 of last 5 games played.
   const momentumLeaderSkaters = [...skaters]
+    .filter((r: any) => (r.momentum_games ?? 0) >= 3)
     .sort((a, b) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0))
     .slice(0, 10);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -914,7 +920,7 @@ export async function fetchGoalieRankings() {
   return goalies
     .map(g => {
       const games = statsByPlayer.get(g.id) ?? [];
-      if (games.length < 2) return null;
+      if (games.length < 3) return null;
       const avgSavePct = games.reduce((sum, r) => sum + (r.save_pct ?? 0), 0) / games.length;
       const avgGAA     = games.reduce((sum, r) => sum + (r.goals_against ?? 0), 0) / games.length;
       const decisions  = games.map(r => r.decision as string | null).filter((d): d is string => !!d);
@@ -935,5 +941,75 @@ export async function fetchGoalieRankings() {
     })
     .filter((g): g is NonNullable<typeof g> => g !== null)
     .sort((a, b) => b.avgSavePct - a.avgSavePct)
-    .slice(0, 15);
+    .slice(0, 10);
+}
+
+// ─── Newcomer Watch ───────────────────────────────────────────────────────────
+
+export async function fetchNewcomerWatch() {
+  const { data } = await supabaseAdmin
+    .from('player_metric_snapshots')
+    .select(`
+      player_id, season_games, momentum_games,
+      momentum_goals, momentum_assists,
+      season_goals, season_assists,
+      momentum_ppm, calculated_at,
+      players!inner(
+        first_name, last_name, headshot_url, position_code,
+        career_games, draft_year, draft_round, draft_pick,
+        in_minors, injury_status,
+        teams(id, abbrev)
+      )
+    `)
+    .gte('season_games', 3)
+    .order('calculated_at', { ascending: false })
+    .limit(600);
+
+  // Latest snapshot per player
+  const seen = new Set<number>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const latest = (data ?? [] as any[]).filter((r: any) => {
+    if (seen.has(r.player_id)) return false;
+    seen.add(r.player_id);
+    return true;
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const newcomers = latest.filter((r: any) => {
+    const p = r.players;
+    return p
+      && (p.career_games ?? 999) <= 50
+      && !p.in_minors
+      && !p.injury_status;
+  });
+
+  // Sort by pts/game this season — rewards sustained production over tiny samples
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  newcomers.sort((a: any, b: any) => {
+    const aRate = ((a.season_goals ?? 0) + (a.season_assists ?? 0)) / Math.max(1, a.season_games ?? 1);
+    const bRate = ((b.season_goals ?? 0) + (b.season_assists ?? 0)) / Math.max(1, b.season_games ?? 1);
+    return bRate - aRate;
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return newcomers.slice(0, 15).map((r: any) => ({
+    player_id: r.player_id as number,
+    season_games:     (r.season_games     ?? 0) as number,
+    momentum_games:   (r.momentum_games   ?? 0) as number,
+    momentum_goals:   (r.momentum_goals   ?? 0) as number,
+    momentum_assists: (r.momentum_assists  ?? 0) as number,
+    season_goals:     (r.season_goals     ?? 0) as number,
+    season_assists:   (r.season_assists   ?? 0) as number,
+    players: {
+      first_name:     r.players.first_name    as string,
+      last_name:      r.players.last_name     as string,
+      headshot_url:   r.players.headshot_url  as string | null,
+      position_code:  r.players.position_code as string,
+      career_games:   (r.players.career_games ?? 0) as number,
+      draft_year:     r.players.draft_year    as number | null,
+      draft_round:    r.players.draft_round   as number | null,
+      draft_pick:     r.players.draft_pick    as number | null,
+      teams:          r.players.teams         as { id: number; abbrev: string } | null,
+    },
+  }));
 }

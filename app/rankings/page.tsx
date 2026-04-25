@@ -3,7 +3,8 @@ import RankingsTable from '@/components/rankings/RankingsTable';
 import { BurningSection } from '@/components/rankings/BurningSection';
 import { BreakoutSection } from '@/components/rankings/BreakoutSection';
 import { GoalieSection } from '@/components/rankings/GoalieSection';
-import { fetchRankings, fetchGoalieRankings } from '@/lib/data';
+import { NewcomerWatch } from '@/components/rankings/NewcomerWatch';
+import { fetchRankings, fetchGoalieRankings, fetchNewcomerWatch } from '@/lib/data';
 
 export const revalidate = 120;
 
@@ -17,15 +18,16 @@ export const metadata: Metadata = {
 };
 
 export default async function RankingsPage() {
-  const [data, goalies] = await Promise.all([
+  const [data, goalies, newcomers] = await Promise.all([
     fetchRankings().catch(() => null),
     fetchGoalieRankings().catch(() => []),
+    fetchNewcomerWatch().catch(() => []),
   ]);
 
   const players    = data?.top100 ?? [];
   const hotSkaters = data?.momentumLeaders?.skaters ?? [];
-  // Pass the full top100 sorted by breakout_delta so BreakoutSection
-  // has enough candidates after filtering out already-elite players.
+  // Full top100 sorted by breakout_delta gives BreakoutSection enough candidates
+  // after the underdog filter (season_games >= 20, season_ppm < threshold) runs.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const breakout   = [...(data?.top100 ?? []) as any[]].sort(
     (a, b) => (b.breakout_delta ?? 0) - (a.breakout_delta ?? 0)
@@ -46,6 +48,8 @@ export default async function RankingsPage() {
         <BreakoutSection players={breakout} />
         <GoalieSection goalies={goalies} />
       </div>
+
+      <NewcomerWatch newcomers={newcomers} />
 
       <RankingsTable players={players} />
     </div>
