@@ -42,7 +42,7 @@ export function GoalieSection({ goalies }: { goalies: GoalieRanking[] }) {
       </div>
 
       <div className="space-y-1">
-        {eligible.map((g, i) => (
+        {eligible.slice(0, 10).map((g, i) => (
           <Link
             key={g.id}
             href={playerUrl(g.id, g.first_name, g.last_name)}

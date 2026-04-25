@@ -22,9 +22,14 @@ export default async function RankingsPage() {
     fetchGoalieRankings().catch(() => []),
   ]);
 
-  const players      = data?.top100 ?? [];
-  const breakout     = data?.breakoutWatch ?? [];
-  const hotSkaters   = data?.momentumLeaders?.skaters ?? [];
+  const players    = data?.top100 ?? [];
+  const hotSkaters = data?.momentumLeaders?.skaters ?? [];
+  // Pass the full top100 sorted by breakout_delta so BreakoutSection
+  // has enough candidates after filtering out already-elite players.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const breakout   = [...(data?.top100 ?? []) as any[]].sort(
+    (a, b) => (b.breakout_delta ?? 0) - (a.breakout_delta ?? 0)
+  );
 
   return (
     <div className="max-w-6xl mx-auto pb-20 md:pb-0">
