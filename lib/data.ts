@@ -471,6 +471,7 @@ export async function fetchRecapData(date: string) {
       .from('games')
       .select(`
         id, game_date, home_score, away_score, youtube_highlight_id,
+        three_stars, team_game_stats,
         home_team:teams!games_home_team_id_fkey(id, abbrev, name, logo_url),
         away_team:teams!games_away_team_id_fkey(id, abbrev, name, logo_url)
       `)
@@ -478,7 +479,7 @@ export async function fetchRecapData(date: string) {
       .in('game_state', ['FINAL', 'OFF']),
     supabaseAdmin
       .from('predictions')
-      .select('game_id, home_win_probability, predicted_home_score, predicted_away_score, prediction_outcomes(home_win)')
+      .select('game_id, home_win_probability, predicted_home_score, predicted_away_score, prediction_outcomes(correct_winner, actual_home_score, actual_away_score)')
       .eq('model_version', modelVersion),
   ]);
 
@@ -498,7 +499,7 @@ export async function fetchRecapData(date: string) {
     .from('game_player_stats')
     .select(`
       player_id, game_id, goals, assists, plus_minus, toi_seconds, shots_on_goal,
-      players(first_name, last_name, position_code),
+      players(first_name, last_name, position_code, headshot_url),
       teams(id, abbrev, name)
     `)
     .in('game_id', gameIds)

@@ -40,13 +40,32 @@ async function fetchPixabayHockeyImage(date: string, query: string): Promise<str
 }
 
 // Pick the best hero image for a recap:
-//   1. YouTube thumbnail from the highest-scoring game that has a highlight video
-//      → real match photo, game-specific, free, no API key
-//   2. Pixabay hockey photo as fallback (when highlights aren't published yet)
+//   1. YouTube thumbnail from the featured game (the one mentioned in the headline)
+//   2. YouTube thumbnail from the highest-scoring game as fallback
+//   3. Pixabay hockey photo as last resort (when highlights aren't published yet)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function pickHeroImage(date: string, games?: any[]): Promise<string | null> {
+async function pickHeroImage(date: string, games?: any[], featuredGame?: string | null): Promise<string | null> {
+  // Helper to build YouTube thumbnail URL
+  const ytUrl = (id: string) => `https://img.youtube.com/vi/${id}/maxresdefault.jpg`;
+
   if (games?.length) {
-    // Prefer the game with the most goals (most exciting) that has a YouTube highlight
+    // 1. Try the featured game first (headline match)
+    if (featuredGame) {
+      // featuredGame is like "MTL @ TOR" — parse away and home abbrevs
+      const parts = featuredGame.replace(/\s/g, '').split('@');
+      if (parts.length === 2) {
+        const [awayAbbrev, homeAbbrev] = parts;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const featured = games.find((g: any) =>
+          g.away_team?.abbrev === awayAbbrev && g.home_team?.abbrev === homeAbbrev
+        );
+        if (featured?.youtube_highlight_id) {
+          return ytUrl(featured.youtube_highlight_id);
+        }
+      }
+    }
+
+    // 2. Fallback: highest-scoring game with a highlight
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const withVideo = [...games]
       .filter((g: any) => g.youtube_highlight_id)
@@ -54,7 +73,7 @@ async function pickHeroImage(date: string, games?: any[]): Promise<string | null
         ((b.home_score ?? 0) + (b.away_score ?? 0)) - ((a.home_score ?? 0) + (a.away_score ?? 0))
       );
     if (withVideo.length > 0) {
-      return `https://img.youtube.com/vi/${withVideo[0].youtube_highlight_id}/maxresdefault.jpg`;
+      return ytUrl(withVideo[0].youtube_highlight_id);
     }
   }
 
@@ -71,7 +90,7 @@ async function pickHeroImage(date: string, games?: any[]): Promise<string | null
         ((b.home_score ?? 0) + (b.away_score ?? 0)) - ((a.home_score ?? 0) + (a.away_score ?? 0))
       )[0];
       if (best.youtube_highlight_id) {
-        return `https://img.youtube.com/vi/${best.youtube_highlight_id}/maxresdefault.jpg`;
+        return ytUrl(best.youtube_highlight_id);
       }
     }
   }
@@ -147,8 +166,8 @@ export async function GET(req: NextRequest) {
       const predHomeWin = (pred.home_win_probability ?? 0.5) >= 0.5;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const outcome = (pred.prediction_outcomes as any[])?.[0];
-      predictedCorrectly = outcome != null
-        ? outcome.home_win === homeWon
+      predictedCorrectly = outcome?.correct_winner != null
+        ? outcome.correct_winner === true
         : predHomeWin === homeWon;
     }
     return {
@@ -201,7 +220,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: null, error: 'AI generation failed — check Netlify function logs for [ai] ask error' }, { status: 500 });
   }
 
-  const heroImageUrl: string | null = await pickHeroImage(date, raw.games);
+  const heroImageUrl: string | null = await pickHeroImage(date, raw.games, result.featured_game);
 
   const { error: upsertErr } = await supabaseAdmin
     .from('daily_recaps')

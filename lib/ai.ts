@@ -289,6 +289,8 @@ export interface DailyRecapOutput {
   title: string;
   summary: string;
   content: string;
+  /** Abbreviation of the game featured in the headline, e.g. "MTL @ TOR" */
+  featured_game?: string;
 }
 
 export async function generateDailyRecap(input: DailyRecapInput): Promise<DailyRecapOutput | null> {
@@ -342,25 +344,28 @@ ${performerLines}
 
 ARTICLE STRUCTURE — follow this exactly:
 
-1. LEDE (1 paragraph): Open with the night's most compelling story. Don't start with "Tonight" or "Last night". Lead with what was surprising, dramatic, or analytically interesting. One specific number in the first sentence.
+1. LEDE (1-2 paragraphs): Open with the night's most compelling story. Don't start with "Tonight" or "Last night". Lead with what was surprising, dramatic, or analytically interesting. One specific number in the first sentence. This sets the tone for the entire article — make it vivid and specific.
 
 2. GAME SECTIONS: One section per game, ordered from most to least interesting. Each section must start with EXACTLY this header format on its own line:
 ### {AWAY_ABBREV} {AWAY_SCORE} @ {HOME_ABBREV} {HOME_SCORE}
-Then 2-3 sentences of specific, narrative recap. Name players. Use exact stats from the data. If the model got it wrong, say why it was hard to call. If a performer had hot momentum data going in, mention it.
+Then 4-6 sentences of specific, narrative recap. Always use the player's FULL FIRST AND LAST NAME (e.g. "Connor McDavid", not just "McDavid"). Include exact stats from the data. Describe how the game unfolded — momentum shifts, key sequences, turning points. If the model got it wrong, explain why it was hard to call. If a performer had strong momentum data going in, connect it to what happened on the ice. Make the reader feel like they watched the game.
 
 3. MOMENTUM WATCH section (start with "### Momentum Watch"):
-2-3 sentences connecting pre-game momentum data to what happened on the ice. Which players' PPM signals were validated tonight? Who outperformed or underperformed their momentum trend? Be specific — use the % above/below season avg figures from the performer data.
+3-4 sentences connecting pre-game momentum data to what happened on the ice. Always use full names. Which players' PPM signals were validated tonight? Who outperformed or underperformed their momentum trend? Be specific — use the % above/below season avg figures from the performer data.
 
 4. LOOKING AHEAD section (start with "### Looking Ahead"):
-1-2 sentences only. One forward-looking observation — back-to-backs, playoff implications, a player to watch in the next game. Concrete, not generic.
+2-3 sentences. Forward-looking observations — back-to-backs, playoff implications, players to watch. Concrete, not generic. Use full names.
 
-TONE: Write like a beat writer who watches every game and trusts the data. Direct sentences. Active verbs. No clichés ("lit the lamp", "finding the back of the net", "putting pucks on net"). No filler phrases ("it was a night of", "fans were treated to"). Every sentence earns its place.
+TONE: Write like a beat writer who watches every game and trusts the data. Direct sentences. Active verbs. No clichés ("lit the lamp", "finding the back of the net", "putting pucks on net"). No filler phrases ("it was a night of", "fans were treated to"). Every sentence earns its place. Write approximately twice as much per game section as you normally would — depth over brevity.
+
+FULL NAMES: Every time you mention a player, use their full first and last name. Never use last name only.
 
 Respond with valid JSON (no markdown, no code blocks):
 {
   "title": "NHL Recap ${input.dateLabel}: [headline max 70 chars — lead with the biggest story, name a team or player]",
   "summary": "2 sentences max 160 chars total. Name date, key players, teams. Written for Google snippet.",
-  "content": "[lede paragraph]\\n\\n### {AWAY} {score} @ {HOME} {score}\\n\\n[game paragraph]\\n\\n[repeat for each game]\\n\\n### Momentum Watch\\n\\n[paragraph]\\n\\n### Looking Ahead\\n\\n[paragraph]"
+  "featured_game": "[AWAY_ABBREV @ HOME_ABBREV — the exact game your headline is about, e.g. MTL @ TOR]",
+  "content": "[lede paragraph]\\n\\n[optional second lede paragraph]\\n\\n### {AWAY} {score} @ {HOME} {score}\\n\\n[game paragraph]\\n\\n[repeat for each game]\\n\\n### Momentum Watch\\n\\n[paragraph]\\n\\n### Looking Ahead\\n\\n[paragraph]"
 }`;
 
   const raw = await ask(prompt);
