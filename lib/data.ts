@@ -601,7 +601,7 @@ export async function fetchRecap(date: string) {
 // ─── Accuracy ─────────────────────────────────────────────────────────────────
 
 export async function fetchAccuracy() {
-  const VERSIONS = ['v1.0', 'v1.1', 'v1.2', 'v1.3', 'v1.4', 'v1.5', 'v1.6', 'v1.7'];
+  const VERSIONS = ['v1.0', 'v1.1', 'v1.2', 'v1.3', 'v1.4', 'v1.5', 'v1.6', 'v1.7', 'v1.8'];
 
   // Three independent queries running in parallel:
   // 1. Model version metadata
@@ -659,7 +659,7 @@ export async function fetchAccuracy() {
       `)
       .in('model_version', VERSIONS)
       .order('created_at', { ascending: false })
-      .limit(800), // 100 games × 8 versions
+      .limit(900), // 100 games × 9 versions
   ]);
 
   if (mvErr) throw mvErr;
