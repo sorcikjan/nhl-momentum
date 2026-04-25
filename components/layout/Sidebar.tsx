@@ -29,7 +29,7 @@ export default function Sidebar() {
             <span className="text-xl">🏒</span>
             <div>
               <div className="text-sm font-bold" style={{ color: 'var(--text-bright)' }}>Hockey Momentum</div>
-              <div className="text-xs font-medium" style={{ color: 'var(--heat)' }}>AI Hockey Intelligence, Daily.</div>
+              <div className="text-xs font-medium" style={{ color: 'var(--heat)' }}>Hockey Intelligence, Daily.</div>
             </div>
           </div>
         </div>

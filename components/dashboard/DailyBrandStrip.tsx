@@ -28,17 +28,13 @@ export default function DailyBrandStrip({ topPlayer, gameCount }: Props) {
               style={{ background: 'rgba(249,115,22,0.15)', color: 'var(--heat)' }}>
               DAILY
             </span>
-            <span className="text-xs px-1.5 py-0.5 rounded font-bold tracking-wide"
-              style={{ background: 'rgba(59,130,246,0.12)', color: 'var(--neon)' }}>
-              AI
-            </span>
           </div>
           <div className="mt-0.5 text-lg font-black tracking-tight leading-tight"
             style={{ color: 'var(--text-bright)' }}>
-            Hockey Intelligence,<br className="sm:hidden" /> Daily.
+            Hockey Intelligence, Daily.
           </div>
-          <div className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
-            Every number has a story. Our AI finds it first.
+          <div className="mt-1 text-xs font-medium" style={{ color: 'var(--neon)' }}>
+            Powered by AI.
           </div>
         </div>
 
