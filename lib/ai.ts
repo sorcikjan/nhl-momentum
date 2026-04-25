@@ -5,7 +5,7 @@
 //       bio refreshes every 48h, perf_eval every 6h
 //   - Nightly stories: Next.js unstable_cache, 24h TTL per date
 //
-// Using gemini-1.5-flash — 1500 RPD on the free tier.
+// Using gemini-2.5-flash — better quality than lite; JSON extraction handles code-fence wrapping.
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { unstable_cache } from 'next/cache';
@@ -21,7 +21,7 @@ export async function ask(prompt: string): Promise<string | null> {
   const client = getClient();
   if (!client) { console.error('[ai] ask: GEMINI_API_KEY not set'); return null; }
   try {
-    const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = client.getGenerativeModel({ model: 'gemini-2.5-flash' });
     const result = await model.generateContent(prompt);
     return result.response.text()?.trim() ?? null;
   } catch (err) {
@@ -381,8 +381,12 @@ Respond with valid JSON (no markdown, no code blocks):
   if (!raw) return null;
 
   try {
-    // Strip any accidental markdown code fences
-    const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    // Extract JSON from the response — handles code fences and preamble text
+    const jsonStart = raw.indexOf('{');
+    const jsonEnd = raw.lastIndexOf('}');
+    const cleaned = jsonStart !== -1 && jsonEnd > jsonStart
+      ? raw.slice(jsonStart, jsonEnd + 1)
+      : raw.replace(/^```json\s*/im, '').replace(/^```\s*/im, '').replace(/```\s*$/im, '').trim();
     const parsed = JSON.parse(cleaned) as DailyRecapOutput;
     if (!parsed.title || !parsed.content) return null;
     return parsed;

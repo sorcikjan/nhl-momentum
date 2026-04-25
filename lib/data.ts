@@ -477,7 +477,7 @@ export async function fetchRecapData(date: string) {
       .from('games')
       .select(`
         id, game_date, home_score, away_score, youtube_highlight_id,
-        three_stars, team_game_stats,
+        venue, start_time_utc, three_stars, team_game_stats,
         home_team:teams!games_home_team_id_fkey(id, abbrev, name, logo_url),
         away_team:teams!games_away_team_id_fkey(id, abbrev, name, logo_url)
       `)

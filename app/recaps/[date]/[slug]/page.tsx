@@ -54,7 +54,7 @@ interface PlayerMentionData {
   surge: number | null; // momentum % above/below season
 }
 
-// Inline player chip — shows headshot, full name, tonight's stats, momentum
+// Inline player chip — headshot, name, team only
 function PlayerMentionCard({ data, word }: { data: PlayerMentionData; word: string }) {
   return (
     <a href={data.href} className="player-mention-card">
@@ -64,12 +64,6 @@ function PlayerMentionCard({ data, word }: { data: PlayerMentionData; word: stri
       )}
       <span className="player-mention-name">{word}</span>
       <span className="player-mention-team">{data.teamAbbrev}</span>
-      <span className="player-mention-stats">{data.goals}G&nbsp;{data.assists}A</span>
-      {data.surge !== null && (
-        <span className="player-mention-surge" style={{ color: data.surge > 10 ? 'var(--heat)' : data.surge < -10 ? 'var(--silver)' : 'var(--text)' }}>
-          {data.surge > 0 ? '↑' : '↓'}{Math.abs(data.surge).toFixed(0)}%
-        </span>
-      )}
     </a>
   );
 }
@@ -157,7 +151,20 @@ function parseArticle(content: string): ArticleSection[] {
   return sections;
 }
 
-// ─── Expanded game card ───────────────────────────────────────────────────────
+// ─── Game card ────────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function StatCell({ label, away, home }: { label: string; away: string | number; home: string | number }) {
+  return (
+    <div className="flex flex-col items-center gap-0.5 min-w-0">
+      <div className="flex items-center gap-3 w-full justify-between">
+        <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--text-bright)' }}>{away}</span>
+        <span className="text-xs font-medium" style={{ color: 'var(--silver)', opacity: 0.6 }}>{label}</span>
+        <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--text-bright)' }}>{home}</span>
+      </div>
+    </div>
+  );
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function GameCard({ game, pred, gUrl }: { game: any; pred: any; gUrl: string }) {
@@ -169,72 +176,85 @@ function GameCard({ game, pred, gUrl }: { game: any; pred: any; gUrl: string }) 
   const pickedHome = homeWinProb != null ? homeWinProb >= 0.5 : null;
   const pickedAbbrev = pickedHome === true ? game.home_team?.abbrev : pickedHome === false ? game.away_team?.abbrev : null;
 
-  // Shots on goal
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const teamStats: any[] = game.team_game_stats ?? [];
-  const sog = teamStats.find((s) => s.category === 'sog');
+  const stat = (cat: string) => teamStats.find((s) => s.category === cat);
 
-  // Three stars
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const threeStars: any[] = game.three_stars ?? [];
 
+  // Venue + game time
+  const venue: string | null = game.venue ?? null;
+  const gameTime: string | null = game.start_time_utc
+    ? new Date(game.start_time_utc).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET'
+    : null;
+
+  const sog = stat('sog');
+  const fo = stat('faceoffWins');
+  const pp = stat('powerPlay');
+  const pim = stat('pim');
+  const hits = stat('hits');
+  const blocks = stat('blockedShots');
+  const gva = stat('giveaways');
+  const tka = stat('takeaways');
+
+  const hasStats = sog || fo || pp || pim || hits || blocks;
+
   return (
-    <div className="rounded-2xl border overflow-hidden mb-2"
+    <div className="rounded-2xl border overflow-hidden mb-6"
       style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
 
-      {/* Score row */}
-      <Link href={gUrl} className="flex items-center gap-3 px-4 py-4 hover:opacity-90 transition-opacity">
-        {/* Away */}
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={teamLogoUrl(game.away_team?.abbrev ?? '')} alt={game.away_team?.abbrev}
-            className="w-10 h-10 flex-shrink-0 drop-shadow" />
-          <div className="min-w-0">
-            <div className="text-xs font-semibold truncate" style={{ color: awayWon ? 'var(--text-bright)' : 'var(--text)', opacity: awayWon ? 1 : 0.6 }}>
-              {game.away_team?.abbrev}
-            </div>
-            {sog?.awayValue != null && (
-              <div className="text-xs" style={{ color: 'var(--text)', opacity: 0.5 }}>
-                {sog.awayValue} SOG
-              </div>
-            )}
+      {/* Headline — team names + score */}
+      <Link href={gUrl} className="block px-5 pt-5 pb-4 hover:opacity-90 transition-opacity">
+        {/* Teams row */}
+        <div className="flex items-center justify-between gap-2 mb-3">
+          {/* Away */}
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={teamLogoUrl(game.away_team?.abbrev ?? '')} alt={game.away_team?.abbrev}
+              className="w-12 h-12 flex-shrink-0 drop-shadow-lg" />
+            <span className="text-xl font-black leading-tight truncate"
+              style={{ color: awayWon ? 'var(--text-bright)' : 'var(--text)', opacity: awayWon ? 1 : 0.5 }}>
+              {game.away_team?.name ?? game.away_team?.abbrev}
+            </span>
+          </div>
+
+          {/* Score */}
+          <div className="flex items-center gap-2 flex-shrink-0 px-2">
+            <span className="text-4xl font-black font-mono leading-none tabular-nums"
+              style={{ color: awayWon ? 'var(--text-bright)' : 'var(--text)', opacity: awayWon ? 1 : 0.35 }}>
+              {game.away_score}
+            </span>
+            <span className="text-xl font-bold" style={{ color: 'var(--text)', opacity: 0.2 }}>–</span>
+            <span className="text-4xl font-black font-mono leading-none tabular-nums"
+              style={{ color: !awayWon ? 'var(--text-bright)' : 'var(--text)', opacity: !awayWon ? 1 : 0.35 }}>
+              {game.home_score}
+            </span>
+          </div>
+
+          {/* Home */}
+          <div className="flex items-center gap-3 flex-1 min-w-0 justify-end">
+            <span className="text-xl font-black leading-tight truncate text-right"
+              style={{ color: !awayWon ? 'var(--text-bright)' : 'var(--text)', opacity: !awayWon ? 1 : 0.5 }}>
+              {game.home_team?.name ?? game.home_team?.abbrev}
+            </span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={teamLogoUrl(game.home_team?.abbrev ?? '')} alt={game.home_team?.abbrev}
+              className="w-12 h-12 flex-shrink-0 drop-shadow-lg" />
           </div>
         </div>
 
-        {/* Score */}
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-2xl font-black font-mono leading-none"
-            style={{ color: awayWon ? 'var(--text-bright)' : 'var(--text)', opacity: awayWon ? 1 : 0.5 }}>
-            {game.away_score}
-          </span>
-          <span className="text-sm font-bold" style={{ color: 'var(--text)', opacity: 0.3 }}>–</span>
-          <span className="text-2xl font-black font-mono leading-none"
-            style={{ color: !awayWon ? 'var(--text-bright)' : 'var(--text)', opacity: !awayWon ? 1 : 0.5 }}>
-            {game.home_score}
-          </span>
-        </div>
-
-        {/* Home */}
-        <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
-          <div className="min-w-0 text-right">
-            <div className="text-xs font-semibold truncate" style={{ color: !awayWon ? 'var(--text-bright)' : 'var(--text)', opacity: !awayWon ? 1 : 0.6 }}>
-              {game.home_team?.abbrev}
-            </div>
-            {sog?.homeValue != null && (
-              <div className="text-xs" style={{ color: 'var(--text)', opacity: 0.5 }}>
-                {sog.homeValue} SOG
-              </div>
-            )}
+        {/* Venue + time */}
+        {(venue || gameTime) && (
+          <div className="text-center text-xs" style={{ color: 'var(--silver)', opacity: 0.5 }}>
+            {[venue, gameTime].filter(Boolean).join(' · ')}
           </div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={teamLogoUrl(game.home_team?.abbrev ?? '')} alt={game.home_team?.abbrev}
-            className="w-10 h-10 flex-shrink-0 drop-shadow" />
-        </div>
+        )}
       </Link>
 
       {/* Prediction row */}
       {(pickedAbbrev !== null || correctWinner !== null) && (
-        <div className="flex items-center justify-between px-4 py-2 gap-3"
+        <div className="flex items-center justify-between px-5 py-2 gap-3"
           style={{ borderTop: '1px solid var(--border)' }}>
           {pickedAbbrev && (
             <div className="flex items-center gap-1.5">
@@ -251,16 +271,28 @@ function GameCard({ game, pred, gUrl }: { game: any; pred: any; gUrl: string }) 
           )}
           {correctWinner !== null && (
             <div className="flex items-center gap-1 ml-auto">
-              <span className="text-sm font-bold"
-                style={{ color: correctWinner ? 'var(--green)' : 'var(--red)' }}>
+              <span className="text-sm font-bold" style={{ color: correctWinner ? 'var(--green)' : 'var(--red)' }}>
                 {correctWinner ? '✓' : '✗'}
               </span>
-              <span className="text-xs font-semibold"
-                style={{ color: correctWinner ? 'var(--green)' : 'var(--red)' }}>
+              <span className="text-xs font-semibold" style={{ color: correctWinner ? 'var(--green)' : 'var(--red)' }}>
                 {correctWinner ? 'Correct' : 'Wrong'}
               </span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Stats grid */}
+      {hasStats && (
+        <div className="px-5 py-4 flex flex-col gap-2" style={{ borderTop: '1px solid var(--border)' }}>
+          {sog && <StatCell label="Shots" away={sog.awayValue} home={sog.homeValue} />}
+          {fo && <StatCell label="Faceoffs" away={fo.awayValue} home={fo.homeValue} />}
+          {pp && <StatCell label="Power Play" away={pp.awayValue} home={pp.homeValue} />}
+          {pim && <StatCell label="PIM" away={pim.awayValue} home={pim.homeValue} />}
+          {hits && <StatCell label="Hits" away={hits.awayValue} home={hits.homeValue} />}
+          {blocks && <StatCell label="Blocks" away={blocks.awayValue} home={blocks.homeValue} />}
+          {gva && <StatCell label="Giveaways" away={gva.awayValue} home={gva.homeValue} />}
+          {tka && <StatCell label="Takeaways" away={tka.awayValue} home={tka.homeValue} />}
         </div>
       )}
 
@@ -288,6 +320,20 @@ function GameCard({ game, pred, gUrl }: { game: any; pred: any; gUrl: string }) 
               </span>
             </a>
           ))}
+        </div>
+      )}
+
+      {/* YouTube highlight */}
+      {game.youtube_highlight_id && (
+        <div style={{ borderTop: '1px solid var(--border)', aspectRatio: '16/9' }}>
+          <iframe
+            src={`https://www.youtube.com/embed/${game.youtube_highlight_id}?rel=0&modestbranding=1`}
+            title={`${game.away_team?.abbrev} @ ${game.home_team?.abbrev} highlights`}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="w-full h-full"
+            style={{ border: 'none', display: 'block' }}
+          />
         </div>
       )}
     </div>
@@ -456,20 +502,18 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
           )}
         </div>
 
-        {/* Article body — lede, then per-game: prose → GameCard → YouTube */}
+        {/* Article body */}
         <article className="mb-10">
           {sections.map((section, i) => {
-            // Lede / standalone paragraphs (before first ### section)
             if (section.type === 'paragraph') {
-              return (
-                <p key={i} className="text-sm leading-relaxed mb-5"
-                  style={{ color: i === 0 ? 'var(--text-bright)' : 'var(--text)' }}>
-                  {linkifyText(section.bodies[0] ?? '', playerData, teamLinks)}
+              return section.bodies.map((body, bi) => (
+                <p key={`${i}-${bi}`} className="text-sm leading-relaxed mb-5"
+                  style={{ color: i === 0 && bi === 0 ? 'var(--text-bright)' : 'var(--text)' }}>
+                  {linkifyText(body, playerData, teamLinks)}
                 </p>
-              );
+              ));
             }
 
-            // Section — game or named (Momentum Watch, Looking Ahead)
             const isGameSection = !!(section.awayAbbrev && section.homeAbbrev);
             const gameKey = isGameSection ? `${section.awayAbbrev}:${section.homeAbbrev}` : null;
             const game = gameKey ? gameByTeams.get(gameKey) : null;
@@ -479,9 +523,8 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
               : '#';
 
             return (
-              <div key={i} className="mb-10">
-                {/* Section divider */}
-                <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', marginBottom: '1rem' }}>
+              <div key={i} className="mb-12">
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', marginBottom: '1.25rem' }}>
                   {!isGameSection && (
                     <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-bright)' }}>
                       {section.header}
@@ -489,40 +532,22 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
                   )}
                 </div>
 
-                {/* 1. Prose paragraphs — read the game first */}
+                {/* 1. GameCard first — acts as the section headline */}
+                {isGameSection && game && (
+                  <GameCard game={game} pred={pred} gUrl={gUrl} />
+                )}
+                {isGameSection && !game && (
+                  <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-bright)' }}>
+                    {section.header}
+                  </h2>
+                )}
+
+                {/* 2. Prose paragraphs below the card */}
                 {section.bodies.map((body, bi) => (
                   <p key={bi} className="text-sm leading-relaxed mb-4" style={{ color: 'var(--text)' }}>
                     {linkifyText(body, playerData, teamLinks)}
                   </p>
                 ))}
-
-                {/* 2. GameCard — structured data after the writing */}
-                {isGameSection && game && (
-                  <div className="mt-5">
-                    <GameCard game={game} pred={pred} gUrl={gUrl} />
-                  </div>
-                )}
-
-                {/* 3. YouTube embed — section closer, watch the highlights */}
-                {isGameSection && game?.youtube_highlight_id && (
-                  <div className="rounded-xl overflow-hidden mt-3" style={{ aspectRatio: '16/9' }}>
-                    <iframe
-                      src={`https://www.youtube.com/embed/${game.youtube_highlight_id}?rel=0&modestbranding=1`}
-                      title={`${game.away_team?.abbrev} @ ${game.home_team?.abbrev} highlights`}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                      className="w-full h-full"
-                      style={{ border: 'none' }}
-                    />
-                  </div>
-                )}
-
-                {/* Fallback header for game sections with no DB match */}
-                {isGameSection && !game && (
-                  <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-bright)' }}>
-                    {section.header}
-                  </h2>
-                )}
               </div>
             );
           })}
