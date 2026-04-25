@@ -350,7 +350,14 @@ ARTICLE STRUCTURE — follow this exactly:
 
 2. GAME SECTIONS: One section per game, ordered from most to least interesting. Each section must start with EXACTLY this header format on its own line:
 ### {AWAY_ABBREV} {AWAY_SCORE} @ {HOME_ABBREV} {HOME_SCORE}
-Then 4-6 sentences of specific, narrative recap. Always use the player's FULL FIRST AND LAST NAME (e.g. "Connor McDavid", not just "McDavid"). Include exact stats from the data. Describe how the game unfolded — momentum shifts, key sequences, turning points. If the model got it wrong, explain why it was hard to call. If a performer had strong momentum data going in, connect it to what happened on the ice. Make the reader feel like they watched the game.
+
+Then exactly TWO paragraphs separated by a blank line:
+
+PARAGRAPH 1 (2-3 sentences) — The game story: how it unfolded, key scoring sequences, momentum shifts, turning points. Active verbs, specific moments. Make the reader feel like they watched it.
+
+PARAGRAPH 2 (2-3 sentences) — The analytical layer: what the pre-game momentum data said vs. what actually happened on the ice, the prediction outcome (if upset, explain why the data missed it; if correct, validate what the signal caught), standout individual performance with exact stats woven naturally into the sentence.
+
+Always use the player's FULL FIRST AND LAST NAME (e.g. "Connor McDavid", not just "McDavid") in both paragraphs.
 
 3. MOMENTUM WATCH section (start with "### Momentum Watch"):
 3-4 sentences connecting pre-game momentum data to what happened on the ice. Always use full names. Which players' PPM signals were validated tonight? Who outperformed or underperformed their momentum trend? Be specific — use the % above/below season avg figures from the performer data.
@@ -367,7 +374,7 @@ Respond with valid JSON (no markdown, no code blocks):
   "title": "[headline max 70 chars — lead with the biggest story, name a specific player or team, make it compelling enough to click]",
   "summary": "2 sentences max 160 chars total. Name date, key players, teams. Written for Google snippet.",
   "featured_game": "[AWAY_ABBREV @ HOME_ABBREV — the exact game your headline is about, e.g. MTL @ TOR]",
-  "content": "[lede paragraph]\\n\\n[optional second lede paragraph]\\n\\n### {AWAY} {score} @ {HOME} {score}\\n\\n[game paragraph]\\n\\n[repeat for each game]\\n\\n### Momentum Watch\\n\\n[paragraph]\\n\\n### Looking Ahead\\n\\n[paragraph]"
+  "content": "[lede paragraph]\\n\\n[optional second lede paragraph]\\n\\n### {AWAY} {score} @ {HOME} {score}\\n\\n[paragraph 1 — game story]\\n\\n[paragraph 2 — analytics]\\n\\n[repeat for each game]\\n\\n### Momentum Watch\\n\\n[paragraph]\\n\\n### Looking Ahead\\n\\n[paragraph]"
 }`;
 
   const raw = await ask(prompt);

@@ -126,7 +126,7 @@ function linkifyText(
 interface ArticleSection {
   type: 'paragraph' | 'section';
   header?: string;
-  body: string;
+  bodies: string[];  // paragraph-type: [text]; section-type: [p1, p2, ...]
   awayAbbrev?: string;
   homeAbbrev?: string;
 }
@@ -142,14 +142,15 @@ function parseArticle(content: string): ArticleSection[] {
       sections.push({
         type: 'section',
         header,
-        body: '',
+        bodies: [],
         awayAbbrev: gameMatch?.[1],
         homeAbbrev: gameMatch?.[2],
       });
-    } else if (sections.length > 0 && sections[sections.length - 1].type === 'section' && !sections[sections.length - 1].body) {
-      sections[sections.length - 1].body = block;
+    } else if (sections.length > 0 && sections[sections.length - 1].type === 'section') {
+      // All paragraphs until the next ### belong to the current section
+      sections[sections.length - 1].bodies.push(block);
     } else {
-      sections.push({ type: 'paragraph', body: block });
+      sections.push({ type: 'paragraph', bodies: [block] });
     }
   }
 
@@ -287,20 +288,6 @@ function GameCard({ game, pred, gUrl }: { game: any; pred: any; gUrl: string }) 
               </span>
             </a>
           ))}
-        </div>
-      )}
-
-      {/* YouTube highlight */}
-      {game.youtube_highlight_id && (
-        <div className="rounded-xl overflow-hidden mx-4 mb-4" style={{ borderTop: threeStars.length ? undefined : '1px solid var(--border)', aspectRatio: '16/9' }}>
-          <iframe
-            src={`https://www.youtube.com/embed/${game.youtube_highlight_id}?rel=0&modestbranding=1`}
-            title={`${game.away_team?.abbrev} @ ${game.home_team?.abbrev} highlights`}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            className="w-full h-full"
-            style={{ border: 'none' }}
-          />
         </div>
       )}
     </div>
@@ -469,19 +456,20 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
           )}
         </div>
 
-        {/* Article body — structured sections with inline game cards */}
+        {/* Article body — lede, then per-game: prose → GameCard → YouTube */}
         <article className="mb-10">
           {sections.map((section, i) => {
+            // Lede / standalone paragraphs (before first ### section)
             if (section.type === 'paragraph') {
               return (
                 <p key={i} className="text-sm leading-relaxed mb-5"
                   style={{ color: i === 0 ? 'var(--text-bright)' : 'var(--text)' }}>
-                  {linkifyText(section.body, playerData, teamLinks)}
+                  {linkifyText(section.bodies[0] ?? '', playerData, teamLinks)}
                 </p>
               );
             }
 
-            // Section header
+            // Section — game or named (Momentum Watch, Looking Ahead)
             const isGameSection = !!(section.awayAbbrev && section.homeAbbrev);
             const gameKey = isGameSection ? `${section.awayAbbrev}:${section.homeAbbrev}` : null;
             const game = gameKey ? gameByTeams.get(gameKey) : null;
@@ -493,7 +481,7 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
             return (
               <div key={i} className="mb-10">
                 {/* Section divider */}
-                <div className="mb-4" style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem' }}>
+                <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', marginBottom: '1rem' }}>
                   {!isGameSection && (
                     <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-bright)' }}>
                       {section.header}
@@ -501,23 +489,39 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
                   )}
                 </div>
 
-                {/* Expanded game card (replaces old mini score grid) */}
+                {/* 1. Prose paragraphs — read the game first */}
+                {section.bodies.map((body, bi) => (
+                  <p key={bi} className="text-sm leading-relaxed mb-4" style={{ color: 'var(--text)' }}>
+                    {linkifyText(body, playerData, teamLinks)}
+                  </p>
+                ))}
+
+                {/* 2. GameCard — structured data after the writing */}
                 {isGameSection && game && (
-                  <GameCard game={game} pred={pred} gUrl={gUrl} />
+                  <div className="mt-5">
+                    <GameCard game={game} pred={pred} gUrl={gUrl} />
+                  </div>
                 )}
 
-                {/* Game section header for non-expanded (no game data) case */}
+                {/* 3. YouTube embed — section closer, watch the highlights */}
+                {isGameSection && game?.youtube_highlight_id && (
+                  <div className="rounded-xl overflow-hidden mt-3" style={{ aspectRatio: '16/9' }}>
+                    <iframe
+                      src={`https://www.youtube.com/embed/${game.youtube_highlight_id}?rel=0&modestbranding=1`}
+                      title={`${game.away_team?.abbrev} @ ${game.home_team?.abbrev} highlights`}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="w-full h-full"
+                      style={{ border: 'none' }}
+                    />
+                  </div>
+                )}
+
+                {/* Fallback header for game sections with no DB match */}
                 {isGameSection && !game && (
                   <h2 className="text-sm font-bold mb-3" style={{ color: 'var(--text-bright)' }}>
                     {section.header}
                   </h2>
-                )}
-
-                {/* Section body */}
-                {section.body && (
-                  <p className="text-sm leading-relaxed mt-4" style={{ color: 'var(--text)' }}>
-                    {linkifyText(section.body, playerData, teamLinks)}
-                  </p>
                 )}
               </div>
             );
