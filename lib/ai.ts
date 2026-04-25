@@ -87,7 +87,7 @@ function buildBioPrompt(input: PlayerAIInput): string {
     ? `Drafted ${input.draftYear}, Round ${input.draftRound}, Pick #${input.draftPick}${input.draftTeam ? ` by ${input.draftTeam}` : ''}`
     : 'Undrafted';
 
-  return `You are an NHL scout writing a player identity card for an analytics platform. Characterize who this player IS as a hockey player — their archetype, style, and role — based on the data.
+  return `You are a sports writer at Hockey Momentum profiling a player for fans who care about who a player actually is, not just their stats. Your job is to translate the numbers into a compelling portrait — their archetype, their value, their story on the ice.
 
 Player: ${input.name} (${input.team}, ${input.position})
 ${input.age ? `Age: ${input.age}` : ''}${input.birthCity ? ` · From: ${input.birthCity}, ${input.birthCountry}` : ''}
@@ -98,7 +98,7 @@ ${draftLine}
 Career (${input.careerGames} GP): ${input.careerGoals}G ${input.careerAssists}A ${careerPoints}pts | ${goalsPerGame} G/game | ${assistsPerGame} A/game${input.careerPlusMinus != null ? ` | ${input.careerPlusMinus > 0 ? '+' : ''}${input.careerPlusMinus} +/-` : ''}
 Current season (${input.seaGames} GP): ${input.seaGoals}G ${input.seaAssists}A | ${input.seaToiMin.toFixed(1)} min/game
 
-Write 2–3 sentences describing who this player is. What type of contributor — sniper, playmaker, two-way forward, physical presence, power play specialist, shutdown defender? Let the goals/assists ratio, ice time, and career rate guide the characterization. Direct and specific. No generic praise. Third person.`;
+Write 2–3 sentences that capture who this player IS. What makes them worth watching? Are they a pure scorer, a playmaker who makes everyone around them better, a two-way force, a power play weapon, an iron-minutes shutdown defender? Let the goals/assists split, ice time, and career rate do the talking — but say it in a way a fan wants to read. Direct. Specific. Third person. No generic praise like "plays hard every night" or "gives 110%".`;
 }
 
 // ─── Player performance eval ──────────────────────────────────────────────────
@@ -115,21 +115,21 @@ function buildPerfEvalPrompt(input: PlayerAIInput): string {
     `  ${g.date}: vs ${g.opponent} — ${g.goals}G ${g.assists}A (${sign(g.plusMinus)}), ${g.toiMin.toFixed(1)} min`
   ).join('\n');
 
-  return `You are an NHL performance analyst evaluating a player's current form vs their season baseline and identity.
+  return `You are a beat writer at Hockey Momentum. Your job is to tell fans what's actually happening with a player's form right now — not to recite numbers, but to interpret what the numbers mean. Is this player a must-watch right now, or someone to monitor from a distance?
 
-Player: ${input.name} (${input.team}, ${input.position})${input.rank ? ` · Global rank #${input.rank}` : ''}
+Player: ${input.name} (${input.team}, ${input.position})${input.rank ? ` · Currently ranked #${input.rank} globally` : ''}
 
 Season baseline (${input.seaGames} games): ${input.seaGoals}G ${input.seaAssists}A ${input.seaPoints}pts | PPM ${input.seaPpm.toFixed(4)} | Shot% ${(input.seaShootPct * 100).toFixed(1)}% | ${input.seaToiMin.toFixed(1)} min/game
 
 Last ${input.momGames} games: ${input.momGoals}G ${input.momAssists}A | PPM ${input.momPpm.toFixed(4)}${ppmDeltaPct ? ` (${Number(ppmDeltaPct) >= 0 ? '+' : ''}${ppmDeltaPct}% vs season)` : ''} | Shot% ${(input.momShootPct * 100).toFixed(1)}% (${Number(shootDeltaPpt) >= 0 ? '+' : ''}${shootDeltaPpt}pp) | ${input.momToiMin.toFixed(1)} min/game (${Number(toiDelta) >= 0 ? '+' : ''}${toiDelta} vs season)
 
-Energy bar: ${input.energyBar}/100
+Energy bar: ${input.energyBar}/100 — how fresh vs fatigued the recent workload suggests
 Breakout delta: ${sign(Number(input.breakoutDelta.toFixed(4)))} PPM
 
 Recent game log:
 ${gameLogLines || '  No recent games'}
 
-Evaluate this player's current form in 2–3 sentences. Is he above or below his season baseline? Surge or slump? Connect it to the type of player he is — if a scorer is cold, say so; if a playmaker is suddenly finishing, say so. Direct, data-backed. Third person.`;
+Write 2–3 sentences on this player's current form. Hot streak or cold spell? Is the recent trend meaningful or noise? Connect the numbers to what it means in practice — if a scorer has gone quiet, say so and why it might matter. If someone's quietly playing the best hockey of their season, make that clear. Data-backed but readable. Third person. No clichés.`;
 }
 
 // ─── Supabase-cached player insights ─────────────────────────────────────────
@@ -225,7 +225,7 @@ async function _generateNightlyStories(input: NightlyStoriesInput): Promise<stri
     `  ${p.name} (${p.team}, ${p.position}): ${p.goals}G ${p.assists}A ${sign(p.plusMinus)}, ${p.toiMin.toFixed(1)} min`
   ).join('\n');
 
-  const prompt = `You are an NHL analyst writing a sharp "last night in the NHL" brief for a data-driven hockey analytics platform. Readers are analytical fans who value insight over hype.
+  const prompt = `You are a sports writer at Hockey Momentum. Your job is to write the "last night" briefing that a hockey fan reads over their morning coffee — punchy, specific, and worth their time. These are fans who love the game and trust the data, but they want to read a story, not a spreadsheet.
 
 Date: ${input.date}
 
@@ -235,14 +235,16 @@ ${gameLines}
 Top performers:
 ${performerLines}
 
-Write 3–5 sentences covering the most compelling stories from last night. Lead with the most dramatic or surprising result. Highlight standout individual performances with specific numbers. Note any interesting patterns (blowouts, tight games, scoring explosions). Do not use clichés like "lit the lamp" or "finding the back of the net". Be precise and analytical.`;
+Write 3–5 sentences covering last night's most compelling stories. Lead with whatever was most surprising, dramatic, or interesting — not just the highest score. Name players with their full first and last name. Use specific numbers to back every claim. If a performance was exceptional, say why it matters. If a result was unexpected, say so directly.
+
+Tone: confident, direct, a little opinionated. Active verbs. Short sentences that land. No clichés ("lit the lamp", "finding the back of the net", "battle in the trenches"). No filler ("it was a night of...", "fans were treated to..."). Write like you watched every shift.`;
 
   return ask(prompt);
 }
 
 export const generateNightlyStories = unstable_cache(
   _generateNightlyStories,
-  ['nightly-stories-v2'],
+  ['nightly-stories-v3'],
   { revalidate: 60 * 60 * 24 },
 );
 
@@ -332,7 +334,7 @@ export async function generateDailyRecap(input: DailyRecapInput): Promise<DailyR
     return `${g.awayTeam} ${g.awayScore} @ ${g.homeTeam} ${g.homeScore}${context ? ` [${context}]` : ''}${g.predictedCorrectly !== null ? ` [model: ${g.predictedCorrectly ? '✓' : '✗'}]` : ''}${g.homeWinProbability != null ? ` [gave ${winner} ${awayWon ? ((1 - g.homeWinProbability) * 100).toFixed(0) : (g.homeWinProbability * 100).toFixed(0)}% win prob]` : ''}`;
   }).join('\n');
 
-  const prompt = `You are a senior hockey writer for NHL Momentum, a data-driven analytics platform. Write a daily recap article for ${input.dateLabel} that reads like real sports journalism — not a data dump, not a press release. Analytical fans read this; they love numbers but they want them woven into narrative, not listed.${newsSection}
+  const prompt = `You are a senior sports writer at Hockey Momentum. Your voice is ESPN energy meets data credibility — you love the game, you trust the numbers, and you know how to make both come alive on the page. Write a daily recap article for ${input.dateLabel} that reads like real sports journalism. Not a data dump. Not a press release. A story.${newsSection}
 
 GAMES (${input.games.length}):
 ${gameHeaders}
@@ -344,7 +346,7 @@ ${performerLines}
 
 ARTICLE STRUCTURE — follow this exactly:
 
-1. LEDE (1-2 paragraphs): Open with the night's most compelling story. Don't start with "Tonight" or "Last night". Lead with what was surprising, dramatic, or analytically interesting. One specific number in the first sentence. This sets the tone for the entire article — make it vivid and specific.
+1. LEDE (1-2 paragraphs): Open with the night's single most compelling story. Don't start with "Tonight", "Last night", or "It was a night". Lead with a specific player, a specific number, or a specific moment. Make the first sentence impossible to ignore — the kind of line that makes a fan stop scrolling. One concrete fact, one strong verb, one clear story.
 
 2. GAME SECTIONS: One section per game, ordered from most to least interesting. Each section must start with EXACTLY this header format on its own line:
 ### {AWAY_ABBREV} {AWAY_SCORE} @ {HOME_ABBREV} {HOME_SCORE}
@@ -356,13 +358,13 @@ Then 4-6 sentences of specific, narrative recap. Always use the player's FULL FI
 4. LOOKING AHEAD section (start with "### Looking Ahead"):
 2-3 sentences. Forward-looking observations — back-to-backs, playoff implications, players to watch. Concrete, not generic. Use full names.
 
-TONE: Write like a beat writer who watches every game and trusts the data. Direct sentences. Active verbs. No clichés ("lit the lamp", "finding the back of the net", "putting pucks on net"). No filler phrases ("it was a night of", "fans were treated to"). Every sentence earns its place. Write approximately twice as much per game section as you normally would — depth over brevity.
+TONE: ESPN excitement meets data credibility. Write like someone who watched every shift and ran every number. Direct sentences. Active verbs. Short paragraphs. One idea per sentence. No clichés ("lit the lamp", "finding the back of the net", "putting pucks on net", "battle in the trenches", "gutsy effort"). No filler ("it was a night of", "fans were treated to", "in what was a"). If it doesn't add information or energy, cut it. Depth over brevity — write approximately twice as much per game section as you normally would.
 
 FULL NAMES: Every time you mention a player, use their full first and last name. Never use last name only.
 
 Respond with valid JSON (no markdown, no code blocks):
 {
-  "title": "NHL Recap ${input.dateLabel}: [headline max 70 chars — lead with the biggest story, name a team or player]",
+  "title": "[headline max 70 chars — lead with the biggest story, name a specific player or team, make it compelling enough to click]",
   "summary": "2 sentences max 160 chars total. Name date, key players, teams. Written for Google snippet.",
   "featured_game": "[AWAY_ABBREV @ HOME_ABBREV — the exact game your headline is about, e.g. MTL @ TOR]",
   "content": "[lede paragraph]\\n\\n[optional second lede paragraph]\\n\\n### {AWAY} {score} @ {HOME} {score}\\n\\n[game paragraph]\\n\\n[repeat for each game]\\n\\n### Momentum Watch\\n\\n[paragraph]\\n\\n### Looking Ahead\\n\\n[paragraph]"
