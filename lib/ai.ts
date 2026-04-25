@@ -5,7 +5,7 @@
 //       bio refreshes every 48h, perf_eval every 6h
 //   - Nightly stories: Next.js unstable_cache, 24h TTL per date
 //
-// Using gemini-2.5-flash-lite — higher free-tier quota than gemini-2.5-flash.
+// Using gemini-1.5-flash — 1500 RPD on the free tier.
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { unstable_cache } from 'next/cache';
@@ -21,7 +21,7 @@ export async function ask(prompt: string): Promise<string | null> {
   const client = getClient();
   if (!client) { console.error('[ai] ask: GEMINI_API_KEY not set'); return null; }
   try {
-    const model = client.getGenerativeModel({ model: 'gemini-2.5-flash-lite' });
+    const model = client.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const result = await model.generateContent(prompt);
     return result.response.text()?.trim() ?? null;
   } catch (err) {
