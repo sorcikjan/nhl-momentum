@@ -17,14 +17,24 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { player } = data;
   const name = `${player.first_name} ${player.last_name}`;
   const team = player.teams?.abbrev ?? '';
+  const teamName = player.teams?.name ?? team;
   const pos  = player.position_code ?? '';
+  const season = '2025–26';
+  const title = `${name} Stats ${season}`;
+  const desc = `${name} ${season} NHL stats — momentum score, recent form, game log and advanced analytics for the ${teamName} ${pos}.`;
   return {
-    title: name,
-    description: `${name} (${team} · ${pos}) — momentum PPM, energy bar, radar chart, and recent game log on NHL Momentum.`,
+    title,
+    description: desc,
     openGraph: {
-      title: `${name} — NHL Momentum`,
-      description: `${name} (${team} · ${pos}) — momentum analytics, PPM trend, and recent NHL game log.`,
+      title: `${name} — Hockey Momentum`,
+      description: desc,
       images: player.headshot_url ? [{ url: player.headshot_url, width: 160, height: 160, alt: name }] : [],
+    },
+    twitter: {
+      card: 'summary',
+      title: `${name} — ${season} NHL Stats`,
+      description: desc,
+      ...(player.headshot_url && { images: [player.headshot_url] }),
     },
   };
 }

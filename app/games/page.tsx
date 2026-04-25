@@ -8,11 +8,16 @@ import { fetchGames } from '@/lib/data';
 export const revalidate = 30;
 
 export const metadata: Metadata = {
-  title: 'Games',
-  description: 'NHL game schedule with momentum-based predictions, win probabilities, and live scores.',
+  title: 'NHL Games & Predictions Today',
+  description: 'NHL game schedule with AI win predictions, win probabilities, and live scores. Updated before every puck drop.',
   openGraph: {
-    title: 'Games — NHL Momentum',
-    description: 'NHL game schedule with momentum-based predictions, win probabilities, and live scores.',
+    title: 'NHL Games & Predictions — Hockey Momentum',
+    description: 'NHL game schedule with AI win predictions, win probabilities, and live scores.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'NHL Games & Predictions Today',
+    description: 'AI win predictions vs bookmaker odds for every NHL game — updated daily.',
   },
 };
 

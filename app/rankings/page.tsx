@@ -9,11 +9,16 @@ import { fetchRankings, fetchGoalieRankings, fetchNewcomerWatch } from '@/lib/da
 export const revalidate = 120;
 
 export const metadata: Metadata = {
-  title: 'Heat Rankings',
-  description: 'Top 100 NHL skaters ranked by Heat score — rolling 5-game momentum vs season average.',
+  title: 'NHL Heat Rankings 2025–26',
+  description: 'Who is the hottest player in the NHL right now? Top 100 skaters ranked by momentum score — rolling 5-game form vs season average.',
   openGraph: {
-    title: 'Heat Rankings — NHL Momentum',
-    description: 'Top 100 NHL skaters ranked by Heat score — rolling 5-game momentum vs season average.',
+    title: 'NHL Heat Rankings — Hockey Momentum',
+    description: 'Who is the hottest player in the NHL right now? Top 100 skaters ranked by rolling momentum score.',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'NHL Heat Rankings 2025–26',
+    description: 'Who is the hottest player in the NHL right now? Updated daily.',
   },
 };
 

@@ -10,13 +10,21 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { team, standing } = await fetchTeam(id).catch(() => ({ team: null, roster: [], recentGames: null, upcoming: null, seasonStats: null, standing: null }));
   if (!team) return { title: 'Team' };
   const record = standing ? `${standing.wins}–${standing.losses}–${standing.otLosses}` : '';
+  const season = '2025–26';
+  const title = `${team.name} ${season} Stats & Standings`;
+  const desc = `${team.name} ${season} NHL stats${record ? ' · ' + record : ''} — roster momentum rankings, player form, recent results, and upcoming schedule.`;
   return {
-    title: team.name,
-    description: `${team.name} (${team.conference} · ${team.division} Division${record ? ' · ' + record : ''}) — roster momentum, energy bar, and schedule on NHL Momentum.`,
+    title,
+    description: desc,
     openGraph: {
-      title: `${team.name} — NHL Momentum`,
-      description: `${team.name} team profile — top skaters by momentum, roster energy, recent results, and upcoming games.`,
+      title: `${team.name} — Hockey Momentum`,
+      description: desc,
       images: [{ url: teamLogoUrl(team.abbrev), width: 80, height: 80, alt: team.name }],
+    },
+    twitter: {
+      card: 'summary',
+      title,
+      description: desc,
     },
   };
 }

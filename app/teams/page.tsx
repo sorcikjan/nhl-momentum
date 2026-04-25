@@ -6,11 +6,16 @@ import { teamUrl } from '@/lib/urls';
 import { getStandings } from '@/lib/nhl-api';
 
 export const metadata: Metadata = {
-  title: 'Teams',
-  description: 'All 32 NHL teams — click any team for roster energy, top skaters by momentum, and upcoming schedule.',
+  title: 'NHL Teams 2025–26',
+  description: 'All 32 NHL teams — roster momentum rankings, energy levels, standings, and upcoming schedule. Updated daily.',
   openGraph: {
-    title: 'Teams — NHL Momentum',
-    description: 'All 32 NHL teams — click any team for roster energy, top skaters by momentum, and upcoming schedule.',
+    title: 'NHL Teams — Hockey Momentum',
+    description: 'All 32 NHL teams — roster energy, top skaters by momentum, and upcoming schedule.',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'NHL Teams 2025–26 — Hockey Momentum',
+    description: 'All 32 NHL teams — roster momentum, standings, and upcoming schedule.',
   },
 };
 

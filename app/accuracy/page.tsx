@@ -7,10 +7,10 @@ export const revalidate = 120;
 
 export const metadata: Metadata = {
   title: 'Prediction Accuracy',
-  description: 'Track NHL Momentum model performance — winner prediction accuracy, score error by version, and per-game history.',
+  description: 'Track Hockey Momentum model performance — winner prediction accuracy, score error by version, and per-game history.',
   openGraph: {
-    title: 'Prediction Accuracy — NHL Momentum',
-    description: 'Track NHL Momentum model performance — winner prediction accuracy, score error by version, and per-game history.',
+    title: 'Prediction Accuracy — Hockey Momentum',
+    description: 'Track Hockey Momentum model performance — winner prediction accuracy, score error by version, and per-game history.',
   },
 };
 

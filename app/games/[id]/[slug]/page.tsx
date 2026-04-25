@@ -17,15 +17,26 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const awayName = (game?.away_team as any)?.name ?? away;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const homeName = (game?.home_team as any)?.name ?? home;
-  const date = game?.game_date ? ` · ${game.game_date.slice(5)}` : '';
-  const title = `${away} at ${home}${date}`;
+  const dateLabel = game?.game_date
+    ? new Date(game.game_date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '';
+  const isFinalGame = ['FINAL', 'OFF'].includes(game?.game_state ?? '');
+  const title = `${awayName} vs ${homeName}${dateLabel ? ' — ' + dateLabel : ''}`;
+  const desc = isFinalGame
+    ? `${awayName} vs ${homeName} recap${dateLabel ? ' — ' + dateLabel : ''}: final score, top performers, expected goals, and AI prediction result.`
+    : `${awayName} vs ${homeName} prediction${dateLabel ? ' — ' + dateLabel : ''}: AI win probability, expected goals, lineup momentum, and betting odds comparison.`;
   return {
     title,
-    description: `${awayName} at ${homeName}${date} — momentum-based prediction, win probability, and lineup analysis on NHL Momentum.`,
+    description: desc,
     openGraph: {
-      title: `${title} — NHL Momentum`,
-      description: `${awayName} at ${homeName} — game prediction, expected goals, win probability, and player momentum inputs.`,
+      title: `${awayName} vs ${homeName} — Hockey Momentum`,
+      description: desc,
       images: [{ url: teamLogoUrl(home), width: 80, height: 80, alt: home }],
+    },
+    twitter: {
+      card: 'summary',
+      title: `${awayName} vs ${homeName}`,
+      description: desc,
     },
   };
 }

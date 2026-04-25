@@ -26,7 +26,7 @@ export async function generateMetadata(
     description: recap.summary ?? `NHL recap for ${dateLabel} — top performers, momentum analytics, and prediction results.`,
     alternates: { canonical },
     openGraph: {
-      title: `${recap.title} — NHL Momentum`,
+      title: `${recap.title} — Hockey Momentum`,
       description: recap.summary ?? undefined,
       type: 'article',
       publishedTime: recap.generated_at,
@@ -375,10 +375,10 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
     datePublished: recap.generated_at,
     dateModified: recap.generated_at,
     ...(recap.hero_image_url && { image: recap.hero_image_url }),
-    author: { '@type': 'Organization', name: 'NHL Momentum' },
+    author: { '@type': 'Organization', name: 'Hockey Momentum' },
     publisher: {
       '@type': 'Organization',
-      name: 'NHL Momentum',
+      name: 'Hockey Momentum',
       url: 'https://nhl-momentum.netlify.app',
     },
   };
@@ -414,7 +414,7 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--text)' }}>
             {recap.games_count != null && <span>{recap.games_count} games</span>}
             <span style={{ opacity: 0.4 }}>·</span>
-            <span>NHL Momentum Analytics</span>
+            <span>Hockey Momentum</span>
             {recap.generated_at && (
               <>
                 <span style={{ opacity: 0.4 }}>·</span>
