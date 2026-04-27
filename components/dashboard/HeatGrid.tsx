@@ -210,22 +210,22 @@ function SkaterCard({ p, rank }: { p: SkaterPlayer; rank: number }) {
         )
       }
       bottom={
-        <>
-          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.78rem', lineHeight: 1.2 }}>
-            {f ? `${f} ` : ''}{p.players.position_code}{p.players.sweater_number != null ? ` · #${p.players.sweater_number}` : ''}
-          </span>
-          <div className="flex items-center gap-1 min-w-0">
+        <div className="flex items-end justify-between gap-1">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.92rem', lineHeight: 1.2 }}>
+              {f ? `${f} ` : ''}{p.players.position_code}{p.players.sweater_number != null ? ` · #${p.players.sweater_number}` : ''}
+            </span>
             <span className="truncate" style={{
               color: '#fff', fontSize: '0.82rem', fontWeight: 800, lineHeight: 1.2,
               textShadow: '0 1px 6px rgba(0,0,0,0.9)',
             }}>
               {initial ? `${initial}. ` : ''}{p.players.last_name}
             </span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoUrl(abbrev)} alt={abbrev}
-              style={{ width: 18, height: 18, flexShrink: 0, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }} />
           </div>
-        </>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoUrl(abbrev)} alt={abbrev}
+            style={{ width: 38, height: 38, flexShrink: 0, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))' }} />
+        </div>
       }
     />
   );
@@ -259,22 +259,22 @@ function GoalieCard({ g, rank }: { g: GoaliePlayer; rank: number }) {
         </div>
       }
       bottom={
-        <>
-          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.78rem', lineHeight: 1.2 }}>
-            {f ? `${f} ` : ''}G
-          </span>
-          <div className="flex items-center gap-1 min-w-0">
+        <div className="flex items-end justify-between gap-1">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.92rem', lineHeight: 1.2 }}>
+              {f ? `${f} ` : ''}G
+            </span>
             <span className="truncate" style={{
               color: '#fff', fontSize: '0.82rem', fontWeight: 800, lineHeight: 1.2,
               textShadow: '0 1px 6px rgba(0,0,0,0.9)',
             }}>
               {initial ? `${initial}. ` : ''}{g.last_name}
             </span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoUrl(abbrev)} alt={abbrev}
-              style={{ width: 18, height: 18, flexShrink: 0, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }} />
           </div>
-        </>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoUrl(abbrev)} alt={abbrev}
+            style={{ width: 38, height: 38, flexShrink: 0, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))' }} />
+        </div>
       }
     />
   );
@@ -309,22 +309,22 @@ function NewcomerCard({ p, rank }: { p: NewcomerPlayer; rank: number }) {
         </div>
       }
       bottom={
-        <>
-          <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.78rem', lineHeight: 1.2 }}>
-            {f ? `${f} ` : ''}{p.players.position_code}
-          </span>
-          <div className="flex items-center gap-1 min-w-0">
+        <div className="flex items-end justify-between gap-1">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.92rem', lineHeight: 1.2 }}>
+              {f ? `${f} ` : ''}{p.players.position_code}
+            </span>
             <span className="truncate" style={{
               color: '#fff', fontSize: '0.82rem', fontWeight: 800, lineHeight: 1.2,
               textShadow: '0 1px 6px rgba(0,0,0,0.9)',
             }}>
               {initial ? `${initial}. ` : ''}{p.players.last_name}
             </span>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoUrl(abbrev)} alt={abbrev}
-              style={{ width: 18, height: 18, flexShrink: 0, filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.8))' }} />
           </div>
-        </>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={logoUrl(abbrev)} alt={abbrev}
+            style={{ width: 38, height: 38, flexShrink: 0, filter: 'drop-shadow(0 1px 4px rgba(0,0,0,0.9))' }} />
+        </div>
       }
     />
   );
