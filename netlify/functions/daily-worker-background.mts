@@ -37,7 +37,7 @@ const handler: BackgroundHandler = async (event) => {
   }
 
   const body = event.body ? JSON.parse(event.body) : {};
-  const phases: string[] = body.phases ?? ['backfill', 'outcomes', 'outcomes-backfill', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy', 'extras', 'assignments'];
+  const phases: string[] = body.phases ?? ['backfill', 'outcomes', 'outcomes-backfill', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy', 'extras', 'assignments', 'recap'];
   const dateParam: string = body.date ?? '';
   const dateSuffix = dateParam ? `&date=${dateParam}` : '';
 

@@ -17,17 +17,47 @@ function getClient() {
   return new GoogleGenerativeAI(key);
 }
 
-export async function ask(prompt: string): Promise<string | null> {
+// Retry with exponential backoff for transient 503 / 429 errors.
+// gemini-2.5-flash occasionally returns 503 during high-demand periods.
+export async function ask(prompt: string, maxRetries = 3): Promise<string | null> {
   const client = getClient();
   if (!client) { console.error('[ai] ask: GEMINI_API_KEY not set'); return null; }
-  try {
-    const model = client.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    const result = await model.generateContent(prompt);
-    return result.response.text()?.trim() ?? null;
-  } catch (err) {
-    console.error('[ai] ask error:', err);
-    return null;
+
+  // Primary model: 2.5 flash (thinking, higher quality)
+  // Fallback model: 2.0 flash (faster, used if 2.5 is unavailable)
+  const models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+
+  for (const modelName of models) {
+    const model = client.getGenerativeModel({ model: modelName });
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const result = await model.generateContent(prompt);
+        const text = result.response.text()?.trim();
+        if (modelName !== 'gemini-2.5-flash' || attempt > 0) {
+          console.log(`[ai] ask: succeeded on model=${modelName} attempt=${attempt + 1}`);
+        }
+        return text ?? null;
+      } catch (err: unknown) {
+        const status = (err as { status?: number })?.status;
+        const isTransient = status === 503 || status === 429;
+        if (isTransient && attempt < maxRetries - 1) {
+          const delayMs = 2000 * Math.pow(2, attempt); // 2s, 4s, 8s
+          console.warn(`[ai] ask: ${status} on model=${modelName} attempt=${attempt + 1}, retrying in ${delayMs}ms`);
+          await new Promise(r => setTimeout(r, delayMs));
+          continue;
+        }
+        if (isTransient && modelName === 'gemini-2.5-flash') {
+          console.warn(`[ai] ask: ${modelName} exhausted (${status}), falling back to gemini-2.0-flash`);
+          break; // try next model
+        }
+        console.error('[ai] ask error:', err);
+        return null;
+      }
+    }
   }
+
+  console.error('[ai] ask: all models and retries exhausted');
+  return null;
 }
 
 // ─── Shared player input ──────────────────────────────────────────────────────
