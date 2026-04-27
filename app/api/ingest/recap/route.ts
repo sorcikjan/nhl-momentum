@@ -98,6 +98,10 @@ async function pickHeroImage(date: string, games?: any[], featuredGame?: string 
   return fetchPixabayHockeyImage(date, 'ice hockey');
 }
 
+// Increase max execution time — AI generation can take 30–60s on heavy demand days.
+// On Netlify this maps to the serverless function timeout hint.
+export const maxDuration = 300;
+
 // POST /api/ingest/recap?date=YYYY-MM-DD
 // Generates and stores a daily recap article for the given date (default: yesterday).
 // Skips if a fresh recap already exists (< 12h old) unless ?force=1.
