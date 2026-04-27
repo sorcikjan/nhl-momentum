@@ -179,7 +179,7 @@ function SkaterCard({ p, rank }: { p: SkaterPlayer; rank: number }) {
       }
       bottom={
         <>
-          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.58rem', lineHeight: 1.2 }}>
+          <span style={{ color: 'rgba(255,255,255,0.65)', fontSize: '0.72rem', lineHeight: 1.2 }}>
             {f ? `${f} ` : ''}{p.players.position_code}{p.players.sweater_number != null ? ` · #${p.players.sweater_number}` : ''}
           </span>
           <span className="truncate" style={{
@@ -202,8 +202,8 @@ function SkaterCard({ p, rank }: { p: SkaterPlayer; rank: number }) {
 function GoalieCard({ g, rank }: { g: GoaliePlayer; rank: number }) {
   const abbrev = g.teams?.abbrev ?? '?';
   const sv = g.avgSavePct;
-  const svColor = sv >= 0.920 ? 'var(--neon)' : sv >= 0.905 ? 'var(--heat)' : 'var(--silver)';
   const heat = Math.round(Math.max(0, Math.min(100, (sv - 0.85) / 0.10 * 100)));
+  const svColor = heatColor(heat);
   const f = flag(g.birth_country);
   const initial = g.first_name?.[0] ?? '';
 
@@ -272,11 +272,11 @@ function NewcomerCard({ p, rank }: { p: NewcomerPlayer; rank: number }) {
       }
       topRight={
         <div style={{ textAlign: 'right' }}>
-          <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.68rem', fontWeight: 800, fontFamily: 'monospace', lineHeight: 1 }}>
-            {p.players.career_games} GP
+          <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.82rem', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1 }}>
+            {ppg}
           </div>
           <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.52rem', lineHeight: 1.4 }}>
-            {ppg} p/g
+            p/g · {p.players.career_games} GP
           </div>
         </div>
       }
