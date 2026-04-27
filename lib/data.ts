@@ -115,7 +115,7 @@ export async function fetchRankings() {
       sos_coefficient, calculated_at,
       players (
         id, first_name, last_name, position_code, team_id,
-        headshot_url, injury_status, sweater_number, in_minors,
+        headshot_url, injury_status, sweater_number, in_minors, birth_country,
         teams ( id, abbrev, name )
       )
     `)
@@ -994,7 +994,7 @@ export async function fetchGoalieRankings() {
 
   const { data: goalies } = await supabaseAdmin
     .from('players')
-    .select('id, first_name, last_name, headshot_url, team_id, teams(id, abbrev, name)')
+    .select('id, first_name, last_name, headshot_url, birth_country, team_id, teams(id, abbrev, name)')
     .eq('position_code', 'G')
     .eq('is_active', true);
 
@@ -1036,6 +1036,8 @@ export async function fetchGoalieRankings() {
         first_name: g.first_name,
         last_name: g.last_name,
         headshot_url: g.headshot_url,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        birth_country: (g as any).birth_country as string | null,
         team_id: g.team_id,
         teams,
         avgSavePct,
@@ -1062,7 +1064,7 @@ export async function fetchNewcomerWatch() {
       players!inner(
         first_name, last_name, headshot_url, position_code,
         career_games, draft_year, draft_round, draft_pick,
-        in_minors, injury_status,
+        in_minors, injury_status, birth_country,
         teams(id, abbrev)
       )
     `)
@@ -1118,6 +1120,7 @@ export async function fetchNewcomerWatch() {
       draft_year:     r.players.draft_year    as number | null,
       draft_round:    r.players.draft_round   as number | null,
       draft_pick:     r.players.draft_pick    as number | null,
+      birth_country:  r.players.birth_country as string | null,
       teams:          r.players.teams         as { id: number; abbrev: string } | null,
     },
   }));

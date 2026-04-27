@@ -6,7 +6,7 @@ import TonightSection from '@/components/dashboard/TonightSection';
 import ResultsSection from '@/components/dashboard/ResultsSection';
 import HeatGrid from '@/components/dashboard/HeatGrid';
 import DailyBrandStrip from '@/components/dashboard/DailyBrandStrip';
-import { fetchRankings, fetchGames, fetchRecentRecaps, fetchRecentCompletedGames, fetchSeriesStandings, teamLogoUrl } from '@/lib/data';
+import { fetchRankings, fetchGames, fetchRecentRecaps, fetchRecentCompletedGames, fetchSeriesStandings, fetchGoalieRankings, fetchNewcomerWatch, teamLogoUrl } from '@/lib/data';
 import type { SeriesInfo } from '@/lib/data';
 import { playerUrl } from '@/lib/urls';
 
@@ -33,6 +33,8 @@ const getTodayGames = cache((date: string) =>
 );
 const getRecentRecaps = cache(() => fetchRecentRecaps(5).catch(() => []));
 const getRecentGames = cache(() => fetchRecentCompletedGames(2, 15).catch(() => ({ games: [], predMap: new Map() })));
+const getGoalieRankings = cache(() => fetchGoalieRankings().catch(() => []));
+const getNewcomers = cache(() => fetchNewcomerWatch().catch(() => []));
 
 // ── Section: Brand strip (daily masthead) ─────────────────────────────────────
 
@@ -100,13 +102,25 @@ async function RecentResultsSection() {
 // ── Section: Who's burning (Heat scroll) ─────────────────────────────────────
 
 async function BurningSection() {
-  const rankings = await getRankings();
+  const [rankings, goalies, newcomers] = await Promise.all([
+    getRankings(),
+    getGoalieRankings(),
+    getNewcomers(),
+  ]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const players = ((rankings?.top100 ?? []) as any[])
-    .sort((a, b) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0))
-    .slice(0, 20);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return <HeatGrid players={players as any[]} />;
+  const skaters = ((rankings?.top100 ?? []) as any[])
+    .sort((a: any, b: any) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0))
+    .slice(0, 15);
+  return (
+    <HeatGrid
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      skaters={skaters as any[]}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      goalies={goalies as any[]}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      newcomers={newcomers as any[]}
+    />
+  );
 }
 
 // ── Section: Playoff bracket (only during playoffs) ──────────────────────────
