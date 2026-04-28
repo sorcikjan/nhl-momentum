@@ -13,7 +13,7 @@ interface Snapshot {
 export default function PPMTimeline({ snapshots, leagueAvgPpm }: { snapshots: Snapshot[]; leagueAvgPpm?: number }) {
   if (!snapshots.length) {
     return (
-      <div className="rounded-xl border p-6 text-center" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <div className="p-6 text-center">
         <p className="text-sm" style={{ color: 'var(--text)' }}>No timeline data yet</p>
       </div>
     );
@@ -36,10 +36,7 @@ export default function PPMTimeline({ snapshots, leagueAvgPpm }: { snapshots: Sn
   const latestSeason = data[data.length - 1]?.season ?? 0;
 
   return (
-    <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <h3 className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--text)' }}>
-        PPM Timeline
-      </h3>
+    <div className="px-2 pb-4">
       <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data} margin={{ top: 5, right: 10, bottom: 5, left: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -61,7 +58,7 @@ export default function PPMTimeline({ snapshots, leagueAvgPpm }: { snapshots: Sn
           )}
           <Line
             type="monotone" dataKey="momentum" name="Momentum PPM"
-            stroke="var(--neon)" strokeWidth={2} dot={false} activeDot={{ r: 4 }}
+            stroke="var(--heat)" strokeWidth={2} dot={false} activeDot={{ r: 4 }}
           />
           <Line
             type="monotone" dataKey="season" name="Season PPM"

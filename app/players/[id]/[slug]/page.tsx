@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import PlayerRadarChart from '@/components/players/RadarChart';
 import PPMTimeline from '@/components/players/PPMTimeline';
-import EnergyBar from '@/components/players/EnergyBar';
 import { fetchPlayer, fetchRankings, fetchLeagueAverages, daysAgo, deriveOutStatus } from '@/lib/data';
 import { getPlayerInsights } from '@/lib/ai';
 import type { PlayerAIInput } from '@/lib/ai';
@@ -248,10 +247,30 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
   const { bio: aiBio, perfEval: aiPerfEval } = await getPlayerInsights(Number(id), aiInput).catch(() => ({ bio: null, perfEval: null }));
 
+  // ── L5 stat row helpers ────────────────────────────────────────────────────
+  const last5Games = (recentGames ?? []).slice(0, 5);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const l5W = last5Games.filter((g: any) => {
+    const game = g.games;
+    const isHome = player.team_id === game?.home_team_id;
+    const ts = isHome ? game?.home_score : game?.away_score;
+    const os = isHome ? game?.away_score : game?.home_score;
+    return ts !== null && os !== null && ts > os;
+  }).length;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const l5L = last5Games.filter((g: any) => {
+    const game = g.games;
+    const isHome = player.team_id === game?.home_team_id;
+    const ts = isHome ? game?.home_score : game?.away_score;
+    const os = isHome ? game?.away_score : game?.home_score;
+    return ts !== null && os !== null && ts < os;
+  }).length;
+  const l5OT = last5Games.length - l5W - l5L;
+
   return (
     <div className="max-w-5xl mx-auto pb-20 md:pb-0 space-y-4">
 
-      {/* ── OUT / Injury banner ───────────────────────────────────────────────── */}
+      {/* 1. Injury banner — unchanged ─────────────────────────────────────────── */}
       {outStatus && (() => {
         const isMinors  = outStatus === 'minors';
         const isInjured = outStatus === 'injured';
@@ -303,165 +322,352 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         );
       })()}
 
-      {/* ── Hero card ─────────────────────────────────────────────────────────── */}
-      <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-        <div className="flex items-stretch gap-0">
+      {/* 2. Cinematic hero ────────────────────────────────────────────────────── */}
+      <div className="relative rounded-xl overflow-hidden" style={{ background: 'var(--bg-card)', minHeight: 240 }}>
 
-          {/* Headshot */}
-          {player.headshot_url && (
-            <div className="relative flex-shrink-0 w-28 md:w-36"
-              style={{ background: 'linear-gradient(135deg, var(--bg) 0%, var(--bg-hover) 100%)' }}>
-              <img src={player.headshot_url} alt={name}
-                className="w-full h-full object-cover object-top" />
-              <div className="absolute inset-0"
-                style={{ background: 'linear-gradient(to right, transparent 60%, var(--bg-card))' }} />
+        {/* Jersey number ghost */}
+        {player.sweater_number && (
+          <div className="absolute select-none pointer-events-none"
+            style={{ right: -10, top: -20, fontSize: 220, fontWeight: 900, lineHeight: 1,
+                     color: 'rgba(255,255,255,0.035)', letterSpacing: '-0.05em' }}>
+            {player.sweater_number}
+          </div>
+        )}
+
+        {/* Headshot right-anchored, fading left */}
+        {player.headshot_url && (
+          <div className="absolute bottom-0 right-0 h-full" style={{ width: 180 }}>
+            <img src={player.headshot_url} alt={name} className="w-full h-full object-cover object-top" />
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, var(--bg-card) 0%, transparent 55%)' }} />
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, var(--bg-card) 0%, transparent 50%)' }} />
+          </div>
+        )}
+
+        {/* Content — constrained to left 72% so it doesn't overlap headshot */}
+        <div className="relative z-10 p-5 md:p-7 flex flex-col gap-3" style={{ maxWidth: '72%' }}>
+
+          {/* Team meta line */}
+          <div className="flex items-center flex-wrap gap-1.5 text-xs font-semibold tracking-widest uppercase"
+            style={{ color: 'var(--text)' }}>
+            {player.teams?.id ? (
+              <Link href={teamUrl(player.teams.id, player.teams.name ?? player.teams.abbrev)}
+                className="hover:opacity-80" style={{ color: 'var(--heat)' }}>
+                {player.teams.abbrev}
+              </Link>
+            ) : (
+              <span style={{ color: 'var(--heat)' }}>{player.teams?.abbrev}</span>
+            )}
+            {player.sweater_number && <><span>·</span><span>#{player.sweater_number}</span></>}
+            {player.position_code && <><span>·</span><span>{player.position_code}</span></>}
+            {age && <><span>·</span><span>Age {age}</span></>}
+            {(outStatus || player.injury_status) && (() => {
+              const label = player.injury_status ?? (outStatus === 'minors' ? 'MINORS' : outStatus === 'injured' ? 'INJURED' : outStatus === 'scratch' ? 'SCRATCH' : 'OUT');
+              const color = outStatus === 'minors' ? 'var(--neon)' : outStatus === 'scratch' ? 'var(--amber)' : 'var(--red)';
+              const bg = outStatus === 'minors' ? 'rgba(99,179,237,0.15)' : outStatus === 'scratch' ? 'rgba(251,191,36,0.18)' : 'rgba(239,68,68,0.2)';
+              return <span className="px-2 py-0.5 rounded font-bold" style={{ background: bg, color, fontSize: 10 }}>{label}</span>;
+            })()}
+          </div>
+
+          {/* Player name */}
+          <h1 style={{ lineHeight: 0.92, letterSpacing: '-0.025em' }}>
+            <span className="block font-black" style={{ fontSize: 'clamp(2rem, 7vw, 3.5rem)', color: 'var(--text-bright)' }}>
+              {player.first_name}
+            </span>
+            <span className="block font-black" style={{ fontSize: 'clamp(2rem, 7vw, 3.5rem)', color: 'var(--heat)' }}>
+              {player.last_name}.
+            </span>
+          </h1>
+
+          {/* Heat circle badge + status */}
+          <div className="flex items-center gap-3 mt-1">
+            <div className="flex items-center justify-center rounded-full flex-shrink-0"
+              style={{ width: 64, height: 64, border: `2.5px solid ${energyColor}`, background: `${energyColor}18` }}>
+              <span className="text-xl font-black font-mono" style={{ color: energyColor }}>{energyBar}</span>
             </div>
-          )}
-
-          {/* Identity */}
-          <div className="flex-1 p-5 flex flex-col justify-center gap-3">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight leading-none"
-                  style={{ color: 'var(--text-bright)' }}>
-                  {player.first_name}<br />{player.last_name}
-                </h1>
-                <div className="flex items-center gap-2 mt-2 flex-wrap text-sm">
-                  {player.teams?.id ? (
-                    <Link href={teamUrl(player.teams.id, player.teams.name ?? player.teams.abbrev)}
-                      className="font-semibold hover:opacity-80" style={{ color: 'var(--neon)' }}>
-                      {player.teams.abbrev}
-                    </Link>
-                  ) : (
-                    <span style={{ color: 'var(--neon)' }}>{player.teams?.abbrev}</span>
-                  )}
-                  <span style={{ color: 'var(--border)' }}>|</span>
-                  <span style={{ color: 'var(--text)' }}>{player.position_code}</span>
-                  {player.sweater_number && (
-                    <>
-                      <span style={{ color: 'var(--border)' }}>|</span>
-                      <span style={{ color: 'var(--text)' }}>#{player.sweater_number}</span>
-                    </>
-                  )}
-                  {(outStatus || player.injury_status) && (() => {
-                    const label = player.injury_status ?? (outStatus === 'minors' ? 'MINORS' : outStatus === 'injured' ? 'INJURED' : outStatus === 'scratch' ? 'SCRATCH' : 'OUT');
-                    const color = outStatus === 'minors' ? 'var(--neon)' : outStatus === 'scratch' ? 'var(--amber)' : 'var(--red)';
-                    const bg    = outStatus === 'minors' ? 'rgba(99,179,237,0.15)' : outStatus === 'scratch' ? 'rgba(251,191,36,0.18)' : 'rgba(239,68,68,0.2)';
-                    return (
-                      <span className="px-2 py-0.5 rounded text-xs font-bold" style={{ background: bg, color }}>
-                        {label}
-                      </span>
-                    );
-                  })()}
-                </div>
-              </div>
-              {rankBadge(ranked?.momentum_rank)}
-            </div>
-
-            {/* Energy — compact status badge in hero, full bar below */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs px-2 py-1 rounded font-semibold"
-                style={{ background: `${energyColor}22`, color: energyColor, border: `1px solid ${energyColor}44` }}>
-                ⚡ {energyLabel} · {energyBar}%
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs font-bold tracking-widest uppercase" style={{ color: energyColor }}>
+                {energyLabel}
               </span>
+              {ranked?.momentum_rank && (
+                <span className="text-xs" style={{ color: 'var(--text)' }}>#{ranked.momentum_rank} in the league</span>
+              )}
             </div>
           </div>
+
+          {/* AI headline — first sentence of aiPerfEval */}
+          {aiPerfEval && (() => {
+            const first = aiPerfEval.split(/(?<=[.!?])\s/)[0]?.trim();
+            return first ? (
+              <p className="text-sm font-medium leading-snug" style={{ color: 'var(--text-bright)' }}>{first}</p>
+            ) : null;
+          })()}
         </div>
       </div>
 
-      {/* ── Bio strip ───────────────────────────────────────────────────────────── */}
-      {(player.birth_date || player.height_inches || player.draft_year || player.career_games) && (
+      {/* 3. L5 stat row (skaters only, only when momGames > 0) ───────────────── */}
+      {!isGoalie && momGames > 0 && (
+        <div className="grid grid-cols-4 gap-3">
+          {[
+            {
+              label: 'Goals',
+              value: momGoals,
+              display: String(momGoals),
+              highlight: momGoals > 0,
+            },
+            {
+              label: 'Assists',
+              value: momAssists,
+              display: String(momAssists),
+              highlight: momAssists > 1,
+            },
+            {
+              label: 'Points',
+              value: momGoals + momAssists,
+              display: String(momGoals + momAssists),
+              highlight: momGoals + momAssists > 2,
+              bold: true,
+            },
+            {
+              label: '+/-',
+              value: Number(latestSnapshot.momentum_plus_minus ?? 0),
+              display: `${Number(latestSnapshot.momentum_plus_minus ?? 0) > 0 ? '+' : ''}${latestSnapshot.momentum_plus_minus ?? 0}`,
+              highlight: Number(latestSnapshot.momentum_plus_minus ?? 0) > 0,
+              negative: Number(latestSnapshot.momentum_plus_minus ?? 0) < 0,
+            },
+          ].map((cell) => (
+            <div key={cell.label} className="rounded-xl border flex flex-col items-center py-3 px-2"
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+              <span className={`text-2xl font-black font-mono ${cell.bold ? 'font-bold' : ''}`}
+                style={{ color: cell.negative ? 'var(--red)' : cell.highlight ? 'var(--heat)' : 'var(--text-bright)' }}>
+                {cell.display}
+              </span>
+              <span className="text-xs mt-1" style={{ color: 'var(--text)' }}>{cell.label}</span>
+              <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.5 }}>L5</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 4. Heat timeline ─────────────────────────────────────────────────────── */}
+      {(metricTimeline?.length ?? 0) > 0 && (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 divide-x divide-y md:divide-y-0"
-            style={{ borderColor: 'var(--border)' }}>
+          <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
+              Heat over 6 weeks
+            </span>
+            {momPpm > seaPpm && (
+              <span className="text-xs px-2 py-0.5 rounded font-semibold"
+                style={{ background: 'rgba(249,115,22,0.15)', color: 'var(--heat)' }}>
+                Current Peak
+              </span>
+            )}
+          </div>
+          <PPMTimeline snapshots={metricTimeline ?? []} leagueAvgPpm={leagueAvg?.seasonPpm} />
+        </div>
+      )}
 
-            {player.birth_date && (() => {
-              const age = Math.floor((Date.now() - new Date(player.birth_date).getTime()) / (365.25 * 86400000));
+      {/* 5. Recent games (last 5) ─────────────────────────────────────────────── */}
+      {last5Games.length > 0 && (
+        <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
+          <div className="px-4 py-3 border-b flex items-center justify-between"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
+              Last 5 games
+            </span>
+            {!isGoalie && (
+              <span className="text-xs font-mono font-semibold" style={{ color: 'var(--heat)' }}>
+                {l5W}W–{l5L}L–{l5OT}OT
+              </span>
+            )}
+          </div>
+
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {last5Games.map((g: any, i: number) => {
+              const game = g.games;
+              const isHome = player.team_id === game?.home_team_id;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const opponentAbbrev = isHome ? (game?.away_team as any)?.abbrev : (game?.home_team as any)?.abbrev;
+              const teamScore  = isHome ? game?.home_score : game?.away_score;
+              const oppScore   = isHome ? game?.away_score : game?.home_score;
+              const hasResult  = teamScore !== null && oppScore !== null;
+              const won        = hasResult && teamScore > oppScore;
+              const lost       = hasResult && teamScore < oppScore;
+              const toiMin     = Math.floor(Number(g.toi_seconds ?? 0) / 60);
+              const toiSec     = String(Number(g.toi_seconds ?? 0) % 60).padStart(2, '0');
+              const gameDate   = String(game?.game_date ?? '').slice(5);
+              const heatRaw    = Math.min(99, Math.round((g.points_per_minute ?? 0) * 600));
+              const heatColor  = heatRaw >= 70 ? 'var(--heat)' : heatRaw >= 35 ? 'var(--amber)' : 'var(--text)';
+
+              // Goalie decision parsing
+              const dec = g.decision ?? null;
+              const decIsWin = dec === 'W' || dec === 'SOW';
+              const decIsLoss = dec === 'L';
+
               return (
-                <BioCell label="Age / Born" value={String(age)}
-                  sub={new Date(player.birth_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} />
+                <div key={i} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3"
+                  style={{ background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)' }}>
+
+                  {/* VS + date */}
+                  <div className="flex-shrink-0 w-20">
+                    {opponentAbbrev && (
+                      <div className="text-xs mb-0.5" style={{ color: 'var(--text)' }}>
+                        {isHome ? 'VS' : '@'} {opponentAbbrev}
+                      </div>
+                    )}
+                    <div className="text-xs font-mono" style={{ color: 'var(--text)' }}>{gameDate || '—'}</div>
+                  </div>
+
+                  {/* Result badge + score */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0 w-20">
+                    {hasResult ? (
+                      <>
+                        <span className="text-xs font-bold px-1.5 py-0.5 rounded"
+                          style={{
+                            background: won ? 'rgba(34,197,94,0.15)' : lost ? 'rgba(239,68,68,0.15)' : 'rgba(160,174,192,0.1)',
+                            color: won ? 'var(--green)' : lost ? 'var(--red)' : 'var(--text)',
+                          }}>
+                          {won ? 'WIN' : lost ? 'LOSS' : 'OT'}
+                        </span>
+                        <span className="text-sm font-mono font-bold" style={{ color: 'var(--text-bright)' }}>
+                          {teamScore}–{oppScore}
+                        </span>
+                      </>
+                    ) : null}
+                  </div>
+
+                  {isGoalie ? (
+                    <div className="flex items-center gap-2 sm:gap-4 flex-1">
+                      <StatPill label="SA" value={String(g.shots_against ?? 0)} />
+                      <StatPill label="GA" value={String(g.goals_against ?? 0)} highlight={Number(g.goals_against) === 0} />
+                      <StatPill
+                        label="SV%"
+                        value={g.save_pct != null ? Number(g.save_pct).toFixed(3).replace(/^0/, '') : '—'}
+                        highlight={Number(g.save_pct ?? 0) >= 0.93}
+                        bold
+                      />
+                      <span className="text-xs font-mono hidden sm:block" style={{ color: 'var(--text)' }}>
+                        {toiMin}:{toiSec} TOI
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 sm:gap-4 flex-1">
+                      <StatPill label="G" value={String(g.goals ?? 0)} highlight={Number(g.goals) > 0} />
+                      <StatPill label="A" value={String(g.assists ?? 0)} highlight={Number(g.assists) > 1} />
+                      <span className="text-xs font-mono hidden sm:block" style={{ color: 'var(--text)' }}>
+                        {toiMin}:{toiSec} TOI
+                      </span>
+                    </div>
+                  )}
+
+                  {/* HEAT number — skaters only */}
+                  {!isGoalie && (
+                    <div className="ml-auto flex-shrink-0 text-sm font-mono font-bold"
+                      style={{ color: heatRaw === 0 ? 'var(--text)' : heatColor }}>
+                      {heatRaw === 0 ? '—' : heatRaw}
+                    </div>
+                  )}
+                </div>
               );
-            })()}
-
-            {player.birth_country && (
-              <BioCell label="Birthplace"
-                value={player.birth_city ?? player.birth_country}
-                sub={[player.birth_state_province, player.birth_country].filter(Boolean).join(', ')} />
-            )}
-
-            {player.height_inches && (
-              <BioCell label="Height / Weight"
-                value={`${Math.floor(player.height_inches / 12)}′${player.height_inches % 12}″`}
-                sub={player.weight_pounds ? `${player.weight_pounds} lbs` : undefined} />
-            )}
-
-            {player.shoots_catches && (
-              <BioCell label={player.position_code === 'G' ? 'Catches' : 'Shoots'}
-                value={player.shoots_catches === 'L' ? 'Left' : 'Right'} />
-            )}
-
-            {player.draft_year && (
-              <BioCell label="Draft"
-                value={`${player.draft_year} · R${player.draft_round} · #${player.draft_pick}`}
-                sub={player.draft_team_abbrev ?? undefined} />
-            )}
-
-            {player.career_games && (
-              <BioCell label="Career"
-                value={`${player.career_points ?? 0} PTS`}
-                sub={`${player.career_games} GP · ${player.career_goals ?? 0}G ${player.career_assists ?? 0}A`} />
-            )}
+            })}
           </div>
         </div>
       )}
 
-      {/* ── AI: Bio / Character + Performance Eval ──────────────────────────────── */}
-      {(aiBio || aiPerfEval) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {aiBio && (
-            <div className="rounded-xl border p-4 flex flex-col gap-2"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--silver)' }}>
-                  Character
-                </span>
-                <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.4 }}>
-                  AI
-                </span>
+      {/* 6. Where he ranks (skaters only) ────────────────────────────────────── */}
+      {!isGoalie && ranked && (
+        <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <span className="text-xs font-semibold uppercase tracking-wider block mb-3" style={{ color: 'var(--text)' }}>
+            Where {player.first_name} ranks
+          </span>
+          <div className="flex flex-col gap-3">
+            {[
+              { label: 'Heat score', fill: Math.min(100, energyBar), rank: ranked.momentum_rank },
+              { label: 'PPM · momentum', fill: pct(momPpm, 0.15), rank: null },
+              { label: 'Goals · L5', fill: pct(momGoals / Math.max(1, momGames), 0.7), rank: null },
+              { label: 'Points · season', fill: pct(seaPpm, 0.15), rank: null },
+            ].map((row) => (
+              <div key={row.label} className="flex items-center gap-3">
+                <span className="text-xs w-40 flex-shrink-0" style={{ color: 'var(--text-bright)' }}>{row.label}</span>
+                <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                  <div className="h-full rounded-full" style={{ width: `${row.fill}%`, background: 'var(--heat)' }} />
+                </div>
+                {row.rank != null ? (
+                  <span className="w-12 text-right text-xs font-mono font-bold" style={{ color: 'var(--heat)' }}>
+                    #{row.rank}
+                  </span>
+                ) : (
+                  <span className="w-12" />
+                )}
               </div>
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--text-bright)' }}>
-                {aiBio}
-              </p>
-            </div>
-          )}
-          {aiPerfEval && (
-            <div className="rounded-xl border p-4 flex flex-col gap-2"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--neon)' }}>
-                  Performance
-                </span>
-                <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.4 }}>
-                  AI · Last 5 games
-                </span>
-              </div>
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--text-bright)' }}>
-                {aiPerfEval}
-              </p>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
       )}
 
-      {/* ── Season Statistics Table ─────────────────────────────────────────────── */}
+      {/* 7. Bio strip ─────────────────────────────────────────────────────────── */}
+      {(player.birth_date || player.height_inches || player.draft_year || player.career_games) && (() => {
+        const parts: { key: string; text: string }[] = [];
+        if (age) parts.push({ key: 'age', text: `Age ${age}` });
+        if (player.birth_city || player.birth_country) {
+          const place = [player.birth_city, player.birth_country].filter(Boolean).join(', ');
+          parts.push({ key: 'birth', text: place });
+        }
+        if (player.height_inches) {
+          const ft = Math.floor(player.height_inches / 12);
+          const inches = player.height_inches % 12;
+          const hw = `${ft}′${inches}″${player.weight_pounds ? ` ${player.weight_pounds} lbs` : ''}`;
+          parts.push({ key: 'hw', text: hw });
+        }
+        if (player.shoots_catches) {
+          const label = player.position_code === 'G' ? 'Catches' : 'Shoots';
+          parts.push({ key: 'shoots', text: `${label} ${player.shoots_catches === 'L' ? 'L' : 'R'}` });
+        }
+        if (player.draft_year) {
+          parts.push({ key: 'draft', text: `Draft ${player.draft_year} R${player.draft_round} #${player.draft_pick}${player.draft_team_abbrev ? ` ${player.draft_team_abbrev}` : ''}` });
+        }
+        if (player.career_games) {
+          parts.push({ key: 'career', text: `${player.career_games} GP · ${player.career_goals ?? 0}G ${player.career_assists ?? 0}A` });
+        }
+        return (
+          <p className="text-xs flex flex-wrap gap-x-2 gap-y-1" style={{ color: 'var(--text)' }}>
+            {parts.map((p, idx) => (
+              <span key={p.key} className="flex items-center gap-2">
+                {p.text}
+                {idx < parts.length - 1 && <span style={{ color: 'var(--border)' }}>·</span>}
+              </span>
+            ))}
+          </p>
+        );
+      })()}
+
+      {/* 8. AI editorial ─────────────────────────────────────────────────────── */}
+      {(() => {
+        const aiPerfRemainder = aiPerfEval
+          ? aiPerfEval.replace(/^[^.!?]+[.!?]\s*/, '').trim()
+          : '';
+        if (!aiBio && !aiPerfRemainder) return null;
+        return (
+          <div className="rounded-xl border p-5 flex flex-col gap-4"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            {aiBio && (
+              <div className="pl-4" style={{ borderLeft: '2px solid var(--heat)' }}>
+                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-bright)' }}>{aiBio}</p>
+              </div>
+            )}
+            {aiPerfRemainder && (
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>{aiPerfRemainder}</p>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* 9. Full season stats (de-emphasized) ────────────────────────────────── */}
       {isGoalie && goalieStats ? (
-        /* Goalie stats: GP, Record, SV%, GAA, SA, TOI/GP */
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-              Season Statistics
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)', opacity: 0.6 }}>
+              Full season stats
             </span>
           </div>
           <div className="overflow-x-auto">
@@ -512,11 +718,10 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           </div>
         </div>
       ) : seaGames > 0 ? (
-        /* Skater stats: G, A, PTS, +/-, PPG, shots, etc. */
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-              Season Statistics
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)', opacity: 0.6 }}>
+              Full season stats
             </span>
           </div>
           <div className="overflow-x-auto">
@@ -591,304 +796,144 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         </div>
       ) : null}
 
-      {/* ── Energy Bar ──────────────────────────────────────────────────────────── */}
-      <EnergyBar value={energyBar} leagueAvg={lgEnergy} />
-
-      {/* ── Radar + PPM timeline ────────────────────────────────────────────────── */}
-      {!isGoalie ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-                Technical Attribute Radar
-              </span>
-              <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text)' }}>
-                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--neon)' }} />Momentum</span>
-                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--text)' }} />Season</span>
-                {leagueAvgRadar && <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--amber)' }} />Lg Avg</span>}
-              </div>
-            </div>
-            <PlayerRadarChart momentum={momentumRadar} season={seasonRadar} leagueMax={leagueMax} leagueAvg={leagueAvgRadar} />
-          </div>
-          <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-                PPM Seasonal Evolution
-              </span>
-              {momPpm > seaPpm && (
-                <span className="text-xs px-2 py-0.5 rounded font-semibold"
-                  style={{ background: 'rgba(34,197,94,0.15)', color: 'var(--green)' }}>
-                  Current Peak
-                </span>
-              )}
-            </div>
-            <PPMTimeline snapshots={metricTimeline ?? []} leagueAvgPpm={leagueAvg?.seasonPpm} />
-          </div>
-        </div>
-      ) : (metricTimeline?.length ?? 0) > 0 && (
+      {/* 10. Momentum Radar (skaters only, full-width) ────────────────────────── */}
+      {!isGoalie && (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="px-4 pt-3 pb-1">
+          <div className="px-4 pt-3 pb-1 flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-              PPM Seasonal Evolution
+              Momentum Radar
             </span>
+            <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text)' }}>
+              <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--heat)' }} />Momentum</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--text)' }} />Season</span>
+              {leagueAvgRadar && <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--amber)' }} />Lg Avg</span>}
+            </div>
           </div>
-          <PPMTimeline snapshots={metricTimeline ?? []} leagueAvgPpm={leagueAvg?.seasonPpm} />
+          <PlayerRadarChart momentum={momentumRadar} season={seasonRadar} leagueMax={leagueMax} leagueAvg={leagueAvgRadar} />
         </div>
       )}
 
-      {/* ── Advanced Performance Matrix (skaters only) ───────────────────────── */}
-      {!isGoalie && <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-        <div className="px-4 py-3 border-b flex items-center justify-between"
-          style={{ borderColor: 'var(--border)' }}>
-          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-            Advanced Performance Matrix
-          </span>
-          <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text)' }}>
-            <span className="flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm" style={{ background: 'var(--silver)' }}/>Season</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm" style={{ background: 'var(--neon)' }}/>Momentum</span>
-            <span className="flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm" style={{ background: 'var(--amber)' }}/>League Avg</span>
+      {/* 11. Performance vs League (skaters only) ─────────────────────────────── */}
+      {!isGoalie && (
+        <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <div className="px-4 py-3 border-b flex items-center justify-between"
+            style={{ borderColor: 'var(--border)' }}>
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
+              Performance vs League
+            </span>
+            <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text)' }}>
+              <span className="flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm" style={{ background: 'var(--silver)' }}/>Season</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm" style={{ background: 'var(--heat)' }}/>Momentum</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm" style={{ background: 'var(--amber)' }}/>League Avg</span>
+            </div>
           </div>
-        </div>
 
-        {/* Mobile: stacked cards */}
-        <div className="md:hidden divide-y" style={{ borderColor: 'var(--border)' }}>
-          {perfMetrics.map((m, i) => {
-            const d = m.delta;
-            const trendColor = d > 2 ? 'var(--green)' : d < -2 ? 'var(--red)' : 'var(--text)';
-            const vl = m.vsLeague;
-            const vlColor = vl > 5 ? 'var(--green)' : vl < -5 ? 'var(--red)' : 'var(--text)';
-            const vlSign = vl > 0 ? '+' : '';
-            return (
-              <div key={m.label} className="px-4 py-3"
-                style={{ background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)', borderColor: 'var(--border)' }}>
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1 min-w-0 pr-2">
+          {/* Mobile: stacked cards */}
+          <div className="md:hidden divide-y" style={{ borderColor: 'var(--border)' }}>
+            {perfMetrics.map((m, i) => {
+              const d = m.delta;
+              const trendColor = d > 2 ? 'var(--green)' : d < -2 ? 'var(--red)' : 'var(--text)';
+              const vl = m.vsLeague;
+              const vlColor = vl > 5 ? 'var(--green)' : vl < -5 ? 'var(--red)' : 'var(--text)';
+              const vlSign = vl > 0 ? '+' : '';
+              return (
+                <div key={m.label} className="px-4 py-3"
+                  style={{ background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)', borderColor: 'var(--border)' }}>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0 pr-2">
+                      <span className="text-sm" style={{ color: 'var(--text-bright)' }}>{m.label}</span>
+                      <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text)' }}>
+                        Sea: {m.seaVal} · Avg: {m.lgVal}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="text-sm font-mono font-bold" style={{ color: 'var(--heat)' }}>{m.momVal}</span>
+                      <span className="text-xs font-mono font-semibold" style={{ color: vlColor }}>
+                        {Math.abs(vl) > 1 ? `${vlSign}${vl.toFixed(0)}%` : '≈'}
+                      </span>
+                      <span className="text-xs font-mono font-semibold" style={{ color: trendColor }}>
+                        {d > 2 ? '↑' : d < -2 ? '↓' : '—'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                      <div className="h-full rounded-full" style={{ width: `${m.seaFill}%`, background: 'var(--silver)' }} />
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                      <div className="h-full rounded-full transition-all" style={{ width: `${m.momFill}%`, background: 'var(--heat)' }} />
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                      <div className="h-full rounded-full" style={{ width: `${m.lgFill}%`, background: 'var(--amber)' }} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop: 5-column grid */}
+          <div className="hidden md:block">
+            <div className="grid text-xs font-semibold uppercase tracking-wide px-4 py-2 border-b"
+              style={{ gridTemplateColumns: '2fr 1fr 3fr 1fr 1fr', color: 'var(--text)', borderColor: 'var(--border)' }}>
+              <span>Metric</span>
+              <span>Momentum</span>
+              <span>Relative Performance</span>
+              <span className="text-right">vs League</span>
+              <span className="text-right">Trend</span>
+            </div>
+            {perfMetrics.map((m, i) => {
+              const d = m.delta;
+              const trendColor = d > 2 ? 'var(--green)' : d < -2 ? 'var(--red)' : 'var(--text)';
+              const trendSign = d > 0 ? '+' : '';
+              const vl = m.vsLeague;
+              const vlColor = vl > 5 ? 'var(--green)' : vl < -5 ? 'var(--red)' : 'var(--text)';
+              const vlSign = vl > 0 ? '+' : '';
+              return (
+                <div key={m.label}
+                  className="grid items-center px-4 py-3 border-b"
+                  style={{
+                    gridTemplateColumns: '2fr 1fr 3fr 1fr 1fr',
+                    borderColor: 'var(--border)',
+                    background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)',
+                  }}>
+                  <div>
                     <span className="text-sm" style={{ color: 'var(--text-bright)' }}>{m.label}</span>
                     <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text)' }}>
                       Sea: {m.seaVal} · Avg: {m.lgVal}
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-sm font-mono font-bold" style={{ color: 'var(--neon)' }}>{m.momVal}</span>
+                  <span className="text-sm font-mono font-bold" style={{ color: 'var(--heat)' }}>{m.momVal}</span>
+                  <div className="px-2 space-y-1">
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                      <div className="h-full rounded-full" style={{ width: `${m.seaFill}%`, background: 'var(--silver)' }} />
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                      <div className="h-full rounded-full transition-all"
+                        style={{ width: `${m.momFill}%`, background: 'var(--heat)' }} />
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                      <div className="h-full rounded-full"
+                        style={{ width: `${m.lgFill}%`, background: 'var(--amber)' }} />
+                    </div>
+                  </div>
+                  <div className="text-right">
                     <span className="text-xs font-mono font-semibold" style={{ color: vlColor }}>
-                      {Math.abs(vl) > 1 ? `${vlSign}${vl.toFixed(0)}%` : '≈'}
+                      {Math.abs(vl) > 1 ? `${vlSign}${vl.toFixed(0)}%` : '≈ avg'}
                     </span>
+                  </div>
+                  <div className="text-right">
                     <span className="text-xs font-mono font-semibold" style={{ color: trendColor }}>
-                      {d > 2 ? '↑' : d < -2 ? '↓' : '—'}
+                      {d > 2 ? '↑' : d < -2 ? '↓' : '—'} {Math.abs(d) > 1 ? `${trendSign}${d.toFixed(0)}%` : '0%'}
                     </span>
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-                    <div className="h-full rounded-full" style={{ width: `${m.seaFill}%`, background: 'var(--silver)' }} />
-                  </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-                    <div className="h-full rounded-full transition-all" style={{ width: `${m.momFill}%`, background: 'var(--neon)' }} />
-                  </div>
-                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-                    <div className="h-full rounded-full" style={{ width: `${m.lgFill}%`, background: 'var(--amber)' }} />
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Desktop: 5-column grid */}
-        <div className="hidden md:block">
-        <div className="grid text-xs font-semibold uppercase tracking-wide px-4 py-2 border-b"
-          style={{ gridTemplateColumns: '2fr 1fr 3fr 1fr 1fr', color: 'var(--text)', borderColor: 'var(--border)' }}>
-          <span>Metric</span>
-          <span>Momentum</span>
-          <span>Relative Performance</span>
-          <span className="text-right">vs League</span>
-          <span className="text-right">Trend</span>
-        </div>
-        {perfMetrics.map((m, i) => {
-          const d = m.delta;
-          const trendColor = d > 2 ? 'var(--green)' : d < -2 ? 'var(--red)' : 'var(--text)';
-          const trendSign = d > 0 ? '+' : '';
-          const vl = m.vsLeague;
-          const vlColor = vl > 5 ? 'var(--green)' : vl < -5 ? 'var(--red)' : 'var(--text)';
-          const vlSign = vl > 0 ? '+' : '';
-          return (
-            <div key={m.label}
-              className="grid items-center px-4 py-3 border-b"
-              style={{
-                gridTemplateColumns: '2fr 1fr 3fr 1fr 1fr',
-                borderColor: 'var(--border)',
-                background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)',
-              }}>
-              <div>
-                <span className="text-sm" style={{ color: 'var(--text-bright)' }}>{m.label}</span>
-                <div className="text-xs font-mono mt-0.5" style={{ color: 'var(--text)' }}>
-                  Sea: {m.seaVal} · Avg: {m.lgVal}
-                </div>
-              </div>
-              <span className="text-sm font-mono font-bold" style={{ color: 'var(--neon)' }}>{m.momVal}</span>
-              <div className="px-2 space-y-1">
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-                  <div className="h-full rounded-full" style={{ width: `${m.seaFill}%`, background: 'var(--silver)' }} />
-                </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-                  <div className="h-full rounded-full transition-all"
-                    style={{ width: `${m.momFill}%`, background: 'var(--neon)' }} />
-                </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-                  <div className="h-full rounded-full"
-                    style={{ width: `${m.lgFill}%`, background: 'var(--amber)' }} />
-                </div>
-              </div>
-              <div className="text-right">
-                <span className="text-xs font-mono font-semibold" style={{ color: vlColor }}>
-                  {Math.abs(vl) > 1 ? `${vlSign}${vl.toFixed(0)}%` : '≈ avg'}
-                </span>
-              </div>
-              <div className="text-right">
-                <span className="text-xs font-mono font-semibold" style={{ color: trendColor }}>
-                  {d > 2 ? '↑' : d < -2 ? '↓' : '—'} {Math.abs(d) > 1 ? `${trendSign}${d.toFixed(0)}%` : '0%'}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-        </div>{/* desktop grid */}
-      </div>}{/* end !isGoalie Advanced Performance Matrix */}
-
-      {/* ── Recent Games Log ───────────────────────────────────────────────────── */}
-      {(recentGames?.length ?? 0) > 0 && (
-        <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
-          <div className="px-4 py-3 border-b flex items-center justify-between"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-              Recent Games Log
-            </span>
-            <span className="text-xs" style={{ color: 'var(--text)' }}>Last {recentGames?.length} games</span>
-          </div>
-
-          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            {(recentGames ?? []).slice(0, 10).map((g: any, i: number) => {
-              const game = g.games;
-              const isHome = player.team_id === game?.home_team_id;
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const opponentAbbrev = isHome ? (game?.away_team as any)?.abbrev : (game?.home_team as any)?.abbrev;
-              const teamScore    = isHome ? game?.home_score : game?.away_score;
-              const oppScore     = isHome ? game?.away_score : game?.home_score;
-              const hasResult    = teamScore !== null && oppScore !== null;
-              const won          = hasResult && teamScore > oppScore;
-              const lost         = hasResult && teamScore < oppScore;
-              const toiMin       = Math.floor(Number(g.toi_seconds ?? 0) / 60);
-              const toiSec       = String(Number(g.toi_seconds ?? 0) % 60).padStart(2, '0');
-              const gameDate     = String(game?.game_date ?? '').slice(5);
-
-              // Goalie decision parsing
-              const dec = g.decision ?? null;
-              const decIsWin = dec === 'W' || dec === 'SOW';
-              const decIsLoss = dec === 'L';
-              const decIsOT = dec === 'O' || dec === 'OT' || dec === 'SOL';
-
-              return (
-                <div key={i} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3"
-                  style={{ background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)' }}>
-
-                  {/* Date + opponent */}
-                  <div className="flex-shrink-0 w-16 sm:w-28">
-                    {opponentAbbrev && (
-                      <div className="text-xs mb-0.5" style={{ color: 'var(--text)' }}>
-                        {isHome ? 'VS' : '@'} {opponentAbbrev}
-                      </div>
-                    )}
-                    <div className="text-xs font-mono" style={{ color: 'var(--text)' }}>{gameDate || '—'}</div>
-                  </div>
-
-                  {/* Result badge */}
-                  {hasResult ? (
-                    <div className="flex items-center gap-1.5 flex-shrink-0 w-20 sm:w-24">
-                      <span className="text-xs font-bold px-1.5 py-0.5 rounded"
-                        style={{
-                          background: won ? 'rgba(34,197,94,0.15)' : lost ? 'rgba(239,68,68,0.15)' : 'rgba(160,174,192,0.1)',
-                          color: won ? 'var(--green)' : lost ? 'var(--red)' : 'var(--text)',
-                        }}>
-                        {won ? 'WIN' : lost ? 'LOSS' : 'OT'}
-                      </span>
-                      <span className="text-sm font-mono font-bold" style={{ color: 'var(--text-bright)' }}>
-                        {teamScore}–{oppScore}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="w-20 sm:w-24" />
-                  )}
-
-                  {isGoalie ? (
-                    /* Goalie stats: Decision, SA, GA, SV%, TOI */
-                    <div className="flex items-center gap-2 sm:gap-4 flex-1">
-                      {dec && (
-                        <div className="flex flex-col items-center min-w-[2rem]">
-                          <span className="text-xs font-bold px-1.5 py-0.5 rounded"
-                            style={{
-                              background: decIsWin ? 'rgba(34,197,94,0.15)' : decIsLoss ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
-                              color: decIsWin ? 'var(--green)' : decIsLoss ? 'var(--red)' : 'var(--amber)',
-                            }}>
-                            {decIsWin ? 'W' : decIsLoss ? 'L' : 'OT'}
-                          </span>
-                          <span className="text-xs" style={{ color: 'var(--text)' }}>DEC</span>
-                        </div>
-                      )}
-                      <StatPill label="SA" value={String(g.shots_against ?? 0)} />
-                      <StatPill label="GA" value={String(g.goals_against ?? 0)} highlight={Number(g.goals_against) === 0} />
-                      <StatPill
-                        label="SV%"
-                        value={g.save_pct != null ? Number(g.save_pct).toFixed(3).replace(/^0/, '') : '—'}
-                        highlight={Number(g.save_pct ?? 0) >= 0.93}
-                        bold
-                      />
-                      <span className="text-xs font-mono hidden sm:block" style={{ color: 'var(--text)' }}>
-                        {toiMin}:{toiSec} TOI
-                      </span>
-                    </div>
-                  ) : (
-                    /* Skater stats: G, A, PTS, +/-, PIM, TOI */
-                    <div className="flex items-center gap-2 sm:gap-4 flex-1">
-                      <StatPill label="G" value={String(g.goals ?? 0)} highlight={Number(g.goals) > 0} />
-                      <StatPill label="A" value={String(g.assists ?? 0)} highlight={Number(g.assists) > 1} />
-                      <StatPill label="PTS" value={String(Number(g.goals ?? 0) + Number(g.assists ?? 0))} highlight={Number(g.goals ?? 0) + Number(g.assists ?? 0) > 1} bold />
-                      {g.plus_minus !== undefined && g.plus_minus !== null && (
-                        <StatPill label="+/-" value={`${Number(g.plus_minus) > 0 ? '+' : ''}${g.plus_minus}`}
-                          highlight={Number(g.plus_minus) > 0} />
-                      )}
-                      {Number(g.pim ?? 0) > 0 && (
-                        <StatPill label="PIM" value={String(g.pim)} />
-                      )}
-                      <span className="text-xs font-mono hidden sm:block" style={{ color: 'var(--text)' }}>
-                        {toiMin}:{toiSec} TOI
-                      </span>
-                    </div>
-                  )}
-
-                  {/* PPM badge — skaters only */}
-                  {!isGoalie && g.points_per_minute !== null && g.points_per_minute !== undefined && (
-                    <div className="hidden sm:block flex-shrink-0 text-xs font-mono px-2 py-1 rounded"
-                      style={{ background: 'rgba(59,130,246,0.1)', color: 'var(--neon)', border: '1px solid rgba(59,130,246,0.2)' }}>
-                      PPM: {Number(g.points_per_minute).toFixed(2)}
-                    </div>
-                  )}
                 </div>
               );
             })}
           </div>
         </div>
       )}
-    </div>
-  );
-}
 
-function BioCell({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return (
-    <div className="px-4 py-3 flex flex-col gap-0.5" style={{ borderColor: 'var(--border)' }}>
-      <span className="text-xs uppercase tracking-wider" style={{ color: 'var(--text)' }}>{label}</span>
-      <span className="text-sm font-semibold font-mono" style={{ color: 'var(--text-bright)' }}>{value}</span>
-      {sub && <span className="text-xs" style={{ color: 'var(--text)' }}>{sub}</span>}
     </div>
   );
 }
