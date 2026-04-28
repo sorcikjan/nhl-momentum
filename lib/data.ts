@@ -11,9 +11,16 @@ export function teamLogoUrl(abbrev: string) {
   return `https://assets.nhle.com/logos/nhl/svg/${abbrev}_light.svg`;
 }
 
+let _modelVersionCache: { version: string; ts: number } | null = null;
+let _playoffTeamsCache: { teams: Set<number>; ts: number } | null = null;
+
 // Returns the active model version string.
-// Used to pin all UI prediction queries to the current active model.
+// Module-level cache avoids a DB round trip on every request that touches predictions.
 async function latestModelVersion(): Promise<string> {
+  const now = Date.now();
+  if (_modelVersionCache && now - _modelVersionCache.ts < 5 * 60_000) {
+    return _modelVersionCache.version;
+  }
   const { data } = await supabaseAdmin
     .from('model_versions')
     .select('version')
@@ -21,7 +28,9 @@ async function latestModelVersion(): Promise<string> {
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
-  return data?.version ?? 'v1.7';
+  const version = data?.version ?? 'v1.7';
+  _modelVersionCache = { version, ts: now };
+  return version;
 }
 
 // ─── League Averages ──────────────────────────────────────────────────────────
@@ -174,33 +183,45 @@ export async function fetchRankings() {
 
   // Step 1: last game_id per player.
   // Chunked into groups of 50 × limit 250 = safely under Supabase's 1000-row cap.
-  // Covers ~5 recent game-days per player — enough for any active player.
-  // Injured players who don't appear fall back to teamGids.length in step 3.
+  // All chunks fire in parallel alongside the recentTeamGames query (step 2).
   const lastGameIdByPlayer = new Map<number, number>();
   const STAT_CHUNK = 50;
+  const sinceDate = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
+
+  const chunkPromises = [];
   for (let ci = 0; ci < allSkaterIds.length; ci += STAT_CHUNK) {
     const chunk = allSkaterIds.slice(ci, ci + STAT_CHUNK);
-    const { data: chunkStats } = await supabaseAdmin
-      .from('game_player_stats')
-      .select('player_id, game_id')
-      .in('player_id', chunk)
-      .order('game_id', { ascending: false })
-      .limit(chunk.length * 5);
-    for (const row of chunkStats ?? []) {
+    chunkPromises.push(
+      (async () => {
+        const { data } = await supabaseAdmin
+          .from('game_player_stats')
+          .select('player_id, game_id')
+          .in('player_id', chunk)
+          .order('game_id', { ascending: false })
+          .limit(chunk.length * 5);
+        return data ?? [];
+      })()
+    );
+  }
+
+  // Step 2: recent completed games for all teams — run in parallel with step 1 chunks.
+  // NOTE: the games table PK is `id`, not `game_id`.
+  const [allChunkData, { data: recentTeamGames }] = await Promise.all([
+    Promise.all(chunkPromises),
+    supabaseAdmin
+      .from('games')
+      .select('id, game_date, home_team_id, away_team_id')
+      .in('game_state', ['FINAL', 'OFF'])
+      .gte('game_date', sinceDate)
+      .order('id', { ascending: false })
+      .limit(700),
+  ]);
+
+  for (const chunkStats of allChunkData) {
+    for (const row of chunkStats) {
       if (!lastGameIdByPlayer.has(row.player_id)) lastGameIdByPlayer.set(row.player_id, row.game_id);
     }
   }
-
-  // Step 2: recent completed games for all teams (last ~45 days covers 15+ games per team).
-  // NOTE: the games table PK is `id`, not `game_id`.
-  const sinceDate = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
-  const { data: recentTeamGames } = await supabaseAdmin
-    .from('games')
-    .select('id, game_date, home_team_id, away_team_id')
-    .in('game_state', ['FINAL', 'OFF'])
-    .gte('game_date', sinceDate)
-    .order('id', { ascending: false })
-    .limit(700);
 
   // Group games by team_id
   const teamGameIds = new Map<number, number[]>(); // team_id → sorted game_ids desc
@@ -497,12 +518,17 @@ export interface SeriesInfo {
 }
 
 export async function fetchPlayoffActiveTeams(): Promise<Set<number>> {
+  const now = Date.now();
+  if (_playoffTeamsCache && now - _playoffTeamsCache.ts < 5 * 60_000) {
+    return _playoffTeamsCache.teams;
+  }
   const { data } = await supabaseAdmin
     .from('games').select('id, home_team_id, away_team_id').eq('game_state', 'FUT').limit(300);
   const active = new Set<number>();
   for (const g of data ?? []) {
     if (isPlayoffGameId(g.id)) { active.add(g.home_team_id); active.add(g.away_team_id); }
   }
+  _playoffTeamsCache = { teams: active, ts: now };
   return active;
 }
 

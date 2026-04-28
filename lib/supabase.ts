@@ -1,25 +1,28 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
+let _anonClient: SupabaseClient | null = null;
+let _adminClient: SupabaseClient | null = null;
+
 function getClient(): SupabaseClient {
+  if (_anonClient) return _anonClient;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
   if (!url || !anonKey) {
     throw new Error('Missing Supabase env vars: NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY');
   }
-
-  return createClient(url, anonKey);
+  _anonClient = createClient(url, anonKey);
+  return _anonClient;
 }
 
 function getAdminClient(): SupabaseClient {
+  if (_adminClient) return _adminClient;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
   if (!url || !serviceKey) {
     throw new Error('Missing Supabase admin env vars: NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY');
   }
-
-  return createClient(url, serviceKey, { auth: { persistSession: false } });
+  _adminClient = createClient(url, serviceKey, { auth: { persistSession: false } });
+  return _adminClient;
 }
 
 export const supabase = {
