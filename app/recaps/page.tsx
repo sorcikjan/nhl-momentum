@@ -6,15 +6,15 @@ import { recapUrl } from '@/lib/urls';
 export const revalidate = 3600;
 
 export const metadata: Metadata = {
-  title: 'NHL Daily Recaps',
-  description: 'Daily NHL game recaps with momentum analytics — top performers, model predictions, and data-driven stories from every night of hockey.',
+  title: 'Last Night — NHL Stories',
+  description: 'Data-driven stories from every NHL game night — top performers, momentum analytics, and how our model did.',
   openGraph: {
-    title: 'NHL Daily Recaps — Hockey Momentum',
-    description: 'Daily NHL game recaps with momentum analytics, top performers, and prediction accuracy.',
+    title: 'Last Night — Hockey Momentum',
+    description: 'Data-driven stories from every NHL game night — top performers, momentum analytics, and prediction accuracy.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'NHL Daily Recaps — Hockey Momentum',
+    title: 'Last Night — Hockey Momentum',
     description: 'Data-driven stories from every NHL game night — top performers, predictions, and momentum analytics.',
   },
 };
@@ -26,10 +26,10 @@ export default async function RecapsPage() {
     <div className="max-w-3xl mx-auto pb-20 md:pb-0">
       <div className="mb-8">
         <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-bright)' }}>
-          NHL Daily Recaps
+          Last Night.
         </h1>
         <p className="text-sm" style={{ color: 'var(--text)' }}>
-          Data-driven recaps of every NHL night — top performers, momentum analytics, and how our model did.
+          Data-driven stories from every NHL game night — top performers, momentum analytics, and how our model did.
         </p>
       </div>
 

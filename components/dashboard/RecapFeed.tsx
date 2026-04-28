@@ -184,7 +184,6 @@ export default function RecapFeed({ recaps }: { recaps: Recap[] }) {
   const [hero, ...stories] = recaps;
   const rest = stories.slice(0, 4);
 
-  const dayName = formatDayName(hero.date);
   const dateSubtitle = formatRecapDate(hero.date);
 
   return (
@@ -194,7 +193,7 @@ export default function RecapFeed({ recaps }: { recaps: Recap[] }) {
       <div className="flex items-end justify-between">
         <div>
           <h2 className="font-editorial font-bold" style={{ fontSize: '2rem', color: 'var(--text-bright)', lineHeight: 1.1 }}>
-            {dayName}.
+            Last night.
           </h2>
           <p className="text-xs mt-0.5" style={{ color: 'var(--silver)', opacity: 0.5 }}>
             {dateSubtitle}{hero.games_count ? ` · ${hero.games_count} games` : ''}

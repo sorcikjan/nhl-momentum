@@ -108,7 +108,7 @@ export default function DailyBrandStrip({ topPlayer, gameCount }: Props) {
               STORIES
             </div>
             <div className="text-xs whitespace-nowrap" style={{ color: 'var(--text-bright)' }}>
-              All recaps →
+              Last night →
             </div>
           </div>
         </a>

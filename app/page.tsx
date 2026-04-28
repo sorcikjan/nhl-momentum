@@ -333,7 +333,7 @@ export default function DashboardPage() {
             className="rounded-xl border p-4 hover:opacity-90 transition-opacity group"
             style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
             <div className="text-lg mb-1">📰</div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Daily Recaps</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Last Night</p>
             <p className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
               Data-backed stories from every game night
             </p>
