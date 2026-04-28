@@ -51,7 +51,7 @@ export default function DailyBrandStrip({ topPlayer, gameCount }: Props) {
       </div>
 
       {/* ── Story hooks bar ────────────────────────────────────────────────────── */}
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
 
         {topPlayer && (
           <a href="/rankings"

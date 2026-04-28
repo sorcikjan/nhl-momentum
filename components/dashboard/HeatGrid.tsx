@@ -387,8 +387,8 @@ export default function HeatGrid({
               onClick={() => setTab(key)}
               className="text-xs px-2.5 py-1 rounded-full font-semibold transition-colors"
               style={{
-                background: tab === key ? 'var(--neon)' : 'var(--bg-card)',
-                color: tab === key ? '#000' : 'var(--text)',
+                background: tab === key ? 'var(--heat)' : 'var(--bg-card)',
+                color: tab === key ? '#fff' : 'var(--text)',
                 border: '1px solid var(--border)',
                 cursor: 'pointer',
               }}
@@ -399,15 +399,15 @@ export default function HeatGrid({
         </div>
       </div>
 
-      {/* Card grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-        {tab === 'skaters' && skaters.slice(0, 16).map((p, i) => (
+      {/* Card grid — 2 cols on mobile, 4 on sm+ */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {tab === 'skaters' && skaters.slice(0, 8).map((p, i) => (
           <SkaterCard key={p.player_id} p={p} rank={i + 1} />
         ))}
-        {tab === 'goalies' && goalies.map((g, i) => (
+        {tab === 'goalies' && goalies.slice(0, 8).map((g, i) => (
           <GoalieCard key={g.id} g={g} rank={i + 1} />
         ))}
-        {tab === 'newcomers' && newcomers.map((p, i) => (
+        {tab === 'newcomers' && newcomers.slice(0, 8).map((p, i) => (
           <NewcomerCard key={p.player_id} p={p} rank={i + 1} />
         ))}
       </div>
