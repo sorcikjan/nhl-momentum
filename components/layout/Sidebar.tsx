@@ -7,6 +7,7 @@ const NAV = [
   { href: '/',           label: 'Home',        icon: '◈' },
   { href: '/games',      label: 'Games',       icon: '🏒' },
   { href: '/playoffs',   label: 'Playoffs',    icon: '🏆' },
+  { href: '/hot',        label: 'Hot',         icon: '🔥' },
   { href: '/rankings',   label: 'Rankings',    icon: '⚡' },
   { href: '/teams',      label: 'Teams',       icon: '🛡' },
   { href: '/recaps',     label: 'Last Night',  icon: '📰' },
@@ -39,7 +40,7 @@ const NAV_MOBILE = [
     ),
   },
   {
-    href: '/rankings',
+    href: '/hot',
     label: 'Hot',
     svg: (
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
@@ -124,19 +125,14 @@ export default function Sidebar() {
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex border-t"
         style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-        {NAV_MOBILE.map(item => {
-          const active = path === item.href && item.label !== 'Ranks';
-          const activeRanks = item.label === 'Ranks' && path === '/rankings';
-          const isActive = active || activeRanks;
-          return (
-            <Link key={item.label} href={item.href}
-              className="flex-1 flex flex-col items-center py-3 text-xs font-medium transition-colors gap-0.5"
-              style={{ color: isActive ? 'var(--heat)' : 'var(--text)' }}>
-              {item.svg}
-              {item.label}
-            </Link>
-          );
-        })}
+        {NAV_MOBILE.map(item => (
+          <Link key={item.label} href={item.href}
+            className="flex-1 flex flex-col items-center py-3 text-xs font-medium transition-colors gap-0.5"
+            style={{ color: path === item.href ? 'var(--heat)' : 'var(--text)' }}>
+            {item.svg}
+            {item.label}
+          </Link>
+        ))}
       </nav>
     </>
   );

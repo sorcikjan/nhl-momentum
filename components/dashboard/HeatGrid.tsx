@@ -359,10 +359,12 @@ export default function HeatGrid({
   skaters,
   goalies,
   newcomers,
+  limit = 8,
 }: {
   skaters: SkaterPlayer[];
   goalies: GoaliePlayer[];
   newcomers: NewcomerPlayer[];
+  limit?: number;
 }) {
   const [tab, setTab] = useState<Tab>('skaters');
   const { title, sub } = HEADLINES[tab];
@@ -401,13 +403,13 @@ export default function HeatGrid({
 
       {/* Card grid — 2 cols on mobile, 4 on sm+ */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {tab === 'skaters' && skaters.slice(0, 8).map((p, i) => (
+        {tab === 'skaters' && skaters.slice(0, limit).map((p, i) => (
           <SkaterCard key={p.player_id} p={p} rank={i + 1} />
         ))}
-        {tab === 'goalies' && goalies.slice(0, 8).map((g, i) => (
+        {tab === 'goalies' && goalies.slice(0, limit).map((g, i) => (
           <GoalieCard key={g.id} g={g} rank={i + 1} />
         ))}
-        {tab === 'newcomers' && newcomers.slice(0, 8).map((p, i) => (
+        {tab === 'newcomers' && newcomers.slice(0, limit).map((p, i) => (
           <NewcomerCard key={p.player_id} p={p} rank={i + 1} />
         ))}
       </div>
