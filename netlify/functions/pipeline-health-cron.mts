@@ -56,6 +56,23 @@ export default async function handler() {
     energy:      (checks.energy     as Record<string, unknown>)?.playersWithEnergy,
     recaps:      (checks.recaps     as Record<string, unknown>)?.newest,
   }));
+
+  // Self-heal: if recap is missing, kick off generation via background worker.
+  // This is a fourth safety net after the 08:00, 09:30, and 10:00 UTC attempts.
+  const recapMissing = issues.some(i => i.startsWith('RECAPS: no recap for yesterday'));
+  if (recapMissing) {
+    console.log('[pipeline-health-cron] auto-fix: triggering recap generation');
+    try {
+      await fetch(`${base}/.netlify/functions/daily-worker-background`, {
+        method: 'POST',
+        headers: { 'x-api-key': ingestKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phases: ['recap'] }),
+      });
+      console.log('[pipeline-health-cron] auto-fix: recap background worker triggered');
+    } catch (err) {
+      console.error('[pipeline-health-cron] auto-fix: failed to trigger recap:', err);
+    }
+  }
 }
 
 export const config: Config = {

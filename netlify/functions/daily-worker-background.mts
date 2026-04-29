@@ -210,8 +210,9 @@ const handler: BackgroundHandler = async (event) => {
   // 9. Daily recap article — generated after outcomes/gamelogs are fresh
   if (phases.includes('recap')) {
     try {
-      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-      const r = await call(`${base}/api/ingest/recap?date=${yesterday}`, h, RECAP_TIMEOUT_MS);
+      // Respect explicit date param (for manual backfills); fall back to yesterday.
+      const recapDate = dateParam || new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const r = await call(`${base}/api/ingest/recap?date=${recapDate}`, h, RECAP_TIMEOUT_MS);
       log.push(`recap: ${r.data?.skipped ? `skipped (${r.data.reason})` : r.data?.title ?? `err: ${r.error}`}`);
     } catch (e) { log.push(`recap: exception ${e}`); }
   }
