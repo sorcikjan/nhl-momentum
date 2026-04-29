@@ -19,7 +19,7 @@ function getClient() {
 
 // Retry with exponential backoff for transient 503 / 429 errors.
 // gemini-2.5-flash occasionally returns 503 during high-demand periods.
-export async function ask(prompt: string, maxRetries = 3): Promise<string | null> {
+export async function ask(prompt: string, maxRetries = 3, options: { json?: boolean } = {}): Promise<string | null> {
   const client = getClient();
   if (!client) { console.error('[ai] ask: GEMINI_API_KEY not set'); return null; }
 
@@ -28,7 +28,10 @@ export async function ask(prompt: string, maxRetries = 3): Promise<string | null
   const models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
 
   for (const modelName of models) {
-    const model = client.getGenerativeModel({ model: modelName });
+    const model = client.getGenerativeModel({
+      model: modelName,
+      ...(options.json ? { generationConfig: { responseMimeType: 'application/json' } } : {}),
+    });
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         const result = await model.generateContent(prompt);
@@ -409,26 +412,31 @@ Respond with valid JSON (no markdown, no code blocks):
   "content": "[lede paragraph]\\n\\n[optional second lede paragraph]\\n\\n### {AWAY} {score} @ {HOME} {score}\\n\\n[paragraph 1 — game story]\\n\\n[paragraph 2 — analytics]\\n\\n[repeat for each game]\\n\\n### Momentum Watch\\n\\n[paragraph]\\n\\n### Looking Ahead\\n\\n[paragraph]"
 }`;
 
-  const raw = await ask(prompt);
+  // json: true forces Gemini to return valid JSON without code fences or literal newlines in strings
+  const raw = await ask(prompt, 3, { json: true });
   if (!raw) return null;
 
   try {
-    // Extract JSON from the response — handles code fences and preamble text
-    const jsonStart = raw.indexOf('{');
-    const jsonEnd = raw.lastIndexOf('}');
+    // Strip markdown code fences first (defensive — json mode should prevent these)
+    const stripped = raw.trim()
+      .replace(/^```json\s*/im, '').replace(/^```\s*/im, '').replace(/\s*```\s*$/im, '').trim();
+    const jsonStart = stripped.indexOf('{');
+    const jsonEnd = stripped.lastIndexOf('}');
     const cleaned = jsonStart !== -1 && jsonEnd > jsonStart
-      ? raw.slice(jsonStart, jsonEnd + 1)
-      : raw.replace(/^```json\s*/im, '').replace(/^```\s*/im, '').replace(/```\s*$/im, '').trim();
+      ? stripped.slice(jsonStart, jsonEnd + 1)
+      : stripped;
     const parsed = JSON.parse(cleaned) as DailyRecapOutput;
     if (!parsed.title || !parsed.content) return null;
     return parsed;
   } catch {
-    // Fallback: treat whole response as content
-    const lines = raw.trim().split('\n');
+    // Fallback: treat whole response as content, stripping any code fence header
+    const stripped = raw.trim()
+      .replace(/^```json\s*/im, '').replace(/^```\s*/im, '').replace(/\s*```\s*$/im, '').trim();
+    const lines = stripped.split('\n');
     return {
       title: lines[0]?.replace(/^#+\s*/, '').slice(0, 100) ?? `NHL Recap — ${input.dateLabel}`,
       summary: lines[1]?.slice(0, 160) ?? '',
-      content: raw,
+      content: stripped,
     };
   }
 }
