@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import React from 'react';
+import React, { cache, Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { fetchRecap, fetchRecapData, teamLogoUrl } from '@/lib/data';
@@ -7,12 +7,14 @@ import { recapUrl, gameUrl, playerUrl, teamUrl } from '@/lib/urls';
 
 export const revalidate = 3600;
 
+// Deduplicate fetchRecap between generateMetadata and the page component.
+const cachedFetchRecap = cache((date: string) => fetchRecap(date).catch(() => null));
 
 export async function generateMetadata(
   { params }: { params: Promise<{ date: string; slug: string }> }
 ): Promise<Metadata> {
   const { date } = await params;
-  const recap = await fetchRecap(date).catch(() => null);
+  const recap = await cachedFetchRecap(date);
   if (!recap) return { title: 'NHL Recap' };
 
   const dateLabel = new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', {
@@ -348,23 +350,11 @@ function GameCard({ game, pred, gUrl, seriesContext }: { game: any; pred: any; g
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Article body (streaming) ─────────────────────────────────────────────────
 
-export default async function RecapSlugPage({ params }: { params: Promise<{ date: string; slug: string }> }) {
-  const { date } = await params;
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) notFound();
-
-  const [recap, raw] = await Promise.all([
-    fetchRecap(date).catch(() => null),
-    fetchRecapData(date).catch(() => null),
-  ]);
-
-  if (!recap) notFound();
-
-  const dateLabel = new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', {
-    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-  });
+async function ArticleBody({ date, content }: { date: string; content: string }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = await fetchRecapData(date).catch(() => null);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const games = (raw?.games ?? []) as any[];
@@ -375,8 +365,7 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const gameByTeams = new Map<string, any>();
   for (const g of games) {
-    const key = `${g.away_team?.abbrev}:${g.home_team?.abbrev}`;
-    gameByTeams.set(key, g);
+    gameByTeams.set(`${g.away_team?.abbrev}:${g.home_team?.abbrev}`, g);
   }
 
   // Build player data map — keyed by full name (lowercase) AND last name (lowercase)
@@ -397,10 +386,8 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
       teamAbbrev: p.teams?.abbrev ?? '',
       surge,
     };
-    // Full name key (primary match for AI-generated text with full names)
     const fullName = `${p.players.first_name ?? ''} ${p.players.last_name}`.trim().toLowerCase();
     if (fullName) playerData.set(fullName, data);
-    // Last name key (fallback for older articles or when AI uses last name only)
     playerData.set(p.players.last_name.toLowerCase(), data);
   }
 
@@ -413,13 +400,196 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
       teamLinks.set(g.home_team.abbrev, teamUrl(g.home_team.id, g.home_team.name ?? g.home_team.abbrev));
   }
 
-  const sections = parseArticle(recap.content);
+  const sections = parseArticle(content);
 
-  // Find first game section — used for hero overlay
-  const firstGameSection = sections.find(s => s.type === 'section' && s.awayAbbrev && s.homeAbbrev);
-  const featuredGame = firstGameSection
-    ? gameByTeams.get(`${firstGameSection.awayAbbrev}:${firstGameSection.homeAbbrev}`)
-    : games[0];
+  return (
+    <>
+      <article className="mb-10">
+        {sections.map((section, i) => {
+          if (section.type === 'paragraph') {
+            return section.bodies.map((body, bi) => (
+              <p key={`${i}-${bi}`} className="text-sm leading-relaxed mb-5"
+                style={{ color: i === 0 && bi === 0 ? 'var(--text-bright)' : 'var(--text)' }}>
+                {linkifyText(body, playerData, teamLinks)}
+              </p>
+            ));
+          }
+
+          const isGameSection = !!(section.awayAbbrev && section.homeAbbrev);
+          const gameKey = isGameSection ? `${section.awayAbbrev}:${section.homeAbbrev}` : null;
+          const game = gameKey ? gameByTeams.get(gameKey) : null;
+          const pred = game ? raw?.predMap?.get(game.id) : null;
+          const seriesContext = game ? raw?.seriesMap?.get(game.id) : undefined;
+          const gUrl = game
+            ? gameUrl(game.id, game.away_team?.abbrev ?? '', game.home_team?.abbrev ?? '', game.game_date)
+            : '#';
+
+          return (
+            <div key={i} className="mb-12">
+              <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', marginBottom: '1.25rem' }}>
+                {!isGameSection && (
+                  <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-bright)' }}>
+                    {section.header}
+                  </h2>
+                )}
+              </div>
+
+              {/* 1. GameCard first — acts as the section headline */}
+              {isGameSection && game && (
+                <GameCard game={game} pred={pred} gUrl={gUrl} seriesContext={seriesContext} />
+              )}
+              {isGameSection && !game && (
+                <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-bright)' }}>
+                  {section.header}
+                </h2>
+              )}
+
+              {/* 2. Prose paragraphs below the card */}
+              {section.bodies.map((body, bi) => (
+                <p key={bi} className="text-sm leading-relaxed mb-4" style={{ color: 'var(--text)' }}>
+                  {linkifyText(body, playerData, teamLinks)}
+                </p>
+              ))}
+            </div>
+          );
+        })}
+      </article>
+
+      {/* Top performers of the day */}
+      {topPerformers.length > 0 && (
+        <div className="rounded-xl border p-4 mb-8" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--neon)' }}>
+            Top performers of the day
+          </h2>
+          <div className="flex flex-col gap-2">
+            {topPerformers.slice(0, 6).map((p, i: number) => {
+              const pts = (p.goals ?? 0) + (p.assists ?? 0);
+              const sign = (n: number) => n >= 0 ? `+${n}` : String(n);
+              const snap = p.snapshot;
+              const surge = snap?.momentum_ppm && snap?.season_ppm && snap.season_ppm > 0
+                ? ((snap.momentum_ppm - snap.season_ppm) / snap.season_ppm * 100)
+                : null;
+              return (
+                <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-xl"
+                  style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                  {/* Rank */}
+                  <span className="text-xs font-mono font-bold w-4 text-center flex-shrink-0"
+                    style={{ color: 'var(--neon)' }}>{i + 1}</span>
+
+                  {/* Headshot */}
+                  {p.players?.headshot_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.players.headshot_url}
+                      alt={`${p.players?.first_name} ${p.players?.last_name}`}
+                      className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                      style={{ border: '2px solid var(--border)' }}
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold"
+                      style={{ background: 'var(--bg-card)', color: 'var(--text)', border: '2px solid var(--border)' }}>
+                      {p.players?.first_name?.[0]}{p.players?.last_name?.[0]}
+                    </div>
+                  )}
+
+                  {/* Name + team */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <Link
+                        href={playerUrl(p.player_id, p.players?.first_name ?? '', p.players?.last_name ?? '')}
+                        className="text-sm font-semibold hover:underline leading-tight"
+                        style={{ color: 'var(--text-bright)' }}>
+                        {p.players?.first_name} {p.players?.last_name}
+                      </Link>
+                      <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.5 }}>·</span>
+                      <span className="text-xs" style={{ color: 'var(--text)' }}>{p.players?.position_code}</span>
+                    </div>
+                    {/* Team with logo */}
+                    <div className="flex items-center gap-1 mt-0.5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={teamLogoUrl(p.teams?.abbrev ?? '')} alt={p.teams?.abbrev ?? ''} className="w-3.5 h-3.5" />
+                      {p.teams?.id ? (
+                        <Link
+                          href={teamUrl(p.teams.id, p.teams.name ?? p.teams.abbrev)}
+                          className="text-xs hover:underline"
+                          style={{ color: 'var(--neon)' }}>
+                          {p.teams?.abbrev}
+                        </Link>
+                      ) : (
+                        <span className="text-xs" style={{ color: 'var(--text)' }}>{p.teams?.abbrev}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="text-right flex-shrink-0">
+                    <div className="text-sm font-mono font-semibold" style={{ color: 'var(--neon)' }}>
+                      {p.goals}G {p.assists}A
+                    </div>
+                    <div className="text-xs" style={{ color: 'var(--text)' }}>
+                      {pts}pts {sign(p.plus_minus ?? 0)}
+                    </div>
+                    {surge !== null && (
+                      <div className="text-xs mt-0.5"
+                        style={{ color: surge > 10 ? 'var(--heat)' : surge < -10 ? 'var(--silver)' : 'var(--text)' }}>
+                        {surge > 0 ? '↑' : '↓'}{Math.abs(surge).toFixed(0)}% momentum
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Footer nav */}
+      <div className="flex items-center justify-between pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+        <Link href="/recaps" className="text-xs hover:underline" style={{ color: 'var(--neon)' }}>
+          ← All recaps
+        </Link>
+        <Link href="/" className="text-xs hover:underline" style={{ color: 'var(--text)' }}>
+          Today&apos;s dashboard →
+        </Link>
+      </div>
+    </>
+  );
+}
+
+function ArticleSkeleton() {
+  return (
+    <>
+      <div className="flex flex-col gap-3 mb-10">
+        {[100, 100, 82, 100, 67].map((w, i) => (
+          <div key={i} className="h-4 rounded animate-pulse"
+            style={{ background: 'var(--border)', width: `${w}%` }} />
+        ))}
+      </div>
+      <div className="rounded-2xl animate-pulse mb-6"
+        style={{ height: 200, background: 'var(--bg-card)', border: '1px solid var(--border)' }} />
+      <div className="flex flex-col gap-3 mb-10">
+        {[100, 100, 75].map((w, i) => (
+          <div key={i} className="h-4 rounded animate-pulse"
+            style={{ background: 'var(--border)', width: `${w}%` }} />
+        ))}
+      </div>
+    </>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default async function RecapSlugPage({ params }: { params: Promise<{ date: string; slug: string }> }) {
+  const { date } = await params;
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) notFound();
+
+  const recap = await cachedFetchRecap(date);
+  if (!recap) notFound();
+
+  const dateLabel = new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+  });
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -482,7 +652,7 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
           </div>
         </div>
 
-        {/* Hero image — tied to the featured game (first game section in article) */}
+        {/* Hero image — renders immediately without waiting for game data */}
         <div className="relative w-full rounded-xl overflow-hidden mb-8"
           style={{ aspectRatio: '12/5', background: 'linear-gradient(135deg, #0d1117 0%, #1a1f35 100%)' }}>
           {recap.hero_image_url && (
@@ -493,172 +663,14 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
               className="absolute inset-0 w-full h-full object-cover opacity-50"
             />
           )}
-          {/* Gradient overlay */}
           <div className="absolute inset-0"
             style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.1) 60%, rgba(0,0,0,0.3) 100%)' }} />
-          {/* Featured game logos */}
-          {featuredGame && (
-            <div className="absolute bottom-4 left-4 flex items-center gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={teamLogoUrl(featuredGame.away_team?.abbrev ?? '')} alt={featuredGame.away_team?.abbrev} className="w-10 h-10 drop-shadow-lg" />
-              <span className="text-lg font-black font-mono" style={{ color: 'rgba(255,255,255,0.9)', textShadow: '0 2px 8px rgba(0,0,0,0.8)' }}>
-                {featuredGame.away_score} – {featuredGame.home_score}
-              </span>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={teamLogoUrl(featuredGame.home_team?.abbrev ?? '')} alt={featuredGame.home_team?.abbrev} className="w-10 h-10 drop-shadow-lg" />
-            </div>
-          )}
         </div>
 
-        {/* Article body */}
-        <article className="mb-10">
-          {sections.map((section, i) => {
-            if (section.type === 'paragraph') {
-              return section.bodies.map((body, bi) => (
-                <p key={`${i}-${bi}`} className="text-sm leading-relaxed mb-5"
-                  style={{ color: i === 0 && bi === 0 ? 'var(--text-bright)' : 'var(--text)' }}>
-                  {linkifyText(body, playerData, teamLinks)}
-                </p>
-              ));
-            }
-
-            const isGameSection = !!(section.awayAbbrev && section.homeAbbrev);
-            const gameKey = isGameSection ? `${section.awayAbbrev}:${section.homeAbbrev}` : null;
-            const game = gameKey ? gameByTeams.get(gameKey) : null;
-            const pred = game ? raw?.predMap?.get(game.id) : null;
-            const seriesContext = game ? raw?.seriesMap?.get(game.id) : undefined;
-            const gUrl = game
-              ? gameUrl(game.id, game.away_team?.abbrev ?? '', game.home_team?.abbrev ?? '', game.game_date)
-              : '#';
-
-            return (
-              <div key={i} className="mb-12">
-                <div style={{ borderTop: '1px solid var(--border)', paddingTop: '1.5rem', marginBottom: '1.25rem' }}>
-                  {!isGameSection && (
-                    <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-bright)' }}>
-                      {section.header}
-                    </h2>
-                  )}
-                </div>
-
-                {/* 1. GameCard first — acts as the section headline */}
-                {isGameSection && game && (
-                  <GameCard game={game} pred={pred} gUrl={gUrl} seriesContext={seriesContext} />
-                )}
-                {isGameSection && !game && (
-                  <h2 className="text-sm font-bold mb-4" style={{ color: 'var(--text-bright)' }}>
-                    {section.header}
-                  </h2>
-                )}
-
-                {/* 2. Prose paragraphs below the card */}
-                {section.bodies.map((body, bi) => (
-                  <p key={bi} className="text-sm leading-relaxed mb-4" style={{ color: 'var(--text)' }}>
-                    {linkifyText(body, playerData, teamLinks)}
-                  </p>
-                ))}
-              </div>
-            );
-          })}
-        </article>
-
-        {/* Top performers of the day */}
-        {topPerformers.length > 0 && (
-          <div className="rounded-xl border p-4 mb-8" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--neon)' }}>
-              Top performers of the day
-            </h2>
-            <div className="flex flex-col gap-2">
-              {topPerformers.slice(0, 6).map((p, i: number) => {
-                const pts = (p.goals ?? 0) + (p.assists ?? 0);
-                const sign = (n: number) => n >= 0 ? `+${n}` : String(n);
-                const snap = p.snapshot;
-                const surge = snap?.momentum_ppm && snap?.season_ppm && snap.season_ppm > 0
-                  ? ((snap.momentum_ppm - snap.season_ppm) / snap.season_ppm * 100)
-                  : null;
-                return (
-                  <div key={i} className="flex items-center gap-3 px-3 py-2 rounded-xl"
-                    style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                    {/* Rank */}
-                    <span className="text-xs font-mono font-bold w-4 text-center flex-shrink-0"
-                      style={{ color: 'var(--neon)' }}>{i + 1}</span>
-
-                    {/* Headshot */}
-                    {p.players?.headshot_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={p.players.headshot_url}
-                        alt={`${p.players?.first_name} ${p.players?.last_name}`}
-                        className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                        style={{ border: '2px solid var(--border)' }}
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold"
-                        style={{ background: 'var(--bg-card)', color: 'var(--text)', border: '2px solid var(--border)' }}>
-                        {p.players?.first_name?.[0]}{p.players?.last_name?.[0]}
-                      </div>
-                    )}
-
-                    {/* Name + team */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <Link
-                          href={playerUrl(p.player_id, p.players?.first_name ?? '', p.players?.last_name ?? '')}
-                          className="text-sm font-semibold hover:underline leading-tight"
-                          style={{ color: 'var(--text-bright)' }}>
-                          {p.players?.first_name} {p.players?.last_name}
-                        </Link>
-                        <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.5 }}>·</span>
-                        <span className="text-xs" style={{ color: 'var(--text)' }}>{p.players?.position_code}</span>
-                      </div>
-                      {/* Team with logo */}
-                      <div className="flex items-center gap-1 mt-0.5">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={teamLogoUrl(p.teams?.abbrev ?? '')} alt={p.teams?.abbrev ?? ''} className="w-3.5 h-3.5" />
-                        {p.teams?.id ? (
-                          <Link
-                            href={teamUrl(p.teams.id, p.teams.name ?? p.teams.abbrev)}
-                            className="text-xs hover:underline"
-                            style={{ color: 'var(--neon)' }}>
-                            {p.teams?.abbrev}
-                          </Link>
-                        ) : (
-                          <span className="text-xs" style={{ color: 'var(--text)' }}>{p.teams?.abbrev}</span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Stats */}
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-sm font-mono font-semibold" style={{ color: 'var(--neon)' }}>
-                        {p.goals}G {p.assists}A
-                      </div>
-                      <div className="text-xs" style={{ color: 'var(--text)' }}>
-                        {pts}pts {sign(p.plus_minus ?? 0)}
-                      </div>
-                      {surge !== null && (
-                        <div className="text-xs mt-0.5"
-                          style={{ color: surge > 10 ? 'var(--heat)' : surge < -10 ? 'var(--silver)' : 'var(--text)' }}>
-                          {surge > 0 ? '↑' : '↓'}{Math.abs(surge).toFixed(0)}% momentum
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Footer nav */}
-        <div className="flex items-center justify-between pt-4" style={{ borderTop: '1px solid var(--border)' }}>
-          <Link href="/recaps" className="text-xs hover:underline" style={{ color: 'var(--neon)' }}>
-            ← All recaps
-          </Link>
-          <Link href="/" className="text-xs hover:underline" style={{ color: 'var(--text)' }}>
-            Today&apos;s dashboard →
-          </Link>
-        </div>
+        {/* Article body, game cards, top performers — stream in while fetchRecapData resolves */}
+        <Suspense fallback={<ArticleSkeleton />}>
+          <ArticleBody date={date} content={recap.content} />
+        </Suspense>
 
       </div>
     </>

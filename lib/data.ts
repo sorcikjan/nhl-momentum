@@ -587,52 +587,66 @@ export async function fetchSeriesStandings(): Promise<Map<string, SeriesInfo>> {
 export async function fetchRecapData(date: string) {
   const modelVersion = await latestModelVersion();
 
-  const [{ data: games }, { data: predictions }] = await Promise.all([
-    supabaseAdmin
-      .from('games')
-      .select(`
-        id, game_date, home_score, away_score, youtube_highlight_id,
-        venue, start_time_utc, three_stars, team_game_stats,
-        home_team:teams!games_home_team_id_fkey(id, abbrev, name, logo_url),
-        away_team:teams!games_away_team_id_fkey(id, abbrev, name, logo_url)
-      `)
-      .eq('game_date', date)
-      .in('game_state', ['FINAL', 'OFF']),
-    supabaseAdmin
-      .from('predictions')
-      .select('game_id, home_win_probability, predicted_home_score, predicted_away_score, prediction_outcomes(correct_winner, actual_home_score, actual_away_score)')
-      .eq('model_version', modelVersion),
-  ]);
+  // Step 1: games for the date
+  const { data: games } = await supabaseAdmin
+    .from('games')
+    .select(`
+      id, game_date, home_score, away_score, youtube_highlight_id,
+      venue, start_time_utc, three_stars, team_game_stats,
+      home_team:teams!games_home_team_id_fkey(id, abbrev, name, logo_url),
+      away_team:teams!games_away_team_id_fkey(id, abbrev, name, logo_url)
+    `)
+    .eq('game_date', date)
+    .in('game_state', ['FINAL', 'OFF']);
 
   if (!games?.length) return null;
 
   const gameIds = games.map((g: { id: number }) => g.id);
 
+  // Step 2: all game-ID-dependent queries in parallel.
+  // Predictions now filtered to this date's games only (was fetching the full season).
+  const [
+    { data: predictions },
+    { data: stats },
+    { data: goalieStats },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from('predictions')
+      .select('game_id, home_win_probability, predicted_home_score, predicted_away_score, prediction_outcomes(correct_winner, actual_home_score, actual_away_score)')
+      .eq('model_version', modelVersion)
+      .in('game_id', gameIds),
+    supabaseAdmin
+      .from('game_player_stats')
+      .select(`
+        player_id, game_id, goals, assists, plus_minus, toi_seconds, shots_on_goal,
+        players(first_name, last_name, position_code, headshot_url),
+        teams(id, abbrev, name)
+      `)
+      .in('game_id', gameIds)
+      .neq('players.position_code', 'G'),
+    supabaseAdmin
+      .from('game_goalie_stats')
+      .select(`player_id, game_id, goals_against, saves: shots_against, toi_seconds, decision, players(first_name, last_name), teams(abbrev)`)
+      .in('game_id', gameIds)
+      .eq('goals_against', 0)
+      .gt('toi_seconds', 3000), // at least 50 min — full game
+  ]);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const predMap = new Map<number, any>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const p of (predictions ?? []) as any[]) {
-    if (gameIds.includes(p.game_id)) predMap.set(p.game_id, p);
+    predMap.set(p.game_id, p);
   }
 
-  // Top skater performers enriched with momentum snapshot
-  const { data: stats } = await supabaseAdmin
-    .from('game_player_stats')
-    .select(`
-      player_id, game_id, goals, assists, plus_minus, toi_seconds, shots_on_goal,
-      players(first_name, last_name, position_code, headshot_url),
-      teams(id, abbrev, name)
-    `)
-    .in('game_id', gameIds)
-    .neq('players.position_code', 'G');
-
+  // Top skater performers
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const topPerformers = (stats as any[] ?? [])
     .filter(s => s.players)
     .sort((a, b) => (b.goals + b.assists) - (a.goals + a.assists))
     .slice(0, 8);
 
-  // Momentum context for top performers
+  // Step 3: momentum snapshots for top performers
   const topIds = topPerformers.map((p: { player_id: number }) => p.player_id);
   const { data: snapshots } = topIds.length ? await supabaseAdmin
     .from('player_metric_snapshots')
@@ -646,15 +660,7 @@ export async function fetchRecapData(date: string) {
     if (!snapMap.has(s.player_id)) snapMap.set(s.player_id, s);
   }
 
-  // Goalie shutouts
-  const { data: goalieStats } = await supabaseAdmin
-    .from('game_goalie_stats')
-    .select(`player_id, game_id, goals_against, saves: shots_against, toi_seconds, decision, players(first_name, last_name), teams(abbrev)`)
-    .in('game_id', gameIds)
-    .eq('goals_against', 0)
-    .gt('toi_seconds', 3000); // at least 50 min — full game
-
-  // Series context — only populated for playoff games
+  // Step 4: series context — only for playoff games
   const seriesMap = new Map<number, string>(); // game_id → "Game N · X leads Y–Z" or "Game N · Tied Y–Y"
   if (games?.length && isPlayoffGameId((games as any[])[0]?.id)) {
     const allSeries = await fetchSeriesStandings();
@@ -662,10 +668,6 @@ export async function fetchRecapData(date: string) {
       const { round, series, gameInSeries } = parsePlayoffGameId(g.id);
       const s = allSeries.get(`${round}-${series}`);
       if (!s) continue;
-      // Series standing BEFORE this game (wins in completed games only)
-      const completedBefore = s.totalPlayed - (
-        (g.game_state === 'FINAL' || g.game_state === 'OFF') ? 1 : 0
-      );
       const awayW = s.awayWins - ((g.game_state === 'FINAL' || g.game_state === 'OFF') && (g.away_score ?? 0) > (g.home_score ?? 0) ? 1 : 0);
       const homeW = s.homeWins - ((g.game_state === 'FINAL' || g.game_state === 'OFF') && (g.home_score ?? 0) > (g.away_score ?? 0) ? 1 : 0);
       const label = awayW === homeW
