@@ -8,8 +8,10 @@ import type { BackgroundHandler } from '@netlify/functions';
 const CALL_TIMEOUT_MS = 25_000;
 // Gamelogs fetches from NHL API per player — allow more time when processing large rosters
 const GAMELOGS_TIMEOUT_MS = 120_000;
-// Gemini generation can take 20-30s on slow days — use a longer timeout for AI routes
-const AI_CALL_TIMEOUT_MS = 55_000;
+// Recap generation: fetchRecapData (~3s) + Gemini 2.5 Flash generation (30-120s) + retries
+// on 503/429 (up to 14s backoff) = can easily exceed 55s. The recap route has maxDuration=300,
+// so we wait up to 250s — leaves 50s margin and fits in the 15-min background budget.
+const RECAP_TIMEOUT_MS = 250_000;
 
 async function call(url: string, headers: Record<string, string>, timeoutMs = CALL_TIMEOUT_MS) {
   const ac = new AbortController();
@@ -209,7 +211,7 @@ const handler: BackgroundHandler = async (event) => {
   if (phases.includes('recap')) {
     try {
       const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-      const r = await call(`${base}/api/ingest/recap?date=${yesterday}`, h, AI_CALL_TIMEOUT_MS);
+      const r = await call(`${base}/api/ingest/recap?date=${yesterday}`, h, RECAP_TIMEOUT_MS);
       log.push(`recap: ${r.data?.skipped ? `skipped (${r.data.reason})` : r.data?.title ?? `err: ${r.error}`}`);
     } catch (e) { log.push(`recap: exception ${e}`); }
   }
