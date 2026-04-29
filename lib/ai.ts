@@ -19,7 +19,7 @@ function getClient() {
 
 // Retry with exponential backoff for transient 503 / 429 errors.
 // gemini-2.5-flash occasionally returns 503 during high-demand periods.
-export async function ask(prompt: string, maxRetries = 3, options: { json?: boolean } = {}): Promise<string | null> {
+export async function ask(prompt: string, maxRetries = 3): Promise<string | null> {
   const client = getClient();
   if (!client) { console.error('[ai] ask: GEMINI_API_KEY not set'); return null; }
 
@@ -28,10 +28,7 @@ export async function ask(prompt: string, maxRetries = 3, options: { json?: bool
   const models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
 
   for (const modelName of models) {
-    const model = client.getGenerativeModel({
-      model: modelName,
-      ...(options.json ? { generationConfig: { responseMimeType: 'application/json' } } : {}),
-    });
+    const model = client.getGenerativeModel({ model: modelName });
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         const result = await model.generateContent(prompt);
@@ -412,20 +409,42 @@ Respond with valid JSON (no markdown, no code blocks):
   "content": "[lede paragraph]\\n\\n[optional second lede paragraph]\\n\\n### {AWAY} {score} @ {HOME} {score}\\n\\n[paragraph 1 — game story]\\n\\n[paragraph 2 — analytics]\\n\\n[repeat for each game]\\n\\n### Momentum Watch\\n\\n[paragraph]\\n\\n### Looking Ahead\\n\\n[paragraph]"
 }`;
 
-  // json: true forces Gemini to return valid JSON without code fences or literal newlines in strings
-  const raw = await ask(prompt, 3, { json: true });
+  const raw = await ask(prompt);
   if (!raw) return null;
 
+  // Repair literal control characters inside JSON string values.
+  // Gemini occasionally outputs real \n/\r/\t inside string values instead of
+  // their JSON escape sequences — this makes JSON.parse throw even though the
+  // structure is otherwise valid.
+  function repairJsonStrings(json: string): string {
+    let out = '';
+    let inStr = false;
+    let esc = false;
+    for (let i = 0; i < json.length; i++) {
+      const ch = json[i];
+      if (esc) { out += ch; esc = false; continue; }
+      if (ch === '\\') { out += ch; esc = true; continue; }
+      if (ch === '"') { out += ch; inStr = !inStr; continue; }
+      if (inStr) {
+        if (ch === '\n') { out += '\\n'; continue; }
+        if (ch === '\r') { out += '\\r'; continue; }
+        if (ch === '\t') { out += '\\t'; continue; }
+      }
+      out += ch;
+    }
+    return out;
+  }
+
   try {
-    // Strip markdown code fences first (defensive — json mode should prevent these)
+    // Strip markdown code fences, then extract the outermost JSON object
     const stripped = raw.trim()
       .replace(/^```json\s*/im, '').replace(/^```\s*/im, '').replace(/\s*```\s*$/im, '').trim();
     const jsonStart = stripped.indexOf('{');
     const jsonEnd = stripped.lastIndexOf('}');
-    const cleaned = jsonStart !== -1 && jsonEnd > jsonStart
+    const extracted = jsonStart !== -1 && jsonEnd > jsonStart
       ? stripped.slice(jsonStart, jsonEnd + 1)
       : stripped;
-    const parsed = JSON.parse(cleaned) as DailyRecapOutput;
+    const parsed = JSON.parse(repairJsonStrings(extracted)) as DailyRecapOutput;
     if (!parsed.title || !parsed.content) return null;
     return parsed;
   } catch {
