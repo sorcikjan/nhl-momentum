@@ -39,16 +39,18 @@ export async function ask(prompt: string, maxRetries = 3): Promise<string | null
         return text ?? null;
       } catch (err: unknown) {
         const status = (err as { status?: number })?.status;
-        const isTransient = status === 503 || status === 429;
+        // 503, 429, and 500 are all transient Gemini errors worth retrying
+        const isTransient = status === 503 || status === 429 || status === 500;
         if (isTransient && attempt < maxRetries - 1) {
           const delayMs = 2000 * Math.pow(2, attempt); // 2s, 4s, 8s
           console.warn(`[ai] ask: ${status} on model=${modelName} attempt=${attempt + 1}, retrying in ${delayMs}ms`);
           await new Promise(r => setTimeout(r, delayMs));
           continue;
         }
-        if (isTransient && modelName === 'gemini-2.5-flash') {
-          console.warn(`[ai] ask: ${modelName} exhausted (${status}), falling back to gemini-2.0-flash`);
-          break; // try next model
+        // Any error from the primary model falls through to the fallback model
+        if (modelName === 'gemini-2.5-flash') {
+          console.warn(`[ai] ask: ${modelName} failed (status=${status ?? 'unknown'}), falling back to gemini-2.0-flash`);
+          break;
         }
         console.error('[ai] ask error:', err);
         return null;
