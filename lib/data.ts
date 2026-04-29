@@ -13,6 +13,8 @@ export function teamLogoUrl(abbrev: string) {
 
 let _modelVersionCache: { version: string; ts: number } | null = null;
 let _playoffTeamsCache: { teams: Set<number>; ts: number } | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _leagueAveragesCache: { data: any; ts: number } | null = null;
 
 // Returns the active model version string.
 // Module-level cache avoids a DB round trip on every request that touches predictions.
@@ -36,6 +38,10 @@ async function latestModelVersion(): Promise<string> {
 // ─── League Averages ──────────────────────────────────────────────────────────
 
 export async function fetchLeagueAverages() {
+  const now = Date.now();
+  if (_leagueAveragesCache && now - _leagueAveragesCache.ts < 30 * 60_000) {
+    return _leagueAveragesCache.data;
+  }
   // Latest snapshot per active skater — limit 1500 covers all ~650 non-goalie players
   const { data } = await supabaseAdmin
     .from('player_metric_snapshots')
@@ -62,7 +68,7 @@ export async function fetchLeagueAverages() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const avg = (fn: (r: any) => number) => latest.reduce((s, r) => s + fn(r), 0) / n;
 
-  return {
+  const result = {
     seasonPpm:      avg(r => r.season_ppm ?? 0),
     momentumPpm:    avg(r => r.momentum_ppm ?? 0),
     goalsPerGame:   avg(r => (r.season_goals ?? 0) / Math.max(1, r.season_games ?? 1)),
@@ -71,6 +77,8 @@ export async function fetchLeagueAverages() {
     energyBar:      avg(r => r.energy_bar ?? 100),
     playerCount:    n,
   };
+  _leagueAveragesCache = { data: result, ts: now };
+  return result;
 }
 
 // ─── Out Status ───────────────────────────────────────────────────────────────
@@ -386,37 +394,44 @@ export async function fetchPlayer(id: string) {
   // Newest first → reverse for timeline chart
   const metricTimeline = (metricTimelineDesc ?? []).slice().reverse();
 
-  // Enrich game stats with game metadata (depends on rawGameStats result)
+  // Enrich game stats with game metadata, and fetch team recent games for scratch detection.
+  // These are independent — teamId is known from the player record, game IDs from rawGameStats.
   let recentGames = rawGameStats ?? [];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let teamRecentGames: any[] = [];
-  if (recentGames.length > 0) {
-    const gameIds = recentGames.map((g: { game_id: number }) => g.game_id);
-    const { data: gameRows } = await supabaseAdmin
-      .from('games')
-      .select(`
-        id, game_date, home_score, away_score, home_team_id, away_team_id,
-        home_team:teams!games_home_team_id_fkey(abbrev),
-        away_team:teams!games_away_team_id_fkey(abbrev)
-      `)
-      .in('id', gameIds);
-    const gameMap = new Map((gameRows ?? []).map((g: { id: number }) => [g.id, g]));
-    recentGames = recentGames.map((g: { game_id: number }) => ({ ...g, games: gameMap.get(g.game_id) ?? null }));
-    teamRecentGames = (gameRows ?? []);
-  }
-
-  // Fetch team's last 10 completed games to detect how many the player missed
   const teamId = player?.team_id ?? (player as { teams?: { id?: number } })?.teams?.id ?? null;
-  if (teamId) {
-    const { data: tgRows } = await supabaseAdmin
-      .from('games')
-      .select('id, game_date')
-      .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
-      .in('game_state', ['FINAL', 'OFF'])
-      .order('game_date', { ascending: false })
-      .limit(15);
-    teamRecentGames = tgRows ?? [];
-  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [gameRows, tgRows]: [any[], any[]] = await Promise.all([
+    recentGames.length > 0
+      ? (async () => {
+          const { data } = await supabaseAdmin
+            .from('games')
+            .select(`
+              id, game_date, home_score, away_score, home_team_id, away_team_id,
+              home_team:teams!games_home_team_id_fkey(abbrev),
+              away_team:teams!games_away_team_id_fkey(abbrev)
+            `)
+            .in('id', recentGames.map((g: { game_id: number }) => g.game_id));
+          return data ?? [];
+        })()
+      : Promise.resolve([]),
+    teamId
+      ? (async () => {
+          const { data } = await supabaseAdmin
+            .from('games')
+            .select('id, game_date')
+            .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+            .in('game_state', ['FINAL', 'OFF'])
+            .order('game_date', { ascending: false })
+            .limit(15);
+          return data ?? [];
+        })()
+      : Promise.resolve([]),
+  ]);
+
+  const gameMap = new Map(gameRows.map((g: { id: number }) => [g.id, g]));
+  recentGames = recentGames.map((g: { game_id: number }) => ({ ...g, games: gameMap.get(g.game_id) ?? null }));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const teamRecentGames: any[] = tgRows.length > 0 ? tgRows : gameRows;
 
   const playerGameIds = new Set(recentGames.map((g: { game_id: number }) => g.game_id));
   const lastPlayedDate: string | null = recentGames.length > 0

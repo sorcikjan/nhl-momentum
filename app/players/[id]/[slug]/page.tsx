@@ -1,17 +1,21 @@
 import type { Metadata } from 'next';
+import { cache, Suspense } from 'react';
 import PlayerRadarChart from '@/components/players/RadarChart';
 import PPMTimeline from '@/components/players/PPMTimeline';
-import { fetchPlayer, fetchRankings, fetchLeagueAverages, daysAgo, deriveOutStatus } from '@/lib/data';
+import { fetchPlayer, fetchLeagueAverages, daysAgo, deriveOutStatus } from '@/lib/data';
 import { getPlayerInsights } from '@/lib/ai';
 import type { PlayerAIInput } from '@/lib/ai';
 import { teamUrl } from '@/lib/urls';
 import Link from 'next/link';
 
+// Deduplicate fetchPlayer between generateMetadata and the page component
+const cachedFetchPlayer = cache((id: string) => fetchPlayer(id).catch(() => null));
+
 export const revalidate = 120;
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string; slug: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const data = await fetchPlayer(id).catch(() => null);
+  const data = await cachedFetchPlayer(id);
   if (!data?.player) return { title: 'Player' };
   const { player } = data;
   const name = `${player.first_name} ${player.last_name}`;
@@ -53,9 +57,8 @@ function rankBadge(rank: number | undefined) {
 
 export default async function PlayerPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
   const { id } = await params;
-  const [data, rankings, leagueAvg] = await Promise.all([
-    fetchPlayer(id).catch(() => null),
-    fetchRankings().catch(() => null),
+  const [data, leagueAvg] = await Promise.all([
+    cachedFetchPlayer(id),
     fetchLeagueAverages().catch(() => null),
   ]);
 
@@ -71,8 +74,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const isGoalie = player.position_code === 'G';
   const latestSnapshot = metricTimeline?.[metricTimeline.length - 1] ?? {};
   const name = `${player.first_name} ${player.last_name}`;
-
-  const ranked = rankings?.top100?.find((p: { player_id: number }) => p.player_id === Number(id));
 
   // Metric layer values
   const momPpm          = Number(latestSnapshot.momentum_ppm     ?? 0);
@@ -195,7 +196,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     name,
     team:            playerTeamAbbrev,
     position:        player.position_code ?? '',
-    rank:            ranked?.momentum_rank ?? null,
+    rank:            latestSnapshot.momentum_rank ?? null,
     // Bio
     birthCity:       player.birth_city       ?? null,
     birthCountry:    player.birth_country    ?? null,
@@ -244,8 +245,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       };
     }),
   };
-
-  const { bio: aiBio, perfEval: aiPerfEval } = await getPlayerInsights(Number(id), aiInput).catch(() => ({ bio: null, perfEval: null }));
 
   // ── L5 stat row helpers ────────────────────────────────────────────────────
   const last5Games = (recentGames ?? []).slice(0, 5);
@@ -388,19 +387,12 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
               <span className="text-xs font-bold tracking-widest uppercase" style={{ color: energyColor }}>
                 {energyLabel}
               </span>
-              {ranked?.momentum_rank && (
-                <span className="text-xs" style={{ color: 'var(--text)' }}>#{ranked.momentum_rank} in the league</span>
+              {latestSnapshot.momentum_rank && (
+                <span className="text-xs" style={{ color: 'var(--text)' }}>#{latestSnapshot.momentum_rank} in the league</span>
               )}
             </div>
           </div>
 
-          {/* AI headline — first sentence of aiPerfEval */}
-          {aiPerfEval && (() => {
-            const first = aiPerfEval.split(/(?<=[.!?])\s/)[0]?.trim();
-            return first ? (
-              <p className="text-sm font-medium leading-snug" style={{ color: 'var(--text-bright)' }}>{first}</p>
-            ) : null;
-          })()}
         </div>
       </div>
 
@@ -575,14 +567,14 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       )}
 
       {/* 6. Where he ranks (skaters only) ────────────────────────────────────── */}
-      {!isGoalie && ranked && (
+      {!isGoalie && latestSnapshot.momentum_rank && (
         <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <span className="text-xs font-semibold uppercase tracking-wider block mb-3" style={{ color: 'var(--text)' }}>
             Where {player.first_name} ranks
           </span>
           <div className="flex flex-col gap-3">
             {[
-              { label: 'Heat score', fill: Math.min(100, energyBar), rank: ranked.momentum_rank },
+              { label: 'Heat score', fill: Math.min(100, energyBar), rank: latestSnapshot.momentum_rank },
               { label: 'PPM · momentum', fill: pct(momPpm, 0.15), rank: null },
               { label: 'Goals · L5', fill: pct(momGoals / Math.max(1, momGames), 0.7), rank: null },
               { label: 'Points · season', fill: pct(seaPpm, 0.15), rank: null },
@@ -641,26 +633,10 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         );
       })()}
 
-      {/* 8. AI editorial ─────────────────────────────────────────────────────── */}
-      {(() => {
-        const aiPerfRemainder = aiPerfEval
-          ? aiPerfEval.replace(/^[^.!?]+[.!?]\s*/, '').trim()
-          : '';
-        if (!aiBio && !aiPerfRemainder) return null;
-        return (
-          <div className="rounded-xl border p-5 flex flex-col gap-4"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            {aiBio && (
-              <div className="pl-4" style={{ borderLeft: '2px solid var(--heat)' }}>
-                <p className="text-sm leading-relaxed" style={{ color: 'var(--text-bright)' }}>{aiBio}</p>
-              </div>
-            )}
-            {aiPerfRemainder && (
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>{aiPerfRemainder}</p>
-            )}
-          </div>
-        );
-      })()}
+      {/* 8. AI editorial — streams in without blocking initial render ─────────── */}
+      <Suspense fallback={<AISectionSkeleton />}>
+        <AISection playerId={Number(id)} aiInput={aiInput} />
+      </Suspense>
 
       {/* 9. Full season stats (de-emphasized) ────────────────────────────────── */}
       {isGoalie && goalieStats ? (
@@ -946,6 +922,39 @@ function StatPill({ label, value, highlight, bold }: { label: string; value: str
         {value}
       </span>
       <span className="text-xs" style={{ color: 'var(--text)' }}>{label}</span>
+    </div>
+  );
+}
+
+async function AISection({ playerId, aiInput }: { playerId: number; aiInput: PlayerAIInput }) {
+  const { bio: aiBio, perfEval: aiPerfEval } = await getPlayerInsights(playerId, aiInput)
+    .catch(() => ({ bio: null, perfEval: null }));
+  const aiPerfRemainder = aiPerfEval
+    ? aiPerfEval.replace(/^[^.!?]+[.!?]\s*/, '').trim()
+    : '';
+  if (!aiBio && !aiPerfRemainder) return null;
+  return (
+    <div className="rounded-xl border p-5 flex flex-col gap-4"
+      style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      {aiBio && (
+        <div className="pl-4" style={{ borderLeft: '2px solid var(--heat)' }}>
+          <p className="text-sm leading-relaxed" style={{ color: 'var(--text-bright)' }}>{aiBio}</p>
+        </div>
+      )}
+      {aiPerfRemainder && (
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>{aiPerfRemainder}</p>
+      )}
+    </div>
+  );
+}
+
+function AISectionSkeleton() {
+  return (
+    <div className="rounded-xl border p-5 flex flex-col gap-3"
+      style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <div className="h-4 w-3/4 rounded animate-pulse" style={{ background: 'var(--border)' }} />
+      <div className="h-4 w-full rounded animate-pulse" style={{ background: 'var(--border)' }} />
+      <div className="h-4 w-2/3 rounded animate-pulse" style={{ background: 'var(--border)' }} />
     </div>
   );
 }
