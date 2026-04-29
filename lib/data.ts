@@ -573,7 +573,14 @@ export async function fetchSeriesStandings(): Promise<Map<string, SeriesInfo>> {
     const s = map.get(key)!;
     if (g.game_state === 'FINAL' || g.game_state === 'OFF') {
       s.totalPlayed++;
-      if ((g.away_score ?? 0) > (g.home_score ?? 0)) s.awayWins++; else s.homeWins++;
+      // Home/away designation rotates across games in a series — match by team ID
+      // to correctly attribute wins to the series-designated home/away team.
+      const homeWon = (g.home_score ?? 0) > (g.away_score ?? 0);
+      if (g.home_team?.id === s.homeTeam.id) {
+        if (homeWon) s.homeWins++; else s.awayWins++;
+      } else {
+        if (homeWon) s.awayWins++; else s.homeWins++;
+      }
       if (s.awayWins === 4 || s.homeWins === 4) s.isComplete = true;
     } else if (g.game_state === 'FUT' && !s.nextGame) {
       s.nextGame = { id: g.id, game_date: g.game_date, start_time_utc: g.start_time_utc ?? null };
