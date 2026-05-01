@@ -437,12 +437,28 @@ Respond with valid JSON (no markdown, no code blocks):
     return out;
   }
 
+  // Find the balanced closing brace of the outermost JSON object.
+  // lastIndexOf('}') picks up braces inside article text and truncates the parse.
+  function findJsonEnd(str: string, start: number): number {
+    let depth = 0, inStr = false, esc = false;
+    for (let i = start; i < str.length; i++) {
+      const ch = str[i];
+      if (esc) { esc = false; continue; }
+      if (ch === '\\' && inStr) { esc = true; continue; }
+      if (ch === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (ch === '{') depth++;
+      else if (ch === '}' && --depth === 0) return i;
+    }
+    return -1;
+  }
+
   try {
     // Strip markdown code fences, then extract the outermost JSON object
     const stripped = raw.trim()
       .replace(/^```json\s*/im, '').replace(/^```\s*/im, '').replace(/\s*```\s*$/im, '').trim();
     const jsonStart = stripped.indexOf('{');
-    const jsonEnd = stripped.lastIndexOf('}');
+    const jsonEnd = jsonStart !== -1 ? findJsonEnd(stripped, jsonStart) : -1;
     const extracted = jsonStart !== -1 && jsonEnd > jsonStart
       ? stripped.slice(jsonStart, jsonEnd + 1)
       : stripped;
