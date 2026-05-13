@@ -78,15 +78,17 @@ export default function Sidebar() {
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0 hover:opacity-80 transition-opacity">
-          <span className="text-2xl leading-none">🏒</span>
-          <div className="flex flex-col leading-none">
-            <span className="text-sm font-bold tracking-tight" style={{ color: 'var(--text-bright)' }}>
-              Hockey Momentum
-            </span>
-            <span className="text-xs font-medium" style={{ color: 'var(--heat)' }}>
-              Hockey Intelligence, Daily.
-            </span>
-          </div>
+          {/* EKG + hockey-stick logo mark */}
+          <svg viewBox="0 0 58 38" fill="none" height="28" style={{ minWidth: 42 }}>
+            <path
+              d="M 0 22 L 7 22 L 9 27 L 14 5 L 19 32 L 23 22 L 27 22 L 27 31 C 27 36 32 38 37 35 C 41 32 42 25 38 22 L 33 22"
+              stroke="var(--heat)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+            />
+          </svg>
+          {/* "momentum." wordmark */}
+          <span className="text-xl font-black" style={{ color: 'var(--text-bright)', letterSpacing: '-0.03em', lineHeight: 1 }}>
+            momentum<span style={{ color: 'var(--heat)' }}>.</span>
+          </span>
         </Link>
 
         {/* Nav links — centered */}
@@ -111,7 +113,7 @@ export default function Sidebar() {
         </nav>
 
         {/* Right — LIVE badge */}
-        <div className="shrink-0 w-[170px] flex justify-end">
+        <div className="shrink-0 w-[200px] flex justify-end">
           <LiveBadge />
         </div>
       </header>
