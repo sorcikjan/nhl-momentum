@@ -388,7 +388,7 @@ export async function fetchPlayer(id: string) {
           .select('*')
           .eq('player_id', id)
           .order('game_id', { ascending: false })
-          .limit(20),
+          .limit(100),
   ]);
 
   // Newest first → reverse for timeline chart

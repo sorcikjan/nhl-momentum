@@ -273,6 +273,16 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   }).length;
   const l5OT = last5Games.length - l5W - l5L;
 
+  // Game events for HeatTimeline overlay (skaters only)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gameEvents = isGoalie ? [] : (recentGames ?? []).map((g: any) => ({
+    date: String(g.games?.game_date ?? '').slice(5, 10).replace('-', '/'),
+    goals: Number(g.goals ?? 0),
+    assists: Number(g.assists ?? 0),
+    plusMinus: Number(g.plus_minus ?? 0),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  })).filter((e: any) => e.date);
+
   return (
     <div className="max-w-5xl mx-auto pb-20 md:pb-0 space-y-4">
 
@@ -464,7 +474,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {/* 4. Heat timeline ─────────────────────────────────────────────────────── */}
       {(metricTimeline?.length ?? 0) > 0 && (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <HeatTimeline snapshots={metricTimeline ?? []} seasonPpm={seaPpm} />
+          <HeatTimeline snapshots={metricTimeline ?? []} seasonPpm={seaPpm} gameEvents={gameEvents} />
         </div>
       )}
 

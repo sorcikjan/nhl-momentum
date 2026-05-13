@@ -1,7 +1,7 @@
 'use client';
 import { useState, useMemo } from 'react';
 import {
-  AreaChart, Area, CartesianGrid, XAxis, YAxis,
+  ComposedChart, Area, Bar, CartesianGrid, XAxis, YAxis,
   ReferenceLine, ResponsiveContainer, Tooltip,
 } from 'recharts';
 import { ppmToHeat } from '@/lib/heat';
@@ -12,9 +12,24 @@ interface Snapshot {
   calculated_at: string;
 }
 
+interface GameEvent {
+  date: string;
+  goals: number;
+  assists: number;
+  plusMinus: number;
+}
+
 type Tab = '6w' | 'season';
 
-export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snapshot[]; seasonPpm?: number }) {
+export default function HeatTimeline({
+  snapshots,
+  seasonPpm,
+  gameEvents,
+}: {
+  snapshots: Snapshot[];
+  seasonPpm?: number;
+  gameEvents?: GameEvent[];
+}) {
   const [tab, setTab] = useState<Tab>('6w');
 
   const deduped = useMemo(() => {
@@ -22,6 +37,14 @@ export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snap
     for (const s of snapshots) byDate.set(s.calculated_at.slice(0, 10), s);
     return Array.from(byDate.values()).sort((a, b) => a.calculated_at.localeCompare(b.calculated_at));
   }, [snapshots]);
+
+  const eventsByDate = useMemo(() => {
+    const m = new Map<string, GameEvent>();
+    for (const e of (gameEvents ?? [])) {
+      if (e.date) m.set(e.date, e);
+    }
+    return m;
+  }, [gameEvents]);
 
   const data = useMemo(() => {
     let src = deduped;
@@ -31,13 +54,21 @@ export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snap
       const cutoffStr = cutoff.toISOString().slice(0, 10);
       src = deduped.filter(s => s.calculated_at.slice(0, 10) >= cutoffStr);
     }
-    return src.map(s => ({
-      date: s.calculated_at.slice(5, 10).replace('-', '/'),
-      heat: ppmToHeat(s.momentum_ppm),
-    }));
-  }, [deduped, tab]);
+    return src.map(s => {
+      const dateKey = s.calculated_at.slice(5, 10).replace('-', '/');
+      const ev = eventsByDate.get(dateKey);
+      return {
+        date: dateKey,
+        heat: ppmToHeat(s.momentum_ppm),
+        goals: ev != null ? ev.goals : null,
+        assists: ev != null ? ev.assists : null,
+        plusMinus: ev != null ? ev.plusMinus : null,
+      };
+    });
+  }, [deduped, tab, eventsByDate]);
 
   const seasonAvgHeat = ppmToHeat(seasonPpm ?? 0);
+  const hasGameEvents = (gameEvents?.length ?? 0) > 0;
 
   const first = data[0]?.heat ?? 0;
   const last = data[data.length - 1]?.heat ?? 0;
@@ -66,6 +97,18 @@ export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snap
           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
             Heat · 0–100
           </span>
+          {hasGameEvents && (
+            <div className="flex items-center gap-2 text-xs font-mono" style={{ color: 'var(--text)' }}>
+              <span className="flex items-center gap-1">
+                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: 'rgba(255,90,36,0.8)' }} />
+                G
+              </span>
+              <span className="flex items-center gap-1">
+                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: 'rgba(58,136,255,0.65)' }} />
+                A
+              </span>
+            </div>
+          )}
           {narrative && (
             <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded"
               style={{
@@ -93,10 +136,10 @@ export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snap
       {/* Chart */}
       <div className="pr-4 pb-4 pl-1">
         <ResponsiveContainer width="100%" height={220}>
-          <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 8 }}>
+          <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 8 }}>
             <defs>
               <linearGradient id="heatAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="rgba(255,90,36,1)" stopOpacity={0.18} />
+                <stop offset="5%" stopColor="rgba(255,90,36,1)" stopOpacity={0.15} />
                 <stop offset="95%" stopColor="rgba(255,90,36,1)" stopOpacity={0.02} />
               </linearGradient>
             </defs>
@@ -117,6 +160,7 @@ export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snap
             />
 
             <YAxis
+              yAxisId="heat"
               domain={[0, 100]}
               ticks={[0, 25, 50, 75, 100]}
               tick={{ fill: 'var(--text)', fontSize: 10, fontFamily: 'monospace' }}
@@ -125,8 +169,18 @@ export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snap
               width={26}
             />
 
+            {hasGameEvents && (
+              <YAxis
+                yAxisId="stats"
+                orientation="right"
+                domain={[0, 8]}
+                hide
+              />
+            )}
+
             {seasonAvgHeat > 0 && (
               <ReferenceLine
+                yAxisId="heat"
                 y={seasonAvgHeat}
                 stroke="rgba(255,90,36,0.45)"
                 strokeDasharray="4 4"
@@ -142,18 +196,66 @@ export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snap
             )}
 
             <Tooltip
-              contentStyle={{
-                background: 'var(--bg-card)',
-                border: '1px solid var(--border)',
-                borderRadius: 8,
-                fontSize: 12,
+              content={({ active, payload, label }) => {
+                if (!active || !payload?.length) return null;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const find = (key: string) => (payload as any[]).find((p: any) => p.dataKey === key)?.value;
+                const heat = find('heat') as number | undefined;
+                const goals = find('goals') as number | null | undefined;
+                const assists = find('assists') as number | null | undefined;
+                const plusMinus = find('plusMinus') as number | null | undefined;
+                const hasGame = goals != null;
+                return (
+                  <div style={{
+                    background: 'var(--bg-card)', border: '1px solid var(--border)',
+                    borderRadius: 8, padding: '8px 12px', fontSize: 12, fontFamily: 'monospace',
+                  }}>
+                    <div style={{ color: 'var(--text-bright)', marginBottom: 6 }}>{label}</div>
+                    {heat != null && (
+                      <div style={{ color: 'var(--heat)' }}>Heat  {heat}</div>
+                    )}
+                    {hasGame && (
+                      <>
+                        <div style={{ color: 'rgba(255,90,36,0.85)', marginTop: 4 }}>
+                          {goals}G · {assists}A · {(goals ?? 0) + (assists ?? 0)} Pts
+                        </div>
+                        <div style={{
+                          color: (plusMinus ?? 0) > 0 ? 'var(--rise)' : (plusMinus ?? 0) < 0 ? 'var(--red)' : 'var(--text)',
+                          marginTop: 2,
+                        }}>
+                          {(plusMinus ?? 0) > 0 ? '+' : ''}{plusMinus} +/-
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
               }}
-              labelStyle={{ color: 'var(--text-bright)', marginBottom: 2, fontFamily: 'monospace' }}
-              itemStyle={{ color: 'var(--heat)', fontFamily: 'monospace' }}
-              formatter={(v) => [`Heat  ${v}`, '']}
             />
 
+            {/* Game event bars rendered before Area so they appear behind the heat line */}
+            {hasGameEvents && (
+              <>
+                <Bar
+                  yAxisId="stats"
+                  dataKey="goals"
+                  stackId="gp"
+                  fill="rgba(255,90,36,0.8)"
+                  barSize={5}
+                  radius={[0, 0, 0, 0]}
+                />
+                <Bar
+                  yAxisId="stats"
+                  dataKey="assists"
+                  stackId="gp"
+                  fill="rgba(58,136,255,0.65)"
+                  barSize={5}
+                  radius={[2, 2, 0, 0]}
+                />
+              </>
+            )}
+
             <Area
+              yAxisId="heat"
               type="monotone"
               dataKey="heat"
               stroke="var(--heat)"
@@ -178,7 +280,7 @@ export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snap
               }}
               activeDot={{ r: 4, fill: 'var(--heat)', stroke: 'var(--bg-card)', strokeWidth: 1.5 }}
             />
-          </AreaChart>
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
     </div>
