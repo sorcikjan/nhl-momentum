@@ -375,7 +375,7 @@ export async function fetchPlayer(id: string) {
       .select('*')
       .eq('player_id', id)
       .order('calculated_at', { ascending: false })
-      .limit(30),
+      .limit(300),
     isGoalie
       ? supabaseAdmin
           .from('game_goalie_stats')
