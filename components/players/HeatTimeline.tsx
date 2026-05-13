@@ -61,10 +61,16 @@ export default function HeatTimeline({
       heatByDate.set(s.calculated_at.slice(0, 10), ppmToHeat(s.momentum_ppm));
     }
 
+    const fmtDate = (iso: string) => {
+      const d = new Date(iso + 'T12:00:00Z');
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    };
+
     // No game events (goalies / edge case): fall back to date-based snapshot data
     if (sorted.length === 0) {
       return deduped.map((s, i) => ({
         label:        `G${i + 1}`,
+        dateLabel:    fmtDate(s.calculated_at.slice(0, 10)),
         snapshotDate: s.calculated_at.slice(0, 10),
         heat:         ppmToHeat(s.momentum_ppm),
         cumGoals:     null as number | null,
@@ -98,6 +104,7 @@ export default function HeatTimeline({
 
       return {
         label:             `G${gameIndex}`,
+        dateLabel:         fmtDate(ev.fullDate),
         snapshotDate:      ev.fullDate,
         heat,
         cumGoals,
@@ -120,6 +127,25 @@ export default function HeatTimeline({
   }, [allData, tab]);
 
   const hasGameEvents = (gameEvents?.length ?? 0) > 0;
+
+  // Build a lookup so the custom tick can find the date label by game label
+  const dateLabelMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const d of data) m.set(d.label, d.dateLabel);
+    return m;
+  }, [data]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const GameTick = ({ x, y, payload }: any) => (
+    <g transform={`translate(${x},${y})`}>
+      <text dy={5} textAnchor="middle" fill="var(--text)" fontSize={10} fontFamily="monospace">
+        {payload.value}
+      </text>
+      <text dy={16} textAnchor="middle" fill="var(--text)" fontSize={9} fontFamily="monospace" opacity={0.45}>
+        {dateLabelMap.get(payload.value) ?? ''}
+      </text>
+    </g>
+  );
   const leagueAvgHeat = leaguePpm ? ppmToHeat(leaguePpm) : null;
 
   const first = data[0]?.heat ?? 0;
@@ -217,11 +243,11 @@ export default function HeatTimeline({
 
             <XAxis
               dataKey="label"
-              tick={{ fill: 'var(--text)', fontSize: 10, fontFamily: 'monospace' }}
+              tick={<GameTick />}
               tickLine={false}
               axisLine={{ stroke: 'var(--border)' }}
               interval={xInterval}
-              dy={4}
+              height={36}
             />
 
             <YAxis
@@ -253,19 +279,19 @@ export default function HeatTimeline({
                     {metric === 'heat' && heat != null && (
                       <>
                         <div style={{ color: 'var(--heat)' }}>Heat  {heat}</div>
-                        {leagueAvgHeat != null && <div style={{ color: 'rgba(255,90,36,0.5)', marginTop: 2 }}>Lg avg  {leagueAvgHeat}</div>}
+                        {leagueAvgHeat != null && <div style={{ color: 'rgba(255,90,36,0.5)', marginTop: 2 }}>League average  {leagueAvgHeat}</div>}
                       </>
                     )}
                     {metric === 'goals' && goals != null && (
                       <>
                         <div style={{ color: '#f59e0b' }}>Goals  {goals}</div>
-                        {lgGoals != null && <div style={{ color: 'rgba(245,158,11,0.5)', marginTop: 2 }}>Lg pace  {Math.round(lgGoals)}</div>}
+                        {lgGoals != null && <div style={{ color: 'rgba(245,158,11,0.5)', marginTop: 2 }}>League average  {Math.round(lgGoals)}</div>}
                       </>
                     )}
                     {metric === 'assists' && assists != null && (
                       <>
                         <div style={{ color: '#3a88ff' }}>Assists  {assists}</div>
-                        {lgAsst != null && <div style={{ color: 'rgba(58,136,255,0.5)', marginTop: 2 }}>Lg pace  {Math.round(lgAsst)}</div>}
+                        {lgAsst != null && <div style={{ color: 'rgba(58,136,255,0.5)', marginTop: 2 }}>League average  {Math.round(lgAsst)}</div>}
                       </>
                     )}
                     {metric === 'plusMinus' && pm != null && (
@@ -305,7 +331,7 @@ export default function HeatTimeline({
                     stroke="rgba(255,90,36,0.4)"
                     strokeDasharray="4 4"
                     label={{
-                      value: `lg avg  ${leagueAvgHeat}`,
+                      value: `League average  ${leagueAvgHeat}`,
                       position: 'insideTopLeft',
                       fill: 'rgba(255,90,36,0.5)',
                       fontSize: 10,
