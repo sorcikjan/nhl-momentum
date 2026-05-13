@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { playerUrl } from '@/lib/urls';
-import { ppmToHeat } from '@/lib/heat';
+import { ppmToHeat, heatBg, heatBorderColor } from '@/lib/heat';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -66,31 +66,6 @@ function flag(country?: string | null): string | null {
   return country ? (FLAGS[country] ?? null) : null;
 }
 
-// Smooth continuous gradient: steel grey (0) → warm amber (55) → fire orange (100)
-function gradientColor(heat: number): string {
-  const h = Math.max(0, Math.min(100, heat));
-  const stops: [number, number, number, number][] = [
-    [0,    90,  95, 115],
-    [25,  155, 140,  90],
-    [55,  220, 135,  40],
-    [80,  245,  95,  20],
-    [100, 255,  55,  10],
-  ];
-  for (let i = 0; i < stops.length - 1; i++) {
-    const [h0, r0, g0, b0] = stops[i];
-    const [h1, r1, g1, b1] = stops[i + 1];
-    if (h <= h1) {
-      const t = (h - h0) / (h1 - h0);
-      return `rgb(${Math.round(r0 + t * (r1 - r0))},${Math.round(g0 + t * (g1 - g0))},${Math.round(b0 + t * (b1 - b0))})`;
-    }
-  }
-  return 'rgb(255,55,10)';
-}
-
-function heatBg(heat: number): string {
-  const t = heat / 100;
-  return `rgb(${Math.round(13 + t * 120)},${Math.round(15 + t * 20)},${Math.round(20 - t * 10)})`;
-}
 
 function logoUrl(abbrev: string) {
   return `https://assets.nhle.com/logos/nhl/svg/${abbrev}_light.svg`;
@@ -102,7 +77,6 @@ function CardShell({
   href,
   headshotUrl,
   heat,
-  color,
   topLeft,
   topRight,
   bottom,
@@ -110,7 +84,6 @@ function CardShell({
   href: string;
   headshotUrl: string | null;
   heat: number;
-  color: string;
   topLeft: React.ReactNode;
   topRight: React.ReactNode;
   bottom: React.ReactNode;
@@ -122,7 +95,7 @@ function CardShell({
       style={{
         background: headshotUrl ? '#0d0f14' : `linear-gradient(135deg, ${heatBg(heat)} 0%, #0d0f14 80%)`,
         aspectRatio: '3 / 4',
-        borderBottom: `4px solid ${color}`,
+        borderBottom: `4px solid ${heatBorderColor(heat)}`,
       }}
     >
       {headshotUrl && (
@@ -161,13 +134,13 @@ function CardShell({
 
 // ── Rank badge (top-left spotlight) ──────────────────────────────────────────
 
-function RankBadge({ rank, color }: { rank: number; color: string }) {
+function RankBadge({ rank }: { rank: number }) {
   return (
     <div style={{ lineHeight: 1 }}>
       <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.5rem', fontFamily: 'monospace', marginBottom: '1px' }}>#</div>
       <div style={{
         color: '#fff', fontSize: '1.3rem', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1,
-        textShadow: `0 0 18px ${color}bb, 0 0 6px ${color}66`,
+        textShadow: '0 0 18px rgba(249,115,22,0.73), 0 0 6px rgba(249,115,22,0.4)',
       }}>
         {rank}
       </div>
@@ -179,7 +152,6 @@ function RankBadge({ rank, color }: { rank: number; color: string }) {
 
 function SkaterCard({ p, rank }: { p: SkaterPlayer; rank: number }) {
   const heat = ppmToHeat(p.momentum_ppm);
-  const color = gradientColor(heat);
   const abbrev = p.players.teams.abbrev;
   const surge = p.season_ppm && p.season_ppm > 0
     ? ((p.momentum_ppm - p.season_ppm) / p.season_ppm * 100)
@@ -192,19 +164,18 @@ function SkaterCard({ p, rank }: { p: SkaterPlayer; rank: number }) {
       href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
       headshotUrl={p.players.headshot_url}
       heat={heat}
-      color={color}
-      topLeft={<RankBadge rank={rank} color={color} />}
+      topLeft={<RankBadge rank={rank} />}
       topRight={
         surge !== null ? (
           <span style={{
-            color: surge >= 0 ? color : 'rgba(255,255,255,0.38)',
+            color: surge >= 0 ? 'var(--heat)' : 'rgba(255,255,255,0.38)',
             fontSize: '0.9rem', fontWeight: 800, fontFamily: 'monospace', lineHeight: 1,
-            textShadow: surge >= 0 ? `0 0 10px ${color}55` : 'none',
+            textShadow: surge >= 0 ? '0 0 10px rgba(249,115,22,0.33)' : 'none',
           }}>
             {surge >= 0 ? '↑' : '↓'}{Math.abs(Math.round(surge))}%
           </span>
         ) : (
-          <span style={{ color, fontSize: '1.1rem', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1 }}>
+          <span style={{ color: 'var(--heat)', fontSize: '1.1rem', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1 }}>
             {heat}
           </span>
         )
@@ -237,7 +208,6 @@ function GoalieCard({ g, rank }: { g: GoaliePlayer; rank: number }) {
   const abbrev = g.teams?.abbrev ?? '?';
   const sv = g.avgSavePct;
   const heat = Math.round(Math.max(0, Math.min(100, (sv - 0.85) / 0.10 * 100)));
-  const color = gradientColor(heat);
   const f = flag(g.birth_country);
   const initial = g.first_name?.[0] ?? '';
 
@@ -246,11 +216,10 @@ function GoalieCard({ g, rank }: { g: GoaliePlayer; rank: number }) {
       href={playerUrl(g.id, g.first_name, g.last_name)}
       headshotUrl={g.headshot_url}
       heat={heat}
-      color={color}
-      topLeft={<RankBadge rank={rank} color={color} />}
+      topLeft={<RankBadge rank={rank} />}
       topRight={
         <div style={{ textAlign: 'right' }}>
-          <div style={{ color, fontSize: '1rem', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1 }}>
+          <div style={{ color: 'var(--heat)', fontSize: '1rem', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1 }}>
             .{Math.round(sv * 1000).toString().padStart(3, '0')}
           </div>
           <div style={{ color: 'rgba(255,255,255,0.38)', fontSize: '0.54rem', lineHeight: 1.4 }}>
@@ -284,7 +253,6 @@ function GoalieCard({ g, rank }: { g: GoaliePlayer; rank: number }) {
 
 function NewcomerCard({ p, rank }: { p: NewcomerPlayer; rank: number }) {
   const heat = ppmToHeat(p.momentum_ppm);
-  const color = gradientColor(heat);
   const abbrev = p.players.teams?.abbrev ?? '?';
   const f = flag(p.players.birth_country);
   const initial = p.players.first_name?.[0] ?? '';
@@ -296,8 +264,7 @@ function NewcomerCard({ p, rank }: { p: NewcomerPlayer; rank: number }) {
       href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
       headshotUrl={p.players.headshot_url}
       heat={heat}
-      color={color}
-      topLeft={<RankBadge rank={rank} color={color} />}
+      topLeft={<RankBadge rank={rank} />}
       topRight={
         <div style={{ textAlign: 'right' }}>
           <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: '1rem', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1 }}>

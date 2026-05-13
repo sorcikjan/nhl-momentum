@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { playerUrl, teamUrl } from '@/lib/urls';
 import { deriveOutStatus, daysAgo } from '@/lib/player-status';
 import { ppmToHeat } from '@/lib/heat';
+import HeatBadge from '@/components/ui/HeatBadge';
 
 interface Player {
   player_id: number;
@@ -176,8 +177,8 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                         </div>
                       </Link>
                     </td>
-                    <td className="px-2 py-2.5 font-mono text-xs md:text-sm font-bold" style={{ color: heat >= 72 ? 'var(--heat)' : heat >= 50 ? 'var(--amber)' : 'var(--text)' }}>
-                      {heat}
+                    <td className="px-2 py-2.5">
+                      <HeatBadge heat={heat} size="sm" />
                     </td>
                     <td className="px-2 py-2.5 font-mono text-xs md:text-sm"
                       style={{ color: delta > 0 ? 'var(--heat)' : delta < 0 ? 'var(--silver)' : 'var(--text)' }}>

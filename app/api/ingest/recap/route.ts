@@ -134,26 +134,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: { date, hero_image_url: heroImageUrl }, error: null });
   }
 
-  // Skip if fresh recap already exists
+  // Fetch all game data for that date (needed before skip check to compare game counts)
+  const raw = await fetchRecapData(date);
+  if (!raw || !raw.games.length) {
+    return NextResponse.json({ data: { skipped: true, date, reason: 'no games found' }, error: null });
+  }
+
+  // Skip if fresh recap exists — unless more games are now FINAL than when it was generated
   if (!force) {
     const { data: existing } = await supabaseAdmin
       .from('daily_recaps')
-      .select('date, generated_at')
+      .select('date, generated_at, games_count')
       .eq('date', date)
       .single();
 
     if (existing?.generated_at) {
       const ageH = (Date.now() - new Date(existing.generated_at).getTime()) / 3_600_000;
-      if (ageH < 12) {
+      const hasNewGames = raw.games.length > (existing.games_count ?? 0);
+      if (ageH < 12 && !hasNewGames) {
         return NextResponse.json({ data: { skipped: true, date, reason: 'fresh recap exists' }, error: null });
       }
     }
-  }
-
-  // Fetch all game data for that date
-  const raw = await fetchRecapData(date);
-  if (!raw || !raw.games.length) {
-    return NextResponse.json({ data: { skipped: true, date, reason: 'no games found' }, error: null });
   }
 
   // Build AI input

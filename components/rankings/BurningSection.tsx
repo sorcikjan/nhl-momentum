@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { ppmToHeat, heatColor } from '@/lib/heat';
+import { ppmToHeat } from '@/lib/heat';
+import HeatBadge from '@/components/ui/HeatBadge';
 import { playerUrl } from '@/lib/urls';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -33,7 +34,6 @@ export function BurningSection({ players }: { players: Player[] }) {
         {top10.map((p: Player, i: number) => {
           const rank = i + 1;
           const heat = ppmToHeat(p.momentum_ppm ?? 0);
-          const color = heatColor(heat);
           const barWidth = topHeat > 0 ? Math.round((heat / topHeat) * 100) : 0;
           const { number: rankClass, accent } = rankStyle(rank);
           const vsAvg = p.season_ppm > 0
@@ -72,11 +72,11 @@ export function BurningSection({ players }: { players: Player[] }) {
                   <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
                     <div
                       className="h-full rounded-full transition-all"
-                      style={{ width: `${barWidth}%`, background: color }}
+                      style={{ width: `${barWidth}%`, background: 'var(--heat)' }}
                     />
                   </div>
                   {vsAvg !== 0 && (
-                    <span className="text-xs font-mono shrink-0" style={{ color: vsAvg > 0 ? color : 'var(--silver)' }}>
+                    <span className="text-xs font-mono shrink-0" style={{ color: vsAvg > 0 ? 'var(--heat)' : 'var(--silver)' }}>
                       {vsAvg > 0 ? '+' : ''}{vsAvg}% vs avg
                     </span>
                   )}
@@ -84,11 +84,8 @@ export function BurningSection({ players }: { players: Player[] }) {
               </div>
 
               {/* Heat score */}
-              <div className="text-right shrink-0">
-                <div className="text-xl font-black tabular-nums" style={{ color }}>
-                  {heat}
-                </div>
-                <div className="text-xs" style={{ color: 'var(--text)' }}>heat</div>
+              <div className="shrink-0">
+                <HeatBadge heat={heat} />
               </div>
 
               {/* Energy dot */}
