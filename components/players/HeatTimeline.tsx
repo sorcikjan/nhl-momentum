@@ -1,6 +1,9 @@
 'use client';
 import { useState, useMemo } from 'react';
-import { AreaChart, Area, ReferenceLine, ResponsiveContainer, Tooltip, YAxis } from 'recharts';
+import {
+  AreaChart, Area, CartesianGrid, XAxis, YAxis,
+  ReferenceLine, ResponsiveContainer, Tooltip,
+} from 'recharts';
 import { ppmToHeat } from '@/lib/heat';
 
 interface Snapshot {
@@ -40,9 +43,11 @@ export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snap
   const last = data[data.length - 1]?.heat ?? 0;
   const diff = last - first;
   const narrative = data.length >= 3
-    ? diff > 5 ? `Trending up +${diff} pts over this window`
-    : diff < -5 ? `Trending down ${diff} pts over this window`
-    : 'Holding steady'
+    ? diff > 5
+      ? `+${diff} pts vs window open`
+      : diff < -5
+      ? `${diff} pts vs window open`
+      : 'Flat over window'
     : '';
 
   if (!snapshots.length) {
@@ -55,11 +60,20 @@ export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snap
 
   return (
     <div>
+      {/* Header */}
       <div className="px-4 pt-3 pb-2 flex items-center justify-between">
-        <div>
-          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>Heat Trend</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
+            Heat · 0–100
+          </span>
           {narrative && (
-            <p className="text-xs mt-0.5" style={{ color: 'var(--heat)' }}>{narrative}</p>
+            <span className="text-xs font-mono font-semibold px-2 py-0.5 rounded"
+              style={{
+                background: diff > 0 ? 'rgba(255,90,36,0.12)' : 'rgba(148,163,184,0.1)',
+                color: diff > 0 ? 'var(--heat)' : 'var(--silver)',
+              }}>
+              {narrative}
+            </span>
           )}
         </div>
         <div className="flex rounded-lg overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
@@ -76,30 +90,74 @@ export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snap
         </div>
       </div>
 
-      <div className="px-2 pb-4">
-        <ResponsiveContainer width="100%" height={180}>
-          <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+      {/* Chart */}
+      <div className="pr-4 pb-4 pl-1">
+        <ResponsiveContainer width="100%" height={220}>
+          <AreaChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 8 }}>
             <defs>
               <linearGradient id="heatAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="rgba(255,90,36,1)" stopOpacity={0.28} />
+                <stop offset="5%" stopColor="rgba(255,90,36,1)" stopOpacity={0.18} />
                 <stop offset="95%" stopColor="rgba(255,90,36,1)" stopOpacity={0.02} />
               </linearGradient>
             </defs>
-            <YAxis domain={[0, 100]} hide />
-            {seasonAvgHeat > 0 && (
-              <ReferenceLine y={seasonAvgHeat} stroke="rgba(255,90,36,0.4)" strokeDasharray="4 4" />
-            )}
-            <Tooltip
-              contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
-              labelStyle={{ color: 'var(--text-bright)', marginBottom: 2 }}
-              itemStyle={{ color: 'var(--heat)' }}
-              formatter={(v) => [`Heat ${v}`, '']}
+
+            <CartesianGrid
+              strokeDasharray="2 4"
+              stroke="var(--border)"
+              vertical={false}
             />
+
+            <XAxis
+              dataKey="date"
+              tick={{ fill: 'var(--text)', fontSize: 10, fontFamily: 'monospace' }}
+              tickLine={false}
+              axisLine={{ stroke: 'var(--border)' }}
+              interval="preserveStartEnd"
+              dy={4}
+            />
+
+            <YAxis
+              domain={[0, 100]}
+              ticks={[0, 25, 50, 75, 100]}
+              tick={{ fill: 'var(--text)', fontSize: 10, fontFamily: 'monospace' }}
+              tickLine={false}
+              axisLine={false}
+              width={26}
+            />
+
+            {seasonAvgHeat > 0 && (
+              <ReferenceLine
+                y={seasonAvgHeat}
+                stroke="rgba(255,90,36,0.45)"
+                strokeDasharray="4 4"
+                label={{
+                  value: `season avg  ${seasonAvgHeat}`,
+                  position: 'insideTopRight',
+                  fill: 'rgba(255,90,36,0.65)',
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  dy: -6,
+                }}
+              />
+            )}
+
+            <Tooltip
+              contentStyle={{
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                fontSize: 12,
+              }}
+              labelStyle={{ color: 'var(--text-bright)', marginBottom: 2, fontFamily: 'monospace' }}
+              itemStyle={{ color: 'var(--heat)', fontFamily: 'monospace' }}
+              formatter={(v) => [`Heat  ${v}`, '']}
+            />
+
             <Area
               type="monotone"
               dataKey="heat"
               stroke="var(--heat)"
-              strokeWidth={2}
+              strokeWidth={1.5}
               fill="url(#heatAreaGrad)"
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               dot={(props: any) => {
@@ -109,7 +167,7 @@ export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snap
                       key="endpoint"
                       cx={props.cx}
                       cy={props.cy}
-                      r={4}
+                      r={3.5}
                       fill="var(--heat)"
                       stroke="var(--bg-card)"
                       strokeWidth={1.5}
