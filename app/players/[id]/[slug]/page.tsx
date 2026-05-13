@@ -52,6 +52,21 @@ const COUNTRY_FLAG: Record<string, string> = {
   AUS: '🇦🇺', NLD: '🇳🇱', GBR: '🇬🇧', HUN: '🇭🇺',
 };
 
+function SectionTitle({ main, accent }: { main: string; accent: string }) {
+  return (
+    <h2 style={{
+      fontFamily: 'var(--font-fraunces), Georgia, serif',
+      fontWeight: 900,
+      fontSize: '1.3rem',
+      letterSpacing: '-0.025em',
+      lineHeight: 1.1,
+    }}>
+      <span style={{ color: 'var(--text-bright)' }}>{main} </span>
+      <span style={{ color: 'var(--heat)' }}>{accent}</span>
+    </h2>
+  );
+}
+
 function rankBadge(rank: number | undefined) {
   if (!rank) return null;
   const label = rank === 1 ? 'ELITE' : rank <= 3 ? 'ELITE' : rank <= 10 ? 'TOP 10' : rank <= 25 ? 'TOP 25' : rank <= 50 ? 'TOP 50' : `#${rank}`;
@@ -281,6 +296,20 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   }).length;
   const l5OT = last5Games.length - l5W - l5L;
 
+  // L5 stat cells — hoisted so each sub-card can render independently
+  const l5PlusMinus = Number(latestSnapshot.momentum_plus_minus ?? 0);
+  const l5ToiSec    = Number(latestSnapshot.momentum_toi_sec ?? 0);
+  const l5ToiPerGm  = momGames > 0 ? l5ToiSec / momGames : 0;
+  const l5ToiMin    = Math.floor(l5ToiPerGm / 60);
+  const l5ToiSecPad = String(Math.round(l5ToiPerGm % 60)).padStart(2, '0');
+  const l5ShootDiff = (momShootPct - seaShootPct) * 100;
+  const l5Cells = [
+    { label: 'Pts',    value: String(momGoals + momAssists), sub: `${momGoals}G · ${momAssists}A`,                         highlight: momGoals + momAssists > 2, negative: false },
+    { label: 'TOI/gm', value: l5ToiPerGm > 0 ? `${l5ToiMin}:${l5ToiSecPad}` : '—',                sub: 'L5 avg',          highlight: false,                     negative: false },
+    { label: 'S%',     value: `${(momShootPct * 100).toFixed(0)}%`, sub: seaShootPct > 0 ? `${l5ShootDiff > 0 ? '+' : ''}${l5ShootDiff.toFixed(1)}% vs avg` : '', highlight: momShootPct > seaShootPct, negative: false },
+    { label: '+/-',    value: `${l5PlusMinus > 0 ? '+' : ''}${l5PlusMinus}`, sub: 'L5',            highlight: l5PlusMinus > 0, negative: l5PlusMinus < 0 },
+  ];
+
   // Game events for HeatTimeline cumulative overlays (skaters only)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const gameEvents = isGoalie ? [] : (recentGames ?? []).map((g: any) => ({
@@ -471,168 +500,153 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {/* 4. Heat timeline ─────────────────────────────────────────────────────── */}
       {(metricTimeline?.length ?? 0) > 0 && (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <div className="px-5 pt-5 pb-1">
+            <SectionTitle main="Heat" accent="trend." />
+          </div>
           <HeatTimeline snapshots={metricTimeline ?? []} leaguePpm={lgPpm} gameEvents={gameEvents}
             leagueGoalsPerGame={lgG} leagueAssistsPerGame={lgA} />
         </div>
       )}
 
-      {/* 5. Last 5 matches ─────────────────────────────────────────────────────── */}
-      {last5Games.length > 0 && (() => {
-        // Stat card computation (moved from old section 3)
-        const momPlusMinus = Number(latestSnapshot.momentum_plus_minus ?? 0);
-        const momToiSec = Number(latestSnapshot.momentum_toi_sec ?? 0);
-        const toiPerGame = momGames > 0 ? momToiSec / momGames : 0;
-        const toiMin5 = Math.floor(toiPerGame / 60);
-        const toiSec5 = String(Math.round(toiPerGame % 60)).padStart(2, '0');
-        const shootDiff = (momShootPct - seaShootPct) * 100;
-        const cells = [
-          { label: 'Pts', value: String(momGoals + momAssists), sub: `${momGoals}G · ${momAssists}A`, highlight: momGoals + momAssists > 2, negative: false },
-          { label: 'TOI/gm', value: toiPerGame > 0 ? `${toiMin5}:${toiSec5}` : '—', sub: 'L5 avg', highlight: false, negative: false },
-          { label: 'S%', value: `${(momShootPct * 100).toFixed(0)}%`, sub: seaShootPct > 0 ? `${shootDiff > 0 ? '+' : ''}${shootDiff.toFixed(1)}% vs avg` : '', highlight: momShootPct > seaShootPct, negative: false },
-          { label: '+/-', value: `${momPlusMinus > 0 ? '+' : ''}${momPlusMinus}`, sub: 'L5', highlight: momPlusMinus > 0, negative: momPlusMinus < 0 },
-        ];
-        return (
-          <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
-            {/* Header */}
-            <div className="px-4 py-3 border-b flex items-center justify-between"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-                Last 5 matches
-              </span>
-              {!isGoalie && (
-                <span className="text-xs font-mono font-semibold" style={{ color: 'var(--heat)' }}>
-                  {l5W}W–{l5L}L–{l5OT}OT
-                </span>
-              )}
-            </div>
-
-            {/* AI perf eval */}
-            <div className="px-4 pt-4 pb-2" style={{ background: 'var(--bg-card)' }}>
-              <Suspense fallback={<div className="h-8 rounded animate-pulse mb-2" style={{ background: 'var(--border)', opacity: 0.4 }} />}>
-                <AIPerfSection playerId={Number(id)} aiInput={aiInput} />
-              </Suspense>
-            </div>
-
-            {/* Stat cards — skaters only */}
-            {!isGoalie && momGames > 0 && (
-              <div className="grid grid-cols-4 gap-3 px-4 pb-4" style={{ background: 'var(--bg-card)' }}>
-                {cells.map((cell) => (
-                  <div key={cell.label} className="rounded-xl border flex flex-col items-center py-3 px-2 gap-0.5"
-                    style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
-                    <span className="text-2xl font-black font-mono"
-                      style={{ color: cell.negative ? 'var(--red)' : cell.highlight ? 'var(--heat)' : 'var(--text-bright)' }}>
-                      {cell.value}
-                    </span>
-                    <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{cell.label}</span>
-                    {cell.sub && (
-                      <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.55 }}>{cell.sub}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Game log */}
-            <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-              {last5Games.map((g: any, i: number) => {
-                const game = g.games;
-                const isHome = player.team_id === game?.home_team_id;
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const opponentAbbrev = isHome ? (game?.away_team as any)?.abbrev : (game?.home_team as any)?.abbrev;
-                const teamScore  = isHome ? game?.home_score : game?.away_score;
-                const oppScore   = isHome ? game?.away_score : game?.home_score;
-                const hasResult  = teamScore !== null && oppScore !== null;
-                const won        = hasResult && teamScore > oppScore;
-                const lost       = hasResult && teamScore < oppScore;
-                const toiMin     = Math.floor(Number(g.toi_seconds ?? 0) / 60);
-                const toiSec     = String(Number(g.toi_seconds ?? 0) % 60).padStart(2, '0');
-                const gameDate   = String(game?.game_date ?? '').slice(5);
-                const heatRaw    = Math.min(99, Math.round((g.points_per_minute ?? 0) * 600));
-                const gameHeatColor = getHeatColor(heatRaw);
-
-                // Goalie decision parsing
-                const dec = g.decision ?? null;
-                const decIsWin = dec === 'W' || dec === 'SOW';
-                const decIsLoss = dec === 'L';
-
-                return (
-                  <div key={i} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3"
-                    style={{ background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)' }}>
-
-                    {/* VS + date */}
-                    <div className="flex-shrink-0 w-20">
-                      {opponentAbbrev && (
-                        <div className="text-xs mb-0.5" style={{ color: 'var(--text)' }}>
-                          {isHome ? 'VS' : '@'} {opponentAbbrev}
-                        </div>
-                      )}
-                      <div className="text-xs font-mono" style={{ color: 'var(--text)' }}>{gameDate || '—'}</div>
-                    </div>
-
-                    {/* Result badge + score */}
-                    <div className="flex items-center gap-1.5 flex-shrink-0 w-20">
-                      {hasResult ? (
-                        <>
-                          <span className="text-xs font-bold px-1.5 py-0.5 rounded"
-                            style={{
-                              background: won ? 'rgba(34,197,94,0.15)' : lost ? 'rgba(239,68,68,0.15)' : 'rgba(160,174,192,0.1)',
-                              color: won ? 'var(--green)' : lost ? 'var(--red)' : 'var(--text)',
-                            }}>
-                            {won ? 'WIN' : lost ? 'LOSS' : 'OT'}
-                          </span>
-                          <span className="text-sm font-mono font-bold" style={{ color: 'var(--text-bright)' }}>
-                            {teamScore}–{oppScore}
-                          </span>
-                        </>
-                      ) : null}
-                    </div>
-
-                    {isGoalie ? (
-                      <div className="flex items-center gap-2 sm:gap-4 flex-1">
-                        <StatPill label="SA" value={String(g.shots_against ?? 0)} />
-                        <StatPill label="GA" value={String(g.goals_against ?? 0)} highlight={Number(g.goals_against) === 0} />
-                        <StatPill
-                          label="SV%"
-                          value={g.save_pct != null ? Number(g.save_pct).toFixed(3).replace(/^0/, '') : '—'}
-                          highlight={Number(g.save_pct ?? 0) >= 0.93}
-                          bold
-                        />
-                        <span className="text-xs font-mono hidden sm:block" style={{ color: 'var(--text)' }}>
-                          {toiMin}:{toiSec} TOI
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 sm:gap-4 flex-1">
-                        <StatPill label="G" value={String(g.goals ?? 0)} highlight={Number(g.goals) > 0} />
-                        <StatPill label="A" value={String(g.assists ?? 0)} highlight={Number(g.assists) > 1} />
-                        <span className="text-xs font-mono hidden sm:block" style={{ color: 'var(--text)' }}>
-                          {toiMin}:{toiSec} TOI
-                        </span>
-                      </div>
-                    )}
-
-                    {/* HEAT number — skaters only */}
-                    {!isGoalie && (
-                      <div className="ml-auto flex-shrink-0 text-sm font-mono font-bold"
-                        style={{ color: heatRaw === 0 ? 'var(--text)' : gameHeatColor }}>
-                        {heatRaw === 0 ? '—' : heatRaw}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+      {/* 5a. Recent form — AI perf eval ──────────────────────────────────────── */}
+      {last5Games.length > 0 && (
+        <div className="rounded-xl border p-5" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <SectionTitle main="Recent" accent="form." />
+          <div className="mt-3">
+            <Suspense fallback={<div className="h-8 rounded animate-pulse" style={{ background: 'var(--border)', opacity: 0.4 }} />}>
+              <AIPerfSection playerId={Number(id)} aiInput={aiInput} />
+            </Suspense>
           </div>
-        );
-      })()}
+        </div>
+      )}
+
+      {/* 5b. Last 5 stats ─────────────────────────────────────────────────────── */}
+      {!isGoalie && last5Games.length > 0 && momGames > 0 && (
+        <div className="rounded-xl border p-5" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <SectionTitle main="Last 5" accent="stats." />
+          <div className="grid grid-cols-4 gap-3 mt-4">
+            {l5Cells.map((cell) => (
+              <div key={cell.label} className="rounded-xl border flex flex-col items-center py-3 px-2 gap-0.5"
+                style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+                <span className="text-2xl font-black font-mono"
+                  style={{ color: cell.negative ? 'var(--red)' : cell.highlight ? 'var(--heat)' : 'var(--text-bright)' }}>
+                  {cell.value}
+                </span>
+                <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{cell.label}</span>
+                {cell.sub && (
+                  <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.55 }}>{cell.sub}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 5c. Game log ─────────────────────────────────────────────────────────── */}
+      {last5Games.length > 0 && (
+        <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+            <SectionTitle main="Game" accent="log." />
+            {!isGoalie && (
+              <span className="text-xs font-mono font-semibold" style={{ color: 'var(--heat)' }}>
+                {l5W}W–{l5L}L–{l5OT}OT
+              </span>
+            )}
+          </div>
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {last5Games.map((g: any, i: number) => {
+              const game = g.games;
+              const isHome = player.team_id === game?.home_team_id;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const opponentAbbrev = isHome ? (game?.away_team as any)?.abbrev : (game?.home_team as any)?.abbrev;
+              const teamScore  = isHome ? game?.home_score : game?.away_score;
+              const oppScore   = isHome ? game?.away_score : game?.home_score;
+              const hasResult  = teamScore !== null && oppScore !== null;
+              const won        = hasResult && teamScore > oppScore;
+              const lost       = hasResult && teamScore < oppScore;
+              const toiMin     = Math.floor(Number(g.toi_seconds ?? 0) / 60);
+              const toiSec     = String(Number(g.toi_seconds ?? 0) % 60).padStart(2, '0');
+              const gameDate   = String(game?.game_date ?? '').slice(5);
+              const heatRaw    = Math.min(99, Math.round((g.points_per_minute ?? 0) * 600));
+              const gameHeatColor = getHeatColor(heatRaw);
+
+              return (
+                <div key={i} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3"
+                  style={{ background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)' }}>
+
+                  {/* VS + date */}
+                  <div className="flex-shrink-0 w-20">
+                    {opponentAbbrev && (
+                      <div className="text-xs mb-0.5" style={{ color: 'var(--text)' }}>
+                        {isHome ? 'VS' : '@'} {opponentAbbrev}
+                      </div>
+                    )}
+                    <div className="text-xs font-mono" style={{ color: 'var(--text)' }}>{gameDate || '—'}</div>
+                  </div>
+
+                  {/* Result badge + score */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0 w-20">
+                    {hasResult ? (
+                      <>
+                        <span className="text-xs font-bold px-1.5 py-0.5 rounded"
+                          style={{
+                            background: won ? 'rgba(34,197,94,0.15)' : lost ? 'rgba(239,68,68,0.15)' : 'rgba(160,174,192,0.1)',
+                            color: won ? 'var(--green)' : lost ? 'var(--red)' : 'var(--text)',
+                          }}>
+                          {won ? 'WIN' : lost ? 'LOSS' : 'OT'}
+                        </span>
+                        <span className="text-sm font-mono font-bold" style={{ color: 'var(--text-bright)' }}>
+                          {teamScore}–{oppScore}
+                        </span>
+                      </>
+                    ) : null}
+                  </div>
+
+                  {isGoalie ? (
+                    <div className="flex items-center gap-2 sm:gap-4 flex-1">
+                      <StatPill label="SA" value={String(g.shots_against ?? 0)} />
+                      <StatPill label="GA" value={String(g.goals_against ?? 0)} highlight={Number(g.goals_against) === 0} />
+                      <StatPill
+                        label="SV%"
+                        value={g.save_pct != null ? Number(g.save_pct).toFixed(3).replace(/^0/, '') : '—'}
+                        highlight={Number(g.save_pct ?? 0) >= 0.93}
+                        bold
+                      />
+                      <span className="text-xs font-mono hidden sm:block" style={{ color: 'var(--text)' }}>
+                        {toiMin}:{toiSec} TOI
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 sm:gap-4 flex-1">
+                      <StatPill label="G" value={String(g.goals ?? 0)} highlight={Number(g.goals) > 0} />
+                      <StatPill label="A" value={String(g.assists ?? 0)} highlight={Number(g.assists) > 1} />
+                      <span className="text-xs font-mono hidden sm:block" style={{ color: 'var(--text)' }}>
+                        {toiMin}:{toiSec} TOI
+                      </span>
+                    </div>
+                  )}
+
+                  {/* HEAT number — skaters only */}
+                  {!isGoalie && (
+                    <div className="ml-auto flex-shrink-0 text-sm font-mono font-bold"
+                      style={{ color: heatRaw === 0 ? 'var(--text)' : gameHeatColor }}>
+                      {heatRaw === 0 ? '—' : heatRaw}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* 6. Where he ranks (skaters only) ────────────────────────────────────── */}
       {!isGoalie && latestSnapshot.momentum_rank && (
         <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <span className="text-xs font-semibold uppercase tracking-wider block mb-3" style={{ color: 'var(--text)' }}>
-            Where {player.first_name} ranks
-          </span>
+          <div className="mb-3">
+            <SectionTitle main={`Where ${player.first_name}`} accent="ranks." />
+          </div>
           <div className="flex flex-col gap-3">
             {[
               { label: 'Heat score', fill: Math.min(100, energyBar), rank: latestSnapshot.momentum_rank },
@@ -661,10 +675,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {/* 9. Full season stats (de-emphasized) ────────────────────────────────── */}
       {isGoalie && goalieStats ? (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)', opacity: 0.6 }}>
-              Full season stats
-            </span>
+          <div className="px-5 pt-5 pb-3 border-b" style={{ borderColor: 'var(--border)' }}>
+            <SectionTitle main="Season" accent="stats." />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -715,10 +727,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         </div>
       ) : seaGames > 0 ? (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="px-4 py-3 border-b" style={{ borderColor: 'var(--border)' }}>
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)', opacity: 0.6 }}>
-              Full season stats
-            </span>
+          <div className="px-5 pt-5 pb-3 border-b" style={{ borderColor: 'var(--border)' }}>
+            <SectionTitle main="Season" accent="stats." />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
