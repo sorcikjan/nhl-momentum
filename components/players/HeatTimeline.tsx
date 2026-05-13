@@ -110,7 +110,7 @@ export default function HeatTimeline({
   const yDomain =
     metric === 'heat'      ? [0, 100] as [number, number] :
     metric === 'plusMinus'
-      ? [(min: number) => Math.min(min, 0), (max: number) => Math.max(max, 0)] as [(v: number) => number, (v: number) => number]
+      ? [(min: number) => Math.min(min, -5), (max: number) => Math.max(max, 1)] as [(v: number) => number, (v: number) => number]
       : [0, 'auto'] as [number, string];
 
   const yTicks = metric === 'heat' ? [0, 25, 50, 75, 100] : undefined;
