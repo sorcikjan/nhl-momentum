@@ -9,9 +9,16 @@ export function ppmToHeat(ppm: number | null | undefined): number {
   return Math.min(100, Math.round((ppm / PPM_MAX) * 100));
 }
 
-// The Heat number is always orange — never amber, gray, or silver.
-export function heatColor(_heat: number): string {
-  return 'var(--heat)';
+// Text/foreground color for a Heat score — accounts for background legibility.
+// Low heat: silver (cold, no momentum)
+// Building: amber
+// Hot: full Heat orange
+// Blazing (80+): white — background is near-orange, needs contrast
+export function heatColor(heat: number): string {
+  if (heat >= 80) return '#ffffff';
+  if (heat >= 60) return 'var(--heat)';
+  if (heat >= 35) return 'var(--amber)';
+  return 'var(--silver)';
 }
 
 // Background color — continuous gradient from Ink (#0a0b0f) to Heat (#ff5a24).

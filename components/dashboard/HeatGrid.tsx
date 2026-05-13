@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { playerUrl } from '@/lib/urls';
-import { ppmToHeat, heatBg, heatBorderColor } from '@/lib/heat';
+import { ppmToHeat, heatBg, heatBorderColor, heatColor } from '@/lib/heat';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -175,7 +175,7 @@ function SkaterCard({ p, rank }: { p: SkaterPlayer; rank: number }) {
             {surge >= 0 ? '↑' : '↓'}{Math.abs(Math.round(surge))}%
           </span>
         ) : (
-          <span style={{ color: 'var(--heat)', fontSize: '1.1rem', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1 }}>
+          <span style={{ color: heatColor(heat), fontSize: '1.1rem', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1 }}>
             {heat}
           </span>
         )
@@ -219,7 +219,7 @@ function GoalieCard({ g, rank }: { g: GoaliePlayer; rank: number }) {
       topLeft={<RankBadge rank={rank} />}
       topRight={
         <div style={{ textAlign: 'right' }}>
-          <div style={{ color: 'var(--heat)', fontSize: '1rem', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1 }}>
+          <div style={{ color: heatColor(heat), fontSize: '1rem', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1 }}>
             .{Math.round(sv * 1000).toString().padStart(3, '0')}
           </div>
           <div style={{ color: 'rgba(255,255,255,0.38)', fontSize: '0.54rem', lineHeight: 1.4 }}>

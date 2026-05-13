@@ -1,4 +1,4 @@
-import { heatBg, heatBorderColor } from '@/lib/heat';
+import { heatBg, heatBorderColor, heatColor } from '@/lib/heat';
 
 interface HeatBadgeProps {
   heat: number;
@@ -20,7 +20,7 @@ export default function HeatBadge({ heat, size = 'md' }: HeatBadgeProps) {
       minWidth: size === 'sm' ? 36 : 44,
     }}>
       <span style={{
-        color: 'var(--heat)', fontWeight: 700,
+        color: heatColor(heat), fontWeight: 700,
         fontFamily: 'var(--font-mono, monospace)', fontSize,
         lineHeight: 1,
       }}>

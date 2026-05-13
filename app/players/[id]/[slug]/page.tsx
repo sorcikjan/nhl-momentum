@@ -4,7 +4,7 @@ import PlayerRadarChart from '@/components/players/RadarChart';
 import HeatTimeline from '@/components/players/HeatTimeline';
 import HeatCircle from '@/components/ui/HeatCircle';
 import { fetchPlayer, fetchLeagueAverages, daysAgo, deriveOutStatus } from '@/lib/data';
-import { ppmToHeat } from '@/lib/heat';
+import { ppmToHeat, heatColor as getHeatColor } from '@/lib/heat';
 import { getPlayerInsights } from '@/lib/ai';
 import type { PlayerAIInput } from '@/lib/ai';
 import { teamUrl } from '@/lib/urls';
@@ -499,7 +499,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
               const toiSec     = String(Number(g.toi_seconds ?? 0) % 60).padStart(2, '0');
               const gameDate   = String(game?.game_date ?? '').slice(5);
               const heatRaw    = Math.min(99, Math.round((g.points_per_minute ?? 0) * 600));
-              const heatColor  = heatRaw >= 70 ? 'var(--heat)' : heatRaw >= 35 ? 'var(--amber)' : 'var(--text)';
+              const gameHeatColor = getHeatColor(heatRaw);
 
               // Goalie decision parsing
               const dec = g.decision ?? null;
@@ -565,7 +565,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                   {/* HEAT number — skaters only */}
                   {!isGoalie && (
                     <div className="ml-auto flex-shrink-0 text-sm font-mono font-bold"
-                      style={{ color: heatRaw === 0 ? 'var(--text)' : heatColor }}>
+                      style={{ color: heatRaw === 0 ? 'var(--text)' : gameHeatColor }}>
                       {heatRaw === 0 ? '—' : heatRaw}
                     </div>
                   )}
