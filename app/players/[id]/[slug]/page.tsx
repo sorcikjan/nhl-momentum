@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
 import { cache, Suspense } from 'react';
 import PlayerRadarChart from '@/components/players/RadarChart';
-import PPMTimeline from '@/components/players/PPMTimeline';
+import HeatTimeline from '@/components/players/HeatTimeline';
+import HeatCircle from '@/components/ui/HeatCircle';
 import { fetchPlayer, fetchLeagueAverages, daysAgo, deriveOutStatus } from '@/lib/data';
+import { ppmToHeat } from '@/lib/heat';
 import { getPlayerInsights } from '@/lib/ai';
 import type { PlayerAIInput } from '@/lib/ai';
 import { teamUrl } from '@/lib/urls';
@@ -93,7 +95,12 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const delta = (mom: number, sea: number) => sea > 0 ? ((mom - sea) / sea) * 100 : 0;
 
   const energyColor = energyBar >= 70 ? 'var(--green)' : energyBar >= 40 ? 'var(--amber)' : 'var(--red)';
-  const energyLabel = energyBar >= 70 ? 'HIGH PERFORMANCE' : energyBar >= 40 ? 'MODERATE' : 'DRAINED';
+  const energyLabel = energyBar >= 70 ? 'HIGH' : energyBar >= 40 ? 'MODERATE' : 'DRAINED';
+
+  const currentHeat = ppmToHeat(momPpm);
+  const prevSnapshot = metricTimeline && metricTimeline.length >= 2 ? metricTimeline[metricTimeline.length - 2] : null;
+  const prevHeat = prevSnapshot ? ppmToHeat(Number(prevSnapshot.momentum_ppm ?? 0)) : null;
+  const heatDelta = prevHeat !== null && currentHeat !== prevHeat ? currentHeat - prevHeat : undefined;
 
   const lastPlayedDaysAgo = lastPlayedDate ? daysAgo(lastPlayedDate) : null;
   const outStatus = deriveOutStatus(consecutiveGamesMissed ?? null, lastPlayedDaysAgo, player.in_minors ?? false);
@@ -328,7 +335,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         {player.sweater_number && (
           <div className="absolute select-none pointer-events-none"
             style={{ right: -10, top: -20, fontSize: 220, fontWeight: 900, lineHeight: 1,
-                     color: 'rgba(255,255,255,0.035)', letterSpacing: '-0.05em' }}>
+                     color: 'rgba(249,115,22,0.07)', letterSpacing: '-0.05em' }}>
             {player.sweater_number}
           </div>
         )}
@@ -377,19 +384,20 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
             </span>
           </h1>
 
-          {/* Heat circle badge + status */}
-          <div className="flex items-center gap-3 mt-1">
-            <div className="flex items-center justify-center rounded-full flex-shrink-0"
-              style={{ width: 64, height: 64, border: `2.5px solid ${energyColor}`, background: `${energyColor}18` }}>
-              <span className="text-xl font-black font-mono" style={{ color: energyColor }}>{energyBar}</span>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-bold tracking-widest uppercase" style={{ color: energyColor }}>
-                {energyLabel}
-              </span>
+          {/* Heat circle (primary) + energy pill (secondary) */}
+          <div className="flex items-center gap-4 mt-1">
+            <HeatCircle heat={currentHeat} size={92} delta={heatDelta} />
+            <div className="flex flex-col gap-2">
               {latestSnapshot.momentum_rank && (
-                <span className="text-xs" style={{ color: 'var(--text)' }}>#{latestSnapshot.momentum_rank} in the league</span>
+                <span className="text-xs" style={{ color: 'var(--text)' }}>
+                  <span className="font-bold" style={{ color: 'var(--heat)' }}>#{latestSnapshot.momentum_rank}</span>{' '}in the league
+                </span>
               )}
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-semibold"
+                style={{ background: `${energyColor}1a`, border: `1px solid ${energyColor}55`, color: energyColor, width: 'fit-content' }}>
+                <span className="font-bold font-mono">{energyBar}</span>
+                <span style={{ opacity: 0.7 }}>{energyLabel}</span>
+              </div>
             </div>
           </div>
 
@@ -397,64 +405,66 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       </div>
 
       {/* 3. L5 stat row (skaters only, only when momGames > 0) ───────────────── */}
-      {!isGoalie && momGames > 0 && (
-        <div className="grid grid-cols-4 gap-3">
-          {[
-            {
-              label: 'Goals',
-              value: momGoals,
-              display: String(momGoals),
-              highlight: momGoals > 0,
-            },
-            {
-              label: 'Assists',
-              value: momAssists,
-              display: String(momAssists),
-              highlight: momAssists > 1,
-            },
-            {
-              label: 'Points',
-              value: momGoals + momAssists,
-              display: String(momGoals + momAssists),
-              highlight: momGoals + momAssists > 2,
-              bold: true,
-            },
-            {
-              label: '+/-',
-              value: Number(latestSnapshot.momentum_plus_minus ?? 0),
-              display: `${Number(latestSnapshot.momentum_plus_minus ?? 0) > 0 ? '+' : ''}${latestSnapshot.momentum_plus_minus ?? 0}`,
-              highlight: Number(latestSnapshot.momentum_plus_minus ?? 0) > 0,
-              negative: Number(latestSnapshot.momentum_plus_minus ?? 0) < 0,
-            },
-          ].map((cell) => (
-            <div key={cell.label} className="rounded-xl border flex flex-col items-center py-3 px-2"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-              <span className={`text-2xl font-black font-mono ${cell.bold ? 'font-bold' : ''}`}
-                style={{ color: cell.negative ? 'var(--red)' : cell.highlight ? 'var(--heat)' : 'var(--text-bright)' }}>
-                {cell.display}
-              </span>
-              <span className="text-xs mt-1" style={{ color: 'var(--text)' }}>{cell.label}</span>
-              <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.5 }}>L5</span>
-            </div>
-          ))}
-        </div>
-      )}
+      {!isGoalie && momGames > 0 && (() => {
+        const momPlusMinus = Number(latestSnapshot.momentum_plus_minus ?? 0);
+        const momToiSec = Number(latestSnapshot.momentum_toi_sec ?? 0);
+        const toiPerGame = momGames > 0 ? momToiSec / momGames : 0;
+        const toiMin = Math.floor(toiPerGame / 60);
+        const toiSec = String(Math.round(toiPerGame % 60)).padStart(2, '0');
+        const shootDiff = (momShootPct - seaShootPct) * 100;
+        const cells = [
+          {
+            label: 'Pts',
+            value: String(momGoals + momAssists),
+            sub: `${momGoals}G · ${momAssists}A`,
+            highlight: momGoals + momAssists > 2,
+            negative: false,
+          },
+          {
+            label: 'TOI/gm',
+            value: toiPerGame > 0 ? `${toiMin}:${toiSec}` : '—',
+            sub: 'L5 avg',
+            highlight: false,
+            negative: false,
+          },
+          {
+            label: 'S%',
+            value: `${(momShootPct * 100).toFixed(0)}%`,
+            sub: seaShootPct > 0 ? `${shootDiff > 0 ? '+' : ''}${shootDiff.toFixed(1)}% vs avg` : '',
+            highlight: momShootPct > seaShootPct,
+            negative: false,
+          },
+          {
+            label: '+/-',
+            value: `${momPlusMinus > 0 ? '+' : ''}${momPlusMinus}`,
+            sub: 'L5',
+            highlight: momPlusMinus > 0,
+            negative: momPlusMinus < 0,
+          },
+        ];
+        return (
+          <div className="grid grid-cols-4 gap-3">
+            {cells.map((cell) => (
+              <div key={cell.label} className="rounded-xl border flex flex-col items-center py-3 px-2 gap-0.5"
+                style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+                <span className="text-2xl font-black font-mono"
+                  style={{ color: cell.negative ? 'var(--red)' : cell.highlight ? 'var(--heat)' : 'var(--text-bright)' }}>
+                  {cell.value}
+                </span>
+                <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{cell.label}</span>
+                {cell.sub && (
+                  <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.55 }}>{cell.sub}</span>
+                )}
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* 4. Heat timeline ─────────────────────────────────────────────────────── */}
       {(metricTimeline?.length ?? 0) > 0 && (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-              Heat over 6 weeks
-            </span>
-            {momPpm > seaPpm && (
-              <span className="text-xs px-2 py-0.5 rounded font-semibold"
-                style={{ background: 'rgba(249,115,22,0.15)', color: 'var(--heat)' }}>
-                Current Peak
-              </span>
-            )}
-          </div>
-          <PPMTimeline snapshots={metricTimeline ?? []} leagueAvgPpm={leagueAvg?.seasonPpm} />
+          <HeatTimeline snapshots={metricTimeline ?? []} seasonPpm={seaPpm} />
         </div>
       )}
 
