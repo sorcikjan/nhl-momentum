@@ -234,7 +234,7 @@ function FeaturedGameCard({ game, pred }: { game: Game; pred: Game }) {
             {isRivalry
               ? <span
                   className="text-xs font-semibold px-2 py-0.5 rounded"
-                  style={{ background: 'rgba(249,115,22,0.3)', color: 'var(--heat)', border: '1px solid rgba(249,115,22,0.4)' }}
+                  style={{ background: 'rgba(255,90,36,0.3)', color: 'var(--heat)', border: '1px solid rgba(255,90,36,0.4)' }}
                 >
                   RIVALRY
                 </span>
@@ -273,9 +273,9 @@ function FeaturedGameCard({ game, pred }: { game: Game; pred: Game }) {
             <span
               className="text-xs font-bold px-2 py-0.5 rounded"
               style={{
-                background: 'rgba(249,115,22,0.15)',
+                background: 'rgba(255,90,36,0.15)',
                 color: 'var(--heat)',
-                border: '1px solid rgba(249,115,22,0.3)',
+                border: '1px solid rgba(255,90,36,0.3)',
               }}
             >
               🔥 RIVALRY
@@ -317,7 +317,7 @@ function RegularGameCard({ game, pred }: { game: Game; pred: Game }) {
   const favorHome = homeProb != null ? homeProb >= 0.5 : null;
   const isRivalry = RIVALRY_PAIRS.has(`${home}-${away}`);
   const venue = (game.venue?.default ?? '').slice(0, 28);
-  const borderColor = isRivalry ? 'rgba(249,115,22,0.3)' : 'var(--border)';
+  const borderColor = isRivalry ? 'rgba(255,90,36,0.3)' : 'var(--border)';
 
   return (
     <Link

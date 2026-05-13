@@ -78,15 +78,16 @@ export default function Sidebar() {
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 shrink-0 hover:opacity-80 transition-opacity">
-          {/* EKG + hockey-stick logo mark */}
-          <svg viewBox="0 0 58 38" fill="none" height="28" style={{ minWidth: 42 }}>
+          {/* Three-spike pulse mark + trailing dot */}
+          <svg viewBox="-1 -1 40 32" fill="none" height="26" style={{ minWidth: 36 }}>
             <path
-              d="M 0 22 L 7 22 L 9 27 L 14 5 L 19 32 L 23 22 L 27 22 L 27 31 C 27 36 32 38 37 35 C 41 32 42 25 38 22 L 33 22"
-              stroke="var(--heat)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+              d="M 0 20 L 4 20 L 6 15 L 8 20 L 10 11 L 12 20 L 14 3 L 19 27 L 23 20 L 30 20"
+              stroke="var(--heat)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
             />
+            <circle cx="33" cy="20" r="2.8" fill="var(--heat)" />
           </svg>
-          {/* "momentum." wordmark */}
-          <span className="text-xl font-black" style={{ color: 'var(--text-bright)', letterSpacing: '-0.03em', lineHeight: 1 }}>
+          {/* "momentum." wordmark — Geist 800 */}
+          <span className="text-xl font-extrabold" style={{ color: 'var(--text-bright)', letterSpacing: '-0.03em', lineHeight: 1 }}>
             momentum<span style={{ color: 'var(--heat)' }}>.</span>
           </span>
         </Link>
@@ -101,9 +102,9 @@ export default function Sidebar() {
                 href={item.href}
                 className="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
                 style={{
-                  background: active ? 'rgba(249,115,22,0.15)' : 'transparent',
+                  background: active ? 'rgba(255,90,36,0.15)' : 'transparent',
                   color: active ? 'var(--heat)' : 'var(--text)',
-                  border: active ? '1px solid rgba(249,115,22,0.3)' : '1px solid transparent',
+                  border: active ? '1px solid rgba(255,90,36,0.3)' : '1px solid transparent',
                 }}
               >
                 {item.label}

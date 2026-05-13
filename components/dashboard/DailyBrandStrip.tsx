@@ -25,7 +25,7 @@ export default function DailyBrandStrip({ topPlayer, gameCount }: Props) {
               Hockey Momentum
             </span>
             <span className="text-xs px-1.5 py-0.5 rounded font-bold tracking-wide"
-              style={{ background: 'rgba(249,115,22,0.15)', color: 'var(--heat)' }}>
+              style={{ background: 'rgba(255,90,36,0.15)', color: 'var(--heat)' }}>
               DAILY
             </span>
           </div>
@@ -56,7 +56,7 @@ export default function DailyBrandStrip({ topPlayer, gameCount }: Props) {
         {topPlayer && (
           <a href="/rankings"
             className="flex-shrink-0 flex items-center gap-2 rounded-lg px-3 py-2 border transition-opacity hover:opacity-80"
-            style={{ background: 'rgba(249,115,22,0.08)', borderColor: 'rgba(249,115,22,0.25)' }}>
+            style={{ background: 'rgba(255,90,36,0.08)', borderColor: 'rgba(255,90,36,0.25)' }}>
             <span className="text-sm">🔥</span>
             <div>
               <div className="text-xs font-bold whitespace-nowrap" style={{ color: 'var(--heat)' }}>

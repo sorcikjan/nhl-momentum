@@ -22,7 +22,7 @@ export default function LiveBadge() {
 
   return (
     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold"
-      style={{ background: 'rgba(249,115,22,0.15)', border: '1px solid rgba(249,115,22,0.4)', color: 'var(--heat)' }}>
+      style={{ background: 'rgba(255,90,36,0.15)', border: '1px solid rgba(255,90,36,0.4)', color: 'var(--heat)' }}>
       <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--heat)' }} />
       LIVE · {count}
     </div>

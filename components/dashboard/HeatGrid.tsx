@@ -140,7 +140,7 @@ function RankBadge({ rank }: { rank: number }) {
       <div style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.5rem', fontFamily: 'monospace', marginBottom: '1px' }}>#</div>
       <div style={{
         color: '#fff', fontSize: '1.3rem', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1,
-        textShadow: '0 0 18px rgba(249,115,22,0.73), 0 0 6px rgba(249,115,22,0.4)',
+        textShadow: '0 0 18px rgba(255,90,36,0.73), 0 0 6px rgba(255,90,36,0.4)',
       }}>
         {rank}
       </div>
@@ -170,7 +170,7 @@ function SkaterCard({ p, rank }: { p: SkaterPlayer; rank: number }) {
           <span style={{
             color: surge >= 0 ? 'var(--heat)' : 'rgba(255,255,255,0.38)',
             fontSize: '0.9rem', fontWeight: 800, fontFamily: 'monospace', lineHeight: 1,
-            textShadow: surge >= 0 ? '0 0 10px rgba(249,115,22,0.33)' : 'none',
+            textShadow: surge >= 0 ? '0 0 10px rgba(255,90,36,0.33)' : 'none',
           }}>
             {surge >= 0 ? '↑' : '↓'}{Math.abs(Math.round(surge))}%
           </span>

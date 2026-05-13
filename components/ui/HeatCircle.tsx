@@ -19,7 +19,7 @@ export default function HeatCircle({ heat, size = 96, delta, label = 'HEAT · L5
       <svg width={size} height={size} style={{ transform: 'rotate(-90deg)', position: 'absolute', inset: 0 }}>
         <circle
           cx={size / 2} cy={size / 2} r={radius}
-          fill="none" stroke="rgba(249,115,22,0.12)" strokeWidth={strokeWidth}
+          fill="none" stroke="rgba(255,90,36,0.12)" strokeWidth={strokeWidth}
         />
         <circle
           cx={size / 2} cy={size / 2} r={radius}
@@ -37,7 +37,7 @@ export default function HeatCircle({ heat, size = 96, delta, label = 'HEAT · L5
       }}>
         {label && (
           <span style={{
-            color: 'rgba(249,115,22,0.6)', fontSize: size * 0.1,
+            color: 'rgba(255,90,36,0.6)', fontSize: size * 0.1,
             fontWeight: 700, letterSpacing: '0.08em', lineHeight: 1,
           }}>
             {label}

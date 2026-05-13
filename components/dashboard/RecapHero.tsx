@@ -66,7 +66,7 @@ export default function RecapHero({
               alt={featured.home_team?.abbrev} className="w-6 h-6 drop-shadow" />
           </div>
           <span className="text-xs font-bold px-2 py-0.5 rounded"
-            style={{ background: 'rgba(249,115,22,0.2)', color: 'var(--heat)', border: '1px solid rgba(249,115,22,0.3)' }}>
+            style={{ background: 'rgba(255,90,36,0.2)', color: 'var(--heat)', border: '1px solid rgba(255,90,36,0.3)' }}>
             RECAP
           </span>
         </div>

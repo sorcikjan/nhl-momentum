@@ -1,18 +1,27 @@
 @import "tailwindcss";
 
 :root {
-  --bg:          #0d0f14;
-  --bg-card:     #131720;
-  --bg-hover:    #1a1f2e;
-  --border:      #1e2535;
+  /* ── Ink (base dark) ─────────────────────────────── */
+  --bg:          #0a0b0f;
+  --bg-card:     #111318;
+  --bg-hover:    #171c27;
+  --border:      #1d2235;
   --text:        #a0aec0;
   --text-bright: #e2e8f0;
-  --neon:        #3b82f6;
-  --neon-glow:   rgba(59, 130, 246, 0.15);
-  --heat:        #f97316;
-  --heat-glow:   rgba(249, 115, 22, 0.15);
+
+  /* ── Brand palette ───────────────────────────────── */
+  --heat:        #ff5a24;
+  --heat-glow:   rgba(255, 90, 36, 0.15);
+  --cold:        #3a88ff;   /* brand Cold — links, active state */
+  --cold-glow:   rgba(58, 136, 255, 0.15);
+  --rise:        #00e5a0;   /* brand Rise — positive momentum */
+  --story:       #e5508b;   /* brand Story — editorial content */
+
+  /* ── Aliases kept for backward compat ───────────── */
+  --neon:        #3a88ff;
+  --neon-glow:   rgba(58, 136, 255, 0.15);
+  --green:       #00e5a0;
   --silver:      #94a3b8;
-  --green:       #22c55e;
   --red:         #ef4444;
   --amber:       #f59e0b;
 }
@@ -24,7 +33,7 @@ body {
 }
 
 .font-editorial {
-  font-family: var(--font-playfair), Georgia, serif;
+  font-family: var(--font-fraunces), Georgia, serif;
 }
 
 * { box-sizing: border-box; }

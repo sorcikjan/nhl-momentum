@@ -335,7 +335,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         {player.sweater_number && (
           <div className="absolute select-none pointer-events-none"
             style={{ right: -10, top: -20, fontSize: 220, fontWeight: 900, lineHeight: 1,
-                     color: 'rgba(249,115,22,0.07)', letterSpacing: '-0.05em' }}>
+                     color: 'rgba(255,90,36,0.07)', letterSpacing: '-0.05em' }}>
             {player.sweater_number}
           </div>
         )}
@@ -374,8 +374,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
             })()}
           </div>
 
-          {/* Player name */}
-          <h1 style={{ lineHeight: 0.92, letterSpacing: '-0.025em' }}>
+          {/* Player name — Fraunces per brand spec */}
+          <h1 style={{ lineHeight: 0.92, letterSpacing: '-0.025em', fontFamily: 'var(--font-fraunces), Georgia, serif' }}>
             <span className="block font-black" style={{ fontSize: 'clamp(2rem, 7vw, 3.5rem)', color: 'var(--text-bright)' }}>
               {player.first_name}
             </span>

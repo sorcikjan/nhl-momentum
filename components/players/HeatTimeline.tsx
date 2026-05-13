@@ -67,7 +67,7 @@ export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snap
             <button key={t} onClick={() => setTab(t)}
               className="px-3 py-1.5 text-xs font-semibold transition-all cursor-pointer"
               style={{
-                background: tab === t ? 'rgba(249,115,22,0.18)' : 'var(--bg-card)',
+                background: tab === t ? 'rgba(255,90,36,0.18)' : 'var(--bg-card)',
                 color: tab === t ? 'var(--heat)' : 'var(--text)',
               }}>
               {t === '6w' ? '6W' : 'Season'}
@@ -81,13 +81,13 @@ export default function HeatTimeline({ snapshots, seasonPpm }: { snapshots: Snap
           <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
             <defs>
               <linearGradient id="heatAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="rgba(249,115,22,1)" stopOpacity={0.28} />
-                <stop offset="95%" stopColor="rgba(249,115,22,1)" stopOpacity={0.02} />
+                <stop offset="5%" stopColor="rgba(255,90,36,1)" stopOpacity={0.28} />
+                <stop offset="95%" stopColor="rgba(255,90,36,1)" stopOpacity={0.02} />
               </linearGradient>
             </defs>
             <YAxis domain={[0, 100]} hide />
             {seasonAvgHeat > 0 && (
-              <ReferenceLine y={seasonAvgHeat} stroke="rgba(249,115,22,0.4)" strokeDasharray="4 4" />
+              <ReferenceLine y={seasonAvgHeat} stroke="rgba(255,90,36,0.4)" strokeDasharray="4 4" />
             )}
             <Tooltip
               contentStyle={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}

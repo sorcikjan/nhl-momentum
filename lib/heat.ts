@@ -14,15 +14,15 @@ export function heatColor(_heat: number): string {
   return 'var(--heat)';
 }
 
-// Background color — continuous gradient from near-black (0) to vivid orange-red (100).
+// Background color — continuous gradient from Ink (#0a0b0f) to Heat (#ff5a24).
 export function heatBg(heat: number): string {
   const stops = [
-    { h: 0,   r: 13,  g: 10,  b: 8  },
-    { h: 20,  r: 26,  g: 14,  b: 6  },
-    { h: 40,  r: 46,  g: 21,  b: 8  },
-    { h: 60,  r: 90,  g: 32,  b: 16 },
-    { h: 80,  r: 140, g: 48,  b: 16 },
-    { h: 100, r: 184, g: 56,  b: 24 },
+    { h: 0,   r: 10,  g: 11,  b: 15 },  // Ink #0a0b0f
+    { h: 20,  r: 28,  g: 14,  b: 6  },
+    { h: 40,  r: 52,  g: 22,  b: 10 },
+    { h: 60,  r: 100, g: 36,  b: 14 },
+    { h: 80,  r: 170, g: 62,  b: 20 },
+    { h: 100, r: 255, g: 90,  b: 36 },  // Heat #ff5a24
   ];
   const clamped = Math.max(0, Math.min(100, heat));
   let lo = stops[0], hi = stops[stops.length - 1];
@@ -38,10 +38,10 @@ export function heatBg(heat: number): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-// Border color: orange, opacity scaled by heat level
+// Border color: Heat orange, opacity scaled by heat level
 export function heatBorderColor(heat: number): string {
   const opacity = Math.max(0.15, Math.min(0.9, heat / 100));
-  return `rgba(249, 115, 22, ${opacity.toFixed(2)})`;
+  return `rgba(255, 90, 36, ${opacity.toFixed(2)})`;
 }
 
 // Short label for a player's heat state
