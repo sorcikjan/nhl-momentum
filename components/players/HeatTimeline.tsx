@@ -13,8 +13,8 @@ interface Snapshot {
 }
 
 interface GameEvent {
-  date: string;      // "MM/DD" for display matching
-  fullDate: string;  // "YYYY-MM-DD" for chronological sort
+  date: string;      // "MM/DD"
+  fullDate: string;  // "YYYY-MM-DD" for lookup and sort
   goals: number;
   assists: number;
   plusMinus: number;
@@ -52,33 +52,59 @@ export default function HeatTimeline({
     return Array.from(byDate.values()).sort((a, b) => a.calculated_at.localeCompare(b.calculated_at));
   }, [snapshots]);
 
-  // Compute cumulative stats across ALL snapshots in order (so 6W window shows
-  // accurate season-to-date totals, not values reset to zero).
   const allData = useMemo(() => {
     const sorted = [...(gameEvents ?? [])].sort((a, b) => a.fullDate.localeCompare(b.fullDate));
-    const hasEvents = sorted.length > 0;
 
-    let cumGoals = 0, cumAssists = 0, cumPlusMinus = 0, ei = 0;
+    // Build snapshot heat lookup: "YYYY-MM-DD" → heat value
+    const heatByDate = new Map<string, number>();
+    for (const s of deduped) {
+      heatByDate.set(s.calculated_at.slice(0, 10), ppmToHeat(s.momentum_ppm));
+    }
 
-    return deduped.map(s => {
-      const snapshotDate = s.calculated_at.slice(0, 10);
-      while (ei < sorted.length && sorted[ei].fullDate <= snapshotDate) {
-        cumGoals     += sorted[ei].goals;
-        cumAssists   += sorted[ei].assists;
-        cumPlusMinus += sorted[ei].plusMinus;
-        ei++;
+    // No game events (goalies / edge case): fall back to date-based snapshot data
+    if (sorted.length === 0) {
+      return deduped.map((s, i) => ({
+        label:        `G${i + 1}`,
+        snapshotDate: s.calculated_at.slice(0, 10),
+        heat:         ppmToHeat(s.momentum_ppm),
+        cumGoals:     null as number | null,
+        cumAssists:   null as number | null,
+        cumPlusMinus: null as number | null,
+        leaguePaceGoals:   null as number | null,
+        leaguePaceAssists: null as number | null,
+      }));
+    }
+
+    // Game-driven: one point per game played
+    let cumGoals = 0, cumAssists = 0, cumPlusMinus = 0;
+
+    return sorted.map((ev, i) => {
+      cumGoals     += ev.goals;
+      cumAssists   += ev.assists;
+      cumPlusMinus += ev.plusMinus;
+
+      const gameIndex = i + 1;
+
+      // Find heat from snapshot on game date or up to 2 days after
+      // (pipeline may run the following day)
+      let heat = 0;
+      for (let d = 0; d <= 2; d++) {
+        const dt = new Date(ev.fullDate + 'T12:00:00Z');
+        dt.setDate(dt.getDate() + d);
+        const key = dt.toISOString().slice(0, 10);
+        const h = heatByDate.get(key);
+        if (h !== undefined) { heat = h; break; }
       }
-      const gamesPlayed = ei;
+
       return {
-        date:              s.calculated_at.slice(5, 10).replace('-', '/'),
-        snapshotDate,
-        heat:              ppmToHeat(s.momentum_ppm),
-        cumGoals:          hasEvents ? cumGoals     : null,
-        cumAssists:        hasEvents ? cumAssists   : null,
-        cumPlusMinus:      hasEvents ? cumPlusMinus : null,
-        // League pace: avg/game × games played — growing diagonal reference
-        leaguePaceGoals:   hasEvents && leagueGoalsPerGame   ? leagueGoalsPerGame   * gamesPlayed : null,
-        leaguePaceAssists: hasEvents && leagueAssistsPerGame ? leagueAssistsPerGame * gamesPlayed : null,
+        label:             `G${gameIndex}`,
+        snapshotDate:      ev.fullDate,
+        heat,
+        cumGoals,
+        cumAssists,
+        cumPlusMinus,
+        leaguePaceGoals:   leagueGoalsPerGame   ? leagueGoalsPerGame   * gameIndex : null,
+        leaguePaceAssists: leagueAssistsPerGame ? leagueAssistsPerGame * gameIndex : null,
       };
     });
   }, [deduped, gameEvents, leagueGoalsPerGame, leagueAssistsPerGame]);
@@ -93,8 +119,8 @@ export default function HeatTimeline({
     return allData;
   }, [allData, tab]);
 
-  const hasGameEvents    = (gameEvents?.length ?? 0) > 0;
-  const leagueAvgHeat    = leaguePpm ? ppmToHeat(leaguePpm) : null;
+  const hasGameEvents = (gameEvents?.length ?? 0) > 0;
+  const leagueAvgHeat = leaguePpm ? ppmToHeat(leaguePpm) : null;
 
   const first = data[0]?.heat ?? 0;
   const last  = data[data.length - 1]?.heat ?? 0;
@@ -115,6 +141,9 @@ export default function HeatTimeline({
 
   const yTicks = metric === 'heat' ? [0, 25, 50, 75, 100] : undefined;
 
+  // Thin X-axis ticks for long season view
+  const xInterval = data.length > 30 ? Math.floor(data.length / 8) - 1 : 'preserveStartEnd';
+
   if (!snapshots.length) {
     return (
       <div className="p-6 text-center">
@@ -125,7 +154,7 @@ export default function HeatTimeline({
 
   return (
     <div>
-      {/* Row 1: title + narrative + time-window toggle */}
+      {/* Row 1: title + narrative + window toggle */}
       <div className="px-4 pt-3 pb-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
           <span className="text-xs font-semibold uppercase tracking-wider shrink-0" style={{ color: 'var(--text)' }}>
@@ -187,11 +216,11 @@ export default function HeatTimeline({
             <CartesianGrid strokeDasharray="2 4" stroke="var(--border)" vertical={false} />
 
             <XAxis
-              dataKey="date"
+              dataKey="label"
               tick={{ fill: 'var(--text)', fontSize: 10, fontFamily: 'monospace' }}
               tickLine={false}
               axisLine={{ stroke: 'var(--border)' }}
-              interval="preserveStartEnd"
+              interval={xInterval}
               dy={4}
             />
 
