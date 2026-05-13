@@ -273,15 +273,16 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   }).length;
   const l5OT = last5Games.length - l5W - l5L;
 
-  // Game events for HeatTimeline overlay (skaters only)
+  // Game events for HeatTimeline cumulative overlays (skaters only)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const gameEvents = isGoalie ? [] : (recentGames ?? []).map((g: any) => ({
     date: String(g.games?.game_date ?? '').slice(5, 10).replace('-', '/'),
+    fullDate: String(g.games?.game_date ?? '').slice(0, 10),
     goals: Number(g.goals ?? 0),
     assists: Number(g.assists ?? 0),
     plusMinus: Number(g.plus_minus ?? 0),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  })).filter((e: any) => e.date);
+  })).filter((e: any) => e.date && e.fullDate);
 
   return (
     <div className="max-w-5xl mx-auto pb-20 md:pb-0 space-y-4">
