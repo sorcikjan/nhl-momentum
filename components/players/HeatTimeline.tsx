@@ -138,10 +138,7 @@ export default function HeatTimeline({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const GameTick = ({ x, y, payload }: any) => (
     <g transform={`translate(${x},${y})`}>
-      <text dy={5} textAnchor="middle" fill="var(--text)" fontSize={10} fontFamily="monospace">
-        {payload.value}
-      </text>
-      <text dy={16} textAnchor="middle" fill="var(--text)" fontSize={9} fontFamily="monospace" opacity={0.45}>
+      <text dy={5} textAnchor="middle" fill="var(--text)" fontSize={9} fontFamily="monospace" opacity={0.65}>
         {dateLabelMap.get(payload.value) ?? ''}
       </text>
     </g>
@@ -270,12 +267,14 @@ export default function HeatTimeline({
                 const pm      = find('cumPlusMinus')      as number | null | undefined;
                 const lgGoals = find('leaguePaceGoals')   as number | null | undefined;
                 const lgAsst  = find('leaguePaceAssists') as number | null | undefined;
+                const labelStr = String(label ?? '');
+                const dateLabel = dateLabelMap.get(labelStr) ?? labelStr;
                 return (
                   <div style={{
                     background: 'var(--bg-card)', border: '1px solid var(--border)',
                     borderRadius: 8, padding: '8px 12px', fontSize: 12, fontFamily: 'monospace',
                   }}>
-                    <div style={{ color: 'var(--text-bright)', marginBottom: 6 }}>{label}</div>
+                    <div style={{ color: 'var(--text-bright)', marginBottom: 6 }}>{dateLabel}</div>
                     {metric === 'heat' && heat != null && (
                       <>
                         <div style={{ color: 'var(--heat)' }}>Heat  {heat}</div>
