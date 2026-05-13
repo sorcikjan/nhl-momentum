@@ -30,17 +30,15 @@ const METRICS: { key: Metric; label: string; color: string }[] = [
   { key: 'plusMinus', label: '+/-',  color: '#00e5a0' },
 ];
 
-const ROLLING_WINDOW = 14;
-
 export default function HeatTimeline({
   snapshots,
-  seasonPpm,
+  leaguePpm,
   gameEvents,
   leagueGoalsPerGame,
   leagueAssistsPerGame,
 }: {
   snapshots: Snapshot[];
-  seasonPpm?: number;
+  leaguePpm?: number;
   gameEvents?: GameEvent[];
   leagueGoalsPerGame?: number;
   leagueAssistsPerGame?: number;
@@ -62,7 +60,7 @@ export default function HeatTimeline({
 
     let cumGoals = 0, cumAssists = 0, cumPlusMinus = 0, ei = 0;
 
-    const raw = deduped.map(s => {
+    return deduped.map(s => {
       const snapshotDate = s.calculated_at.slice(0, 10);
       while (ei < sorted.length && sorted[ei].fullDate <= snapshotDate) {
         cumGoals     += sorted[ei].goals;
@@ -78,17 +76,10 @@ export default function HeatTimeline({
         cumGoals:          hasEvents ? cumGoals     : null,
         cumAssists:        hasEvents ? cumAssists   : null,
         cumPlusMinus:      hasEvents ? cumPlusMinus : null,
-        // League pace: avg per game × games played — a growing diagonal reference line
+        // League pace: avg/game × games played — growing diagonal reference
         leaguePaceGoals:   hasEvents && leagueGoalsPerGame   ? leagueGoalsPerGame   * gamesPlayed : null,
         leaguePaceAssists: hasEvents && leagueAssistsPerGame ? leagueAssistsPerGame * gamesPlayed : null,
       };
-    });
-
-    // Add trailing 14-point rolling average for heat
-    return raw.map((d, i) => {
-      const window = raw.slice(Math.max(0, i - ROLLING_WINDOW + 1), i + 1);
-      const heatRollingAvg = Math.round(window.reduce((sum, p) => sum + p.heat, 0) / window.length);
-      return { ...d, heatRollingAvg };
     });
   }, [deduped, gameEvents, leagueGoalsPerGame, leagueAssistsPerGame]);
 
@@ -102,7 +93,8 @@ export default function HeatTimeline({
     return allData;
   }, [allData, tab]);
 
-  const hasGameEvents = (gameEvents?.length ?? 0) > 0;
+  const hasGameEvents    = (gameEvents?.length ?? 0) > 0;
+  const leagueAvgHeat    = leaguePpm ? ppmToHeat(leaguePpm) : null;
 
   const first = data[0]?.heat ?? 0;
   const last  = data[data.length - 1]?.heat ?? 0;
@@ -216,12 +208,11 @@ export default function HeatTimeline({
                 if (!active || !payload?.length) return null;
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const find = (key: string) => (payload as any[]).find((p: any) => p.dataKey === key)?.value;
-                const heat    = find('heat')              as number | undefined;
-                const rollAvg = find('heatRollingAvg')   as number | undefined;
-                const goals   = find('cumGoals')         as number | null | undefined;
-                const assists = find('cumAssists')       as number | null | undefined;
-                const pm      = find('cumPlusMinus')     as number | null | undefined;
-                const lgGoals = find('leaguePaceGoals')  as number | null | undefined;
+                const heat    = find('heat')               as number | undefined;
+                const goals   = find('cumGoals')          as number | null | undefined;
+                const assists = find('cumAssists')        as number | null | undefined;
+                const pm      = find('cumPlusMinus')      as number | null | undefined;
+                const lgGoals = find('leaguePaceGoals')   as number | null | undefined;
                 const lgAsst  = find('leaguePaceAssists') as number | null | undefined;
                 return (
                   <div style={{
@@ -232,7 +223,7 @@ export default function HeatTimeline({
                     {metric === 'heat' && heat != null && (
                       <>
                         <div style={{ color: 'var(--heat)' }}>Heat  {heat}</div>
-                        {rollAvg != null && <div style={{ color: 'rgba(255,90,36,0.5)', marginTop: 2 }}>14d avg  {rollAvg}</div>}
+                        {leagueAvgHeat != null && <div style={{ color: 'rgba(255,90,36,0.5)', marginTop: 2 }}>Lg avg  {leagueAvgHeat}</div>}
                       </>
                     )}
                     {metric === 'goals' && goals != null && (
@@ -278,15 +269,21 @@ export default function HeatTimeline({
                   }}
                   activeDot={{ r: 4, fill: 'var(--heat)', stroke: 'var(--bg-card)', strokeWidth: 1.5 }}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="heatRollingAvg"
-                  stroke="rgba(255,90,36,0.4)"
-                  strokeWidth={1.5}
-                  strokeDasharray="4 4"
-                  dot={false}
-                  activeDot={false}
-                />
+                {leagueAvgHeat != null && (
+                  <ReferenceLine
+                    y={leagueAvgHeat}
+                    stroke="rgba(255,90,36,0.4)"
+                    strokeDasharray="4 4"
+                    label={{
+                      value: `lg avg  ${leagueAvgHeat}`,
+                      position: 'insideTopLeft',
+                      fill: 'rgba(255,90,36,0.5)',
+                      fontSize: 10,
+                      fontFamily: 'monospace',
+                      dy: -6,
+                    }}
+                  />
+                )}
               </>
             )}
 

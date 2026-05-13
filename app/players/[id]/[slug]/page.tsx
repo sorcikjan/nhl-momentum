@@ -475,7 +475,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {/* 4. Heat timeline ─────────────────────────────────────────────────────── */}
       {(metricTimeline?.length ?? 0) > 0 && (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <HeatTimeline snapshots={metricTimeline ?? []} seasonPpm={seaPpm} gameEvents={gameEvents}
+          <HeatTimeline snapshots={metricTimeline ?? []} leaguePpm={lgPpm} gameEvents={gameEvents}
             leagueGoalsPerGame={lgG} leagueAssistsPerGame={lgA} />
         </div>
       )}
