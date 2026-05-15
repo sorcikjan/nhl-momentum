@@ -48,7 +48,7 @@ export async function fetchLeagueAverages() {
     .select(`
       player_id, season_ppm, momentum_ppm,
       season_goals, season_games, season_assists, season_shooting_pct,
-      energy_bar,
+      season_plus_minus, energy_bar,
       players!inner(position_code)
     `)
     .eq('players.is_active', true)
@@ -68,6 +68,21 @@ export async function fetchLeagueAverages() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const avg = (fn: (r: any) => number) => latest.reduce((s, r) => s + fn(r), 0) / n;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const percentile = (vals: number[], p: number) => {
+    const sorted = [...vals].sort((a, b) => a - b);
+    const idx = (p / 100) * (sorted.length - 1);
+    const lo = Math.floor(idx), hi = Math.ceil(idx);
+    return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gPG  = latest.map((r: any) => (r.season_goals   ?? 0) / Math.max(1, r.season_games ?? 1));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const aPG  = latest.map((r: any) => (r.season_assists  ?? 0) / Math.max(1, r.season_games ?? 1));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pmPG = latest.map((r: any) => (r.season_plus_minus ?? 0) / Math.max(1, r.season_games ?? 1));
+
   const result = {
     seasonPpm:      avg(r => r.season_ppm ?? 0),
     momentumPpm:    avg(r => r.momentum_ppm ?? 0),
@@ -76,6 +91,13 @@ export async function fetchLeagueAverages() {
     shootingPct:    avg(r => r.season_shooting_pct ?? 0),
     energyBar:      avg(r => r.energy_bar ?? 100),
     playerCount:    n,
+    // 95th/5th percentile per-game rates for chart range bands
+    p95GoalsPerGame:       percentile(gPG,  95),
+    p5GoalsPerGame:        percentile(gPG,   5),
+    p95AssistsPerGame:     percentile(aPG,  95),
+    p5AssistsPerGame:      percentile(aPG,   5),
+    p95PlusMinusPerGame:   percentile(pmPG, 95),
+    p5PlusMinusPerGame:    percentile(pmPG,  5),
   };
   _leagueAveragesCache = { data: result, ts: now };
   return result;

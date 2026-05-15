@@ -36,12 +36,24 @@ export default function HeatTimeline({
   gameEvents,
   leagueGoalsPerGame,
   leagueAssistsPerGame,
+  p95GoalsPerGame,
+  p5GoalsPerGame,
+  p95AssistsPerGame,
+  p5AssistsPerGame,
+  p95PlusMinusPerGame,
+  p5PlusMinusPerGame,
 }: {
   snapshots: Snapshot[];
   leaguePpm?: number;
   gameEvents?: GameEvent[];
   leagueGoalsPerGame?: number;
   leagueAssistsPerGame?: number;
+  p95GoalsPerGame?: number;
+  p5GoalsPerGame?: number;
+  p95AssistsPerGame?: number;
+  p5AssistsPerGame?: number;
+  p95PlusMinusPerGame?: number;
+  p5PlusMinusPerGame?: number;
 }) {
   const [tab,    setTab]    = useState<Tab>('6w');
   const [metric, setMetric] = useState<Metric>('heat');
@@ -78,6 +90,12 @@ export default function HeatTimeline({
         cumPlusMinus: null as number | null,
         leaguePaceGoals:   null as number | null,
         leaguePaceAssists: null as number | null,
+        p95PaceGoals:      null as number | null,
+        p5PaceGoals:       null as number | null,
+        p95PaceAssists:    null as number | null,
+        p5PaceAssists:     null as number | null,
+        p95PacePlusMinus:  null as number | null,
+        p5PacePlusMinus:   null as number | null,
       }));
     }
 
@@ -110,11 +128,19 @@ export default function HeatTimeline({
         cumGoals,
         cumAssists,
         cumPlusMinus,
-        leaguePaceGoals:   leagueGoalsPerGame   ? leagueGoalsPerGame   * gameIndex : null,
-        leaguePaceAssists: leagueAssistsPerGame ? leagueAssistsPerGame * gameIndex : null,
+        leaguePaceGoals:    leagueGoalsPerGame    ? leagueGoalsPerGame    * gameIndex : null,
+        leaguePaceAssists:  leagueAssistsPerGame  ? leagueAssistsPerGame  * gameIndex : null,
+        p95PaceGoals:       p95GoalsPerGame       ? p95GoalsPerGame       * gameIndex : null,
+        p5PaceGoals:        p5GoalsPerGame        ? p5GoalsPerGame        * gameIndex : null,
+        p95PaceAssists:     p95AssistsPerGame     ? p95AssistsPerGame     * gameIndex : null,
+        p5PaceAssists:      p5AssistsPerGame      ? p5AssistsPerGame      * gameIndex : null,
+        p95PacePlusMinus:   p95PlusMinusPerGame   ? p95PlusMinusPerGame   * gameIndex : null,
+        p5PacePlusMinus:    p5PlusMinusPerGame    ? p5PlusMinusPerGame    * gameIndex : null,
       };
     });
-  }, [deduped, gameEvents, leagueGoalsPerGame, leagueAssistsPerGame]);
+  }, [deduped, gameEvents, leagueGoalsPerGame, leagueAssistsPerGame,
+      p95GoalsPerGame, p5GoalsPerGame, p95AssistsPerGame, p5AssistsPerGame,
+      p95PlusMinusPerGame, p5PlusMinusPerGame]);
 
   const data = useMemo(() => {
     if (tab === '6w') {
@@ -265,8 +291,14 @@ export default function HeatTimeline({
                 const goals   = find('cumGoals')          as number | null | undefined;
                 const assists = find('cumAssists')        as number | null | undefined;
                 const pm      = find('cumPlusMinus')      as number | null | undefined;
-                const lgGoals = find('leaguePaceGoals')   as number | null | undefined;
-                const lgAsst  = find('leaguePaceAssists') as number | null | undefined;
+                const lgGoals   = find('leaguePaceGoals')   as number | null | undefined;
+                const lgAsst    = find('leaguePaceAssists') as number | null | undefined;
+                const p95Goals  = find('p95PaceGoals')      as number | null | undefined;
+                const p5Goals   = find('p5PaceGoals')       as number | null | undefined;
+                const p95Asst   = find('p95PaceAssists')    as number | null | undefined;
+                const p5Asst    = find('p5PaceAssists')     as number | null | undefined;
+                const p95PM     = find('p95PacePlusMinus')  as number | null | undefined;
+                const p5PM      = find('p5PacePlusMinus')   as number | null | undefined;
                 const labelStr = String(label ?? '');
                 const dateLabel = dateLabelMap.get(labelStr) ?? labelStr;
                 return (
@@ -278,25 +310,31 @@ export default function HeatTimeline({
                     {metric === 'heat' && heat != null && (
                       <>
                         <div style={{ color: 'var(--heat)' }}>Heat  {heat}</div>
-                        {leagueAvgHeat != null && <div style={{ color: 'rgba(255,90,36,0.5)', marginTop: 2 }}>League average  {leagueAvgHeat}</div>}
+                        {leagueAvgHeat != null && <div style={{ color: 'rgba(255,90,36,0.5)', marginTop: 2 }}>League avg  {leagueAvgHeat}</div>}
                       </>
                     )}
                     {metric === 'goals' && goals != null && (
                       <>
                         <div style={{ color: '#f59e0b' }}>Goals  {goals}</div>
-                        {lgGoals != null && <div style={{ color: 'rgba(245,158,11,0.5)', marginTop: 2 }}>League average  {Math.round(lgGoals)}</div>}
+                        {p95Goals != null && <div style={{ color: 'rgba(245,158,11,0.7)', marginTop: 2 }}>Top 5%  {Math.round(p95Goals)}</div>}
+                        {lgGoals  != null && <div style={{ color: 'rgba(245,158,11,0.45)', marginTop: 1 }}>Avg  {Math.round(lgGoals)}</div>}
+                        {p5Goals  != null && <div style={{ color: 'rgba(245,158,11,0.3)', marginTop: 1 }}>Bot 5%  {Math.round(p5Goals)}</div>}
                       </>
                     )}
                     {metric === 'assists' && assists != null && (
                       <>
                         <div style={{ color: '#3a88ff' }}>Assists  {assists}</div>
-                        {lgAsst != null && <div style={{ color: 'rgba(58,136,255,0.5)', marginTop: 2 }}>League average  {Math.round(lgAsst)}</div>}
+                        {p95Asst != null && <div style={{ color: 'rgba(58,136,255,0.7)', marginTop: 2 }}>Top 5%  {Math.round(p95Asst)}</div>}
+                        {lgAsst  != null && <div style={{ color: 'rgba(58,136,255,0.45)', marginTop: 1 }}>Avg  {Math.round(lgAsst)}</div>}
+                        {p5Asst  != null && <div style={{ color: 'rgba(58,136,255,0.3)', marginTop: 1 }}>Bot 5%  {Math.round(p5Asst)}</div>}
                       </>
                     )}
                     {metric === 'plusMinus' && pm != null && (
-                      <div style={{ color: pm >= 0 ? '#00e5a0' : 'var(--red)' }}>
-                        +/-  {pm > 0 ? '+' : ''}{pm}
-                      </div>
+                      <>
+                        <div style={{ color: pm >= 0 ? '#00e5a0' : 'var(--red)' }}>+/-  {pm > 0 ? '+' : ''}{pm}</div>
+                        {p95PM != null && <div style={{ color: 'rgba(0,229,160,0.7)', marginTop: 2 }}>Top 5%  {p95PM > 0 ? '+' : ''}{Math.round(p95PM)}</div>}
+                        {p5PM  != null && <div style={{ color: 'rgba(0,229,160,0.35)', marginTop: 1 }}>Bot 5%  {p5PM > 0 ? '+' : ''}{Math.round(p5PM)}</div>}
+                      </>
                     )}
                   </div>
                 );
@@ -345,34 +383,64 @@ export default function HeatTimeline({
             {/* ── Goals view ── */}
             {metric === 'goals' && (
               <>
+                {p95GoalsPerGame != null && (
+                  <Line type="monotone" dataKey="p95PaceGoals"
+                    stroke="rgba(245,158,11,0.6)" strokeWidth={1} strokeDasharray="3 4"
+                    dot={false} activeDot={false} connectNulls />
+                )}
+                {leagueGoalsPerGame != null && (
+                  <Line type="monotone" dataKey="leaguePaceGoals"
+                    stroke="rgba(245,158,11,0.35)" strokeWidth={1} strokeDasharray="3 4"
+                    dot={false} activeDot={false} connectNulls />
+                )}
+                {p5GoalsPerGame != null && (
+                  <Line type="monotone" dataKey="p5PaceGoals"
+                    stroke="rgba(245,158,11,0.2)" strokeWidth={1} strokeDasharray="3 4"
+                    dot={false} activeDot={false} connectNulls />
+                )}
                 <Line type="monotone" dataKey="cumGoals"
                   stroke="#f59e0b" strokeWidth={2} dot={false} connectNulls
                   activeDot={{ r: 4, fill: '#f59e0b', stroke: 'var(--bg-card)', strokeWidth: 1.5 }} />
-                {leagueGoalsPerGame && (
-                  <Line type="monotone" dataKey="leaguePaceGoals"
-                    stroke="rgba(245,158,11,0.4)" strokeWidth={1.5} strokeDasharray="4 4"
-                    dot={false} activeDot={false} connectNulls />
-                )}
               </>
             )}
 
             {/* ── Assists view ── */}
             {metric === 'assists' && (
               <>
+                {p95AssistsPerGame != null && (
+                  <Line type="monotone" dataKey="p95PaceAssists"
+                    stroke="rgba(58,136,255,0.6)" strokeWidth={1} strokeDasharray="3 4"
+                    dot={false} activeDot={false} connectNulls />
+                )}
+                {leagueAssistsPerGame != null && (
+                  <Line type="monotone" dataKey="leaguePaceAssists"
+                    stroke="rgba(58,136,255,0.35)" strokeWidth={1} strokeDasharray="3 4"
+                    dot={false} activeDot={false} connectNulls />
+                )}
+                {p5AssistsPerGame != null && (
+                  <Line type="monotone" dataKey="p5PaceAssists"
+                    stroke="rgba(58,136,255,0.2)" strokeWidth={1} strokeDasharray="3 4"
+                    dot={false} activeDot={false} connectNulls />
+                )}
                 <Line type="monotone" dataKey="cumAssists"
                   stroke="#3a88ff" strokeWidth={2} dot={false} connectNulls
                   activeDot={{ r: 4, fill: '#3a88ff', stroke: 'var(--bg-card)', strokeWidth: 1.5 }} />
-                {leagueAssistsPerGame && (
-                  <Line type="monotone" dataKey="leaguePaceAssists"
-                    stroke="rgba(58,136,255,0.4)" strokeWidth={1.5} strokeDasharray="4 4"
-                    dot={false} activeDot={false} connectNulls />
-                )}
               </>
             )}
 
             {/* ── +/- view ── */}
             {metric === 'plusMinus' && (
               <>
+                {p95PlusMinusPerGame != null && (
+                  <Line type="monotone" dataKey="p95PacePlusMinus"
+                    stroke="rgba(0,229,160,0.6)" strokeWidth={1} strokeDasharray="3 4"
+                    dot={false} activeDot={false} connectNulls />
+                )}
+                {p5PlusMinusPerGame != null && (
+                  <Line type="monotone" dataKey="p5PacePlusMinus"
+                    stroke="rgba(0,229,160,0.25)" strokeWidth={1} strokeDasharray="3 4"
+                    dot={false} activeDot={false} connectNulls />
+                )}
                 <ReferenceLine y={0}
                   stroke="rgba(0,229,160,0.3)"
                   strokeDasharray="4 4"

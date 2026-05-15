@@ -133,6 +133,12 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const lgA      = leagueAvg?.assistsPerGame ?? 0;
   const lgShoot  = leagueAvg?.shootingPct    ?? 0;
   const lgEnergy = Math.round(leagueAvg?.energyBar ?? 85);
+  const lgP95G   = leagueAvg?.p95GoalsPerGame     ?? 0;
+  const lgP5G    = leagueAvg?.p5GoalsPerGame      ?? 0;
+  const lgP95A   = leagueAvg?.p95AssistsPerGame   ?? 0;
+  const lgP5A    = leagueAvg?.p5AssistsPerGame    ?? 0;
+  const lgP95PM  = leagueAvg?.p95PlusMinusPerGame ?? 0;
+  const lgP5PM   = leagueAvg?.p5PlusMinusPerGame  ?? 0;
   const vsLeague = (playerVal: number, lgVal: number) =>
     lgVal > 0 ? ((playerVal - lgVal) / lgVal) * 100 : 0;
 
@@ -504,7 +510,10 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
             <SectionTitle main="Heat" accent="trend." />
           </div>
           <HeatTimeline snapshots={metricTimeline ?? []} leaguePpm={lgPpm} gameEvents={gameEvents}
-            leagueGoalsPerGame={lgG} leagueAssistsPerGame={lgA} />
+            leagueGoalsPerGame={lgG} leagueAssistsPerGame={lgA}
+            p95GoalsPerGame={lgP95G} p5GoalsPerGame={lgP5G}
+            p95AssistsPerGame={lgP95A} p5AssistsPerGame={lgP5A}
+            p95PlusMinusPerGame={lgP95PM} p5PlusMinusPerGame={lgP5PM} />
         </div>
       )}
 
