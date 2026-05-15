@@ -4,11 +4,12 @@ import { usePathname } from 'next/navigation';
 import LiveBadge from './LiveBadge';
 
 const NAV_DESKTOP = [
-  { href: '/',          label: 'Home' },
-  { href: '/games',     label: 'Games' },
-  { href: '/hot',       label: 'Hot' },
-  { href: '/rankings',  label: 'Rankings' },
-  { href: '/search',    label: 'Search' },
+  { href: '/',                              label: 'Home' },
+  { href: '/games',                         label: 'Games' },
+  { href: '/hot',                           label: 'Hot' },
+  { href: '/rankings',                      label: 'Rankings' },
+  { href: '/search',                        label: 'Search' },
+  { href: '/tournaments/iihf-wc-2026',      label: 'World Championship', highlight: true },
 ];
 
 const NAV_MOBILE = [
@@ -95,16 +96,17 @@ export default function Sidebar() {
         {/* Nav links — centered */}
         <nav className="flex-1 flex items-center justify-center gap-1">
           {NAV_DESKTOP.map(item => {
-            const active = path === item.href;
+            const active = path === item.href || path.startsWith(item.href + '/') && item.href !== '/';
+            const isHighlight = 'highlight' in item && item.highlight && !active;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className="px-4 py-2 rounded-lg text-sm font-semibold transition-all"
                 style={{
-                  background: active ? 'rgba(255,90,36,0.15)' : 'transparent',
-                  color: active ? 'var(--heat)' : 'var(--text)',
-                  border: active ? '1px solid rgba(255,90,36,0.3)' : '1px solid transparent',
+                  background: active ? 'rgba(255,90,36,0.15)' : isHighlight ? 'rgba(255,90,36,0.08)' : 'transparent',
+                  color: active || isHighlight ? 'var(--heat)' : 'var(--text)',
+                  border: active ? '1px solid rgba(255,90,36,0.3)' : isHighlight ? '1px solid rgba(255,90,36,0.2)' : '1px solid transparent',
                 }}
               >
                 {item.label}
