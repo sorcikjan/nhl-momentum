@@ -1,8 +1,11 @@
-const API_BASE = 'https://v1.hockey.api-sports.io';
-export const WC_LEAGUE_ID = 111;
+// TheSportsDB — free, no API key required
+const TSDB_BASE = 'https://www.thesportsdb.com/api/v1/json/3';
+const TSDB_WC_LEAGUE = 4976; // Mens Ice Hockey World Championships
+
+// API-Sports — keyed, used only for live in-game status overlay
+const APISPORTS_BASE = 'https://v1.hockey.api-sports.io';
+export const WC_APISPORTS_LEAGUE = 111;
 export const WC_SEASON = 2026;
-// Tournament runs May 15–26. Grouped by venue (Stockholm = A, Herning = B).
-const WC_START = '2026-05-15';
 
 export const TEAM_FLAG: Record<string, string> = {
   Canada: '🇨🇦', USA: '🇺🇸', Sweden: '🇸🇪', Finland: '🇫🇮',
@@ -13,10 +16,30 @@ export const TEAM_FLAG: Record<string, string> = {
   Italy: '🇮🇹', 'Great Britain': '🇬🇧',
 };
 
-// Known group assignments from venue (Stockholm = A, Herning = B)
-// Populated as we confirm from game matchups
-const GROUP_A_IDS = new Set([1321, 1332, 1324, 1325]); // Canada, Sweden, Finland, Germany
-const GROUP_B_IDS = new Set([1334, 1333, 1322, 1323]); // USA, Switzerland, Czech Republic, Denmark
+// Strip " Ice Hockey" suffix from TheSportsDB team names
+function normName(raw: string): string {
+  return raw.replace(/\s+Ice\s+Hockey$/i, '').trim();
+}
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface TSDBEvent {
+  idEvent: string;
+  idAPIfootball?: string;   // API-Sports cross-reference
+  strHomeTeam: string;      // "Canada Ice Hockey"
+  strAwayTeam: string;
+  idHomeTeam: string;
+  idAwayTeam: string;
+  strHomeTeamBadge: string;
+  strAwayTeamBadge: string;
+  intHomeScore: string | null;
+  intAwayScore: string | null;
+  dateEvent: string;        // "2026-05-15"
+  strTime: string;          // "14:20:00" UTC
+  strTimeLocal: string;     // "16:20:00" local (CET)
+  strStatus: string;        // "NS" | "FT" | "AOT" | "AP" | "LIVE"
+  strVideo: string | null;
+}
 
 export interface WCTeam {
   id: number;
@@ -41,119 +64,172 @@ export interface WCStanding {
   description: string | null;
 }
 
-export interface WCGame {
-  id: number;
-  date: string;
-  teams: { home: WCTeam; away: WCTeam };
-  // API returns null for unstarted games, object with total for finished
-  scores: { home: { total: number } | null; away: { total: number } | null };
-  periods: { overtime: number | null; penalties: number | null } | null;
-  status: { long: string; short: string; elapsed: string | null };
-  league: { id: number; season: number };
-}
+// ── Fetchers ──────────────────────────────────────────────────────────────────
 
-async function apiFetch<T>(path: string, revalidate = 300): Promise<T[]> {
-  const key = process.env.API_SPORTS_KEY;
-  if (!key) return [];
+async function tsdbFetch(path: string, revalidate = 1800): Promise<TSDBEvent[]> {
   try {
-    const res = await fetch(`${API_BASE}${path}`, {
-      headers: { 'x-apisports-key': key },
-      next: { revalidate },
-    });
+    const res = await fetch(`${TSDB_BASE}${path}`, { next: { revalidate } });
     if (!res.ok) return [];
-    const json = await res.json();
-    if (json.errors && Object.keys(json.errors).length > 0) return [];
-    return Array.isArray(json.response) ? (json.response as T[]) : [];
+    const json = await res.json() as Record<string, unknown>;
+    const first = Object.values(json)[0];
+    return Array.isArray(first) ? (first as TSDBEvent[]) : [];
   } catch {
     return [];
   }
 }
 
-// Derive team group from known seed assignments, then infer from opponents
-function inferGroup(teamId: number, opponentId: number): string {
-  if (GROUP_A_IDS.has(teamId) || GROUP_A_IDS.has(opponentId)) return 'Group A';
-  if (GROUP_B_IDS.has(teamId) || GROUP_B_IDS.has(opponentId)) return 'Group B';
-  return 'Group A'; // fallback — will resolve as more games are seen
+// Full 2026 WC schedule — free, no key. Revalidates every 30 min.
+export async function fetchWCSchedule(): Promise<TSDBEvent[]> {
+  return tsdbFetch(`/eventsseason.php?id=${TSDB_WC_LEAGUE}&s=${WC_SEASON}`, 1800);
 }
 
-// Build standings from finished game results (free-tier compatible)
-export function buildStandingsFromGames(games: WCGame[]): { groupA: WCStanding[]; groupB: WCStanding[] } {
-  const finished = games.filter(g =>
-    g.status.short === 'FT' || g.status.short === 'AOT' || g.status.short === 'AP'
-  );
+// Today's WC games with live status from API-Sports (keyed).
+// Returns a Map of apiSportsGameId → { status, elapsed, homeScore, awayScore }
+export async function fetchLiveStatus(): Promise<Map<string, { status: string; elapsed: string | null; homeScore: number | null; awayScore: number | null }>> {
+  const key = process.env.API_SPORTS_KEY;
+  if (!key) return new Map();
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const res = await fetch(`${APISPORTS_BASE}/games?date=${today}`, {
+      headers: { 'x-apisports-key': key },
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return new Map();
+    const json = await res.json() as { response?: unknown[] };
+    const games = (json.response ?? []) as Array<{
+      id: number;
+      league: { id: number };
+      status: { short: string; elapsed: string | null };
+      scores: { home: { total: number } | null; away: { total: number } | null };
+    }>;
+    const map = new Map<string, { status: string; elapsed: string | null; homeScore: number | null; awayScore: number | null }>();
+    for (const g of games) {
+      if (g.league?.id !== WC_APISPORTS_LEAGUE) continue;
+      map.set(String(g.id), {
+        status: g.status.short,
+        elapsed: g.status.elapsed,
+        homeScore: g.scores.home?.total ?? null,
+        awayScore: g.scores.away?.total ?? null,
+      });
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
 
-  const teams = new Map<number, WCTeam>();
-  const groups = new Map<number, string>();
-  const rec = new Map<number, { w: number; otw: number; otl: number; l: number; gf: number; ga: number; form: string[] }>();
+// ── Group derivation ──────────────────────────────────────────────────────────
 
-  function ensure(team: WCTeam) {
-    if (!teams.has(team.id)) teams.set(team.id, team);
-    if (!rec.has(team.id)) rec.set(team.id, { w: 0, otw: 0, otl: 0, l: 0, gf: 0, ga: 0, form: [] });
+// Groups derived from matchup graph connectivity (BFS).
+// Canada confirmed Group B via individual event lookup — used as anchor.
+export function deriveGroups(events: TSDBEvent[]): Map<string, 'Group A' | 'Group B'> {
+  const adj = new Map<string, Set<string>>();
+  const ensure = (n: string) => { if (!adj.has(n)) adj.set(n, new Set()); };
+  for (const e of events) {
+    const h = normName(e.strHomeTeam);
+    const a = normName(e.strAwayTeam);
+    ensure(h); ensure(a);
+    adj.get(h)!.add(a);
+    adj.get(a)!.add(h);
   }
 
-  for (const g of finished) {
-    const homeScore = g.scores.home?.total ?? 0;
-    const awayScore = g.scores.away?.total ?? 0;
-    const isOT = !!(g.periods?.overtime);
-    ensure(g.teams.home);
-    ensure(g.teams.away);
+  const visited = new Set<string>();
+  const components: string[][] = [];
+  for (const node of adj.keys()) {
+    if (!visited.has(node)) {
+      const comp: string[] = [];
+      const q = [node];
+      while (q.length) {
+        const cur = q.shift()!;
+        if (visited.has(cur)) continue;
+        visited.add(cur); comp.push(cur);
+        for (const nb of adj.get(cur)!) if (!visited.has(nb)) q.push(nb);
+      }
+      components.push(comp);
+    }
+  }
 
-    // Infer groups from matchup
-    const grp = inferGroup(g.teams.home.id, g.teams.away.id);
-    if (!groups.has(g.teams.home.id)) groups.set(g.teams.home.id, grp);
-    if (!groups.has(g.teams.away.id)) groups.set(g.teams.away.id, grp);
+  const result = new Map<string, 'Group A' | 'Group B'>();
+  for (const comp of components) {
+    // Canada is Group B (confirmed via API lookup of game 2354269)
+    const label: 'Group A' | 'Group B' = comp.includes('Canada') ? 'Group B' : 'Group A';
+    comp.forEach(t => result.set(t, label));
+  }
+  return result;
+}
 
-    const h = rec.get(g.teams.home.id)!;
-    const a = rec.get(g.teams.away.id)!;
-    h.gf += homeScore; h.ga += awayScore;
-    a.gf += awayScore; a.ga += homeScore;
+// ── Standings builder ─────────────────────────────────────────────────────────
 
-    if (homeScore > awayScore) {
+export function buildStandingsFromSchedule(events: TSDBEvent[]): { groupA: WCStanding[]; groupB: WCStanding[] } {
+  const groups = deriveGroups(events);
+
+  // Collect teams from all events
+  const teams = new Map<string, WCTeam>();
+  for (const e of events) {
+    const hn = normName(e.strHomeTeam);
+    const an = normName(e.strAwayTeam);
+    if (!teams.has(hn)) teams.set(hn, { id: Number(e.idHomeTeam), name: hn, logo: e.strHomeTeamBadge });
+    if (!teams.has(an)) teams.set(an, { id: Number(e.idAwayTeam), name: an, logo: e.strAwayTeamBadge });
+  }
+
+  // Compute records from finished games
+  type Rec = { w: number; otw: number; otl: number; l: number; gf: number; ga: number; form: string[] };
+  const rec = new Map<string, Rec>();
+  const ensureRec = (n: string) => { if (!rec.has(n)) rec.set(n, { w:0, otw:0, otl:0, l:0, gf:0, ga:0, form:[] }); };
+
+  for (const e of events) {
+    if (!['FT', 'AOT', 'AP'].includes(e.strStatus)) continue;
+    const hn = normName(e.strHomeTeam);
+    const an = normName(e.strAwayTeam);
+    const hs = Number(e.intHomeScore ?? 0);
+    const as_ = Number(e.intAwayScore ?? 0);
+    const isOT = e.strStatus === 'AOT' || e.strStatus === 'AP';
+    ensureRec(hn); ensureRec(an);
+    const h = rec.get(hn)!; const a = rec.get(an)!;
+    h.gf += hs; h.ga += as_; a.gf += as_; a.ga += hs;
+    if (hs > as_) {
       if (isOT) { h.otw++; h.form.push('O'); a.otl++; a.form.push('O'); }
       else { h.w++; h.form.push('W'); a.l++; a.form.push('L'); }
-    } else {
+    } else if (as_ > hs) {
       if (isOT) { a.otw++; a.form.push('O'); h.otl++; h.form.push('O'); }
       else { a.w++; a.form.push('W'); h.l++; h.form.push('L'); }
     }
   }
 
-  const toStanding = (teamId: number, position: number, group: string): WCStanding => {
-    const team = teams.get(teamId)!;
-    const r = rec.get(teamId)!;
-    const gp = r.w + r.otw + r.otl + r.l;
-    const pts = r.w * 3 + r.otw * 2 + r.otl * 1;
+  const makeStanding = (name: string, pos: number): WCStanding => {
+    const team = teams.get(name)!;
+    const r = rec.get(name) ?? { w:0, otw:0, otl:0, l:0, gf:0, ga:0, form:[] };
     return {
-      position,
-      group: { name: group },
+      position: pos,
+      group: { name: groups.get(name) ?? 'Group A' },
       team,
-      games: { played: gp, win: { total: r.w }, win_overtime: { total: r.otw }, lose: { total: r.l }, lose_overtime: { total: r.otl } },
+      games: { played: r.w+r.otw+r.otl+r.l, win: { total: r.w }, win_overtime: { total: r.otw }, lose: { total: r.l }, lose_overtime: { total: r.otl } },
       goals: { for: r.gf, against: r.ga },
-      points: pts,
+      points: r.w*3 + r.otw*2 + r.otl,
       form: r.form.join(''),
       description: null,
     };
   };
 
-  const sorted = [...teams.keys()].sort((a, b) => {
-    const ra = rec.get(a)!; const rb = rec.get(b)!;
-    const ptsa = ra.w * 3 + ra.otw * 2 + ra.otl; const ptsb = rb.w * 3 + rb.otw * 2 + rb.otl;
-    if (ptsa !== ptsb) return ptsb - ptsa;
+  const sortNames = (names: string[]) => [...names].sort((a, b) => {
+    const ra = rec.get(a) ?? { w:0, otw:0, otl:0, l:0, gf:0, ga:0 };
+    const rb = rec.get(b) ?? { w:0, otw:0, otl:0, l:0, gf:0, ga:0 };
+    const pa = ra.w*3+ra.otw*2+ra.otl, pb = rb.w*3+rb.otw*2+rb.otl;
+    if (pa !== pb) return pb - pa;
     return (rb.gf - rb.ga) - (ra.gf - ra.ga);
   });
 
-  const groupA: WCStanding[] = [];
-  const groupB: WCStanding[] = [];
-  let posA = 1, posB = 1;
-  for (const id of sorted) {
-    const grp = groups.get(id) ?? 'Group A';
-    if (grp === 'Group A') groupA.push(toStanding(id, posA++, 'Group A'));
-    else groupB.push(toStanding(id, posB++, 'Group B'));
-  }
+  const aNames = sortNames([...teams.keys()].filter(n => (groups.get(n) ?? 'Group A') === 'Group A'));
+  const bNames = sortNames([...teams.keys()].filter(n => (groups.get(n) ?? 'Group A') === 'Group B'));
 
-  return { groupA, groupB };
+  return {
+    groupA: aNames.map((n, i) => makeStanding(n, i+1)),
+    groupB: bNames.map((n, i) => makeStanding(n, i+1)),
+  };
 }
 
-// Team Heat: 60% recent form (last 3 games) + 40% offense (GF/GP vs tournament peak)
+// ── Heat ──────────────────────────────────────────────────────────────────────
+
 export function computeTeamHeats(standings: WCStanding[]): Map<number, number> {
   const active = standings.filter(s => s.games.played > 0);
   const maxGpg = active.length > 0
@@ -172,40 +248,4 @@ export function computeTeamHeats(standings: WCStanding[]): Map<number, number> {
     map.set(s.team.id, Math.max(1, Math.min(99, heat)));
   }
   return map;
-}
-
-export async function fetchWCStandings(): Promise<{ groupA: WCStanding[]; groupB: WCStanding[] }> {
-  const data = await apiFetch<WCStanding>(`/standings?league=${WC_LEAGUE_ID}&season=${WC_SEASON}`, 1800);
-  const groupA = data.filter(s => s.group?.name === 'Group A').sort((a, b) => a.position - b.position);
-  const groupB = data.filter(s => s.group?.name === 'Group B').sort((a, b) => a.position - b.position);
-  return { groupA, groupB };
-}
-
-// Fetch all WC games from tournament start through today.
-// Past dates cached 24h (games won't change); today cached 30min.
-export async function fetchWCGamesThrough(): Promise<WCGame[]> {
-  const start = new Date(WC_START);
-  const today = new Date();
-  const todayStr = today.toISOString().slice(0, 10);
-
-  const dates: { date: string; isToday: boolean }[] = [];
-  const d = new Date(start);
-  while (d.toISOString().slice(0, 10) <= todayStr) {
-    dates.push({ date: d.toISOString().slice(0, 10), isToday: d.toISOString().slice(0, 10) === todayStr });
-    d.setDate(d.getDate() + 1);
-  }
-
-  const results = await Promise.all(
-    dates.map(({ date, isToday }) =>
-      apiFetch<WCGame>(`/games?date=${date}`, isToday ? 1800 : 86400)
-    )
-  );
-
-  return results.flat().filter(g => g.league?.id === WC_LEAGUE_ID);
-}
-
-export async function fetchWCGamesToday(): Promise<WCGame[]> {
-  const today = new Date().toISOString().slice(0, 10);
-  const data = await apiFetch<WCGame>(`/games?date=${today}`, 1800);
-  return data.filter(g => g.league?.id === WC_LEAGUE_ID);
 }
