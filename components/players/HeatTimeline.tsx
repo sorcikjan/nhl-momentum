@@ -96,6 +96,12 @@ export default function HeatTimeline({
         p5PaceAssists:     null as number | null,
         p95PacePlusMinus:  null as number | null,
         p5PacePlusMinus:   null as number | null,
+        goalsBandBase:     null as number | null,
+        goalsBandDiff:     null as number | null,
+        assistsBandBase:   null as number | null,
+        assistsBandDiff:   null as number | null,
+        pmBandBase:        null as number | null,
+        pmBandDiff:        null as number | null,
       }));
     }
 
@@ -136,6 +142,13 @@ export default function HeatTimeline({
         p5PaceAssists:      p5AssistsPerGame      ? p5AssistsPerGame      * gameIndex : null,
         p95PacePlusMinus:   p95PlusMinusPerGame   ? p95PlusMinusPerGame   * gameIndex : null,
         p5PacePlusMinus:    p5PlusMinusPerGame    ? p5PlusMinusPerGame    * gameIndex : null,
+        // Band diffs for stacked-area fill between p5 and p95
+        goalsBandBase:  p5GoalsPerGame       ? p5GoalsPerGame       * gameIndex : null,
+        goalsBandDiff:  (p95GoalsPerGame != null && p5GoalsPerGame != null)   ? (p95GoalsPerGame - p5GoalsPerGame)   * gameIndex : null,
+        assistsBandBase: p5AssistsPerGame    ? p5AssistsPerGame     * gameIndex : null,
+        assistsBandDiff: (p95AssistsPerGame != null && p5AssistsPerGame != null) ? (p95AssistsPerGame - p5AssistsPerGame) * gameIndex : null,
+        pmBandBase:     p5PlusMinusPerGame   ? p5PlusMinusPerGame   * gameIndex : null,
+        pmBandDiff:     (p95PlusMinusPerGame != null && p5PlusMinusPerGame != null) ? (p95PlusMinusPerGame - p5PlusMinusPerGame) * gameIndex : null,
       };
     });
   }, [deduped, gameEvents, leagueGoalsPerGame, leagueAssistsPerGame,
@@ -411,6 +424,15 @@ export default function HeatTimeline({
             {/* ── Goals view ── */}
             {metric === 'goals' && (
               <>
+                {/* Shaded band between p5 and p95 */}
+                {p95GoalsPerGame != null && p5GoalsPerGame != null && (
+                  <>
+                    <Area stackId="gband" type="monotone" dataKey="goalsBandBase"
+                      fill="transparent" stroke="none" dot={false} activeDot={false} connectNulls legendType="none" />
+                    <Area stackId="gband" type="monotone" dataKey="goalsBandDiff"
+                      fill="rgba(245,158,11,0.07)" stroke="none" dot={false} activeDot={false} connectNulls legendType="none" />
+                  </>
+                )}
                 {p95GoalsPerGame != null && (
                   <Line type="monotone" dataKey="p95PaceGoals"
                     stroke="rgba(245,158,11,0.6)" strokeWidth={1} strokeDasharray="3 4"
@@ -435,6 +457,15 @@ export default function HeatTimeline({
             {/* ── Assists view ── */}
             {metric === 'assists' && (
               <>
+                {/* Shaded band between p5 and p95 */}
+                {p95AssistsPerGame != null && p5AssistsPerGame != null && (
+                  <>
+                    <Area stackId="aband" type="monotone" dataKey="assistsBandBase"
+                      fill="transparent" stroke="none" dot={false} activeDot={false} connectNulls legendType="none" />
+                    <Area stackId="aband" type="monotone" dataKey="assistsBandDiff"
+                      fill="rgba(58,136,255,0.07)" stroke="none" dot={false} activeDot={false} connectNulls legendType="none" />
+                  </>
+                )}
                 {p95AssistsPerGame != null && (
                   <Line type="monotone" dataKey="p95PaceAssists"
                     stroke="rgba(58,136,255,0.6)" strokeWidth={1} strokeDasharray="3 4"
@@ -459,6 +490,15 @@ export default function HeatTimeline({
             {/* ── +/- view ── */}
             {metric === 'plusMinus' && (
               <>
+                {/* Shaded band between p5 and p95 */}
+                {p95PlusMinusPerGame != null && p5PlusMinusPerGame != null && (
+                  <>
+                    <Area stackId="pmband" type="monotone" dataKey="pmBandBase"
+                      fill="transparent" stroke="none" dot={false} activeDot={false} connectNulls legendType="none" />
+                    <Area stackId="pmband" type="monotone" dataKey="pmBandDiff"
+                      fill="rgba(0,229,160,0.07)" stroke="none" dot={false} activeDot={false} connectNulls legendType="none" />
+                  </>
+                )}
                 {p95PlusMinusPerGame != null && (
                   <Line type="monotone" dataKey="p95PacePlusMinus"
                     stroke="rgba(0,229,160,0.6)" strokeWidth={1} strokeDasharray="3 4"
