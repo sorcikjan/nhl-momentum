@@ -169,6 +169,20 @@ export default function HeatTimeline({
       </text>
     </g>
   );
+
+  // Renders a label at the last data point of a pace line
+  const endLabel = (label: string, color: string) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ({ index, cx, cy }: any) => {
+      if (index !== data.length - 1) return null;
+      return (
+        <text x={cx + 5} y={cy} fill={color} fontSize={9} fontFamily="monospace"
+          dominantBaseline="middle" key={label}>
+          {label}
+        </text>
+      );
+    };
+
   const leagueAvgHeat = leaguePpm ? ppmToHeat(leaguePpm) : null;
 
   const first = data[0]?.heat ?? 0;
@@ -182,11 +196,23 @@ export default function HeatTimeline({
 
   const activeMeta = METRICS.find(m => m.key === metric)!;
 
+  // For +/- the pace lines can span a wide range — compute clean integer domain
+  // so recharts doesn't generate fractional ticks.
+  const pmDomain = useMemo((): [number, number] => {
+    const vals = data.flatMap(d => [
+      d.cumPlusMinus, d.p95PacePlusMinus, d.p5PacePlusMinus,
+    ]).filter((v): v is number => v != null);
+    if (!vals.length) return [-5, 5];
+    const lo = Math.min(...vals, -5);
+    const hi = Math.max(...vals,  1);
+    const step = hi - lo > 30 ? 10 : hi - lo > 10 ? 5 : 1;
+    return [Math.floor(lo / step) * step, Math.ceil(hi / step) * step];
+  }, [data]);
+
   const yDomain =
     metric === 'heat'      ? [0, 100] as [number, number] :
-    metric === 'plusMinus'
-      ? [(min: number) => Math.min(min, -5), (max: number) => Math.max(max, 1)] as [(v: number) => number, (v: number) => number]
-      : [0, 'auto'] as [number, string];
+    metric === 'plusMinus' ? pmDomain :
+                             [0, 'auto'] as [number, string];
 
   const yTicks = metric === 'heat' ? [0, 25, 50, 75, 100] : undefined;
 
@@ -254,7 +280,7 @@ export default function HeatTimeline({
       {/* Chart */}
       <div className="pr-4 pb-4 pl-1">
         <ResponsiveContainer width="100%" height={220}>
-          <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: 8 }}>
+          <ComposedChart data={data} margin={{ top: 8, right: 52, bottom: 4, left: 8 }}>
             <defs>
               <linearGradient id="heatAreaGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%"  stopColor="rgba(255,90,36,1)" stopOpacity={0.15} />
@@ -276,6 +302,7 @@ export default function HeatTimeline({
             <YAxis
               domain={yDomain}
               ticks={yTicks}
+              tickFormatter={metric === 'plusMinus' ? (v: number) => String(Math.round(v)) : undefined}
               tick={{ fill: 'var(--text)', fontSize: 10, fontFamily: 'monospace' }}
               tickLine={false}
               axisLine={false}
@@ -386,17 +413,20 @@ export default function HeatTimeline({
                 {p95GoalsPerGame != null && (
                   <Line type="monotone" dataKey="p95PaceGoals"
                     stroke="rgba(245,158,11,0.6)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls />
+                    dot={false} activeDot={false} connectNulls
+                    label={endLabel('Top 5%', 'rgba(245,158,11,0.65)')} />
                 )}
                 {leagueGoalsPerGame != null && (
                   <Line type="monotone" dataKey="leaguePaceGoals"
                     stroke="rgba(245,158,11,0.35)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls />
+                    dot={false} activeDot={false} connectNulls
+                    label={endLabel('Avg', 'rgba(245,158,11,0.45)')} />
                 )}
                 {p5GoalsPerGame != null && (
                   <Line type="monotone" dataKey="p5PaceGoals"
                     stroke="rgba(245,158,11,0.2)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls />
+                    dot={false} activeDot={false} connectNulls
+                    label={endLabel('Bot 5%', 'rgba(245,158,11,0.3)')} />
                 )}
                 <Line type="monotone" dataKey="cumGoals"
                   stroke="#f59e0b" strokeWidth={2} dot={false} connectNulls
@@ -410,17 +440,20 @@ export default function HeatTimeline({
                 {p95AssistsPerGame != null && (
                   <Line type="monotone" dataKey="p95PaceAssists"
                     stroke="rgba(58,136,255,0.6)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls />
+                    dot={false} activeDot={false} connectNulls
+                    label={endLabel('Top 5%', 'rgba(58,136,255,0.65)')} />
                 )}
                 {leagueAssistsPerGame != null && (
                   <Line type="monotone" dataKey="leaguePaceAssists"
                     stroke="rgba(58,136,255,0.35)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls />
+                    dot={false} activeDot={false} connectNulls
+                    label={endLabel('Avg', 'rgba(58,136,255,0.45)')} />
                 )}
                 {p5AssistsPerGame != null && (
                   <Line type="monotone" dataKey="p5PaceAssists"
                     stroke="rgba(58,136,255,0.2)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls />
+                    dot={false} activeDot={false} connectNulls
+                    label={endLabel('Bot 5%', 'rgba(58,136,255,0.3)')} />
                 )}
                 <Line type="monotone" dataKey="cumAssists"
                   stroke="#3a88ff" strokeWidth={2} dot={false} connectNulls
@@ -434,12 +467,14 @@ export default function HeatTimeline({
                 {p95PlusMinusPerGame != null && (
                   <Line type="monotone" dataKey="p95PacePlusMinus"
                     stroke="rgba(0,229,160,0.6)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls />
+                    dot={false} activeDot={false} connectNulls
+                    label={endLabel('Top 5%', 'rgba(0,229,160,0.65)')} />
                 )}
                 {p5PlusMinusPerGame != null && (
                   <Line type="monotone" dataKey="p5PacePlusMinus"
                     stroke="rgba(0,229,160,0.25)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls />
+                    dot={false} activeDot={false} connectNulls
+                    label={endLabel('Bot 5%', 'rgba(0,229,160,0.35)')} />
                 )}
                 <ReferenceLine y={0}
                   stroke="rgba(0,229,160,0.3)"
