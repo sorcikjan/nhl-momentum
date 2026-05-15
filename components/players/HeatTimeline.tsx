@@ -170,15 +170,16 @@ export default function HeatTimeline({
     </g>
   );
 
-  // Renders a label at the last data point of a pace line
-  const endLabel = (label: string, color: string) =>
+  // Custom dot that renders only at the last point as an end-of-line label.
+  // Using dot (not label) because dot props always include exact cx/cy pixels.
+  const endDot = (text: string, color: string) =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ({ index, cx, cy }: any) => {
-      if (index !== data.length - 1) return null;
+    (props: any) => {
+      if (props.index !== data.length - 1) return <g key={props.index} />;
       return (
-        <text x={cx + 5} y={cy} fill={color} fontSize={9} fontFamily="monospace"
-          dominantBaseline="middle" key={label}>
-          {label}
+        <text key={text} x={props.cx + 5} y={props.cy} fill={color}
+          fontSize={9} fontFamily="monospace" dominantBaseline="middle">
+          {text}
         </text>
       );
     };
@@ -413,20 +414,17 @@ export default function HeatTimeline({
                 {p95GoalsPerGame != null && (
                   <Line type="monotone" dataKey="p95PaceGoals"
                     stroke="rgba(245,158,11,0.6)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls
-                    label={endLabel('Top 5%', 'rgba(245,158,11,0.65)')} />
+                    dot={endDot('Top 5%', 'rgba(245,158,11,0.7)')} activeDot={false} connectNulls />
                 )}
                 {leagueGoalsPerGame != null && (
                   <Line type="monotone" dataKey="leaguePaceGoals"
                     stroke="rgba(245,158,11,0.35)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls
-                    label={endLabel('Avg', 'rgba(245,158,11,0.45)')} />
+                    dot={endDot('Avg', 'rgba(245,158,11,0.5)')} activeDot={false} connectNulls />
                 )}
                 {p5GoalsPerGame != null && (
                   <Line type="monotone" dataKey="p5PaceGoals"
                     stroke="rgba(245,158,11,0.2)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls
-                    label={endLabel('Bot 5%', 'rgba(245,158,11,0.3)')} />
+                    dot={endDot('Bot 5%', 'rgba(245,158,11,0.35)')} activeDot={false} connectNulls />
                 )}
                 <Line type="monotone" dataKey="cumGoals"
                   stroke="#f59e0b" strokeWidth={2} dot={false} connectNulls
@@ -440,20 +438,17 @@ export default function HeatTimeline({
                 {p95AssistsPerGame != null && (
                   <Line type="monotone" dataKey="p95PaceAssists"
                     stroke="rgba(58,136,255,0.6)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls
-                    label={endLabel('Top 5%', 'rgba(58,136,255,0.65)')} />
+                    dot={endDot('Top 5%', 'rgba(58,136,255,0.7)')} activeDot={false} connectNulls />
                 )}
                 {leagueAssistsPerGame != null && (
                   <Line type="monotone" dataKey="leaguePaceAssists"
                     stroke="rgba(58,136,255,0.35)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls
-                    label={endLabel('Avg', 'rgba(58,136,255,0.45)')} />
+                    dot={endDot('Avg', 'rgba(58,136,255,0.5)')} activeDot={false} connectNulls />
                 )}
                 {p5AssistsPerGame != null && (
                   <Line type="monotone" dataKey="p5PaceAssists"
                     stroke="rgba(58,136,255,0.2)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls
-                    label={endLabel('Bot 5%', 'rgba(58,136,255,0.3)')} />
+                    dot={endDot('Bot 5%', 'rgba(58,136,255,0.35)')} activeDot={false} connectNulls />
                 )}
                 <Line type="monotone" dataKey="cumAssists"
                   stroke="#3a88ff" strokeWidth={2} dot={false} connectNulls
@@ -467,14 +462,12 @@ export default function HeatTimeline({
                 {p95PlusMinusPerGame != null && (
                   <Line type="monotone" dataKey="p95PacePlusMinus"
                     stroke="rgba(0,229,160,0.6)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls
-                    label={endLabel('Top 5%', 'rgba(0,229,160,0.65)')} />
+                    dot={endDot('Top 5%', 'rgba(0,229,160,0.7)')} activeDot={false} connectNulls />
                 )}
                 {p5PlusMinusPerGame != null && (
                   <Line type="monotone" dataKey="p5PacePlusMinus"
                     stroke="rgba(0,229,160,0.25)" strokeWidth={1} strokeDasharray="3 4"
-                    dot={false} activeDot={false} connectNulls
-                    label={endLabel('Bot 5%', 'rgba(0,229,160,0.35)')} />
+                    dot={endDot('Bot 5%', 'rgba(0,229,160,0.4)')} activeDot={false} connectNulls />
                 )}
                 <ReferenceLine y={0}
                   stroke="rgba(0,229,160,0.3)"
