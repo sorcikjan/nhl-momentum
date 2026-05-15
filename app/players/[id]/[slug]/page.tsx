@@ -309,11 +309,29 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const l5ToiMin    = Math.floor(l5ToiPerGm / 60);
   const l5ToiSecPad = String(Math.round(l5ToiPerGm % 60)).padStart(2, '0');
   const l5ShootDiff = (momShootPct - seaShootPct) * 100;
+
+  // Trend: compare L5 per-game rate vs full-season per-game rate
+  const seaToiPerGm   = seaGames > 0 ? Number(latestSnapshot.season_toi_sec ?? 0) / seaGames : 0;
+  const seaPtsPerGm   = seaGames > 0 ? (seaGoals + seaAssists) / seaGames : 0;
+  const l5PtsPerGm    = momGames > 0 ? (momGoals + momAssists) / momGames : 0;
+  const seaPlMinPerGm = seaGames > 0 ? Number(latestSnapshot.season_plus_minus ?? 0) / seaGames : 0;
+  const l5PlMinPerGm  = momGames > 0 ? l5PlusMinus / momGames : 0;
+  const mkTrend = (up: boolean, down: boolean) => up ? 'up' as const : down ? 'down' as const : 'neutral' as const;
+
   const l5Cells = [
-    { label: 'Pts',    value: String(momGoals + momAssists), sub: `${momGoals}G · ${momAssists}A`,                         highlight: momGoals + momAssists > 2, negative: false },
-    { label: 'TOI/gm', value: l5ToiPerGm > 0 ? `${l5ToiMin}:${l5ToiSecPad}` : '—',                sub: 'L5 avg',          highlight: false,                     negative: false },
-    { label: 'S%',     value: `${(momShootPct * 100).toFixed(0)}%`, sub: seaShootPct > 0 ? `${l5ShootDiff > 0 ? '+' : ''}${l5ShootDiff.toFixed(1)}% vs avg` : '', highlight: momShootPct > seaShootPct, negative: false },
-    { label: '+/-',    value: `${l5PlusMinus > 0 ? '+' : ''}${l5PlusMinus}`, sub: 'L5',            highlight: l5PlusMinus > 0, negative: l5PlusMinus < 0 },
+    { label: 'Pts',    value: String(momGoals + momAssists), sub: `${momGoals}G · ${momAssists}A`,
+      highlight: momGoals + momAssists > 2, negative: false,
+      trend: mkTrend(l5PtsPerGm > seaPtsPerGm + 0.05, l5PtsPerGm < seaPtsPerGm - 0.05) },
+    { label: 'TOI/gm', value: l5ToiPerGm > 0 ? `${l5ToiMin}:${l5ToiSecPad}` : '—', sub: 'L5 avg',
+      highlight: false, negative: false,
+      trend: mkTrend(l5ToiPerGm > seaToiPerGm + 30, l5ToiPerGm < seaToiPerGm - 30) },
+    { label: 'S%',     value: `${(momShootPct * 100).toFixed(0)}%`,
+      sub: seaShootPct > 0 ? `${l5ShootDiff > 0 ? '+' : ''}${l5ShootDiff.toFixed(1)}% vs avg` : '',
+      highlight: momShootPct > seaShootPct, negative: false,
+      trend: mkTrend(l5ShootDiff > 1, l5ShootDiff < -1) },
+    { label: '+/-',    value: `${l5PlusMinus > 0 ? '+' : ''}${l5PlusMinus}`, sub: 'L5',
+      highlight: l5PlusMinus > 0, negative: l5PlusMinus < 0,
+      trend: mkTrend(l5PlMinPerGm > seaPlMinPerGm + 0.1, l5PlMinPerGm < seaPlMinPerGm - 0.1) },
   ];
 
   // Game events for HeatTimeline cumulative overlays (skaters only)
@@ -503,11 +521,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
 
-      {/* 4. Heat timeline ─────────────────────────────────────────────────────── */}
+      {/* 4. Form tracker ─────────────────────────────────────────────────────── */}
       {(metricTimeline?.length ?? 0) > 0 && (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="px-5 pt-5 pb-1">
-            <SectionTitle main="Heat" accent="trend." />
+            <SectionTitle main="Form" accent="tracker." />
           </div>
           <HeatTimeline snapshots={metricTimeline ?? []} leaguePpm={lgPpm} gameEvents={gameEvents}
             leagueGoalsPerGame={lgG} leagueAssistsPerGame={lgA}
@@ -535,8 +553,14 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           <SectionTitle main="Last 5" accent="stats." />
           <div className="grid grid-cols-4 gap-3 mt-4">
             {l5Cells.map((cell) => (
-              <div key={cell.label} className="rounded-xl border flex flex-col items-center py-3 px-2 gap-0.5"
+              <div key={cell.label} className="relative rounded-xl border flex flex-col items-center py-3 px-2 gap-0.5"
                 style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+                {cell.trend !== 'neutral' && (
+                  <span className="absolute top-1.5 right-2 text-xs font-bold leading-none"
+                    style={{ color: cell.trend === 'up' ? 'var(--green)' : 'var(--red)' }}>
+                    {cell.trend === 'up' ? '▲' : '▼'}
+                  </span>
+                )}
                 <span className="text-2xl font-black font-mono"
                   style={{ color: cell.negative ? 'var(--red)' : cell.highlight ? 'var(--heat)' : 'var(--text-bright)' }}>
                   {cell.value}
