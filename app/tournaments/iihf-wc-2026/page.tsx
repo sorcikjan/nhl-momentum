@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import {
   fetchWCStandings,
   fetchWCGamesToday,
+  fetchWCGamesThrough,
+  buildStandingsFromGames,
   computeTeamHeats,
   TEAM_FLAG,
   type WCStanding,
@@ -9,7 +11,7 @@ import {
 } from '@/lib/iihf';
 import { heatColor } from '@/lib/heat';
 
-export const revalidate = 300;
+export const revalidate = 1800;
 
 export const metadata: Metadata = {
   title: 'IIHF World Championship 2026 — Hockey Momentum',
@@ -57,19 +59,17 @@ function FormPips({ form }: { form: string }) {
 function GameCard({ game }: { game: WCGame }) {
   const home = game.teams.home;
   const away = game.teams.away;
-  const homeScore = game.scores.home.total;
-  const awayScore = game.scores.away.total;
-  const isLive = game.status.short === 'LIVE' || game.status.short === '1P' || game.status.short === '2P' || game.status.short === '3P' || game.status.short === 'OT';
-  const isFinished = game.status.short === 'FT' || game.status.short === 'AOT';
+  const homeScore = game.scores.home?.total ?? null;
+  const awayScore = game.scores.away?.total ?? null;
+  const isLive = ['LIVE', '1P', '2P', '3P', 'OT', 'BT'].includes(game.status.short);
+  const isFinished = ['FT', 'AOT', 'AP'].includes(game.status.short);
   const isScheduled = !isLive && !isFinished;
 
-  // Format scheduled time (UTC → display as CET = UTC+2)
   let timeDisplay = '';
   if (isScheduled && game.date) {
     const d = new Date(game.date);
-    const cet = new Date(d.getTime() + 2 * 60 * 60 * 1000);
-    const h = String(cet.getUTCHours()).padStart(2, '0');
-    const m = String(cet.getUTCMinutes()).padStart(2, '0');
+    const h = String(d.getUTCHours() + 2).padStart(2, '0');
+    const m = String(d.getUTCMinutes()).padStart(2, '0');
     timeDisplay = `${h}:${m} CET`;
   }
 
@@ -77,37 +77,30 @@ function GameCard({ game }: { game: WCGame }) {
     <div className="rounded-xl border p-4 flex flex-col gap-3"
       style={{ background: 'var(--bg-card)', borderColor: isLive ? 'rgba(255,90,36,0.4)' : 'var(--border)' }}>
 
-      {/* Status row */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between h-4">
         {isLive && (
           <span className="text-xs font-bold tracking-widest px-2 py-0.5 rounded"
             style={{ background: 'rgba(255,90,36,0.15)', color: 'var(--heat)' }}>
-            LIVE · {game.status.elapsed ?? game.status.short}
+            LIVE {game.status.elapsed ? `· ${game.status.elapsed}′` : ''}
           </span>
         )}
         {isFinished && (
-          <span className="text-xs font-semibold tracking-wider" style={{ color: 'var(--text)', opacity: 0.5 }}>FINAL</span>
+          <span className="text-xs font-semibold tracking-wider" style={{ color: 'var(--text)', opacity: 0.45 }}>FINAL</span>
         )}
         {isScheduled && (
-          <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.5 }}>{timeDisplay}</span>
+          <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.45 }}>{timeDisplay}</span>
         )}
       </div>
 
-      {/* Teams + score */}
-      {[
-        { team: home, score: homeScore, opponent: awayScore },
-        { team: away, score: awayScore, opponent: homeScore },
-      ].map(({ team, score, opponent }) => (
+      {([{ team: home, score: homeScore, opp: awayScore }, { team: away, score: awayScore, opp: homeScore }] as const).map(({ team, score, opp }) => (
         <div key={team.id} className="flex items-center gap-3">
           <img src={team.logo} alt={team.name} width={28} height={28} style={{ objectFit: 'contain', flexShrink: 0 }} />
-          <div className="flex items-center gap-1.5 flex-1 min-w-0">
-            <span className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
-              {TEAM_FLAG[team.name] ?? ''} {team.name}
-            </span>
-          </div>
+          <span className="flex-1 text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
+            {TEAM_FLAG[team.name] ?? ''} {team.name}
+          </span>
           {score !== null && (
             <span className="text-xl font-black font-mono tabular-nums"
-              style={{ color: score > (opponent ?? 0) ? 'var(--text-bright)' : 'var(--text)', opacity: score > (opponent ?? 0) ? 1 : 0.5 }}>
+              style={{ color: score > (opp ?? 0) ? 'var(--text-bright)' : 'var(--text)', opacity: score > (opp ?? 0) ? 1 : 0.45 }}>
               {score}
             </span>
           )}
@@ -123,6 +116,7 @@ function StandingsTable({ standings, heats, title, accent }: {
   title: string;
   accent: string;
 }) {
+  if (standings.length === 0) return null;
   return (
     <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
       <div className="px-5 pt-5 pb-3">
@@ -132,7 +126,7 @@ function StandingsTable({ standings, heats, title, accent }: {
         <table className="w-full text-xs">
           <thead>
             <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
-              <th className="px-4 py-2 text-left font-semibold uppercase tracking-wide w-6" style={{ color: 'var(--text)' }}>#</th>
+              <th className="px-4 py-2 text-left font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}>#</th>
               <th className="px-2 py-2 text-left font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}>Team</th>
               <th className="px-2 py-2 text-center font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}>GP</th>
               <th className="px-2 py-2 text-center font-semibold uppercase tracking-wide" style={{ color: 'var(--green)' }}>W</th>
@@ -140,7 +134,7 @@ function StandingsTable({ standings, heats, title, accent }: {
               <th className="px-2 py-2 text-center font-semibold uppercase tracking-wide" style={{ color: 'var(--red)' }}>L</th>
               <th className="px-2 py-2 text-center font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}>GF</th>
               <th className="px-2 py-2 text-center font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}>GA</th>
-              <th className="px-2 py-2 text-center font-semibold uppercase tracking-wide" style={{ color: 'var(--text)' }}>PTS</th>
+              <th className="px-2 py-2 text-center font-semibold uppercase tracking-wide font-black" style={{ color: 'var(--text-bright)' }}>PTS</th>
               <th className="px-2 py-2 text-center font-semibold uppercase tracking-wide hidden sm:table-cell" style={{ color: 'var(--text)' }}>Form</th>
               <th className="px-4 py-2 text-center font-semibold uppercase tracking-wide" style={{ color: 'var(--heat)' }}>Heat</th>
             </tr>
@@ -149,12 +143,11 @@ function StandingsTable({ standings, heats, title, accent }: {
             {standings.map((s, i) => {
               const heat = heats.get(s.team.id) ?? 50;
               const otTotal = s.games.win_overtime.total + s.games.lose_overtime.total;
-              const isPromotion = s.description?.toLowerCase().includes('quarter') || s.description?.toLowerCase().includes('play');
               return (
                 <tr key={s.team.id}
                   style={{ background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)', borderTop: '1px solid var(--border)' }}>
                   <td className="px-4 py-3 font-mono text-center"
-                    style={{ color: isPromotion ? 'var(--neon)' : 'var(--text)', opacity: isPromotion ? 1 : 0.4 }}>
+                    style={{ color: s.position <= 4 ? 'var(--neon)' : 'var(--text)', opacity: s.position <= 4 ? 1 : 0.4 }}>
                     {s.position}
                   </td>
                   <td className="px-2 py-3">
@@ -189,21 +182,26 @@ function StandingsTable({ standings, heats, title, accent }: {
 }
 
 export default async function IIHFWorldChampionshipPage() {
-  const [{ groupA, groupB }, todayGames] = await Promise.all([
+  const [apiStandings, todayGames, allGames] = await Promise.all([
     fetchWCStandings(),
     fetchWCGamesToday(),
+    fetchWCGamesThrough(),
   ]);
+
+  // Prefer API standings (Pro plan); fall back to computing from game results (free tier)
+  const useApi = apiStandings.groupA.length > 0 || apiStandings.groupB.length > 0;
+  const { groupA, groupB } = useApi ? apiStandings : buildStandingsFromGames(allGames);
 
   const allStandings = [...groupA, ...groupB];
   const heats = computeTeamHeats(allStandings);
-  const hasStandings = allStandings.length > 0;
+  const gamesPlayed = allGames.filter(g => ['FT', 'AOT', 'AP'].includes(g.status.short)).length;
 
   return (
     <div className="max-w-5xl mx-auto pb-20 md:pb-0 space-y-4">
 
       {/* Hero */}
       <div className="relative rounded-xl overflow-hidden px-6 py-8"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+        style={{ background: 'var(--bg-card)' }}>
         <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
           <div style={{
             position: 'absolute', right: -20, top: -30, fontSize: 220,
@@ -216,15 +214,13 @@ export default async function IIHFWorldChampionshipPage() {
             IIHF · May 15–26, 2026 · Stockholm & Herning
           </div>
           <h1 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', lineHeight: 0.95, letterSpacing: '-0.025em' }}>
-            <span className="block font-black" style={{ fontSize: 'clamp(2rem, 6vw, 3rem)', color: 'var(--text-bright)' }}>
-              World
-            </span>
-            <span className="block font-black" style={{ fontSize: 'clamp(2rem, 6vw, 3rem)', color: 'var(--heat)' }}>
-              Championship.
-            </span>
+            <span className="block font-black" style={{ fontSize: 'clamp(2rem, 6vw, 3rem)', color: 'var(--text-bright)' }}>World</span>
+            <span className="block font-black" style={{ fontSize: 'clamp(2rem, 6vw, 3rem)', color: 'var(--heat)' }}>Championship.</span>
           </h1>
-          <p className="text-sm mt-1" style={{ color: 'var(--text)', opacity: 0.65 }}>
-            Team momentum scores updated every 5 minutes · {allStandings.length} nations competing
+          <p className="text-sm mt-1" style={{ color: 'var(--text)', opacity: 0.55 }}>
+            {gamesPlayed > 0
+              ? `${gamesPlayed} game${gamesPlayed !== 1 ? 's' : ''} played · standings update every 30 min`
+              : 'Tournament begins today · standings update as games are played'}
           </p>
         </div>
       </div>
@@ -243,26 +239,27 @@ export default async function IIHFWorldChampionshipPage() {
         </div>
       )}
 
-      {/* Group standings */}
-      {hasStandings ? (
+      {/* Group standings — appear once games are played */}
+      {allStandings.length > 0 ? (
         <>
           <StandingsTable standings={groupA} heats={heats} title="Group" accent="A." />
           <StandingsTable standings={groupB} heats={heats} title="Group" accent="B." />
         </>
       ) : (
         <div className="rounded-xl border p-8 text-center" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <p className="text-sm" style={{ color: 'var(--text)', opacity: 0.5 }}>
-            Standings will appear once games begin.
-          </p>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Standings build as games finish.</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--text)', opacity: 0.5 }}>Check back after tonight's games.</p>
         </div>
       )}
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-4 text-xs px-1" style={{ color: 'var(--text)', opacity: 0.45 }}>
-        <span><span style={{ color: 'var(--neon)' }}>●</span> Advances to quarterfinals</span>
-        <span>Heat = recent form (60%) + goals/game (40%)</span>
-        <span>OT = overtime wins + overtime losses</span>
-      </div>
+      {allStandings.length > 0 && (
+        <div className="flex flex-wrap gap-4 text-xs px-1" style={{ color: 'var(--text)', opacity: 0.4 }}>
+          <span><span style={{ color: 'var(--neon)' }}>●</span> Top 4 advance to quarterfinals</span>
+          <span>Heat = recent form (60%) + goals/game vs field (40%)</span>
+          <span>OT column = overtime wins + overtime losses</span>
+        </div>
+      )}
 
     </div>
   );
