@@ -228,6 +228,74 @@ export function buildStandingsFromSchedule(events: TSDBEvent[]): { groupA: WCSta
   };
 }
 
+// ── Single-event detail ───────────────────────────────────────────────────────
+
+export interface TSDBEventDetail extends TSDBEvent {
+  strVenue: string | null;
+  strCity: string | null;
+  strDescriptionEN: string | null;
+}
+
+export async function fetchEventDetail(id: string): Promise<TSDBEventDetail | null> {
+  try {
+    const res = await fetch(`${TSDB_BASE}/lookupevent.php?id=${id}`, { next: { revalidate: 300 } });
+    if (!res.ok) return null;
+    const json = await res.json() as { events?: TSDBEventDetail[] };
+    return json.events?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// ── Game events (goals/penalties) from API-Sports ─────────────────────────────
+
+export interface WCGameEvent {
+  team: string;
+  player: string;
+  assist1: string | null;
+  assist2: string | null;
+  period: number;
+  time: string;
+  type: string;
+  detail: string;
+}
+
+export async function fetchGameEvents(apiSportsGameId: string): Promise<WCGameEvent[]> {
+  const key = process.env.API_SPORTS_KEY;
+  if (!key) return [];
+  try {
+    const res = await fetch(`${APISPORTS_BASE}/games/events?game=${apiSportsGameId}`, {
+      headers: { 'x-apisports-key': key },
+      next: { revalidate: 120 },
+    });
+    if (!res.ok) return [];
+    const json = await res.json() as {
+      response?: Array<{
+        team: { name: string };
+        player: { name: string };
+        assist1: { name: string } | null;
+        assist2: { name: string } | null;
+        period: number;
+        time: string;
+        type: string;
+        detail: string;
+      }>;
+    };
+    return (json.response ?? []).map(e => ({
+      team: e.team.name,
+      player: e.player.name,
+      assist1: e.assist1?.name ?? null,
+      assist2: e.assist2?.name ?? null,
+      period: e.period,
+      time: e.time,
+      type: e.type,
+      detail: e.detail,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 // ── Heat ──────────────────────────────────────────────────────────────────────
 
 export function computeTeamHeats(standings: WCStanding[]): Map<number, number> {

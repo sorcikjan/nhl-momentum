@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import {
   fetchWCSchedule,
   fetchLiveStatus,
@@ -70,7 +71,8 @@ function GameCard({ event, live }: {
   const isFinished = ['FT', 'AOT', 'AP'].includes(status);
 
   return (
-    <div className="rounded-xl border p-4 flex flex-col gap-3"
+    <Link href={`/tournaments/iihf-wc-2026/games/${event.idEvent}`}
+      className="rounded-xl border p-4 flex flex-col gap-3 transition-opacity hover:opacity-80"
       style={{ background: 'var(--bg-card)', borderColor: isLive ? 'rgba(255,90,36,0.4)' : 'var(--border)' }}>
 
       <div className="flex items-center justify-between h-4">
@@ -108,7 +110,7 @@ function GameCard({ event, live }: {
           )}
         </div>
       ))}
-    </div>
+    </Link>
   );
 }
 
