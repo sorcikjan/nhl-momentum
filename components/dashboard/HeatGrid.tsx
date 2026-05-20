@@ -374,21 +374,17 @@ function NewcomerRow({ p, rank }: { p: NewcomerPlayer; rank: number }) {
 
 interface ColumnProps {
   tag: string;
-  title: string;
   subtitle: string;
   listLink: string;
   children: React.ReactNode;
 }
 
-function DesktopColumn({ tag, title, subtitle, listLink, children }: ColumnProps) {
+function DesktopColumn({ tag, subtitle, listLink, children }: ColumnProps) {
   return (
     <div className="rounded-xl border flex flex-col" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
       <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
-        <p className="text-xs font-bold tracking-widest uppercase mb-0.5" style={{ color: 'var(--heat)', opacity: 0.7 }}>
-          {tag}
-        </p>
-        <p className="font-semibold text-sm" style={{ color: 'var(--text-bright)' }}>{title}</p>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--text)', opacity: 0.5 }}>{subtitle}</p>
+        <p className="font-bold text-sm mb-0.5" style={{ color: 'var(--text-bright)' }}>{tag}</p>
+        <p className="text-xs" style={{ color: 'var(--text)', opacity: 0.5 }}>{subtitle}</p>
       </div>
       <div className="flex flex-col flex-1">
         {children}
@@ -446,8 +442,7 @@ export default function HeatGrid({
       {/* Desktop: 3-column layout */}
       <div className="hidden md:grid md:grid-cols-3 gap-4">
         <DesktopColumn
-          tag="HEAT · TOP 5"
-          title="Hottest skaters"
+          tag="Heat"
           subtitle="Ranked by 5-game momentum"
           listLink="/rankings"
         >
@@ -457,8 +452,7 @@ export default function HeatGrid({
         </DesktopColumn>
 
         <DesktopColumn
-          tag="GOALIES · TOP 5"
-          title="Best in net"
+          tag="Goalies"
           subtitle="Ranked by 5-game save %"
           listLink="/rankings?tab=goalies"
         >
@@ -468,9 +462,8 @@ export default function HeatGrid({
         </DesktopColumn>
 
         <DesktopColumn
-          tag="ROOKIES · TOP 5"
-          title="Rookies on the rise"
-          subtitle="First-year skaters making noise"
+          tag="Fresh faces"
+          subtitle="First-year skaters ranked by Heat"
           listLink="/rankings?tab=newcomers"
         >
           {top5Newcomers.map((p, i) => (

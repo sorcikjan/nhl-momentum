@@ -1199,13 +1199,9 @@ export async function fetchNewcomerWatch() {
       && (!isPlayoffs || playoffTeams.has(p.teams?.id));
   });
 
-  // Sort by pts/game this season — rewards sustained production over tiny samples
+  // Sort by recent Heat (momentum_ppm) — same metric as the skater rankings
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  newcomers.sort((a: any, b: any) => {
-    const aRate = ((a.season_goals ?? 0) + (a.season_assists ?? 0)) / Math.max(1, a.season_games ?? 1);
-    const bRate = ((b.season_goals ?? 0) + (b.season_assists ?? 0)) / Math.max(1, b.season_games ?? 1);
-    return bRate - aRate;
-  });
+  newcomers.sort((a: any, b: any) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0));
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return newcomers.slice(0, 15).map((r: any) => ({
@@ -1216,6 +1212,7 @@ export async function fetchNewcomerWatch() {
     momentum_assists: (r.momentum_assists  ?? 0) as number,
     season_goals:     (r.season_goals     ?? 0) as number,
     season_assists:   (r.season_assists   ?? 0) as number,
+    momentum_ppm:     (r.momentum_ppm     ?? 0) as number,
     players: {
       first_name:     r.players.first_name    as string,
       last_name:      r.players.last_name     as string,
