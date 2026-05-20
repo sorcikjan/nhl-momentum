@@ -123,7 +123,7 @@ async function TonightSlate({ today }: { today: string }) {
     const homeAbbrev = g.homeTeam?.abbrev;
     const awayPlayers = awayAbbrev ? (teamPlayersMap.get(awayAbbrev) ?? []).slice(0, 3) : [];
     const homePlayers = homeAbbrev ? (teamPlayersMap.get(homeAbbrev) ?? []).slice(0, 3) : [];
-    const combined = [...awayPlayers, ...homePlayers].sort((a, b) => b.heat - a.heat);
+    const combined = [...awayPlayers, ...homePlayers]; // already sorted within each group
     if (combined.length > 0) watchPlayers.set(g.id, combined);
   }
 
@@ -348,6 +348,10 @@ export default function DashboardPage() {
       <div className="flex flex-col gap-3">
         <p className="text-xs font-semibold tracking-widest uppercase"
           style={{ color: 'var(--text)', opacity: 0.4 }}>Explore</p>
+        <h2 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05 }}>
+          <span style={{ color: 'var(--text-bright)' }}>More ways to </span>
+          <span style={{ color: 'var(--heat)' }}>dig in.</span>
+        </h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {([
             { href: '/rankings', category: 'RANKINGS', title: 'Heat Rankings', desc: "Who's playing the best hockey right now", color: 'var(--heat)' },

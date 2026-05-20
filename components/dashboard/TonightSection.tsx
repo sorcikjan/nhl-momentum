@@ -178,13 +178,17 @@ function GameRow({
 
         {/* WATCH FOR players */}
         {watchPlayers && watchPlayers.length > 0 && (
-          <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-            {watchPlayers.slice(0, 3).map((wp, i) => (
-              <div key={i} className="flex items-center gap-1">
-                <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.6 }}>{wp.name.split(' ').pop()}</span>
-                <HeatBadge heat={wp.heat} />
-              </div>
-            ))}
+          <div className="flex flex-col gap-1 flex-shrink-0">
+            <span className="text-xs font-bold tracking-widest uppercase" style={{ color: 'var(--text)', opacity: 0.35 }}>WATCH FOR</span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {watchPlayers.map((wp, i) => (
+                <div key={i} className="flex items-center gap-1">
+                  {i > 0 && <span style={{ color: 'var(--text)', opacity: 0.3 }}>·</span>}
+                  <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.6 }}>{wp.name.split(' ').pop()}</span>
+                  <HeatBadge heat={wp.heat} />
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>

@@ -69,51 +69,94 @@ interface GameTrackerProps {
   awayWins: number;
   homeWins: number;
   gameInSeriesTonight: number | null;
+  seriesGames: Array<{ gameNum: number; seriesAwayScore: number; seriesHomeScore: number }>;
+  awayAbbrev: string;
+  homeAbbrev: string;
 }
 
-function GameTracker({ totalPlayed, awayWins, homeWins, gameInSeriesTonight }: GameTrackerProps) {
+function GameTracker({ totalPlayed, awayWins, homeWins, gameInSeriesTonight, seriesGames, awayAbbrev, homeAbbrev }: GameTrackerProps) {
   const games = [1, 2, 3, 4, 5, 6, 7];
 
   return (
-    <div className="flex gap-1.5 mt-2">
+    <div className="flex gap-1.5 mt-2 flex-wrap">
       {games.map(num => {
         const isPlayed = num <= totalPlayed;
         const isTonight = num === gameInSeriesTonight;
         const isFuture = !isPlayed && !isTonight;
 
-        let bg = 'rgba(255,255,255,0.06)';
-        let border = '1px solid rgba(255,255,255,0.1)';
-        let textColor = 'rgba(255,255,255,0.2)';
-        let content: React.ReactNode = '—';
-
         if (isTonight) {
-          bg = 'var(--heat)';
-          border = 'none';
-          textColor = '#fff';
-          content = <span style={{ fontSize: '0.55rem', fontWeight: 900 }}>G{num}</span>;
-        } else if (isPlayed) {
-          bg = 'rgba(255,255,255,0.12)';
-          border = 'none';
-          textColor = 'rgba(255,255,255,0.6)';
-          content = <span style={{ fontSize: '0.6rem', fontWeight: 700 }}>{num}</span>;
-        } else if (isFuture) {
-          content = <span style={{ fontSize: '0.55rem' }}>—</span>;
+          return (
+            <div
+              key={num}
+              className="flex items-center justify-center rounded"
+              style={{
+                width: '28px', height: '20px',
+                background: 'var(--heat)',
+                border: 'none',
+                color: '#fff',
+              }}
+            >
+              <span style={{ fontSize: '0.55rem', fontWeight: 900 }}>G{num}</span>
+            </div>
+          );
         }
 
-        return (
-          <div
-            key={num}
-            className="flex items-center justify-center rounded"
-            style={{
-              width: '28px', height: '20px',
-              background: bg,
-              border,
-              color: textColor,
-            }}
-          >
-            {content}
-          </div>
-        );
+        if (isPlayed) {
+          const gameData = seriesGames.find(sg => sg.gameNum === num);
+          if (gameData) {
+            const awayWon = gameData.seriesAwayScore > gameData.seriesHomeScore;
+            const winnerAbbrev = awayWon ? awayAbbrev : homeAbbrev;
+            const score = `${gameData.seriesAwayScore}–${gameData.seriesHomeScore}`;
+            return (
+              <div
+                key={num}
+                className="flex flex-col items-center justify-center rounded"
+                style={{
+                  width: '48px', height: '34px',
+                  background: 'rgba(255,255,255,0.08)',
+                  border: 'none',
+                }}
+              >
+                <span style={{ fontSize: '0.55rem', fontWeight: 900, color: '#fff', lineHeight: 1.1 }}>{winnerAbbrev}</span>
+                <span style={{ fontSize: '0.5rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.1 }}>{score}</span>
+              </div>
+            );
+          }
+          // Fallback if no gameData found
+          return (
+            <div
+              key={num}
+              className="flex items-center justify-center rounded"
+              style={{
+                width: '28px', height: '20px',
+                background: 'rgba(255,255,255,0.12)',
+                border: 'none',
+                color: 'rgba(255,255,255,0.6)',
+              }}
+            >
+              <span style={{ fontSize: '0.6rem', fontWeight: 700 }}>{num}</span>
+            </div>
+          );
+        }
+
+        if (isFuture) {
+          return (
+            <div
+              key={num}
+              className="flex items-center justify-center rounded"
+              style={{
+                width: '28px', height: '20px',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.1)',
+                color: 'rgba(255,255,255,0.2)',
+              }}
+            >
+              <span style={{ fontSize: '0.55rem' }}>—</span>
+            </div>
+          );
+        }
+
+        return null;
       })}
     </div>
   );
@@ -341,12 +384,15 @@ export default function PlayoffHero({ seriesMap, rankings, todayGames, predMap }
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={teamLogoUrl(featured.awayTeam.abbrev)} alt={featured.awayTeam.abbrev}
                   style={{ width: '52px', height: '52px' }} />
-                <span className="text-sm font-black" style={{ color: '#fff' }}>{featured.awayTeam.abbrev}</span>
-                {featured.awayWins > featured.homeWins && (
-                  <span className="text-xs font-semibold" style={{ color: 'var(--heat)' }}>LEADS</span>
-                )}
+                <span className="text-sm font-black" style={{ color: '#fff' }}>{featured.awayTeam.name}</span>
                 {featured.isComplete && featured.awayWins > featured.homeWins && (
                   <span className="text-xs font-semibold" style={{ color: 'var(--neon)' }}>WINS</span>
+                )}
+                {!featured.isComplete && featured.awayWins > featured.homeWins && (
+                  <span className="text-xs font-semibold" style={{ color: 'var(--heat)' }}>LEADS</span>
+                )}
+                {!featured.isComplete && !tied && featured.awayWins < featured.homeWins && (
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text)', opacity: 0.45 }}>TRAILS</span>
                 )}
               </div>
 
@@ -371,12 +417,15 @@ export default function PlayoffHero({ seriesMap, rankings, todayGames, predMap }
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={teamLogoUrl(featured.homeTeam.abbrev)} alt={featured.homeTeam.abbrev}
                   style={{ width: '52px', height: '52px' }} />
-                <span className="text-sm font-black" style={{ color: '#fff' }}>{featured.homeTeam.abbrev}</span>
-                {featured.homeWins > featured.awayWins && (
-                  <span className="text-xs font-semibold" style={{ color: 'var(--heat)' }}>LEADS</span>
-                )}
+                <span className="text-sm font-black" style={{ color: '#fff' }}>{featured.homeTeam.name}</span>
                 {featured.isComplete && featured.homeWins > featured.awayWins && (
                   <span className="text-xs font-semibold" style={{ color: 'var(--neon)' }}>WINS</span>
+                )}
+                {!featured.isComplete && featured.homeWins > featured.awayWins && (
+                  <span className="text-xs font-semibold" style={{ color: 'var(--heat)' }}>LEADS</span>
+                )}
+                {!featured.isComplete && !tied && featured.homeWins < featured.awayWins && (
+                  <span className="text-xs font-semibold" style={{ color: 'var(--text)', opacity: 0.45 }}>TRAILS</span>
                 )}
               </div>
             </div>
@@ -387,6 +436,9 @@ export default function PlayoffHero({ seriesMap, rankings, todayGames, predMap }
               awayWins={featured.awayWins}
               homeWins={featured.homeWins}
               gameInSeriesTonight={featured.isComplete ? null : gameInSeriesTonight}
+              seriesGames={featured.seriesGames}
+              awayAbbrev={featured.awayTeam.abbrev}
+              homeAbbrev={featured.homeTeam.abbrev}
             />
 
             {/* Full bracket link */}

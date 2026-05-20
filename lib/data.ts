@@ -552,6 +552,7 @@ export interface SeriesInfo {
   totalPlayed: number;
   isComplete: boolean;
   nextGame: { id: number; game_date: string; start_time_utc: string | null } | null;
+  seriesGames: Array<{ gameNum: number; seriesAwayScore: number; seriesHomeScore: number }>;
 }
 
 export async function fetchPlayoffActiveTeams(): Promise<Set<number>> {
@@ -590,7 +591,7 @@ export async function fetchSeriesStandings(): Promise<Map<string, SeriesInfo>> {
     const key = `${round}-${series}`;
     if (!map.has(key)) {
       map.set(key, { round, seriesNum: series, awayTeam: g.away_team, homeTeam: g.home_team,
-        awayWins: 0, homeWins: 0, totalPlayed: 0, isComplete: false, nextGame: null });
+        awayWins: 0, homeWins: 0, totalPlayed: 0, isComplete: false, nextGame: null, seriesGames: [] });
     }
     const s = map.get(key)!;
     if (g.game_state === 'FINAL' || g.game_state === 'OFF') {
@@ -604,9 +605,19 @@ export async function fetchSeriesStandings(): Promise<Map<string, SeriesInfo>> {
         if (homeWon) s.awayWins++; else s.homeWins++;
       }
       if (s.awayWins === 4 || s.homeWins === 4) s.isComplete = true;
+      const { gameInSeries } = parsePlayoffGameId(g.id);
+      const gameHomeIsSeriesHome = g.home_team?.id === s.homeTeam.id;
+      s.seriesGames.push({
+        gameNum: gameInSeries,
+        seriesAwayScore: gameHomeIsSeriesHome ? (g.away_score ?? 0) : (g.home_score ?? 0),
+        seriesHomeScore: gameHomeIsSeriesHome ? (g.home_score ?? 0) : (g.away_score ?? 0),
+      });
     } else if (g.game_state === 'FUT' && !s.nextGame) {
       s.nextGame = { id: g.id, game_date: g.game_date, start_time_utc: g.start_time_utc ?? null };
     }
+  }
+  for (const s of map.values()) {
+    s.seriesGames.sort((a, b) => a.gameNum - b.gameNum);
   }
   return map;
 }
