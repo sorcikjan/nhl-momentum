@@ -348,8 +348,6 @@ function NewcomerRow({ p, rank }: { p: NewcomerPlayer; rank: number }) {
   const heat = ppmToHeat(p.momentum_ppm);
   const abbrev = p.players.teams?.abbrev ?? '?';
   const initial = p.players.first_name?.[0] ?? '';
-  const pts = p.season_goals + p.season_assists;
-  const ppg = p.season_games > 0 ? (pts / p.season_games).toFixed(2) : '—';
 
   return (
     <Link
@@ -365,7 +363,16 @@ function NewcomerRow({ p, rank }: { p: NewcomerPlayer; rank: number }) {
       <span className="flex-1 truncate text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
         {initial}. {p.players.last_name}
       </span>
-      <span className="text-xs font-mono" style={{ color: 'rgba(255,255,255,0.5)' }}>{ppg} p/g</span>
+      <span
+        className="text-xs font-mono font-bold px-1.5 py-0.5 rounded"
+        style={{
+          background: `${heatBg(heat)}44`,
+          color: heatColor(heat),
+          border: `1px solid ${heatBorderColor(heat)}`,
+        }}
+      >
+        {heat}
+      </span>
     </Link>
   );
 }
