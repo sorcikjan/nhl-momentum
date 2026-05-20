@@ -40,3 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .env.local
+
+# Claude Code worktrees (never commit these — embedded git repos break CI)
+.claude/worktrees/
