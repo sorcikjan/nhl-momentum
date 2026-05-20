@@ -344,61 +344,25 @@ export default function DashboardPage() {
         <TonightSlate today={today} />
       </Suspense>
 
-      {/* 6. Explore — story entry points */}
+      {/* 6. Explore — feature entry points */}
       <div className="flex flex-col gap-3">
         <p className="text-xs font-semibold tracking-widest uppercase"
           style={{ color: 'var(--text)', opacity: 0.4 }}>Explore</p>
-        <div className="grid grid-cols-2 gap-3">
-          <a href="/rankings"
-            className="rounded-xl border p-4 hover:opacity-90 transition-opacity group"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <div className="text-lg mb-1">⚡</div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Heat Rankings</p>
-            <p className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
-              Who&apos;s playing the best hockey right now
-            </p>
-            <p className="mt-2 text-xs font-medium" style={{ color: 'var(--heat)' }}>View rankings →</p>
-          </a>
-          <a href="/games"
-            className="rounded-xl border p-4 hover:opacity-90 transition-opacity group"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <div className="text-lg mb-1">🏒</div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Games &amp; Predictions</p>
-            <p className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
-              AI win predictions vs bookmaker odds
-            </p>
-            <p className="mt-2 text-xs font-medium" style={{ color: 'var(--neon)' }}>See predictions →</p>
-          </a>
-          <a href="/recaps"
-            className="rounded-xl border p-4 hover:opacity-90 transition-opacity group"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <div className="text-lg mb-1">📰</div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Last Night</p>
-            <p className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
-              Data-backed stories from every game night
-            </p>
-            <p className="mt-2 text-xs font-medium" style={{ color: 'var(--silver)' }}>Read stories →</p>
-          </a>
-          <a href="/playoffs"
-            className="rounded-xl border p-4 hover:opacity-90 transition-opacity group"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <div className="text-lg mb-1">🏆</div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Playoff Bracket</p>
-            <p className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
-              Series standings round by round
-            </p>
-            <p className="mt-2 text-xs font-medium" style={{ color: 'var(--heat)' }}>View bracket →</p>
-          </a>
-          <a href="/teams"
-            className="rounded-xl border p-4 hover:opacity-90 transition-opacity group"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <div className="text-lg mb-1">🛡</div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Teams</p>
-            <p className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
-              Roster momentum, form and player status
-            </p>
-            <p className="mt-2 text-xs font-medium" style={{ color: 'var(--green)' }}>Browse teams →</p>
-          </a>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {([
+            { href: '/rankings', category: 'RANKINGS', title: 'Heat Rankings', desc: "Who's playing the best hockey right now", color: 'var(--heat)' },
+            { href: '/games', category: 'PREDICTIONS', title: 'Games & Predictions', desc: 'AI win predictions vs bookmaker odds', color: 'var(--neon)' },
+            { href: '/recaps', category: 'STORIES', title: 'AI archive', desc: 'Data-backed stories from every game night', color: 'var(--text-bright)' },
+            { href: '/playoffs', category: 'BRACKET', title: 'Playoff Bracket', desc: 'Series standings round by round', color: 'var(--heat)' },
+          ] as const).map(({ href, category, title, desc, color }) => (
+            <a key={href} href={href}
+              className="rounded-xl border p-4 hover:opacity-90 transition-opacity flex flex-col gap-1"
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+              <p className="text-xs font-bold tracking-widest uppercase" style={{ color, opacity: 0.7 }}>{category}</p>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>{title}</p>
+              <p className="text-xs" style={{ color: 'var(--text)', opacity: 0.6 }}>{desc}</p>
+            </a>
+          ))}
         </div>
       </div>
 

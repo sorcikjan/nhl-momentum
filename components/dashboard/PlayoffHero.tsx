@@ -299,7 +299,7 @@ export default function PlayoffHero({ seriesMap, rankings, todayGames, predMap }
         </p>
         <h2 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontWeight: 900, fontSize: 'clamp(1.8rem, 4vw, 2.5rem)', letterSpacing: '-0.03em', lineHeight: 1.0, color: 'var(--text-bright)' }}>
           Game {gameInSeriesTonight} tonight:{' '}
-          <span style={{ color: 'var(--text-bright)' }}>{seriesStatusLine}.</span>
+          <span style={{ color: 'var(--heat)' }}>{seriesStatusLine}.</span>
         </h2>
         {subtext && (
           <p className="mt-2 text-sm" style={{ color: 'var(--text)', opacity: 0.7 }}>
