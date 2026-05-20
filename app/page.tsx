@@ -47,10 +47,12 @@ const getSeriesStandings = cache(() => fetchSeriesStandings().catch(() => new Ma
 // ── Section: Playoff Hero ─────────────────────────────────────────────────────
 
 async function PlayoffHeroSection({ today }: { today: string }) {
-  const [seriesMap, rankings, { games, predictions }] = await Promise.all([
+  const [seriesMap, rankings, { games, predictions }, goalies, newcomers] = await Promise.all([
     getSeriesStandings(),
     getRankings(),
     getTodayGames(today),
+    getGoalieRankings(),
+    getNewcomers(),
   ]);
   if (seriesMap.size === 0) return null;
 
@@ -67,6 +69,10 @@ async function PlayoffHeroSection({ today }: { today: string }) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       todayGames={games as any[]}
       predMap={predMap}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      goalies={goalies as any[]}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      newcomers={newcomers as any[]}
     />
   );
 }

@@ -1,6 +1,6 @@
 import type { SeriesInfo } from '@/lib/data';
 import { computeSeriesProb, teamLogoUrl } from '@/lib/data';
-import { ppmToHeat } from '@/lib/heat';
+import { ppmToHeat, heatColor } from '@/lib/heat';
 import { gameUrl } from '@/lib/urls';
 import Link from 'next/link';
 
@@ -38,6 +38,10 @@ interface PlayoffHeroProps {
   todayGames: any[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   predMap: Record<number, any>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  goalies: any[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  newcomers: any[];
 }
 
 // Build a heat-score lookup: team abbrev → top 3 Heat players
@@ -175,40 +179,53 @@ function OtherSeriesRow({ s }: { s: SeriesInfo }) {
     ? `Tied ${leaderW}–${trailingW}`
     : `${leaderAbbrev} leads ${leaderW}–${trailingW}`;
 
+  const nextGameNum = s.nextGame ? s.awayWins + s.homeWins + 1 : null;
+
   return (
     <div
-      className="flex items-center justify-between gap-2 rounded-xl border px-3 py-2"
+      className="flex items-center justify-between gap-2 rounded-xl border px-4 py-3"
       style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
     >
       <div className="flex items-center gap-2 flex-1 min-w-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={teamLogoUrl(s.awayTeam.abbrev)} alt={s.awayTeam.abbrev} className="w-5 h-5 flex-shrink-0" />
-        <span className="text-xs font-bold" style={{ color: s.awayWins > s.homeWins ? 'var(--text-bright)' : 'var(--text)', opacity: s.awayWins < s.homeWins && s.isComplete ? 0.4 : 1 }}>
+        <img src={teamLogoUrl(s.awayTeam.abbrev)} alt={s.awayTeam.abbrev} className="w-6 h-6 flex-shrink-0" />
+        <span className="text-sm font-black" style={{ color: s.awayWins > s.homeWins ? 'var(--text-bright)' : 'var(--text)', opacity: s.awayWins < s.homeWins && s.isComplete ? 0.4 : 1 }}>
           {s.awayTeam.abbrev}
         </span>
-        <span className="text-xs font-black font-mono" style={{ color: 'var(--text-bright)' }}>
+        <span className="text-base font-black font-mono" style={{ color: 'var(--text-bright)' }}>
           {s.awayWins}
         </span>
-        <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.3 }}>—</span>
-        <span className="text-xs font-black font-mono" style={{ color: 'var(--text-bright)' }}>
+        <span className="text-sm" style={{ color: 'var(--text)', opacity: 0.3 }}>—</span>
+        <span className="text-base font-black font-mono" style={{ color: 'var(--text-bright)' }}>
           {s.homeWins}
         </span>
-        <span className="text-xs font-bold" style={{ color: s.homeWins > s.awayWins ? 'var(--text-bright)' : 'var(--text)', opacity: s.homeWins < s.awayWins && s.isComplete ? 0.4 : 1 }}>
+        <span className="text-sm font-black" style={{ color: s.homeWins > s.awayWins ? 'var(--text-bright)' : 'var(--text)', opacity: s.homeWins < s.awayWins && s.isComplete ? 0.4 : 1 }}>
           {s.homeTeam.abbrev}
         </span>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={teamLogoUrl(s.homeTeam.abbrev)} alt={s.homeTeam.abbrev} className="w-5 h-5 flex-shrink-0" />
+        <img src={teamLogoUrl(s.homeTeam.abbrev)} alt={s.homeTeam.abbrev} className="w-6 h-6 flex-shrink-0" />
       </div>
-      <span className="text-xs flex-shrink-0" style={{ color: s.isComplete ? 'var(--neon)' : 'var(--text)', opacity: s.isComplete ? 0.9 : 0.5 }}>
-        {statusLabel}
-      </span>
+      <div className="flex items-center gap-3 flex-shrink-0">
+        <span className="text-sm font-semibold" style={{ color: s.isComplete ? 'var(--neon)' : 'var(--text)', opacity: s.isComplete ? 0.9 : 0.5 }}>
+          {statusLabel}
+        </span>
+        {!s.isComplete && nextGameNum !== null && s.nextGame && (
+          <Link
+            href={gameUrl(s.nextGame.id, s.awayTeam.abbrev, s.homeTeam.abbrev, s.nextGame.game_date)}
+            className="text-xs font-semibold"
+            style={{ color: 'var(--heat)' }}
+          >
+            Game {nextGameNum} →
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
 
 // ── Main PlayoffHero component ────────────────────────────────────────────────
 
-export default function PlayoffHero({ seriesMap, rankings, todayGames, predMap }: PlayoffHeroProps) {
+export default function PlayoffHero({ seriesMap, rankings, todayGames, predMap, goalies, newcomers }: PlayoffHeroProps) {
   if (seriesMap.size === 0) return null;
 
   const heatMap = buildTeamHeatMap(rankings);
@@ -534,6 +551,155 @@ export default function PlayoffHero({ seriesMap, rankings, todayGames, predMap }
           )}
         </div>
       </div>
+
+      {/* Players to watch */}
+      {(() => {
+        const awayAbbrev = featured.awayTeam.abbrev;
+        const homeAbbrev = featured.homeTeam.abbrev;
+
+        // Top 3 Heat skaters per team (rankings already sorted by momentum_ppm descending in caller)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const awaySkaters = (rankings as any[])
+          .filter((r: any) => r.players?.teams?.abbrev === awayAbbrev)
+          .slice(0, 3);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const homeSkaters = (rankings as any[])
+          .filter((r: any) => r.players?.teams?.abbrev === homeAbbrev)
+          .slice(0, 3);
+
+        // Top goalie whose team is one of the two featured teams
+        // GoaliePlayer shape: { id, first_name, last_name, teams: { abbrev }, avgSavePct, ... }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const featuredGoalie = (goalies as any[]).find((g: any) =>
+          g.teams?.abbrev === awayAbbrev || g.teams?.abbrev === homeAbbrev
+        ) ?? null;
+
+        // Top newcomer whose team is one of the two featured teams
+        // NewcomerPlayer shape: { player_id, momentum_ppm, players: { first_name, last_name, teams: { abbrev } } }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const featuredNewcomer = (newcomers as any[]).find((n: any) =>
+          n.players?.teams?.abbrev === awayAbbrev || n.players?.teams?.abbrev === homeAbbrev
+        ) ?? null;
+
+        if (awaySkaters.length === 0 && homeSkaters.length === 0 && !featuredGoalie && !featuredNewcomer) {
+          return null;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        function SkaterRow({ player, rank }: { player: any; rank: number }) {
+          const lastName = (player.players?.last_name ?? `${player.players?.first_name ?? ''} ${player.players?.last_name ?? ''}`.trim().split(' ').pop() ?? '—');
+          const heat = ppmToHeat(player.momentum_ppm ?? 0);
+          return (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.4, minWidth: '14px' }}>{rank}</span>
+              <span className="flex-1 text-sm font-semibold truncate" style={{ color: 'var(--text-bright)' }}>{lastName}</span>
+              <span style={{
+                fontSize: '0.65rem', fontWeight: 900, color: '#fff',
+                background: heatColor(heat), borderRadius: '4px', padding: '1px 5px',
+                flexShrink: 0,
+              }}>{heat}</span>
+            </div>
+          );
+        }
+
+        return (
+          <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <p className="text-xs font-bold tracking-widest uppercase mb-3" style={{ color: 'var(--text)', opacity: 0.4 }}>PLAYERS TO WATCH</p>
+
+            {/* Two-column skater list */}
+            {(awaySkaters.length > 0 || homeSkaters.length > 0) && (
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                {/* Away team */}
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={teamLogoUrl(awayAbbrev)} alt={awayAbbrev} style={{ width: '16px', height: '16px' }} />
+                    <span className="text-xs font-black" style={{ color: 'var(--text-bright)' }}>{awayAbbrev}</span>
+                    <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.4 }}>TOP SKATERS</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {awaySkaters.map((p: any, i: number) => (
+                      <SkaterRow key={p.player_id ?? i} player={p} rank={i + 1} />
+                    ))}
+                    {awaySkaters.length === 0 && (
+                      <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.3 }}>No data</span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Home team */}
+                <div>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={teamLogoUrl(homeAbbrev)} alt={homeAbbrev} style={{ width: '16px', height: '16px' }} />
+                    <span className="text-xs font-black" style={{ color: 'var(--text-bright)' }}>{homeAbbrev}</span>
+                    <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.4 }}>TOP SKATERS</span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    {homeSkaters.map((p: any, i: number) => (
+                      <SkaterRow key={p.player_id ?? i} player={p} rank={i + 1} />
+                    ))}
+                    {homeSkaters.length === 0 && (
+                      <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.3 }}>No data</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Goalie + Newcomer small cards */}
+            {(featuredGoalie || featuredNewcomer) && (
+              <div className="grid grid-cols-2 gap-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
+                {/* Top Goalie */}
+                {featuredGoalie && (
+                  <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)' }}>
+                    <p className="text-xs font-bold tracking-widest uppercase mb-1.5" style={{ color: 'var(--text)', opacity: 0.4 }}>TOP GOALIE</p>
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {featuredGoalie.teams?.abbrev && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={teamLogoUrl(featuredGoalie.teams.abbrev)} alt={featuredGoalie.teams.abbrev} style={{ width: '14px', height: '14px', flexShrink: 0 }} />
+                        )}
+                        <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-bright)' }}>
+                          {featuredGoalie.last_name ?? '—'}
+                        </span>
+                      </div>
+                      <span className="text-xs font-mono font-bold flex-shrink-0" style={{ color: 'var(--neon)' }}>
+                        .{String(Math.round((featuredGoalie.avgSavePct ?? 0) * 1000)).padStart(3, '0')}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {!featuredGoalie && <div />}
+
+                {/* Fresh face */}
+                {featuredNewcomer && (
+                  <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)' }}>
+                    <p className="text-xs font-bold tracking-widest uppercase mb-1.5" style={{ color: 'var(--text)', opacity: 0.4 }}>FRESH FACE</p>
+                    <div className="flex items-center justify-between gap-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {featuredNewcomer.players?.teams?.abbrev && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={teamLogoUrl(featuredNewcomer.players.teams.abbrev)} alt={featuredNewcomer.players.teams.abbrev} style={{ width: '14px', height: '14px', flexShrink: 0 }} />
+                        )}
+                        <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-bright)' }}>
+                          {featuredNewcomer.players?.last_name ?? '—'}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize: '0.65rem', fontWeight: 900, color: '#fff',
+                        background: heatColor(ppmToHeat(featuredNewcomer.momentum_ppm ?? 0)),
+                        borderRadius: '4px', padding: '1px 5px', flexShrink: 0,
+                      }}>{ppmToHeat(featuredNewcomer.momentum_ppm ?? 0)}</span>
+                    </div>
+                  </div>
+                )}
+                {!featuredNewcomer && <div />}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Other series */}
       {otherSeries.length > 0 && (

@@ -235,8 +235,6 @@ export default function RecapFeed({ recaps }: { recaps: Recap[] }) {
   const secondaryStories = stories.slice(0, 3); // right column: up to 3
   const mobileExtra = stories.slice(0, 2);      // mobile: 2 below hero
 
-  const storyCount = recaps.length;
-
   return (
     <section className="flex flex-col gap-4">
 
@@ -244,8 +242,8 @@ export default function RecapFeed({ recaps }: { recaps: Recap[] }) {
       <div className="flex items-end justify-between">
         <div>
           <h2 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05 }}>
-            <span style={{ color: 'var(--text-bright)' }}>The night in </span>
-            <span style={{ color: 'var(--heat)' }}>{storyCount} stories.</span>
+            <span style={{ color: 'var(--text-bright)' }}>Last </span>
+            <span style={{ color: 'var(--heat)' }}>night.</span>
           </h2>
           <p className="text-xs mt-0.5" style={{ color: 'var(--silver)', opacity: 0.5 }}>
             {formatRecapDate(hero.date)}{hero.games_count ? ` · ${hero.games_count} games` : ''}
