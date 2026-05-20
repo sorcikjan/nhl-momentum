@@ -16,14 +16,14 @@ function storyLabel(title: string): { text: string; color: string } {
   if (t.includes('return') || t.includes('comeback') || t.includes('injury'))
     return { text: 'COMEBACK', color: 'var(--amber)' };
   if (t.includes('shutout') || t.includes('goalie') || t.includes('save'))
-    return { text: 'SHUTOUT', color: 'var(--neon)' };
+    return { text: 'GOALTENDING', color: 'var(--neon)' };
   if (t.includes('sweep') || t.includes('streak') || t.includes('dominat'))
     return { text: 'HOT STREAK', color: 'var(--heat)' };
   if (t.includes('upset') || t.includes('stun') || t.includes('shock'))
     return { text: 'UPSET', color: 'var(--red)' };
   if (t.includes('overtime') || t.includes(' ot ') || t.includes('shootout'))
     return { text: 'OVERTIME', color: 'var(--neon)' };
-  return { text: 'LAST NIGHT', color: 'var(--heat)' };
+  return { text: 'LAST NIGHT · BIG STORY', color: 'var(--heat)' };
 }
 
 function formatRecapDate(dateStr: string): string {
@@ -31,12 +31,7 @@ function formatRecapDate(dateStr: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-function formatDayName(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00Z');
-  return d.toLocaleDateString('en-US', { weekday: 'long' });
-}
-
-// ── Hero card (most recent recap) ─────────────────────────────────────────────
+// ── Hero card (most recent recap, desktop ~60%) ───────────────────────────────
 
 function RecapHeroCard({ recap }: { recap: Recap }) {
   const title = cleanTitle(recap.title ?? '');
@@ -53,7 +48,7 @@ function RecapHeroCard({ recap }: { recap: Recap }) {
       <div className="absolute inset-0"
         style={{ background: 'linear-gradient(135deg, #2a0a00 0%, #1a0f00 40%, #0d0f14 100%)' }} />
 
-      {/* Hero image — higher opacity than before so it reads */}
+      {/* Hero image */}
       {recap.hero_image_url && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -69,7 +64,7 @@ function RecapHeroCard({ recap }: { recap: Recap }) {
         background: 'linear-gradient(to top, rgba(8,8,12,0.99) 0%, rgba(8,8,12,0.75) 45%, rgba(8,8,12,0.2) 100%)'
       }} />
 
-      {/* Top-left: story type label */}
+      {/* Top-left: category label */}
       <div className="absolute top-4 left-4 flex items-center gap-1.5">
         <span style={{ color: label.color, fontSize: '0.7rem', fontWeight: 700 }}>—</span>
         <span style={{ color: label.color, fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.1em' }}>
@@ -77,7 +72,7 @@ function RecapHeroCard({ recap }: { recap: Recap }) {
         </span>
       </div>
 
-      {/* Games count badge — top right */}
+      {/* Top-right: HEAT badge if games_count available */}
       {recap.games_count > 0 && (
         <div className="absolute top-3 right-4 flex items-center justify-center"
           style={{
@@ -106,7 +101,7 @@ function RecapHeroCard({ recap }: { recap: Recap }) {
 
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold group-hover:underline" style={{ color: 'var(--heat)' }}>
-            Read recap →
+            READ MORE →
           </span>
           <span className="text-xs font-mono" style={{ color: 'rgba(255,255,255,0.3)' }}>
             {formatRecapDate(recap.date)}
@@ -117,7 +112,68 @@ function RecapHeroCard({ recap }: { recap: Recap }) {
   );
 }
 
-// ── Compact story row (older recaps) ──────────────────────────────────────────
+// ── Secondary story card (thumbnail left, text right) ─────────────────────────
+
+function SecondaryStoryCard({ recap }: { recap: Recap }) {
+  const title = cleanTitle(recap.title ?? '');
+  const href = recapUrl(recap.date, recap.title ?? '');
+  const label = storyLabel(title);
+
+  return (
+    <Link
+      href={href}
+      className="flex items-start gap-3 rounded-xl hover:opacity-80 transition-opacity"
+      style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', padding: '12px' }}
+    >
+      {/* Thumbnail (~80px) */}
+      <div className="flex-shrink-0 rounded-lg overflow-hidden"
+        style={{ width: '80px', height: '64px', position: 'relative', background: '#1a1f2e' }}>
+        {recap.hero_image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={recap.hero_image_url}
+            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.75 }}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center"
+            style={{ background: 'linear-gradient(135deg, #1a0a00, #0d0f14)' }}>
+            <span style={{ fontSize: '1.2rem', opacity: 0.4 }}>
+              📰
+            </span>
+          </div>
+        )}
+        <div className="absolute inset-0" style={{ background: 'rgba(8,8,12,0.3)' }} />
+      </div>
+
+      {/* Text content */}
+      <div className="flex-1 min-w-0 flex flex-col gap-1">
+        {/* Category tag */}
+        <div className="flex items-center gap-1">
+          <span style={{ color: label.color, fontSize: '0.6rem', fontWeight: 700 }}>—</span>
+          <span style={{ color: label.color, fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.08em' }}>
+            {label.text}
+          </span>
+        </div>
+
+        {/* Headline */}
+        <p className="font-bold leading-snug line-clamp-2"
+          style={{ fontSize: '0.8rem', color: 'var(--text-bright)' }}>
+          {title}
+        </p>
+
+        {/* One-line description */}
+        {recap.summary && (
+          <p className="text-xs line-clamp-1" style={{ color: 'var(--silver)', opacity: 0.5 }}>
+            {recap.summary}
+          </p>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+// ── Compact story row (mobile — smaller) ──────────────────────────────────────
 
 function CompactStoryRow({ recap }: { recap: Recap }) {
   const title = cleanTitle(recap.title ?? '');
@@ -147,27 +203,21 @@ function CompactStoryRow({ recap }: { recap: Recap }) {
             <span style={{ fontSize: '1.2rem', opacity: 0.4 }}>📰</span>
           </div>
         )}
-        {/* Dim overlay */}
         <div className="absolute inset-0" style={{ background: 'rgba(8,8,12,0.3)' }} />
       </div>
 
       {/* Text content */}
       <div className="flex-1 min-w-0 flex flex-col gap-1">
-        {/* Label */}
         <div className="flex items-center gap-1">
           <span style={{ color: label.color, fontSize: '0.6rem', fontWeight: 700 }}>—</span>
           <span style={{ color: label.color, fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.08em' }}>
             {label.text}
           </span>
         </div>
-
-        {/* Title */}
         <p className="font-bold leading-snug line-clamp-2"
           style={{ fontSize: '0.8rem', color: 'var(--text-bright)' }}>
           {title}
         </p>
-
-        {/* Subtitle */}
         <p className="text-xs" style={{ color: 'var(--silver)', opacity: 0.5 }}>
           {dateLabel}{recap.games_count ? ` · ${recap.games_count} games` : ''}
         </p>
@@ -182,9 +232,10 @@ export default function RecapFeed({ recaps }: { recaps: Recap[] }) {
   if (!recaps.length) return null;
 
   const [hero, ...stories] = recaps;
-  const rest = stories.slice(0, 4);
+  const secondaryStories = stories.slice(0, 3); // right column: up to 3
+  const mobileExtra = stories.slice(0, 2);      // mobile: 2 below hero
 
-  const dateSubtitle = formatRecapDate(hero.date);
+  const storyCount = recaps.length;
 
   return (
     <section className="flex flex-col gap-4">
@@ -192,34 +243,39 @@ export default function RecapFeed({ recaps }: { recaps: Recap[] }) {
       {/* Section header */}
       <div className="flex items-end justify-between">
         <div>
-          <h2 className="font-editorial font-bold" style={{ fontSize: '2rem', color: 'var(--text-bright)', lineHeight: 1.1 }}>
-            Last night.
+          <h2 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05 }}>
+            <span style={{ color: 'var(--text-bright)' }}>The night in </span>
+            <span style={{ color: 'var(--heat)' }}>{storyCount} stories.</span>
           </h2>
           <p className="text-xs mt-0.5" style={{ color: 'var(--silver)', opacity: 0.5 }}>
-            {dateSubtitle}{hero.games_count ? ` · ${hero.games_count} games` : ''}
+            {formatRecapDate(hero.date)}{hero.games_count ? ` · ${hero.games_count} games` : ''}
           </p>
         </div>
       </div>
 
-      {/* Hero recap card */}
-      <RecapHeroCard recap={hero} />
+      {/* Desktop: 3-col grid — hero takes 2/3, right column takes 1/3 */}
+      <div className="hidden md:grid md:grid-cols-3 gap-4">
+        {/* Hero — spans 2 columns */}
+        <div className="md:col-span-2">
+          <RecapHeroCard recap={hero} />
+        </div>
 
-      {/* More stories */}
-      {rest.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-bold" style={{ color: 'var(--text-bright)' }}>
-              More stories
-            </span>
-            <span className="text-xs" style={{ color: 'var(--silver)', opacity: 0.4 }}>
-              AI-generated
-            </span>
-          </div>
-          {rest.map((recap: Recap) => (
-            <CompactStoryRow key={recap.date} recap={recap} />
+        {/* Right column: 3 secondary story cards */}
+        <div className="flex flex-col gap-3">
+          {secondaryStories.map((recap: Recap) => (
+            <SecondaryStoryCard key={recap.date} recap={recap} />
           ))}
         </div>
-      )}
+      </div>
+
+      {/* Mobile: hero full width, then 2 compact cards */}
+      <div className="md:hidden flex flex-col gap-3">
+        <RecapHeroCard recap={hero} />
+        {mobileExtra.map((recap: Recap) => (
+          <CompactStoryRow key={recap.date} recap={recap} />
+        ))}
+      </div>
+
     </section>
   );
 }

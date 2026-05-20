@@ -1123,6 +1123,28 @@ export async function fetchGoalieRankings() {
     .slice(0, 10);
 }
 
+// ─── Series Probability ──────────────────────────────────────────────────────
+
+export function computeSeriesProb(p: number, aWins: number, bWins: number): number {
+  // Negative binomial: P(team A wins series given a wins, b wins, per-game prob p)
+  const r = 4 - aWins;
+  const s = 4 - bWins;
+  if (r <= 0) return 1;
+  if (s <= 0) return 0;
+  function comb(n: number, k: number): number {
+    if (k < 0 || k > n) return 0;
+    if (k === 0 || k === n) return 1;
+    let result = 1;
+    for (let i = 0; i < k; i++) result = result * (n - i) / (i + 1);
+    return result;
+  }
+  let prob = 0;
+  for (let k = 0; k < s; k++) {
+    prob += comb(r + k - 1, k) * Math.pow(p, r) * Math.pow(1 - p, k);
+  }
+  return Math.min(1, Math.max(0, prob));
+}
+
 // ─── Newcomer Watch ───────────────────────────────────────────────────────────
 
 export async function fetchNewcomerWatch() {

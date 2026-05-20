@@ -53,20 +53,6 @@ interface NewcomerPlayer {
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
 
-const FLAGS: Record<string, string> = {
-  CAN: '🇨🇦', USA: '🇺🇸', SWE: '🇸🇪', FIN: '🇫🇮',
-  CZE: '🇨🇿', SVK: '🇸🇰', RUS: '🇷🇺', DEU: '🇩🇪',
-  CHE: '🇨🇭', AUT: '🇦🇹', LVA: '🇱🇻', DNK: '🇩🇰',
-  NOR: '🇳🇴', BLR: '🇧🇾', UKR: '🇺🇦', SVN: '🇸🇮',
-  FRA: '🇫🇷', GBR: '🇬🇧', NLD: '🇳🇱', KAZ: '🇰🇿',
-  POL: '🇵🇱', BEL: '🇧🇪', HRV: '🇭🇷',
-};
-
-function flag(country?: string | null): string | null {
-  return country ? (FLAGS[country] ?? null) : null;
-}
-
-
 function logoUrl(abbrev: string) {
   return `https://assets.nhle.com/logos/nhl/svg/${abbrev}_light.svg`;
 }
@@ -156,7 +142,6 @@ function SkaterCard({ p, rank }: { p: SkaterPlayer; rank: number }) {
   const surge = p.season_ppm && p.season_ppm > 0
     ? ((p.momentum_ppm - p.season_ppm) / p.season_ppm * 100)
     : null;
-  const f = flag(p.players.birth_country);
   const initial = p.players.first_name?.[0] ?? '';
 
   return (
@@ -184,7 +169,7 @@ function SkaterCard({ p, rank }: { p: SkaterPlayer; rank: number }) {
         <div className="flex items-end justify-between gap-1">
           <div className="flex flex-col gap-0.5 min-w-0">
             <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.92rem', lineHeight: 1.2 }}>
-              {f ? `${f} ` : ''}{p.players.position_code}{p.players.sweater_number != null ? ` · #${p.players.sweater_number}` : ''}
+              {p.players.position_code}{p.players.sweater_number != null ? ` · #${p.players.sweater_number}` : ''}
             </span>
             <span className="truncate" style={{
               color: '#fff', fontSize: '0.82rem', fontWeight: 800, lineHeight: 1.2,
@@ -202,13 +187,47 @@ function SkaterCard({ p, rank }: { p: SkaterPlayer; rank: number }) {
   );
 }
 
+// ── Skater row (for desktop column view) ──────────────────────────────────────
+
+function SkaterRow({ p, rank }: { p: SkaterPlayer; rank: number }) {
+  const heat = ppmToHeat(p.momentum_ppm);
+  const abbrev = p.players.teams.abbrev;
+  const initial = p.players.first_name?.[0] ?? '';
+
+  return (
+    <Link
+      href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
+      className="flex items-center gap-3 rounded-lg px-3 py-2 hover:opacity-80 transition-opacity"
+      style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}
+    >
+      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', fontFamily: 'monospace', minWidth: '16px' }}>
+        {rank}
+      </span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={logoUrl(abbrev)} alt={abbrev} style={{ width: 24, height: 24, flexShrink: 0 }} />
+      <span className="flex-1 truncate text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
+        {initial}. {p.players.last_name}
+      </span>
+      <span
+        className="text-xs font-mono font-bold px-1.5 py-0.5 rounded"
+        style={{
+          background: `${heatBg(heat)}44`,
+          color: heatColor(heat),
+          border: `1px solid ${heatBorderColor(heat)}`,
+        }}
+      >
+        {heat}
+      </span>
+    </Link>
+  );
+}
+
 // ── Goalie card ───────────────────────────────────────────────────────────────
 
 function GoalieCard({ g, rank }: { g: GoaliePlayer; rank: number }) {
   const abbrev = g.teams?.abbrev ?? '?';
   const sv = g.avgSavePct;
   const heat = Math.round(Math.max(0, Math.min(100, (sv - 0.85) / 0.10 * 100)));
-  const f = flag(g.birth_country);
   const initial = g.first_name?.[0] ?? '';
 
   return (
@@ -230,9 +249,7 @@ function GoalieCard({ g, rank }: { g: GoaliePlayer; rank: number }) {
       bottom={
         <div className="flex items-end justify-between gap-1">
           <div className="flex flex-col gap-0.5 min-w-0">
-            <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.92rem', lineHeight: 1.2 }}>
-              {f ? `${f} ` : ''}G
-            </span>
+            <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.92rem', lineHeight: 1.2 }}>G</span>
             <span className="truncate" style={{
               color: '#fff', fontSize: '0.82rem', fontWeight: 800, lineHeight: 1.2,
               textShadow: '0 1px 6px rgba(0,0,0,0.9)',
@@ -249,12 +266,40 @@ function GoalieCard({ g, rank }: { g: GoaliePlayer; rank: number }) {
   );
 }
 
+// ── Goalie row ─────────────────────────────────────────────────────────────────
+
+function GoalieRow({ g, rank }: { g: GoaliePlayer; rank: number }) {
+  const abbrev = g.teams?.abbrev ?? '?';
+  const sv = g.avgSavePct;
+  const heat = Math.round(Math.max(0, Math.min(100, (sv - 0.85) / 0.10 * 100)));
+  const initial = g.first_name?.[0] ?? '';
+
+  return (
+    <Link
+      href={playerUrl(g.id, g.first_name, g.last_name)}
+      className="flex items-center gap-3 rounded-lg px-3 py-2 hover:opacity-80 transition-opacity"
+      style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}
+    >
+      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', fontFamily: 'monospace', minWidth: '16px' }}>
+        {rank}
+      </span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={logoUrl(abbrev)} alt={abbrev} style={{ width: 24, height: 24, flexShrink: 0 }} />
+      <span className="flex-1 truncate text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
+        {initial}. {g.last_name}
+      </span>
+      <span className="text-xs font-mono" style={{ color: heatColor(heat) }}>
+        .{Math.round(sv * 1000).toString().padStart(3, '0')}
+      </span>
+    </Link>
+  );
+}
+
 // ── Newcomer card ─────────────────────────────────────────────────────────────
 
 function NewcomerCard({ p, rank }: { p: NewcomerPlayer; rank: number }) {
   const heat = ppmToHeat(p.momentum_ppm);
   const abbrev = p.players.teams?.abbrev ?? '?';
-  const f = flag(p.players.birth_country);
   const initial = p.players.first_name?.[0] ?? '';
   const pts = p.season_goals + p.season_assists;
   const ppg = p.season_games > 0 ? (pts / p.season_games).toFixed(2) : '—';
@@ -279,7 +324,7 @@ function NewcomerCard({ p, rank }: { p: NewcomerPlayer; rank: number }) {
         <div className="flex items-end justify-between gap-1">
           <div className="flex flex-col gap-0.5 min-w-0">
             <span style={{ color: 'rgba(255,255,255,0.75)', fontSize: '0.92rem', lineHeight: 1.2 }}>
-              {f ? `${f} ` : ''}{p.players.position_code}
+              {p.players.position_code}
             </span>
             <span className="truncate" style={{
               color: '#fff', fontSize: '0.82rem', fontWeight: 800, lineHeight: 1.2,
@@ -297,30 +342,75 @@ function NewcomerCard({ p, rank }: { p: NewcomerPlayer; rank: number }) {
   );
 }
 
+// ── Newcomer row ──────────────────────────────────────────────────────────────
+
+function NewcomerRow({ p, rank }: { p: NewcomerPlayer; rank: number }) {
+  const heat = ppmToHeat(p.momentum_ppm);
+  const abbrev = p.players.teams?.abbrev ?? '?';
+  const initial = p.players.first_name?.[0] ?? '';
+  const pts = p.season_goals + p.season_assists;
+  const ppg = p.season_games > 0 ? (pts / p.season_games).toFixed(2) : '—';
+
+  return (
+    <Link
+      href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
+      className="flex items-center gap-3 rounded-lg px-3 py-2 hover:opacity-80 transition-opacity"
+      style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}
+    >
+      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', fontFamily: 'monospace', minWidth: '16px' }}>
+        {rank}
+      </span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={logoUrl(abbrev)} alt={abbrev} style={{ width: 24, height: 24, flexShrink: 0 }} />
+      <span className="flex-1 truncate text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
+        {initial}. {p.players.last_name}
+      </span>
+      <span className="text-xs font-mono" style={{ color: 'rgba(255,255,255,0.5)' }}>{ppg} p/g</span>
+    </Link>
+  );
+}
+
+// ── Desktop column ─────────────────────────────────────────────────────────────
+
+interface ColumnProps {
+  tag: string;
+  title: string;
+  subtitle: string;
+  listLink: string;
+  children: React.ReactNode;
+}
+
+function DesktopColumn({ tag, title, subtitle, listLink, children }: ColumnProps) {
+  return (
+    <div className="rounded-xl border flex flex-col" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
+        <p className="text-xs font-bold tracking-widest uppercase mb-0.5" style={{ color: 'var(--heat)', opacity: 0.7 }}>
+          {tag}
+        </p>
+        <p className="font-semibold text-sm" style={{ color: 'var(--text-bright)' }}>{title}</p>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--text)', opacity: 0.5 }}>{subtitle}</p>
+      </div>
+      <div className="flex flex-col flex-1">
+        {children}
+      </div>
+      <div className="px-4 py-3" style={{ borderTop: '1px solid var(--border)' }}>
+        <a href={listLink} className="text-xs font-semibold" style={{ color: 'var(--heat)' }}>
+          FULL LIST →
+        </a>
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 type Tab = 'skaters' | 'goalies' | 'newcomers';
 
 const TABS: { key: Tab; label: string }[] = [
-  { key: 'skaters',   label: 'Skaters'     },
+  { key: 'skaters',   label: 'Heat'        },
   { key: 'goalies',   label: 'Goalies'     },
   { key: 'newcomers', label: 'Fresh faces' },
 ];
-
-const HEADLINES: Record<Tab, { title: React.ReactNode; sub: string }> = {
-  skaters: {
-    title: <><span style={{ color: 'var(--text-bright)' }}>Who&apos;s </span><span style={{ color: 'var(--heat)' }}>burning?</span></>,
-    sub: 'Top skaters by 5-game momentum. ↑/↓ = vs season average.',
-  },
-  goalies: {
-    title: <span style={{ color: 'var(--text-bright)' }}>Between the pipes</span>,
-    sub: 'Top goalies ranked by 5-game save %.',
-  },
-  newcomers: {
-    title: <span style={{ color: 'var(--text-bright)' }}>Fresh faces</span>,
-    sub: 'First-year skaters making noise this season.',
-  },
-};
 
 export default function HeatGrid({
   skaters,
@@ -334,22 +424,65 @@ export default function HeatGrid({
   limit?: number;
 }) {
   const [tab, setTab] = useState<Tab>('skaters');
-  const { title, sub } = HEADLINES[tab];
+
+  const top5Skaters = skaters.slice(0, 5);
+  const top5Goalies = goalies.slice(0, 5);
+  const top5Newcomers = newcomers.slice(0, 5);
 
   return (
     <section className="flex flex-col gap-4">
 
-      {/* Header + tabs */}
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h2 className="font-editorial" style={{ fontSize: '1.75rem', lineHeight: 1.1, fontWeight: 700 }}>
-            {title}
-          </h2>
-          <p style={{ color: 'var(--silver)', opacity: 0.55, fontSize: '0.78rem', marginTop: '0.25rem' }}>
-            {sub}
-          </p>
-        </div>
-        <div className="flex gap-1 flex-shrink-0">
+      {/* Section headline */}
+      <div>
+        <h2 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05 }}>
+          <span style={{ color: 'var(--text-bright)' }}>Who&apos;s </span>
+          <span style={{ color: 'var(--heat)' }}>burning.</span>
+        </h2>
+        <p style={{ color: 'var(--silver)', opacity: 0.55, fontSize: '0.78rem', marginTop: '0.25rem' }}>
+          Top skaters, goalies and rookies by recent Heat.
+        </p>
+      </div>
+
+      {/* Desktop: 3-column layout */}
+      <div className="hidden md:grid md:grid-cols-3 gap-4">
+        <DesktopColumn
+          tag="HEAT · TOP 5"
+          title="Hottest skaters"
+          subtitle="Ranked by 5-game momentum"
+          listLink="/rankings"
+        >
+          {top5Skaters.map((p, i) => (
+            <SkaterRow key={p.player_id} p={p} rank={i + 1} />
+          ))}
+        </DesktopColumn>
+
+        <DesktopColumn
+          tag="GOALIES · TOP 5"
+          title="Best in net"
+          subtitle="Ranked by 5-game save %"
+          listLink="/rankings?tab=goalies"
+        >
+          {top5Goalies.map((g, i) => (
+            <GoalieRow key={g.id} g={g} rank={i + 1} />
+          ))}
+        </DesktopColumn>
+
+        <DesktopColumn
+          tag="ROOKIES · TOP 5"
+          title="Rookies on the rise"
+          subtitle="First-year skaters making noise"
+          listLink="/rankings?tab=newcomers"
+        >
+          {top5Newcomers.map((p, i) => (
+            <NewcomerRow key={p.player_id} p={p} rank={i + 1} />
+          ))}
+        </DesktopColumn>
+      </div>
+
+      {/* Mobile: tab switcher + card grid */}
+      <div className="md:hidden">
+        {/* Pill tab switcher */}
+        <div className="flex gap-1 mb-4">
           {TABS.map(({ key, label }) => (
             <button
               key={key}
@@ -366,19 +499,19 @@ export default function HeatGrid({
             </button>
           ))}
         </div>
-      </div>
 
-      {/* Card grid — 2 cols on mobile, 4 on sm+ */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {tab === 'skaters' && skaters.slice(0, limit).map((p, i) => (
-          <SkaterCard key={p.player_id} p={p} rank={i + 1} />
-        ))}
-        {tab === 'goalies' && goalies.slice(0, limit).map((g, i) => (
-          <GoalieCard key={g.id} g={g} rank={i + 1} />
-        ))}
-        {tab === 'newcomers' && newcomers.slice(0, limit).map((p, i) => (
-          <NewcomerCard key={p.player_id} p={p} rank={i + 1} />
-        ))}
+        {/* Card grid — 2 cols */}
+        <div className="grid grid-cols-2 gap-2">
+          {tab === 'skaters' && skaters.slice(0, limit).map((p, i) => (
+            <SkaterCard key={p.player_id} p={p} rank={i + 1} />
+          ))}
+          {tab === 'goalies' && goalies.slice(0, limit).map((g, i) => (
+            <GoalieCard key={g.id} g={g} rank={i + 1} />
+          ))}
+          {tab === 'newcomers' && newcomers.slice(0, limit).map((p, i) => (
+            <NewcomerCard key={p.player_id} p={p} rank={i + 1} />
+          ))}
+        </div>
       </div>
 
       {/* Legend */}
@@ -387,7 +520,7 @@ export default function HeatGrid({
           color: 'var(--silver)', opacity: 0.45, fontSize: '0.6rem',
           fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', flexShrink: 0,
         }}>
-          {tab === 'skaters' ? 'HEAT' : tab === 'goalies' ? 'SV%' : 'PPG'}
+          HEAT
         </span>
         <div style={{
           flex: 1, height: '5px', borderRadius: '3px',

@@ -5,10 +5,17 @@ import RecapFeed from '@/components/dashboard/RecapFeed';
 import TonightSection from '@/components/dashboard/TonightSection';
 import ResultsSection from '@/components/dashboard/ResultsSection';
 import HeatGrid from '@/components/dashboard/HeatGrid';
-import DailyBrandStrip from '@/components/dashboard/DailyBrandStrip';
-import { fetchRankings, fetchGames, fetchRecentRecaps, fetchRecentCompletedGames, fetchSeriesStandings, fetchGoalieRankings, fetchNewcomerWatch, teamLogoUrl } from '@/lib/data';
-import type { SeriesInfo } from '@/lib/data';
-import { playerUrl } from '@/lib/urls';
+import PlayoffHero from '@/components/dashboard/PlayoffHero';
+import {
+  fetchRankings,
+  fetchGames,
+  fetchRecentRecaps,
+  fetchRecentCompletedGames,
+  fetchSeriesStandings,
+  fetchGoalieRankings,
+  fetchNewcomerWatch,
+} from '@/lib/data';
+import { ppmToHeat } from '@/lib/heat';
 
 export const revalidate = 60;
 
@@ -35,36 +42,36 @@ const getRecentRecaps = cache(() => fetchRecentRecaps(5).catch(() => []));
 const getRecentGames = cache(() => fetchRecentCompletedGames(2, 15).catch(() => ({ games: [], predMap: new Map() })));
 const getGoalieRankings = cache(() => fetchGoalieRankings().catch(() => []));
 const getNewcomers = cache(() => fetchNewcomerWatch().catch(() => []));
+const getSeriesStandings = cache(() => fetchSeriesStandings().catch(() => new Map()));
 
-// ── Section: Brand strip (daily masthead) ─────────────────────────────────────
+// ── Section: Playoff Hero ─────────────────────────────────────────────────────
 
-async function BrandStripSection({ today }: { today: string }) {
-  const [rankings, { games }] = await Promise.all([
+async function PlayoffHeroSection({ today }: { today: string }) {
+  const [seriesMap, rankings, { games, predictions }] = await Promise.all([
+    getSeriesStandings(),
     getRankings(),
     getTodayGames(today),
   ]);
+  if (seriesMap.size === 0) return null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const top = ((rankings?.top100 ?? []) as any[])
-    .sort((a: any, b: any) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0))[0];
-
-  const topPlayer = top ? {
-    name: `${top.players.first_name} ${top.players.last_name}`,
-    team: top.players.teams?.abbrev ?? '',
-    ppm: top.momentum_ppm ?? 0,
-    href: playerUrl(top.player_id, top.players.first_name, top.players.last_name),
-  } : null;
-
+  const predMap: Record<number, any> = {};
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const gameCount = (games as any[]).filter((g: any) =>
-    ['LIVE', 'CRIT', 'PRE', 'FUT', 'SCHEDULED'].includes(g.game_state ?? '') ||
-    g.game_state == null
-  ).length;
+  for (const p of (predictions ?? []) as any[]) predMap[p.game_id] = p;
 
-  return <DailyBrandStrip topPlayer={topPlayer} gameCount={gameCount} />;
+  return (
+    <PlayoffHero
+      seriesMap={seriesMap}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      rankings={(rankings?.top100 ?? []) as any[]}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      todayGames={games as any[]}
+      predMap={predMap}
+    />
+  );
 }
 
-// ── Section: Last Night (recap feed — hero + 4 compact stories) ───────────────
+// ── Section: Last Night (recap feed) ─────────────────────────────────────────
 
 async function LastNightSection() {
   const recaps = await getRecentRecaps();
@@ -75,7 +82,10 @@ async function LastNightSection() {
 // ── Section: Tonight (upcoming / live games) ──────────────────────────────────
 
 async function TonightSlate({ today }: { today: string }) {
-  const { games, predictions, odds } = await getTodayGames(today);
+  const [{ games, predictions, odds }, rankings] = await Promise.all([
+    getTodayGames(today),
+    getRankings(),
+  ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const predMap: Record<number, any> = {};
@@ -87,19 +97,97 @@ async function TonightSlate({ today }: { today: string }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const o of (odds ?? []) as any[]) oddsMap[o.game_id] = [...(oddsMap[o.game_id] ?? []), o];
 
+  // Compute watchPlayers: top 3 Heat players per team, mapped by game_id
+  const watchPlayers = new Map<number, Array<{ name: string; heat: number; team: string }>>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return <TonightSection games={games as any[]} predMap={predMap} oddsMap={oddsMap} />;
+  const top100 = (rankings?.top100 ?? []) as any[];
+
+  // Build team → players lookup sorted by heat desc
+  const teamPlayersMap = new Map<string, Array<{ name: string; heat: number; team: string }>>();
+  for (const r of top100) {
+    const abbrev = r.players?.teams?.abbrev;
+    if (!abbrev) continue;
+    const heat = ppmToHeat(r.momentum_ppm ?? 0);
+    const name = `${r.players.first_name ?? ''} ${r.players.last_name ?? ''}`.trim();
+    if (!teamPlayersMap.has(abbrev)) teamPlayersMap.set(abbrev, []);
+    teamPlayersMap.get(abbrev)!.push({ name, heat, team: abbrev });
+  }
+  // Sort each team's players by heat desc
+  for (const arr of teamPlayersMap.values()) {
+    arr.sort((a, b) => b.heat - a.heat);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const g of games as any[]) {
+    const awayAbbrev = g.awayTeam?.abbrev;
+    const homeAbbrev = g.homeTeam?.abbrev;
+    const awayPlayers = awayAbbrev ? (teamPlayersMap.get(awayAbbrev) ?? []).slice(0, 3) : [];
+    const homePlayers = homeAbbrev ? (teamPlayersMap.get(homeAbbrev) ?? []).slice(0, 3) : [];
+    const combined = [...awayPlayers, ...homePlayers].sort((a, b) => b.heat - a.heat);
+    if (combined.length > 0) watchPlayers.set(g.id, combined);
+  }
+
+  return (
+    <TonightSection
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      games={games as any[]}
+      predMap={predMap}
+      oddsMap={oddsMap}
+      watchPlayers={watchPlayers}
+    />
+  );
 }
 
 // ── Section: Recent results ───────────────────────────────────────────────────
 
 async function RecentResultsSection() {
-  const { games, predMap } = await getRecentGames();
+  const [{ games, predMap }, rankings] = await Promise.all([
+    getRecentGames(),
+    getRankings(),
+  ]);
+
+  // Compute topPlayers: highest-Heat player per game from either team
+  const topPlayers = new Map<number, { name: string; heat: number; team: string }>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return <ResultsSection games={games as any[]} predMap={predMap} />;
+  const top100 = (rankings?.top100 ?? []) as any[];
+
+  // Build team → players lookup
+  const teamPlayersMap = new Map<string, Array<{ name: string; heat: number; team: string }>>();
+  for (const r of top100) {
+    const abbrev = r.players?.teams?.abbrev;
+    if (!abbrev) continue;
+    const heat = ppmToHeat(r.momentum_ppm ?? 0);
+    const name = `${r.players.first_name ?? ''} ${r.players.last_name ?? ''}`.trim();
+    if (!teamPlayersMap.has(abbrev)) teamPlayersMap.set(abbrev, []);
+    teamPlayersMap.get(abbrev)!.push({ name, heat, team: abbrev });
+  }
+  for (const arr of teamPlayersMap.values()) {
+    arr.sort((a, b) => b.heat - a.heat);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const g of games as any[]) {
+    const awayAbbrev = g.away_team?.abbrev;
+    const homeAbbrev = g.home_team?.abbrev;
+    const awayTop = awayAbbrev ? (teamPlayersMap.get(awayAbbrev) ?? [])[0] : null;
+    const homeTop = homeAbbrev ? (teamPlayersMap.get(homeAbbrev) ?? [])[0] : null;
+    const top = awayTop && homeTop
+      ? (awayTop.heat >= homeTop.heat ? awayTop : homeTop)
+      : awayTop ?? homeTop ?? null;
+    if (top) topPlayers.set(g.id, top);
+  }
+
+  return (
+    <ResultsSection
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      games={games as any[]}
+      predMap={predMap}
+      topPlayers={topPlayers}
+    />
+  );
 }
 
-// ── Section: Who's burning (Heat scroll) ─────────────────────────────────────
+// ── Section: Who's burning (Heat grid) ───────────────────────────────────────
 
 async function BurningSection() {
   const [rankings, goalies, newcomers] = await Promise.all([
@@ -123,110 +211,37 @@ async function BurningSection() {
   );
 }
 
-// ── Section: Playoff bracket (only during playoffs) ──────────────────────────
+// ── Skeletons ─────────────────────────────────────────────────────────────────
 
-function PlayoffSeriesRow({ s }: { s: SeriesInfo }) {
-  const leaderW = Math.max(s.awayWins, s.homeWins);
-  const trailingW = Math.min(s.awayWins, s.homeWins);
-  const leaderAbbrev = s.awayWins >= s.homeWins ? s.awayTeam.abbrev : s.homeTeam.abbrev;
-
-  const statusLabel = s.isComplete
-    ? `${leaderAbbrev} wins ${leaderW}–${trailingW}`
-    : leaderW === trailingW
-    ? `Tied ${leaderW}–${trailingW}`
-    : `${leaderAbbrev} leads ${leaderW}–${trailingW}`;
-
+function HeroSkeleton() {
   return (
-    <div className="flex items-center justify-between gap-3 py-2"
-      style={{ borderBottom: '1px solid var(--border)' }}>
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={teamLogoUrl(s.awayTeam.abbrev)} alt={s.awayTeam.abbrev} className="w-6 h-6 flex-shrink-0" />
-        <span className="text-xs font-semibold" style={{ color: 'var(--text)', opacity: s.isComplete && s.awayWins < s.homeWins ? 0.4 : 1 }}>{s.awayTeam.abbrev}</span>
-        <span className="text-xs font-black font-mono tabular-nums ml-1"
-          style={{ color: s.awayWins > s.homeWins ? 'var(--text-bright)' : 'var(--text)', opacity: s.awayWins < s.homeWins ? 0.35 : 1 }}>
-          {s.awayWins}
-        </span>
-        <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.2 }}>–</span>
-        <span className="text-xs font-black font-mono tabular-nums"
-          style={{ color: s.homeWins > s.awayWins ? 'var(--text-bright)' : 'var(--text)', opacity: s.homeWins < s.awayWins ? 0.35 : 1 }}>
-          {s.homeWins}
-        </span>
-        <span className="text-xs font-semibold ml-1" style={{ color: 'var(--text)', opacity: s.isComplete && s.homeWins < s.awayWins ? 0.4 : 1 }}>{s.homeTeam.abbrev}</span>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={teamLogoUrl(s.homeTeam.abbrev)} alt={s.homeTeam.abbrev} className="w-6 h-6 flex-shrink-0" />
+    <div className="flex flex-col gap-4">
+      <div className="rounded-2xl animate-pulse" style={{ background: 'var(--bg-card)', minHeight: '180px' }} />
+      <div className="flex flex-col gap-2">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
+        ))}
       </div>
-      <span className="text-xs flex-shrink-0" style={{ color: s.isComplete ? 'var(--neon)' : 'var(--text)', opacity: s.isComplete ? 0.9 : 0.5 }}>
-        {statusLabel}
-      </span>
     </div>
   );
 }
 
-async function PlayoffBracketSection() {
-  const seriesMap = await fetchSeriesStandings().catch(() => new Map());
-  if (seriesMap.size === 0) return null;
-
-  const rounds = new Map<number, SeriesInfo[]>();
-  for (const s of seriesMap.values()) {
-    if (!rounds.has(s.round)) rounds.set(s.round, []);
-    rounds.get(s.round)!.push(s);
-  }
-
-  const ROUND_LABELS: Record<number, string> = {
-    1: 'First Round', 2: 'Second Round', 3: 'Conference Finals', 4: 'Stanley Cup Final',
-  };
-
+function ResultsSkeleton() {
   return (
-    <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-xs font-semibold tracking-widest uppercase"
-          style={{ color: 'var(--text)', opacity: 0.4 }}>Stanley Cup Playoffs</p>
-        <a href="/playoffs" className="text-xs font-medium" style={{ color: 'var(--neon)' }}>Full bracket →</a>
-      </div>
-      {[...rounds.entries()].sort(([a], [b]) => a - b).map(([round, series]) => (
-        <div key={round} className="mb-4 last:mb-0">
-          <p className="text-xs font-bold mb-1" style={{ color: 'var(--text-bright)' }}>
-            {ROUND_LABELS[round] ?? `Round ${round}`}
-          </p>
-          {series.sort((a, b) => a.seriesNum - b.seriesNum).map(s => (
-            <PlayoffSeriesRow key={`${s.round}-${s.seriesNum}`} s={s} />
-          ))}
-        </div>
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="h-32 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
       ))}
     </div>
   );
 }
 
-// ── Skeletons ─────────────────────────────────────────────────────────────────
-
-function BrandStripSkeleton() {
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex justify-between">
-        <div className="flex flex-col gap-1">
-          <div className="h-3 w-24 rounded animate-pulse" style={{ background: 'var(--border)' }} />
-          <div className="h-6 w-48 rounded animate-pulse" style={{ background: 'var(--border)' }} />
-          <div className="h-3 w-40 rounded animate-pulse" style={{ background: 'var(--border)' }} />
-        </div>
-        <div className="h-3 w-16 rounded animate-pulse" style={{ background: 'var(--border)' }} />
-      </div>
-      <div className="flex gap-2">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-12 w-32 flex-shrink-0 rounded-lg animate-pulse" style={{ background: 'var(--bg-card)' }} />
-        ))}
-      </div>
-      <div className="h-px" style={{ background: 'var(--border)' }} />
-    </div>
-  );
-}
-
-function HeroSkeleton() {
+function StorySkeleton() {
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-2xl animate-pulse" style={{ background: 'var(--bg-card)', minHeight: '280px' }} />
       <div className="flex flex-col gap-2">
-        {[...Array(4)].map((_, i) => (
+        {[...Array(3)].map((_, i) => (
           <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
         ))}
       </div>
@@ -234,35 +249,62 @@ function HeroSkeleton() {
   );
 }
 
+function HeatGridSkeleton() {
+  return (
+    <div className="hidden md:grid md:grid-cols-3 gap-4">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="h-64 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
+      ))}
+    </div>
+  );
+}
+
 function GameSkeleton() {
   return (
     <div className="flex flex-col gap-2">
-      <div className="rounded-2xl animate-pulse" style={{ background: 'var(--bg-card)', height: '130px' }} />
-      {[...Array(3)].map((_, i) => (
-        <div key={i} className="h-10 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
-      ))}
-    </div>
-  );
-}
-
-function ResultsSkeleton() {
-  return (
-    <div className="flex flex-col gap-2">
       {[...Array(4)].map((_, i) => (
-        <div key={i} className="h-24 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
+        <div key={i} className="h-14 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
       ))}
     </div>
   );
 }
 
-function HeatScrollSkeleton() {
+// ── NEW HERE? Banner ──────────────────────────────────────────────────────────
+
+function NewHereBanner() {
   return (
-    <div className="flex gap-3 overflow-x-hidden">
-      {[...Array(5)].map((_, i) => (
-        <div key={i} className="flex-shrink-0 rounded-2xl animate-pulse"
-          style={{ background: 'var(--bg-card)', width: '140px', height: '190px' }} />
-      ))}
+    <div style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }} className="px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-start gap-3">
+        <span className="text-xs font-bold tracking-widest uppercase shrink-0" style={{ color: 'var(--heat)' }}>NEW HERE?</span>
+        <p className="text-xs" style={{ color: 'var(--text)' }}>
+          Momentum gives every NHL player a <strong style={{ color: 'var(--heat)' }}>Heat score from 0 to 100</strong>, updated every game. See who&apos;s burning, who&apos;s cooling, and which games tonight are worth watching.
+        </p>
+      </div>
+      <div className="flex items-center gap-3 shrink-0 text-xs">
+        <span style={{ color: 'var(--text)', opacity: 0.5 }}>67% pick accuracy · YTD</span>
+        <a href="/games" style={{ color: 'var(--heat)' }} className="font-semibold">How it works →</a>
+      </div>
     </div>
+  );
+}
+
+// ── Footer ────────────────────────────────────────────────────────────────────
+
+function SiteFooter() {
+  return (
+    <footer className="pt-8 pb-4 flex items-center justify-between gap-4 flex-wrap text-xs" style={{ borderTop: '1px solid var(--border)', color: 'var(--text)', opacity: 0.4 }}>
+      <div className="flex gap-2 flex-wrap">
+        <span>DATA</span>
+        {['NHL Stats API', 'MoneyPuck', 'Natural Stat Trick'].map(s => (
+          <span key={s}>· {s}</span>
+        ))}
+      </div>
+      <div className="flex gap-4 flex-wrap">
+        {[['How Heat works', '/methodology'], ['API', '/api'], ['Twitter', 'https://twitter.com']].map(([label, href]) => (
+          <a key={label} href={href} className="hover:opacity-70">{label}</a>
+        ))}
+      </div>
+    </footer>
   );
 }
 
@@ -272,39 +314,37 @@ export default function DashboardPage() {
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="max-w-2xl mx-auto pb-20 md:pb-0 flex flex-col gap-8">
+    <div className="max-w-5xl mx-auto pb-20 md:pb-0 flex flex-col gap-8">
 
-      {/* 0. Daily masthead — brand identity + story hooks */}
-      <Suspense fallback={<BrandStripSkeleton />}>
-        <BrandStripSection today={today} />
-      </Suspense>
+      {/* 0. NEW HERE? banner — static, no Suspense */}
+      <NewHereBanner />
 
-      {/* 1. Playoff bracket — only rendered during playoffs */}
+      {/* 1. Playoff Hero — only rendered during playoffs */}
       <Suspense fallback={null}>
-        <PlayoffBracketSection />
+        <PlayoffHeroSection today={today} />
       </Suspense>
 
-      {/* 2. Last Night — cinematic recap hero */}
-      <Suspense fallback={<HeroSkeleton />}>
-        <LastNightSection />
-      </Suspense>
-
-      {/* 3. Tonight — split-color prediction cards */}
-      <Suspense fallback={<GameSkeleton />}>
-        <TonightSlate today={today} />
-      </Suspense>
-
-      {/* 3. Recent results — completed games with prediction outcomes */}
+      {/* 2. Results & predictions — completed games */}
       <Suspense fallback={<ResultsSkeleton />}>
         <RecentResultsSection />
       </Suspense>
 
-      {/* 4. Who's burning — horizontal heat scroll */}
-      <Suspense fallback={<HeatScrollSkeleton />}>
+      {/* 3. Stories — recap feed */}
+      <Suspense fallback={<StorySkeleton />}>
+        <LastNightSection />
+      </Suspense>
+
+      {/* 4. Who's burning — Heat grid */}
+      <Suspense fallback={<HeatGridSkeleton />}>
         <BurningSection />
       </Suspense>
 
-      {/* 5. Explore — story entry points */}
+      {/* 5. Tonight — upcoming / live games */}
+      <Suspense fallback={<GameSkeleton />}>
+        <TonightSlate today={today} />
+      </Suspense>
+
+      {/* 6. Explore — story entry points */}
       <div className="flex flex-col gap-3">
         <p className="text-xs font-semibold tracking-widest uppercase"
           style={{ color: 'var(--text)', opacity: 0.4 }}>Explore</p>
@@ -315,7 +355,7 @@ export default function DashboardPage() {
             <div className="text-lg mb-1">⚡</div>
             <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Heat Rankings</p>
             <p className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
-              Who's playing the best hockey right now
+              Who&apos;s playing the best hockey right now
             </p>
             <p className="mt-2 text-xs font-medium" style={{ color: 'var(--heat)' }}>View rankings →</p>
           </a>
@@ -323,7 +363,7 @@ export default function DashboardPage() {
             className="rounded-xl border p-4 hover:opacity-90 transition-opacity group"
             style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
             <div className="text-lg mb-1">🏒</div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Games & Predictions</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Games &amp; Predictions</p>
             <p className="mt-1 text-xs" style={{ color: 'var(--text)' }}>
               AI win predictions vs bookmaker odds
             </p>
@@ -361,6 +401,9 @@ export default function DashboardPage() {
           </a>
         </div>
       </div>
+
+      {/* 7. Footer */}
+      <SiteFooter />
 
     </div>
   );
