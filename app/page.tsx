@@ -3,7 +3,7 @@ import { cache } from 'react';
 import type { Metadata } from 'next';
 import RecapFeed from '@/components/dashboard/RecapFeed';
 import TonightSection from '@/components/dashboard/TonightSection';
-import ResultsSection, { computeResultsMeta } from '@/components/dashboard/ResultsSection';
+import ResultsSection from '@/components/dashboard/ResultsSection';
 import HeatGrid from '@/components/dashboard/HeatGrid';
 import PlayoffHero from '@/components/dashboard/PlayoffHero';
 import {
@@ -75,6 +75,28 @@ async function PlayoffHeroSection({ today }: { today: string }) {
       newcomers={newcomers as any[]}
     />
   );
+}
+
+// ── Helper: compute accuracy meta from completed games (server-side only) ────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function computeResultsMeta(games: any[], predMap: Map<number, any>) {
+  const completed = games.filter(g => ['FINAL', 'OFF'].includes(g.game_state));
+  if (!completed.length) return null;
+  const lastNight = completed.reduce((max: string, g: any) =>
+    (g.game_date as string) > max ? (g.game_date as string) : max, '');
+  const lastNightGames = completed.filter((g: any) => g.game_date === lastNight);
+  let hits = 0, total = 0;
+  for (const g of lastNightGames) {
+    const pred = predMap.get(g.id);
+    if (!pred) continue;
+    const outcome = Array.isArray(pred.prediction_outcomes) ? pred.prediction_outcomes[0] : pred.prediction_outcomes;
+    if (outcome?.correct_winner !== undefined && outcome?.correct_winner !== null) {
+      total++;
+      if (outcome.correct_winner) hits++;
+    }
+  }
+  return { lastNight, gameCount: lastNightGames.length, hits, total, pct: total > 0 ? Math.round((hits / total) * 100) : null };
 }
 
 // ── Section: Last Night — combined results + recaps ───────────────────────────
