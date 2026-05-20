@@ -3,7 +3,7 @@ import { cache } from 'react';
 import type { Metadata } from 'next';
 import RecapFeed from '@/components/dashboard/RecapFeed';
 import TonightSection from '@/components/dashboard/TonightSection';
-import ResultsSection from '@/components/dashboard/ResultsSection';
+import ResultsSection, { computeResultsMeta } from '@/components/dashboard/ResultsSection';
 import HeatGrid from '@/components/dashboard/HeatGrid';
 import PlayoffHero from '@/components/dashboard/PlayoffHero';
 import {
@@ -77,20 +77,107 @@ async function PlayoffHeroSection({ today }: { today: string }) {
   );
 }
 
-// ── Section: Last Night (recap feed) ─────────────────────────────────────────
+// ── Section: Last Night — combined results + recaps ───────────────────────────
 
 async function LastNightSection() {
-  const recaps = await getRecentRecaps();
-  if (!recaps.length) return null;
-  return <RecapFeed recaps={recaps} />;
+  const [[{ games, predMap }, rankings], recaps] = await Promise.all([
+    Promise.all([getRecentGames(), getRankings()]),
+    getRecentRecaps(),
+  ]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const top100 = (rankings?.top100 ?? []) as any[];
+
+  // Build team → top players lookup for TOP HEAT labels on result cards
+  const teamPlayersMap = new Map<string, Array<{ name: string; heat: number; team: string }>>();
+  for (const r of top100) {
+    const abbrev = r.players?.teams?.abbrev;
+    if (!abbrev) continue;
+    const heat = ppmToHeat(r.momentum_ppm ?? 0);
+    const name = `${r.players.first_name ?? ''} ${r.players.last_name ?? ''}`.trim();
+    if (!teamPlayersMap.has(abbrev)) teamPlayersMap.set(abbrev, []);
+    teamPlayersMap.get(abbrev)!.push({ name, heat, team: abbrev });
+  }
+  for (const arr of teamPlayersMap.values()) arr.sort((a, b) => b.heat - a.heat);
+
+  const topPlayers = new Map<number, { name: string; heat: number; team: string }>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const g of games as any[]) {
+    const awayTop = (teamPlayersMap.get(g.away_team?.abbrev) ?? [])[0] ?? null;
+    const homeTop = (teamPlayersMap.get(g.home_team?.abbrev) ?? [])[0] ?? null;
+    const top = awayTop && homeTop
+      ? (awayTop.heat >= homeTop.heat ? awayTop : homeTop)
+      : awayTop ?? homeTop ?? null;
+    if (top) topPlayers.set(g.id, top);
+  }
+
+  // Compute header meta from results
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const meta = computeResultsMeta(games as any[], predMap);
+  const hasResults = !!meta;
+  const hasRecaps = recaps.length > 0;
+  if (!hasResults && !hasRecaps) return null;
+
+  // Shared header data — prefer results date, fall back to recap date
+  const dateLabel = meta
+    ? new Date((meta.lastNight) + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+    : recaps[0]
+    ? new Date(recaps[0].date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    : '';
+
+  return (
+    <section className="flex flex-col gap-6">
+
+      {/* Shared header */}
+      <div className="flex items-end justify-between">
+        <div>
+          <h2 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05 }}>
+            <span style={{ color: 'var(--text-bright)' }}>Last </span>
+            <span style={{ color: 'var(--heat)' }}>night.</span>
+          </h2>
+          <p style={{ color: 'var(--silver)', opacity: 0.55, fontSize: '0.78rem', marginTop: '0.25rem' }}>
+            {dateLabel}{meta ? ` · ${meta.gameCount} game${meta.gameCount !== 1 ? 's' : ''}` : ''}
+          </p>
+        </div>
+        {meta?.pct !== null && meta?.pct !== undefined && (
+          <span className="text-xs font-semibold flex-shrink-0" style={{ color: 'var(--neon)' }}>
+            WE GOT {meta.hits}/{meta.total} right · {meta.pct}%
+          </span>
+        )}
+      </div>
+
+      {/* Game results */}
+      {hasResults && (
+        <ResultsSection
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          games={games as any[]}
+          predMap={predMap}
+          topPlayers={topPlayers}
+          hideHeader
+        />
+      )}
+
+      {/* Stories divider + recap cards */}
+      {hasRecaps && (
+        <div className="flex flex-col gap-4">
+          <p className="text-xs font-bold tracking-widest uppercase" style={{ color: 'var(--text)', opacity: 0.35 }}>
+            STORIES
+          </p>
+          <RecapFeed recaps={recaps} hideHeader />
+        </div>
+      )}
+
+    </section>
+  );
 }
 
 // ── Section: Tonight (upcoming / live games) ──────────────────────────────────
 
 async function TonightSlate({ today }: { today: string }) {
-  const [{ games, predictions, odds }, rankings] = await Promise.all([
+  const [{ games, predictions, odds }, rankings, seriesMap] = await Promise.all([
     getTodayGames(today),
     getRankings(),
+    getSeriesStandings(),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -103,8 +190,6 @@ async function TonightSlate({ today }: { today: string }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const o of (odds ?? []) as any[]) oddsMap[o.game_id] = [...(oddsMap[o.game_id] ?? []), o];
 
-  // Compute watchPlayers: top 3 Heat players per team, mapped by game_id
-  const watchPlayers = new Map<number, Array<{ name: string; heat: number; team: string }>>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const top100 = (rankings?.top100 ?? []) as any[];
 
@@ -118,19 +203,47 @@ async function TonightSlate({ today }: { today: string }) {
     if (!teamPlayersMap.has(abbrev)) teamPlayersMap.set(abbrev, []);
     teamPlayersMap.get(abbrev)!.push({ name, heat, team: abbrev });
   }
-  // Sort each team's players by heat desc
-  for (const arr of teamPlayersMap.values()) {
-    arr.sort((a, b) => b.heat - a.heat);
-  }
+  for (const arr of teamPlayersMap.values()) arr.sort((a, b) => b.heat - a.heat);
 
+  const watchPlayers = new Map<number, Array<{ name: string; heat: number; team: string }>>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const g of games as any[]) {
-    const awayAbbrev = g.awayTeam?.abbrev;
-    const homeAbbrev = g.homeTeam?.abbrev;
-    const awayPlayers = awayAbbrev ? (teamPlayersMap.get(awayAbbrev) ?? []).slice(0, 3) : [];
-    const homePlayers = homeAbbrev ? (teamPlayersMap.get(homeAbbrev) ?? []).slice(0, 3) : [];
-    const combined = [...awayPlayers, ...homePlayers]; // already sorted within each group
+    const awayPlayers = (teamPlayersMap.get(g.awayTeam?.abbrev) ?? []).slice(0, 3);
+    const homePlayers = (teamPlayersMap.get(g.homeTeam?.abbrev) ?? []).slice(0, 3);
+    const combined = [...awayPlayers, ...homePlayers];
     if (combined.length > 0) watchPlayers.set(g.id, combined);
+  }
+
+  // During playoffs: detect the featured series game so it's not shown twice
+  // (PlayoffHero already gives it full coverage — TonightSection shows the rest)
+  let featuredGameId: number | undefined;
+  if (seriesMap.size > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const todayAbbrevsSet = new Set((games as any[]).flatMap((g: any) => [g.awayTeam?.abbrev, g.homeTeam?.abbrev]).filter(Boolean));
+    const activeSeries = [...seriesMap.values()].filter(s => !s.isComplete);
+    const seriesTonight = activeSeries.filter(s =>
+      todayAbbrevsSet.has(s.awayTeam.abbrev) || todayAbbrevsSet.has(s.homeTeam.abbrev)
+    );
+    const candidates = seriesTonight.length > 0 ? seriesTonight : activeSeries;
+
+    // Score by sum of top-3 Heat per team
+    const teamScore = (abbrev: string) => {
+      const heats = (teamPlayersMap.get(abbrev) ?? []).slice(0, 3).map(p => p.heat);
+      return heats.reduce((s, h) => s + h, 0);
+    };
+    let featuredSeries = null, bestScore = -1;
+    for (const s of candidates) {
+      const score = teamScore(s.awayTeam.abbrev) + teamScore(s.homeTeam.abbrev);
+      if (score > bestScore) { bestScore = score; featuredSeries = s; }
+    }
+    if (featuredSeries) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fg = (games as any[]).find((g: any) =>
+        (g.awayTeam?.abbrev === featuredSeries!.awayTeam.abbrev || g.awayTeam?.abbrev === featuredSeries!.homeTeam.abbrev) &&
+        (g.homeTeam?.abbrev === featuredSeries!.awayTeam.abbrev || g.homeTeam?.abbrev === featuredSeries!.homeTeam.abbrev)
+      );
+      featuredGameId = fg?.id;
+    }
   }
 
   return (
@@ -140,55 +253,7 @@ async function TonightSlate({ today }: { today: string }) {
       predMap={predMap}
       oddsMap={oddsMap}
       watchPlayers={watchPlayers}
-    />
-  );
-}
-
-// ── Section: Recent results ───────────────────────────────────────────────────
-
-async function RecentResultsSection() {
-  const [{ games, predMap }, rankings] = await Promise.all([
-    getRecentGames(),
-    getRankings(),
-  ]);
-
-  // Compute topPlayers: highest-Heat player per game from either team
-  const topPlayers = new Map<number, { name: string; heat: number; team: string }>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const top100 = (rankings?.top100 ?? []) as any[];
-
-  // Build team → players lookup
-  const teamPlayersMap = new Map<string, Array<{ name: string; heat: number; team: string }>>();
-  for (const r of top100) {
-    const abbrev = r.players?.teams?.abbrev;
-    if (!abbrev) continue;
-    const heat = ppmToHeat(r.momentum_ppm ?? 0);
-    const name = `${r.players.first_name ?? ''} ${r.players.last_name ?? ''}`.trim();
-    if (!teamPlayersMap.has(abbrev)) teamPlayersMap.set(abbrev, []);
-    teamPlayersMap.get(abbrev)!.push({ name, heat, team: abbrev });
-  }
-  for (const arr of teamPlayersMap.values()) {
-    arr.sort((a, b) => b.heat - a.heat);
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const g of games as any[]) {
-    const awayAbbrev = g.away_team?.abbrev;
-    const homeAbbrev = g.home_team?.abbrev;
-    const awayTop = awayAbbrev ? (teamPlayersMap.get(awayAbbrev) ?? [])[0] : null;
-    const homeTop = homeAbbrev ? (teamPlayersMap.get(homeAbbrev) ?? [])[0] : null;
-    const top = awayTop && homeTop
-      ? (awayTop.heat >= homeTop.heat ? awayTop : homeTop)
-      : awayTop ?? homeTop ?? null;
-    if (top) topPlayers.set(g.id, top);
-  }
-
-  return (
-    <ResultsSection
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      games={games as any[]}
-      predMap={predMap}
-      topPlayers={topPlayers}
+      excludeGameId={featuredGameId}
     />
   );
 }
@@ -234,23 +299,17 @@ function HeroSkeleton() {
 
 function ResultsSkeleton() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-      {[...Array(4)].map((_, i) => (
-        <div key={i} className="h-32 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
-      ))}
-    </div>
-  );
-}
-
-function StorySkeleton() {
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-2xl animate-pulse" style={{ background: 'var(--bg-card)', minHeight: '280px' }} />
-      <div className="flex flex-col gap-2">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-20 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
+    <div className="flex flex-col gap-6">
+      {/* Skeleton header */}
+      <div className="h-10 w-48 rounded-lg animate-pulse" style={{ background: 'var(--bg-card)' }} />
+      {/* Game result cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-32 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
         ))}
       </div>
+      {/* Recap hero */}
+      <div className="rounded-2xl animate-pulse" style={{ background: 'var(--bg-card)', minHeight: '280px' }} />
     </div>
   );
 }
@@ -330,13 +389,8 @@ export default function DashboardPage() {
         <PlayoffHeroSection today={today} />
       </Suspense>
 
-      {/* 2. Results & predictions — completed games */}
+      {/* 2. Last night — results + recap stories combined */}
       <Suspense fallback={<ResultsSkeleton />}>
-        <RecentResultsSection />
-      </Suspense>
-
-      {/* 3. Stories — recap feed */}
-      <Suspense fallback={<StorySkeleton />}>
         <LastNightSection />
       </Suspense>
 

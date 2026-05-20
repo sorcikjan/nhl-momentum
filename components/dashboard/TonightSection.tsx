@@ -203,6 +203,7 @@ export default function TonightSection({
   predMap,
   oddsMap: _oddsMap,
   watchPlayers,
+  excludeGameId,
 }: {
   games: Game[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -210,8 +211,11 @@ export default function TonightSection({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   oddsMap: Record<number, any[]>;
   watchPlayers?: Map<number, WatchPlayer[]>;
+  excludeGameId?: number;
 }) {
-  const upcoming = games.filter((g: Game) => ['FUT', 'PRE', 'LIVE', 'CRIT'].includes(g.gameState));
+  const upcoming = games
+    .filter((g: Game) => ['FUT', 'PRE', 'LIVE', 'CRIT'].includes(g.gameState))
+    .filter((g: Game) => g.id !== excludeGameId);
   if (!upcoming.length) return null;
 
   // Sort: live first, then by start time
