@@ -500,17 +500,23 @@ export default function HeatGrid({
           ))}
         </div>
 
-        {/* Card grid — 2 cols */}
-        <div className="grid grid-cols-2 gap-2">
-          {tab === 'skaters' && skaters.slice(0, limit).map((p, i) => (
-            <SkaterCard key={p.player_id} p={p} rank={i + 1} />
+        {/* Row list — same format as desktop columns */}
+        <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          {tab === 'skaters' && top5Skaters.map((p, i) => (
+            <SkaterRow key={p.player_id} p={p} rank={i + 1} />
           ))}
-          {tab === 'goalies' && goalies.slice(0, limit).map((g, i) => (
-            <GoalieCard key={g.id} g={g} rank={i + 1} />
+          {tab === 'goalies' && top5Goalies.map((g, i) => (
+            <GoalieRow key={g.id} g={g} rank={i + 1} />
           ))}
-          {tab === 'newcomers' && newcomers.slice(0, limit).map((p, i) => (
-            <NewcomerCard key={p.player_id} p={p} rank={i + 1} />
+          {tab === 'newcomers' && top5Newcomers.map((p, i) => (
+            <NewcomerRow key={p.player_id} p={p} rank={i + 1} />
           ))}
+          <div className="px-4 py-3" style={{ borderTop: '1px solid var(--border)' }}>
+            <a href={tab === 'skaters' ? '/rankings' : tab === 'goalies' ? '/rankings?tab=goalies' : '/rankings?tab=newcomers'}
+              className="text-xs font-semibold" style={{ color: 'var(--heat)' }}>
+              FULL LIST →
+            </a>
+          </div>
         </div>
       </div>
 
