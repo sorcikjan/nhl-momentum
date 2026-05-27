@@ -119,6 +119,24 @@ export default function Sidebar() {
         </div>
       </header>
 
+      {/* Mobile top bar */}
+      <header className="md:hidden fixed top-0 left-0 right-0 h-12 z-50 flex items-center justify-between px-4 border-b"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+        <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+          <svg viewBox="-1 -1 40 32" fill="none" height="22" style={{ minWidth: 30 }}>
+            <path
+              d="M 0 20 L 4 20 L 6 15 L 8 20 L 10 11 L 12 20 L 14 3 L 19 27 L 23 20 L 30 20"
+              stroke="var(--heat)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"
+            />
+            <circle cx="33" cy="20" r="2.8" fill="var(--heat)" />
+          </svg>
+          <span className="text-lg font-extrabold" style={{ color: 'var(--text-bright)', letterSpacing: '-0.03em', lineHeight: 1 }}>
+            momentum<span style={{ color: 'var(--heat)' }}>.</span>
+          </span>
+        </Link>
+        <LiveBadge />
+      </header>
+
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex border-t"
         style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
