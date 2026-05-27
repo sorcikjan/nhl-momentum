@@ -52,6 +52,20 @@ const COUNTRY_FLAG: Record<string, string> = {
   AUS: '🇦🇺', NLD: '🇳🇱', GBR: '🇬🇧', HUN: '🇭🇺',
 };
 
+const TEAM_BG_COLORS: Record<string, string> = {
+  ANA: '#945a2a', ARI: '#8c2633', UTA: '#1a5276',
+  BOS: '#8b6914', BUF: '#003087', CGY: '#8c1c1c',
+  CAR: '#7a0000', CHI: '#7a0618', COL: '#4a1726',
+  CBJ: '#002654', DAL: '#004a30', DET: '#7a0a14',
+  EDM: '#1a3060', FLA: '#041e42', LAK: '#333333',
+  MIN: '#0f3022', MTL: '#6e1220', NSH: '#1a2a5c',
+  NJD: '#7a0a14', NYI: '#003a6b', NYR: '#00277a',
+  OTT: '#7a5c1a', PHI: '#8b2e00', PIT: '#1a1a1a',
+  SEA: '#001628', SJS: '#004a50', STL: '#001e6b',
+  TBL: '#001a5c', TOR: '#001845', VAN: '#00421e',
+  VGK: '#252f34', WSH: '#041e42', WPG: '#041e42',
+};
+
 function SectionTitle({ main, accent }: { main: string; accent: string }) {
   return (
     <h2 style={{
@@ -400,7 +414,149 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         );
       })()}
 
-      {/* 2. Cinematic hero ────────────────────────────────────────────────────── */}
+      {/* 2a. Mobile hero — stacked layout ──────────────────────────────────── */}
+      <div className="md:hidden space-y-3">
+
+        {/* Photo card */}
+        <div className="relative rounded-xl overflow-hidden" style={{ height: 220, background: 'var(--bg-card)' }}>
+          {player.headshot_url ? (
+            <img src={player.headshot_url} alt={name} className="w-full h-full object-cover object-top" />
+          ) : (
+            <div className="w-full h-full" style={{ background: 'var(--bg-card)' }} />
+          )}
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 50%)' }} />
+
+          {/* Team badge — top left */}
+          {player.teams?.abbrev && (
+            <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-black tracking-widest uppercase"
+              style={{ background: TEAM_BG_COLORS[player.teams.abbrev] ?? 'rgba(0,0,0,0.7)', color: '#fff' }}>
+              {player.teams.abbrev}
+            </div>
+          )}
+
+          {/* Out status badge — top right */}
+          {outStatus && (() => {
+            const label = outStatus === 'minors' ? 'MINORS' : outStatus === 'injured' ? 'INJURED' : outStatus === 'scratch' ? 'SCRATCH' : 'OUT';
+            const bg = outStatus === 'minors' ? 'rgba(99,179,237,0.85)' : outStatus === 'scratch' ? 'rgba(251,191,36,0.85)' : 'rgba(239,68,68,0.85)';
+            return (
+              <div className="absolute top-3 right-3 px-2 py-0.5 rounded font-bold text-xs"
+                style={{ background: bg, color: '#fff' }}>{label}</div>
+            );
+          })()}
+
+          {/* Jersey number — bottom right ghost */}
+          {player.sweater_number && (
+            <div className="absolute bottom-2 right-3 font-black leading-none select-none pointer-events-none"
+              style={{ fontSize: 52, color: 'rgba(255,255,255,0.13)', letterSpacing: '-0.05em' }}>
+              {player.sweater_number}
+            </div>
+          )}
+        </div>
+
+        {/* Name block */}
+        <div>
+          <div className="flex items-center flex-wrap gap-1.5 text-xs font-semibold tracking-widest uppercase mb-1.5" style={{ color: 'var(--text)', opacity: 0.7 }}>
+            {player.teams?.id ? (
+              <Link href={teamUrl(player.teams.id, player.teams.name ?? player.teams.abbrev ?? '')}
+                style={{ color: 'var(--heat)' }}>{player.teams.abbrev}</Link>
+            ) : (
+              <span style={{ color: 'var(--heat)' }}>{player.teams?.abbrev}</span>
+            )}
+            {player.position_code && <><span>·</span><span>{player.position_code}</span></>}
+            {age && <><span>·</span><span>Age {age}</span></>}
+          </div>
+          <h1 style={{ lineHeight: 0.9, letterSpacing: '-0.025em', fontFamily: 'var(--font-fraunces), Georgia, serif' }}>
+            <span className="block font-black" style={{ fontSize: '2.4rem', color: 'var(--text-bright)' }}>
+              {player.first_name}
+            </span>
+            <span className="block font-black" style={{ fontSize: '2.4rem', color: 'var(--heat)' }}>
+              {player.last_name}.
+            </span>
+          </h1>
+        </div>
+
+        {/* 2-col: HEAT + ENERGY */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-xl border p-4 flex flex-col items-center gap-2"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <span className="text-xs font-semibold tracking-widest uppercase self-start" style={{ color: 'var(--text)', opacity: 0.6 }}>Heat</span>
+            <HeatCircle heat={currentHeat} size={72} delta={heatDelta} />
+            {latestSnapshot.momentum_rank && (
+              <span className="text-xs" style={{ color: 'var(--text)' }}>
+                <span className="font-bold" style={{ color: 'var(--heat)' }}>#{latestSnapshot.momentum_rank}</span> ranked
+              </span>
+            )}
+          </div>
+
+          <div className="rounded-xl border p-4 flex flex-col gap-2 justify-center"
+            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+            <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'var(--text)', opacity: 0.6 }}>Energy</span>
+            <div>
+              <div className="flex items-baseline justify-between mb-1.5">
+                <span className="text-3xl font-black font-mono" style={{ color: energyColor }}>{energyBar}</span>
+                <span className="text-xs font-bold" style={{ color: energyColor }}>{energyLabel}</span>
+              </div>
+              <div className="rounded-full overflow-hidden" style={{ background: 'var(--border)', height: 6 }}>
+                <div className="h-full rounded-full" style={{ width: `${energyBar}%`, background: energyColor }} />
+              </div>
+            </div>
+            <span className="text-xs leading-snug" style={{ color: 'var(--text)', opacity: 0.55 }}>
+              {energyBar >= 70 ? 'Fresh — low workload' : energyBar >= 40 ? 'Moderate fatigue' : 'Drained — heavy load'}
+            </span>
+          </div>
+        </div>
+
+        {/* 2-col: BORN + DRAFTED */}
+        {(player.birth_city || player.birth_country || player.draft_year) && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+              <span className="text-xs font-semibold tracking-widest uppercase block mb-2" style={{ color: 'var(--text)', opacity: 0.6 }}>Born</span>
+              {(player.birth_city || player.birth_country) && (
+                <div className="text-sm font-semibold leading-snug" style={{ color: 'var(--text-bright)' }}>
+                  {[player.birth_city, player.birth_country].filter(Boolean).join(', ')}
+                </div>
+              )}
+              {player.birth_country && COUNTRY_FLAG[player.birth_country] && (
+                <div className="text-2xl mt-1">{COUNTRY_FLAG[player.birth_country]}</div>
+              )}
+              {player.height_inches && (
+                <div className="text-xs mt-2 font-mono" style={{ color: 'var(--text)', opacity: 0.7 }}>
+                  {Math.floor(player.height_inches / 12)}′{player.height_inches % 12}″{player.weight_pounds ? ` · ${player.weight_pounds} lb` : ''}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+              <span className="text-xs font-semibold tracking-widest uppercase block mb-2" style={{ color: 'var(--text)', opacity: 0.6 }}>Drafted</span>
+              {player.draft_year ? (
+                <>
+                  <div className="text-2xl font-black font-mono" style={{ color: 'var(--text-bright)' }}>{player.draft_year}</div>
+                  <div className="text-xs mt-1 leading-snug" style={{ color: 'var(--text)' }}>
+                    R{player.draft_round} Pick #{player.draft_pick}
+                    {player.draft_team_abbrev && <div style={{ color: 'var(--heat)' }}>{player.draft_team_abbrev}</div>}
+                  </div>
+                </>
+              ) : (
+                <div className="text-sm font-semibold mt-1" style={{ color: 'var(--text)' }}>Undrafted</div>
+              )}
+              {player.career_games ? (
+                <div className="text-xs mt-2 font-mono" style={{ color: 'var(--text)', opacity: 0.6 }}>
+                  {player.career_games} GP · {player.career_goals ?? 0}G {player.career_assists ?? 0}A
+                </div>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        {/* AI CHARACTER card */}
+        <Suspense fallback={<div className="h-20 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)', opacity: 0.5 }} />}>
+          <AIBioMobileCard playerId={Number(id)} aiInput={aiInput} />
+        </Suspense>
+
+      </div>
+
+      {/* 2b. Cinematic hero — desktop only ─────────────────────────────────── */}
+      <div className="hidden md:block">
       <div className="relative rounded-xl overflow-hidden" style={{ background: 'var(--bg-card)', minHeight: 240 }}>
 
         {/* Jersey number ghost */}
@@ -520,6 +676,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
         </div>
       </div>
+      </div>{/* end hidden md:block */}
 
       {/* 4. Form tracker ─────────────────────────────────────────────────────── */}
       {(metricTimeline?.length ?? 0) > 0 && (
@@ -1041,5 +1198,21 @@ async function AIPerfSection({ playerId, aiInput }: { playerId: number; aiInput:
     <p className="text-sm leading-relaxed pb-2" style={{ color: 'var(--text)' }}>
       {perfEval}
     </p>
+  );
+}
+
+async function AIBioMobileCard({ playerId, aiInput }: { playerId: number; aiInput: PlayerAIInput }) {
+  const { bio } = await getPlayerInsights(playerId, aiInput).catch(() => ({ bio: null, perfEval: null }));
+  if (!bio) return null;
+  return (
+    <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <div className="inline-flex items-center px-2.5 py-1 rounded-full mb-3 text-xs font-bold tracking-widest uppercase"
+        style={{ background: 'rgba(255,90,36,0.15)', color: 'var(--heat)', border: '1px solid rgba(255,90,36,0.3)' }}>
+        AI Character
+      </div>
+      <p className="text-sm leading-relaxed" style={{ color: 'var(--text-bright)', fontFamily: 'var(--font-fraunces), Georgia, serif', fontStyle: 'italic' }}>
+        {bio}
+      </p>
+    </div>
   );
 }
