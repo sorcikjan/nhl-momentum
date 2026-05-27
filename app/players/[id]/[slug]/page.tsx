@@ -557,122 +557,187 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
       {/* 2b. Cinematic hero — desktop only ─────────────────────────────────── */}
       <div className="hidden md:block">
-      <div className="relative rounded-xl overflow-hidden" style={{ background: 'var(--bg-card)', minHeight: 240 }}>
+      <div className="relative rounded-xl overflow-hidden" style={{ background: 'var(--bg-card)', minHeight: 380 }}>
 
-        {/* Jersey number ghost */}
+        {/* Jersey ghost — full background */}
         {player.sweater_number && (
           <div className="absolute select-none pointer-events-none"
-            style={{ right: -10, top: -20, fontSize: 220, fontWeight: 900, lineHeight: 1,
-                     color: 'rgba(255,90,36,0.07)', letterSpacing: '-0.05em' }}>
+            style={{ right: -15, top: -40, fontSize: 380, fontWeight: 900, lineHeight: 1,
+                     color: 'rgba(255,90,36,0.055)', letterSpacing: '-0.05em', zIndex: 0 }}>
             {player.sweater_number}
           </div>
         )}
+        {/* Warm right overlay */}
+        <div className="absolute inset-0 pointer-events-none"
+          style={{ background: 'linear-gradient(to right, transparent 35%, rgba(160,50,0,0.09) 100%)', zIndex: 0 }} />
 
-        {/* Team logo — top right */}
-        {player.teams?.abbrev && (
-          <div className="absolute top-4 right-4 z-20 opacity-70" style={{ width: 44, height: 44 }}>
-            <img
-              src={`https://assets.nhle.com/logos/nhl/svg/${player.teams.abbrev}_light.svg`}
-              alt={player.teams.abbrev}
-              style={{ width: 44, height: 44, objectFit: 'contain' }}
-            />
-          </div>
-        )}
+        {/* 3-column grid: photo | content | stats */}
+        <div className="relative z-10 grid p-5 gap-5 items-start" style={{ gridTemplateColumns: '260px 1fr 220px' }}>
 
-        {/* Headshot right-anchored, fading left */}
-        {player.headshot_url && (
-          <div className="absolute bottom-0 right-0 h-full w-[120px] md:w-[180px]">
-            <img src={player.headshot_url} alt={name} className="w-full h-full object-cover object-top" />
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, var(--bg-card) 0%, transparent 55%)' }} />
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, var(--bg-card) 0%, transparent 50%)' }} />
-          </div>
-        )}
-
-        {/* Content — constrained to left 72% so it doesn't overlap headshot */}
-        <div className="relative z-10 p-5 md:p-7 flex flex-col gap-3" style={{ maxWidth: '72%' }}>
-
-          {/* Team meta: flag · team · number · position · status */}
-          <div className="flex items-center flex-wrap gap-1.5 text-xs font-semibold tracking-widest uppercase" style={{ color: 'var(--text)' }}>
-            {player.birth_country && COUNTRY_FLAG[player.birth_country] && (
-              <span style={{ fontSize: 16, lineHeight: 1 }}>{COUNTRY_FLAG[player.birth_country]}</span>
-            )}
-            {player.teams?.id ? (
-              <Link href={teamUrl(player.teams.id, player.teams.name ?? player.teams.abbrev)}
-                className="hover:opacity-80" style={{ color: 'var(--heat)' }}>
-                {player.teams.name ?? player.teams.abbrev}
-              </Link>
+          {/* LEFT: Photo card */}
+          <div className="relative rounded-xl overflow-hidden"
+            style={{ height: 340, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            {player.headshot_url ? (
+              <img src={player.headshot_url} alt={name} className="absolute inset-0 w-full h-full object-cover object-top" />
             ) : (
-              <span style={{ color: 'var(--heat)' }}>{player.teams?.name ?? player.teams?.abbrev}</span>
-            )}
-            {player.sweater_number && <><span>·</span><span>#{player.sweater_number}</span></>}
-            {player.position_code && <><span>·</span><span>{player.position_code}</span></>}
-            {(outStatus || player.injury_status) && (() => {
-              const label = player.injury_status ?? (outStatus === 'minors' ? 'MINORS' : outStatus === 'injured' ? 'INJURED' : outStatus === 'scratch' ? 'SCRATCH' : 'OUT');
-              const color = outStatus === 'minors' ? 'var(--neon)' : outStatus === 'scratch' ? 'var(--amber)' : 'var(--red)';
-              const bg = outStatus === 'minors' ? 'rgba(99,179,237,0.15)' : outStatus === 'scratch' ? 'rgba(251,191,36,0.18)' : 'rgba(239,68,68,0.2)';
-              return <span className="px-2 py-0.5 rounded font-bold" style={{ background: bg, color, fontSize: 10 }}>{label}</span>;
-            })()}
-          </div>
-
-          {/* Player name — Fraunces per brand spec */}
-          <h1 style={{ lineHeight: 0.92, letterSpacing: '-0.025em', fontFamily: 'var(--font-fraunces), Georgia, serif' }}>
-            <span className="block font-black" style={{ fontSize: 'clamp(2rem, 7vw, 3.5rem)', color: 'var(--text-bright)' }}>
-              {player.first_name}
-            </span>
-            <span className="block font-black" style={{ fontSize: 'clamp(2rem, 7vw, 3.5rem)', color: 'var(--heat)' }}>
-              {player.last_name}.
-            </span>
-          </h1>
-
-          {/* Heat circle + rank + energy bar */}
-          <div className="flex items-start gap-4 mt-1">
-            <HeatCircle heat={currentHeat} size={92} delta={heatDelta} />
-            <div className="flex flex-col gap-2 pt-1">
-              {latestSnapshot.momentum_rank && (
-                <span className="text-xs" style={{ color: 'var(--text)' }}>
-                  <span className="font-bold" style={{ color: 'var(--heat)' }}>#{latestSnapshot.momentum_rank}</span>{' '}in the league
-                </span>
-              )}
-              {/* Energy — bar + label + context */}
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)', opacity: 0.6 }}>Energy</span>
-                  <span className="text-xs font-bold font-mono" style={{ color: energyColor }}>{energyBar} · {energyLabel}</span>
-                </div>
-                <div className="rounded-full overflow-hidden" style={{ background: 'var(--border)', height: 5, width: 120 }}>
-                  <div className="h-full rounded-full" style={{ width: `${energyBar}%`, background: energyColor, transition: 'width 0.6s ease' }} />
-                </div>
-                <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.55 }}>
-                  {energyBar >= 70 ? 'Fresh — manageable recent workload' : energyBar >= 40 ? 'Moderate — watch for fatigue dips' : 'Drained — heavy recent workload'}
-                </span>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.18)' }}>PLAYER PHOTO</span>
               </div>
-            </div>
+            )}
+            {player.teams?.abbrev && (
+              <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-lg text-xs font-black tracking-widest uppercase"
+                style={{ background: TEAM_BG_COLORS[player.teams.abbrev] ?? 'rgba(0,0,0,0.7)', color: '#fff' }}>
+                {player.teams.abbrev}
+              </div>
+            )}
+            {outStatus && (() => {
+              const label = outStatus === 'minors' ? 'MINORS' : outStatus === 'injured' ? 'INJURED' : outStatus === 'scratch' ? 'SCRATCH' : 'OUT';
+              const bg = outStatus === 'minors' ? 'rgba(99,179,237,0.85)' : outStatus === 'scratch' ? 'rgba(251,191,36,0.85)' : 'rgba(239,68,68,0.85)';
+              return (
+                <div className="absolute top-3 right-3 z-10 px-2 py-0.5 rounded font-bold text-xs"
+                  style={{ background: bg, color: '#fff' }}>{label}</div>
+              );
+            })()}
+            {player.sweater_number && (
+              <div className="absolute bottom-3 right-4 z-10 font-bold"
+                style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem', letterSpacing: '0.05em' }}>
+                #{player.sweater_number}
+              </div>
+            )}
           </div>
 
-          {/* AI character — Suspense streamed */}
-          <Suspense fallback={<div className="h-10 rounded animate-pulse" style={{ background: 'var(--border)', opacity: 0.5 }} />}>
-            <AIBioSection playerId={Number(id)} aiInput={aiInput} />
-          </Suspense>
+          {/* CENTER: Meta + name + info trio + AI */}
+          <div className="flex flex-col gap-4">
 
-          {/* Bio pills */}
-          {(age || player.birth_city || player.birth_country || player.height_inches || player.draft_year || player.career_games) && (
-            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.65 }}>
-              {age && <span>Age {age}</span>}
-              {(player.birth_city || player.birth_country) && (
-                <span>{[player.birth_city, player.birth_country].filter(Boolean).join(', ')}</span>
+            {/* Meta row */}
+            <div className="flex items-center flex-wrap gap-2 text-xs font-semibold tracking-widest uppercase"
+              style={{ color: 'rgba(255,255,255,0.38)' }}>
+              {player.teams?.id ? (
+                <Link href={teamUrl(player.teams.id, player.teams.name ?? player.teams.abbrev ?? '')}
+                  className="hover:opacity-80 transition-opacity"
+                  style={{ color: 'rgba(255,255,255,0.38)' }}>
+                  {player.teams.name ?? player.teams.abbrev}
+                </Link>
+              ) : (
+                <span>{player.teams?.name ?? player.teams?.abbrev}</span>
+              )}
+              {player.position_code && <><span style={{ color: 'rgba(255,255,255,0.18)' }}>·</span><span>{player.position_code}</span></>}
+              {age && <><span style={{ color: 'rgba(255,255,255,0.18)' }}>·</span><span>Age {age}</span></>}
+              {player.shoots_catches && (
+                <><span style={{ color: 'rgba(255,255,255,0.18)' }}>·</span>
+                <span>{player.shoots_catches === 'L' ? 'L' : 'R'}-{player.position_code === 'G' ? 'catches' : 'shoots'}</span></>
               )}
               {player.height_inches && (
-                <span>{Math.floor(player.height_inches / 12)}′{player.height_inches % 12}″{player.weight_pounds ? ` · ${player.weight_pounds} lbs` : ''}</span>
+                <><span style={{ color: 'rgba(255,255,255,0.18)' }}>·</span>
+                <span>{Math.floor(player.height_inches / 12)}′{player.height_inches % 12}″</span></>
               )}
-              {player.shoots_catches && (
-                <span>{player.position_code === 'G' ? 'Catches' : 'Shoots'} {player.shoots_catches === 'L' ? 'L' : 'R'}</span>
+              {player.weight_pounds && (
+                <><span style={{ color: 'rgba(255,255,255,0.18)' }}>·</span><span>{player.weight_pounds} lb</span></>
+              )}
+            </div>
+
+            {/* Big name */}
+            <h1 style={{ lineHeight: 0.88, letterSpacing: '-0.03em', fontFamily: 'var(--font-fraunces), Georgia, serif' }}>
+              <span className="block font-black" style={{ fontSize: 'clamp(3rem, 5.5vw, 4.5rem)', color: 'var(--text-bright)' }}>
+                {player.first_name}
+              </span>
+              <span className="block font-black" style={{ fontSize: 'clamp(3rem, 5.5vw, 4.5rem)', color: 'var(--heat)' }}>
+                {player.last_name}.
+              </span>
+            </h1>
+
+            {/* Info trio: BORN · DRAFTED · SEASON */}
+            <div className="flex gap-8">
+              {(player.birth_city || player.birth_country) && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Born</span>
+                  <div className="flex items-center gap-1.5">
+                    {player.birth_country && COUNTRY_FLAG[player.birth_country] && (
+                      <span style={{ fontSize: 14, lineHeight: 1 }}>{COUNTRY_FLAG[player.birth_country]}</span>
+                    )}
+                    <span className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
+                      {[player.birth_city, player.birth_country].filter(Boolean).join(', ')}
+                    </span>
+                  </div>
+                </div>
               )}
               {player.draft_year && (
-                <span>Draft {player.draft_year} R{player.draft_round} #{player.draft_pick}{player.draft_team_abbrev ? ` · ${player.draft_team_abbrev}` : ''}</span>
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Drafted</span>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
+                    {player.draft_year}{player.draft_round === 1 && player.draft_pick === 1
+                      ? ' · 1st overall'
+                      : player.draft_round ? ` · R${player.draft_round} #${player.draft_pick}` : ''}
+                  </span>
+                </div>
               )}
-              {player.career_games ? <span>{player.career_games} GP career · {player.career_goals ?? 0}G {player.career_assists ?? 0}A</span> : null}
+              {seaGames > 0 && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Season</span>
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
+                    {seaGoals}G · {seaAssists}A · {seaGoals + seaAssists} pts
+                  </span>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* AI CHARACTER */}
+            <div>
+              <div className="inline-flex items-center px-2.5 py-1 rounded-full mb-3 text-xs font-bold tracking-widest uppercase"
+                style={{ background: 'rgba(255,90,36,0.15)', color: 'var(--heat)', border: '1px solid rgba(255,90,36,0.3)' }}>
+                AI Character
+              </div>
+              <Suspense fallback={<div className="h-12 rounded animate-pulse" style={{ background: 'var(--border)', opacity: 0.4 }} />}>
+                <AIBioSection playerId={Number(id)} aiInput={aiInput} />
+              </Suspense>
+            </div>
+
+          </div>
+
+          {/* RIGHT: Heat + Energy cards */}
+          <div className="flex flex-col gap-3">
+
+            {/* HEAT · L5 */}
+            <div className="rounded-xl border p-4" style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'var(--border)' }}>
+              <div className="flex items-center gap-1.5 mb-3">
+                <span className="text-xs font-bold tracking-widest uppercase" style={{ color: 'var(--heat)' }}>Heat</span>
+                <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
+                <span className="text-xs font-bold tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.35)' }}>L5</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <HeatCircle heat={currentHeat} size={80} delta={heatDelta} />
+                <div className="flex flex-col gap-1">
+                  {heatDelta !== undefined && heatDelta !== 0 && (
+                    <span className="text-sm font-bold" style={{ color: heatDelta > 0 ? 'var(--green)' : 'var(--red)' }}>
+                      {heatDelta > 0 ? '↑' : '↓'} {heatDelta > 0 ? '+' : ''}{heatDelta}
+                    </span>
+                  )}
+                  {latestSnapshot.momentum_rank && (
+                    <span className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                      #{latestSnapshot.momentum_rank} overall
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* ENERGY */}
+            <div className="rounded-xl border p-4" style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'var(--border)' }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-bold tracking-widest uppercase" style={{ color: energyColor }}>Energy</span>
+                <span className="text-xs font-bold tracking-widest uppercase" style={{ color: energyColor }}>{energyLabel}</span>
+              </div>
+              <div className="rounded-full overflow-hidden mb-2" style={{ background: 'var(--border)', height: 6 }}>
+                <div className="h-full rounded-full" style={{ width: `${energyBar}%`, background: energyColor }} />
+              </div>
+              <div className="text-2xl font-black font-mono mb-1" style={{ color: energyColor }}>{energyBar}</div>
+              <span className="text-xs leading-snug" style={{ color: 'rgba(255,255,255,0.38)' }}>
+                {lastPlayedDaysAgo !== null ? `Last game ${lastPlayedDaysAgo}d ago. ` : ''}
+                {energyBar >= 70 ? 'Fresh — manageable workload' : energyBar >= 40 ? 'Moderate — watch for fatigue' : 'Drained — heavy recent load'}
+              </span>
+            </div>
+
+          </div>
 
         </div>
       </div>
