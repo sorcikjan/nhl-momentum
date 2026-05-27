@@ -426,11 +426,14 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           )}
           <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 50%)' }} />
 
-          {/* Team badge — top left */}
+          {/* Team logo — top left */}
           {player.teams?.abbrev && (
-            <div className="absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-black tracking-widest uppercase"
-              style={{ background: TEAM_BG_COLORS[player.teams.abbrev] ?? 'rgba(0,0,0,0.7)', color: '#fff' }}>
-              {player.teams.abbrev}
+            <div className="absolute top-3 left-3 z-10">
+              <img
+                src={`https://assets.nhle.com/logos/nhl/svg/${player.teams.abbrev}_light.svg`}
+                alt={player.teams.abbrev}
+                style={{ width: 44, height: 44, objectFit: 'contain', filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.7))' }}
+              />
             </div>
           )}
 
@@ -574,22 +577,31 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         {/* 3-column grid: photo | content | stats */}
         <div className="relative z-10 grid p-5 gap-5 items-start" style={{ gridTemplateColumns: '260px 1fr 220px' }}>
 
-          {/* LEFT: Photo card */}
-          <div className="relative rounded-xl overflow-hidden"
-            style={{ height: 340, background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            {player.headshot_url ? (
-              <img src={player.headshot_url} alt={name} className="absolute inset-0 w-full h-full object-cover object-top" />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.18)' }}>PLAYER PHOTO</span>
-              </div>
+          {/* LEFT: Photo — blends into hero background */}
+          <div className="relative" style={{ height: 340 }}>
+            {player.headshot_url && (
+              <img src={player.headshot_url} alt={name}
+                className="absolute inset-0 w-full h-full object-cover object-top"
+                style={{ borderRadius: 12 }} />
             )}
+            {/* Fade photo edges into card background */}
+            <div className="absolute inset-x-0 bottom-0 pointer-events-none"
+              style={{ height: '45%', background: 'linear-gradient(to top, var(--bg-card) 10%, transparent 100%)', borderRadius: '0 0 12px 12px' }} />
+            <div className="absolute inset-y-0 right-0 pointer-events-none"
+              style={{ width: '35%', background: 'linear-gradient(to right, transparent 0%, var(--bg-card) 100%)' }} />
+
+            {/* Team logo — top left */}
             {player.teams?.abbrev && (
-              <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-lg text-xs font-black tracking-widest uppercase"
-                style={{ background: TEAM_BG_COLORS[player.teams.abbrev] ?? 'rgba(0,0,0,0.7)', color: '#fff' }}>
-                {player.teams.abbrev}
+              <div className="absolute top-3 left-3 z-10">
+                <img
+                  src={`https://assets.nhle.com/logos/nhl/svg/${player.teams.abbrev}_light.svg`}
+                  alt={player.teams.abbrev}
+                  style={{ width: 52, height: 52, objectFit: 'contain', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.7))' }}
+                />
               </div>
             )}
+
+            {/* Out status */}
             {outStatus && (() => {
               const label = outStatus === 'minors' ? 'MINORS' : outStatus === 'injured' ? 'INJURED' : outStatus === 'scratch' ? 'SCRATCH' : 'OUT';
               const bg = outStatus === 'minors' ? 'rgba(99,179,237,0.85)' : outStatus === 'scratch' ? 'rgba(251,191,36,0.85)' : 'rgba(239,68,68,0.85)';
@@ -598,9 +610,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                   style={{ background: bg, color: '#fff' }}>{label}</div>
               );
             })()}
+
+            {/* Jersey # bottom right */}
             {player.sweater_number && (
               <div className="absolute bottom-3 right-4 z-10 font-bold"
-                style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.8rem', letterSpacing: '0.05em' }}>
+                style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem', letterSpacing: '0.05em' }}>
                 #{player.sweater_number}
               </div>
             )}
