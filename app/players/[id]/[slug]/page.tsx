@@ -425,7 +425,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
         {/* Headshot right-anchored, fading left */}
         {player.headshot_url && (
-          <div className="absolute bottom-0 right-0 h-full" style={{ width: 180 }}>
+          <div className="absolute bottom-0 right-0 h-full w-[120px] md:w-[180px]">
             <img src={player.headshot_url} alt={name} className="w-full h-full object-cover object-top" />
             <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, var(--bg-card) 0%, transparent 55%)' }} />
             <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, var(--bg-card) 0%, transparent 50%)' }} />
