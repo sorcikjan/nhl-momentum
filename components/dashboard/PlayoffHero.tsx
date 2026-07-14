@@ -256,10 +256,6 @@ export default function PlayoffHero({ seriesMap, rankings, todayGames, predMap, 
     if (score > bestScore) { bestScore = score; featured = s; }
   }
 
-  if (!featured) {
-    // Fall back to any series (even completed)
-    featured = allSeries[0] ?? null;
-  }
   if (!featured) return null;
 
   // Get tonight's game for the featured series

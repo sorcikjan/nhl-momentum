@@ -34,7 +34,7 @@ export default async function NewsPage() {
           NHL News
         </h1>
         <p className="text-sm" style={{ color: 'var(--text)' }}>
-          Latest headlines from NHL.com and sports media, updated every 30 minutes.
+          Latest headlines from NHL.com and sports media, updated daily.
         </p>
       </div>
 

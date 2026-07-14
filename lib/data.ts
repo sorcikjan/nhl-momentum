@@ -215,7 +215,7 @@ export async function fetchRankings() {
   // Chunked into groups of 50 × limit 250 = safely under Supabase's 1000-row cap.
   // All chunks fire in parallel alongside the recentTeamGames query (step 2).
   const lastGameIdByPlayer = new Map<number, number>();
-  const STAT_CHUNK = 50;
+  const STAT_CHUNK = 25;
   const sinceDate = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
 
   const chunkPromises = [];
@@ -228,7 +228,7 @@ export async function fetchRankings() {
           .select('player_id, game_id')
           .in('player_id', chunk)
           .order('game_id', { ascending: false })
-          .limit(chunk.length * 5);
+          .limit(chunk.length * 40);
         return data ?? [];
       })()
     );

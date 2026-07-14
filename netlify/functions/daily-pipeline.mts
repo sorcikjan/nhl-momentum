@@ -11,7 +11,7 @@ export default async function handler() {
   const res = await fetch(`${base}/.netlify/functions/daily-worker-background`, {
     method: 'POST',
     headers: { 'x-api-key': ingestKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ phases: ['backfill', 'gamelogs', 'outcomes', 'outcomes-backfill', 'metrics', 'snapshots', 'odds', 'energy', 'extras', 'recap'] }),
+    body: JSON.stringify({ phases: ['backfill', 'gamelogs', 'outcomes', 'outcomes-backfill', 'metrics', 'snapshots', 'odds', 'energy', 'extras', 'signals', 'recap'] }),
   });
 
   console.log('[daily-pipeline] triggered background worker, status:', res.status);

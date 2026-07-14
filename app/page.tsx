@@ -141,6 +141,9 @@ async function LastNightSection() {
   if (!hasResults && !hasRecaps) return null;
 
   // Shared header data — prefer results date, fall back to recap date
+  const refDate = meta?.lastNight ?? recaps[0]?.date ?? '';
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const isStale = refDate < yesterday;
   const dateLabel = meta
     ? new Date((meta.lastNight) + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
     : recaps[0]
@@ -154,8 +157,14 @@ async function LastNightSection() {
       <div className="flex items-end justify-between">
         <div>
           <h2 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05 }}>
-            <span style={{ color: 'var(--text-bright)' }}>Last </span>
-            <span style={{ color: 'var(--heat)' }}>night.</span>
+            {isStale ? (
+              <span style={{ color: 'var(--text-bright)' }}>Most recent night.</span>
+            ) : (
+              <>
+                <span style={{ color: 'var(--text-bright)' }}>Last </span>
+                <span style={{ color: 'var(--heat)' }}>night.</span>
+              </>
+            )}
           </h2>
           <p style={{ color: 'var(--silver)', opacity: 0.55, fontSize: '0.78rem', marginTop: '0.25rem' }}>
             {dateLabel}{meta ? ` · ${meta.gameCount} game${meta.gameCount !== 1 ? 's' : ''}` : ''}
@@ -387,7 +396,7 @@ function SiteFooter() {
         ))}
       </div>
       <div className="flex gap-4 flex-wrap">
-        {[['How Heat works', '/methodology'], ['API', '/api'], ['Twitter', 'https://twitter.com']].map(([label, href]) => (
+        {[['Twitter', 'https://twitter.com']].map(([label, href]) => (
           <a key={label} href={href} className="hover:opacity-70">{label}</a>
         ))}
       </div>
