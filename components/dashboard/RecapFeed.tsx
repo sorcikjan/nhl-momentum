@@ -23,7 +23,7 @@ function storyLabel(title: string): { text: string; color: string } {
     return { text: 'UPSET', color: 'var(--red)' };
   if (t.includes('overtime') || t.includes(' ot ') || t.includes('shootout'))
     return { text: 'OVERTIME', color: 'var(--neon)' };
-  return { text: 'LAST NIGHT · BIG STORY', color: 'var(--heat)' };
+  return { text: 'TOP STORY', color: 'var(--heat)' };
 }
 
 function formatRecapDate(dateStr: string): string {

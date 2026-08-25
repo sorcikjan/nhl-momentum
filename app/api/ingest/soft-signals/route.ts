@@ -31,7 +31,7 @@ async function fetchNewsdataSignals() {
   const key = process.env.NEWSDATA_API_KEY;
   if (!key) return [];
 
-  const url = `https://newsdata.io/api/1/news?apikey=${key}&q=NHL+hockey&language=en&category=sports&size=10`;
+  const url = `https://newsdata.io/api/1/news?apikey=${key}&qInTitle=NHL&language=en&category=sports&size=10`;
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) return [];
 
