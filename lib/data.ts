@@ -2,9 +2,10 @@
 // Pages should call these directly — never fetch their own API over HTTP.
 
 import { supabaseAdmin } from '@/lib/supabase';
-import { getGamesByDate, getGameBoxscore, getStandings, getTeamSeasonStats } from '@/lib/nhl-api';
+import { getGamesByDate, getGameBoxscore, getGamePlayByPlay, getStandings, getTeamSeasonStats } from '@/lib/nhl-api';
 export { deriveOutStatus, daysAgo } from '@/lib/player-status';
 import { daysAgo } from '@/lib/player-status';
+import { processPlayByPlay } from '@/lib/play-by-play';
 
 // NHL CDN logo URL — works for all 32 teams
 export function teamLogoUrl(abbrev: string) {
@@ -364,6 +365,72 @@ export async function fetchGames(date: string) {
   return { games, predictions, odds };
 }
 
+// Same shape as fetchGames but across several dates in one round of calls —
+// used by the schedule page's Today / Tomorrow / This week views. The NHL
+// schedule endpoint is per-date, so we still fan out one call per date, but
+// the DB reads (predictions/odds) are batched into a single query each.
+export async function fetchGamesRange(dates: string[]) {
+  const activeModel = await latestModelVersion();
+  const gamesByDate = await Promise.all(dates.map(d => getGamesByDate(d)));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const games = gamesByDate.flat() as any[];
+  const gameIds = games.map(g => g.id);
+
+  if (gameIds.length === 0) {
+    return { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map() };
+  }
+
+  const [{ data: allPredictions }, { data: odds }] = await Promise.all([
+    supabaseAdmin
+      .from('predictions')
+      .select('*, prediction_outcomes(*)')
+      .in('game_id', gameIds)
+      .order('created_at', { ascending: false }),
+    supabaseAdmin
+      .from('external_odds')
+      .select('*')
+      .in('game_id', gameIds)
+      .order('fetched_at', { ascending: false }),
+  ]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const predByGame = new Map<number, any>();
+  for (const p of (allPredictions ?? [])) {
+    const existing = predByGame.get(p.game_id);
+    if (!existing || p.model_version === activeModel) {
+      predByGame.set(p.game_id, p);
+    }
+  }
+  const predictions = Array.from(predByGame.values());
+
+  // Per-game top Heat player (for "watch for") — sourced from the same
+  // pre-game skater snapshots the prediction model itself uses as input.
+  const { data: snapshots } = await supabaseAdmin
+    .from('game_team_snapshots')
+    .select('game_id, is_home, skater_snapshots')
+    .in('game_id', gameIds);
+
+  const topPlayerByGame = new Map<number, { playerId: number; name: string; compositePpm: number; teamAbbrev: string }>();
+  const topHeatByGameTeam = new Map<string, number>(); // `${gameId}-${isHome}` → highest compositePpm
+  for (const snap of snapshots ?? []) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const skaters = (snap.skater_snapshots as any[]) ?? [];
+    if (!skaters.length) continue;
+    const game = games.find(g => g.id === snap.game_id);
+    const teamAbbrev = snap.is_home ? game?.homeTeam?.abbrev : game?.awayTeam?.abbrev;
+    const top = [...skaters].sort((a, b) => (b.compositePpm ?? 0) - (a.compositePpm ?? 0))[0];
+    if (top) {
+      topHeatByGameTeam.set(`${snap.game_id}-${snap.is_home}`, top.compositePpm ?? 0);
+      const existing = topPlayerByGame.get(snap.game_id);
+      if (!existing || (top.compositePpm ?? 0) > existing.compositePpm) {
+        topPlayerByGame.set(snap.game_id, { playerId: top.playerId, name: top.playerName, compositePpm: top.compositePpm ?? 0, teamAbbrev: teamAbbrev ?? '' });
+      }
+    }
+  }
+
+  return { games, predictions, odds, topPlayerByGame, topHeatByGameTeam };
+}
+
 // ─── Player ───────────────────────────────────────────────────────────────────
 
 export type GoalieAgg = {
@@ -533,11 +600,11 @@ export async function fetchNightlyStoryData(date: string) {
 
 // ─── Playoff utilities ────────────────────────────────────────────────────────
 
-function isPlayoffGameId(id: number): boolean {
+export function isPlayoffGameId(id: number): boolean {
   return Math.floor(id / 10000) % 100 === 3;
 }
 
-function parsePlayoffGameId(id: number): { round: number; series: number; gameInSeries: number } {
+export function parsePlayoffGameId(id: number): { round: number; series: number; gameInSeries: number } {
   const suffix = id % 10000;
   return { round: Math.floor(suffix / 100), series: Math.floor((suffix % 100) / 10), gameInSeries: suffix % 10 };
 }
@@ -570,9 +637,15 @@ export async function fetchPlayoffActiveTeams(): Promise<Set<number>> {
   return active;
 }
 
-export async function fetchSeriesStandings(): Promise<Map<string, SeriesInfo>> {
-  const now = new Date();
-  const seasonYear = now.getMonth() < 8 ? now.getFullYear() - 1 : now.getFullYear();
+// seasonYear defaults to the current in-progress season (for the playoffs page's
+// "live bracket" view) but can be overridden — e.g. by the game detail page,
+// which needs the series for whatever season that specific game belongs to,
+// not necessarily the current one.
+export async function fetchSeriesStandings(seasonYear?: number): Promise<Map<string, SeriesInfo>> {
+  if (seasonYear === undefined) {
+    const now = new Date();
+    seasonYear = now.getMonth() < 8 ? now.getFullYear() - 1 : now.getFullYear();
+  }
   const idMin = seasonYear * 1000000 + 30000;
   const idMax = seasonYear * 1000000 + 39999;
 
@@ -984,8 +1057,8 @@ export async function fetchTeam(id: string) {
 // ─── Match ────────────────────────────────────────────────────────────────────
 
 export async function fetchMatch(id: string) {
-  // Game record, live NHL data, and model version can all start at once
-  const [{ data: game }, liveData, activeModel] = await Promise.all([
+  // Game record, live NHL data, play-by-play, and model version can all start at once
+  const [{ data: game }, liveData, rawPlayByPlay, activeModel] = await Promise.all([
     supabaseAdmin
       .from('games')
       .select(`
@@ -996,8 +1069,13 @@ export async function fetchMatch(id: string) {
       .eq('id', id)
       .single(),
     getGameBoxscore(Number(id)).catch(() => null),
+    getGamePlayByPlay(Number(id)).catch(() => null),
     latestModelVersion(),
   ]);
+
+  const homeTeamId = game?.home_team_id ?? null;
+  const awayTeamId = game?.away_team_id ?? null;
+  const gameDate = game?.game_date ?? null;
 
   // All DB reads are now independent — run in parallel
   const [
@@ -1006,6 +1084,9 @@ export async function fetchMatch(id: string) {
     { data: playerStats },
     { data: goalieStats },
     { data: externalOdds },
+    { data: headToHeadRaw },
+    { data: homeLastGame },
+    { data: awayLastGame },
   ] = await Promise.all([
     supabaseAdmin
       .from('predictions')
@@ -1030,6 +1111,42 @@ export async function fetchMatch(id: string) {
       .select('*')
       .eq('game_id', id)
       .order('fetched_at', { ascending: false }),
+    // Past meetings between these two teams, regardless of home/away side
+    homeTeamId && awayTeamId
+      ? supabaseAdmin
+          .from('games')
+          .select(`id, game_date, home_score, away_score,
+            home_team:teams!games_home_team_id_fkey ( abbrev ),
+            away_team:teams!games_away_team_id_fkey ( abbrev )`)
+          .or(`and(home_team_id.eq.${homeTeamId},away_team_id.eq.${awayTeamId}),and(home_team_id.eq.${awayTeamId},away_team_id.eq.${homeTeamId})`)
+          .in('game_state', ['FINAL', 'OFF'])
+          .neq('id', id)
+          .order('game_date', { ascending: false })
+          .limit(6)
+      : Promise.resolve({ data: [] }),
+    // Most recent prior completed game for each team — used to compute rest days
+    homeTeamId && gameDate
+      ? supabaseAdmin
+          .from('games')
+          .select('game_date')
+          .or(`home_team_id.eq.${homeTeamId},away_team_id.eq.${homeTeamId}`)
+          .in('game_state', ['FINAL', 'OFF'])
+          .lt('game_date', gameDate)
+          .order('game_date', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+    awayTeamId && gameDate
+      ? supabaseAdmin
+          .from('games')
+          .select('game_date')
+          .or(`home_team_id.eq.${awayTeamId},away_team_id.eq.${awayTeamId}`)
+          .in('game_state', ['FINAL', 'OFF'])
+          .lt('game_date', gameDate)
+          .order('game_date', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
   ]);
 
   // Sort: active model version first, fall back to most recent if active model has no prediction
@@ -1039,7 +1156,115 @@ export async function fetchMatch(id: string) {
     return 0;
   });
 
-  return { game, liveData, predictions, snapshots, playerStats, goalieStats, externalOdds };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const homeSnap = (snapshots ?? []).find((s: any) => s.is_home);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const awaySnap = (snapshots ?? []).find((s: any) => !s.is_home);
+
+  // Real goal-by-goal score progression + recent event feed — no fabricated data.
+  // Only meaningful once the game has started, but harmless (empty) otherwise.
+  const homeAbbrev = game?.home_team?.abbrev ?? '';
+  const awayAbbrev = game?.away_team?.abbrev ?? '';
+  const playByPlay = rawPlayByPlay && homeTeamId && awayTeamId
+    ? processPlayByPlay(rawPlayByPlay, homeTeamId, awayTeamId, homeAbbrev, awayAbbrev)
+    : { momentum: [], recentPlays: [] };
+
+  const dayDiff = (a: string, b: string) => Math.round(
+    (new Date(b + 'T00:00:00Z').getTime() - new Date(a + 'T00:00:00Z').getTime()) / 86_400_000
+  );
+  const restDays = {
+    home: homeLastGame?.game_date && gameDate ? dayDiff(homeLastGame.game_date, gameDate) : null,
+    away: awayLastGame?.game_date && gameDate ? dayDiff(awayLastGame.game_date, gameDate) : null,
+  };
+
+  // Season save% / GAA for the two goalies flagged pre-game by the pipeline's
+  // own goalie_snapshot (the same field that already drives the prediction model).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const homeGoalieSnap = (homeSnap?.goalie_snapshot as any) ?? null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const awayGoalieSnap = (awaySnap?.goalie_snapshot as any) ?? null;
+  const goalieIds = [homeGoalieSnap?.playerId, awayGoalieSnap?.playerId].filter((v): v is number => !!v);
+  const goalieSeasonStats = new Map<number, { savePct: number; gaa: number; gamesPlayed: number }>();
+  if (goalieIds.length) {
+    const { data: goalieGames } = await supabaseAdmin
+      .from('game_goalie_stats')
+      .select('player_id, save_pct, goals_against, toi_seconds')
+      .in('player_id', goalieIds);
+    for (const gId of goalieIds) {
+      const rows = (goalieGames ?? []).filter(r => r.player_id === gId);
+      if (!rows.length) continue;
+      const totalToi = rows.reduce((s, r) => s + (r.toi_seconds ?? 0), 0);
+      const totalGA = rows.reduce((s, r) => s + (r.goals_against ?? 0), 0);
+      const avgSavePct = rows.reduce((s, r) => s + (r.save_pct ?? 0), 0) / rows.length;
+      goalieSeasonStats.set(gId, {
+        savePct: avgSavePct,
+        gaa: totalToi > 0 ? (totalGA / totalToi) * 3600 : 0,
+        gamesPlayed: rows.length,
+      });
+    }
+  }
+
+  return {
+    game, liveData, predictions, snapshots, playerStats, goalieStats, externalOdds,
+    playByPlay, headToHead: headToHeadRaw ?? [], restDays, goalieSeasonStats,
+  };
+}
+
+// Season power play / penalty kill % — aggregated from this team's own recent
+// completed games (team_game_stats.powerPlay, already ingested as "made/opportunities").
+// Bounded to the last 20 games with data so an early-season sample doesn't get treated
+// as a full-season rate.
+export async function fetchTeamSpecialTeams(teamId: number) {
+  const { data } = await supabaseAdmin
+    .from('games')
+    .select('id, home_team_id, away_team_id, team_game_stats')
+    .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
+    .in('game_state', ['FINAL', 'OFF'])
+    .not('team_game_stats', 'is', null)
+    .order('game_date', { ascending: false })
+    .limit(20);
+
+  let ppMade = 0, ppOpp = 0, pkGoalsAgainst = 0, pkOpp = 0, gamesConsidered = 0;
+  for (const g of data ?? []) {
+    const isHome = g.home_team_id === teamId;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const stats = (g.team_game_stats as any[]) ?? [];
+    const pp = stats.find(s => s.category === 'powerPlay');
+    if (!pp) continue;
+    const ownVal = isHome ? pp.homeValue : pp.awayValue;
+    const oppVal = isHome ? pp.awayValue : pp.homeValue;
+    const [ownMade, ownOpp] = String(ownVal ?? '').split('/').map(Number);
+    const [oppMade, oppOpp] = String(oppVal ?? '').split('/').map(Number);
+    if (Number.isFinite(ownMade) && Number.isFinite(ownOpp) && ownOpp > 0) { ppMade += ownMade; ppOpp += ownOpp; }
+    if (Number.isFinite(oppMade) && Number.isFinite(oppOpp) && oppOpp > 0) { pkGoalsAgainst += oppMade; pkOpp += oppOpp; }
+    gamesConsidered++;
+  }
+
+  return {
+    gamesConsidered,
+    powerPlayPct: ppOpp > 0 ? ppMade / ppOpp : null,
+    penaltyKillPct: pkOpp > 0 ? (pkOpp - pkGoalsAgainst) / pkOpp : null,
+  };
+}
+
+// Pre-game vs. most-recent Heat for a set of players — the real basis for a
+// "who moved up / who moved down" card. Pre-game value comes from the snapshot
+// captured before puck drop (the same input the prediction model used); the
+// "moved to" value is each player's latest computed snapshot after the game.
+export async function fetchPostGameHeat(playerIds: number[]) {
+  if (!playerIds.length) return new Map<number, number>();
+  const { data } = await supabaseAdmin
+    .from('player_metric_snapshots')
+    .select('player_id, composite_ppm, calculated_at')
+    .in('player_id', playerIds)
+    .order('calculated_at', { ascending: false })
+    .limit(playerIds.length * 5);
+
+  const latest = new Map<number, number>();
+  for (const row of data ?? []) {
+    if (!latest.has(row.player_id)) latest.set(row.player_id, row.composite_ppm ?? 0);
+  }
+  return latest;
 }
 
 // ─── Pipeline Status ──────────────────────────────────────────────────────────

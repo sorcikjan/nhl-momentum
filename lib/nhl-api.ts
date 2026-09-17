@@ -74,6 +74,10 @@ export async function getGameRightRail(gameId: number) {
   return get<Record<string, unknown>>(`/gamecenter/${gameId}/right-rail`);
 }
 
+export async function getGamePlayByPlay(gameId: number) {
+  return get<Record<string, unknown>>(`/gamecenter/${gameId}/play-by-play`);
+}
+
 // ─── Team Info ────────────────────────────────────────────────────────────────
 
 export async function getTeamSeasonStats(teamAbbrev: string) {

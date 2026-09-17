@@ -1,14 +1,37 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { fetchMatch, teamLogoUrl } from '@/lib/data';
-import { teamUrl, playerUrl } from '@/lib/urls';
+import {
+  fetchMatch, fetchAccuracy, fetchRecap, fetchSeriesStandings, fetchTeamSpecialTeams,
+  fetchPostGameHeat, isPlayoffGameId, parsePlayoffGameId, teamLogoUrl,
+} from '@/lib/data';
+import { teamUrl, playerUrl, recapUrl } from '@/lib/urls';
 import { decimalToNormProb, formatBookmaker } from '@/lib/odds-api';
+import { ppmToHeat } from '@/lib/heat';
+import { periodScoresFromMomentum } from '@/lib/play-by-play';
+
+import GameHero from '@/components/games/GameHero';
+import MomentumTracker from '@/components/games/MomentumTracker';
+import RecentActionFeed from '@/components/games/RecentActionFeed';
+import WinProbabilityCard from '@/components/games/WinProbabilityCard';
+import HeatingUpCard, { type HeatPlayerRow } from '@/components/games/HeatingUpCard';
+import LiveStatsGrid from '@/components/games/LiveStatsGrid';
+import ThreeStarsRow from '@/components/games/ThreeStarsRow';
+import PredictionCard from '@/components/games/PredictionCard';
+import HeatImpactCard, { type Mover } from '@/components/games/HeatImpactCard';
+import RecapCard from '@/components/games/RecapCard';
+import HighlightsCard from '@/components/games/HighlightsCard';
+import SeriesTrackerCard from '@/components/games/SeriesTrackerCard';
+import GoalieMatchupCard from '@/components/games/GoalieMatchupCard';
+import PlayersToWatchCard from '@/components/games/PlayersToWatchCard';
+import SpecialTeamsCard from '@/components/games/SpecialTeamsCard';
+import HeadToHeadCard from '@/components/games/HeadToHeadCard';
+import LineupContextCard from '@/components/games/LineupContextCard';
 
 export const revalidate = 30;
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string; slug: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const { game } = await fetchMatch(id).catch(() => ({ game: null, liveData: null, predictions: null, snapshots: null, playerStats: null, goalieStats: null }));
+  const { game } = await fetchMatch(id).catch(() => ({ game: null }));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const away = (game?.away_team as any)?.abbrev ?? 'Away';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -33,19 +56,58 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       description: desc,
       images: [{ url: teamLogoUrl(home), width: 80, height: 80, alt: home }],
     },
-    twitter: {
-      card: 'summary',
-      title: `${awayName} vs ${homeName}`,
-      description: desc,
-    },
+    twitter: { card: 'summary', title: `${awayName} vs ${homeName}`, description: desc },
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normPlayers(teamPlayers: any, teamId: number): any[] {
+  return [
+    ...(teamPlayers?.forwards ?? []),
+    ...(teamPlayers?.defense ?? []),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ].map((p: any) => {
+    const full: string = p.name?.default ?? '';
+    const sp = full.indexOf(' ');
+    return {
+      player_id: p.playerId,
+      team_id: teamId,
+      goals: p.goals ?? 0,
+      assists: p.assists ?? 0,
+      plus_minus: p.plusMinus ?? 0,
+      players: {
+        first_name: sp > 0 ? full.slice(0, sp) : '',
+        last_name: sp > 0 ? full.slice(sp + 1) : full,
+        position_code: p.position,
+      },
+    };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }).sort((a: any, b: any) => (b.goals + b.assists) - (a.goals + a.assists));
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normGoalie(goalies: any[], teamId: number): any | null {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const g = (goalies ?? []).find((x: any) => x.starter) ?? goalies?.[0] ?? null;
+  if (!g) return null;
+  const full: string = g.name?.default ?? '';
+  const sp = full.indexOf(' ');
+  return {
+    player_id: g.playerId,
+    team_id: teamId,
+    shots_against: g.shotsAgainst ?? 0,
+    goals_against: g.goalsAgainst ?? 0,
+    save_pct: (g.shotsAgainst ?? 0) > 0 ? (g.saves ?? 0) / g.shotsAgainst : null,
+    players: { first_name: sp > 0 ? full.slice(0, sp) : '', last_name: sp > 0 ? full.slice(sp + 1) : full },
   };
 }
 
 export default async function MatchPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
   const { id } = await params;
-  const { game, liveData, predictions, snapshots, playerStats, goalieStats, externalOdds } = await fetchMatch(id);
+  const {
+    game, liveData, predictions, snapshots, playerStats, goalieStats, externalOdds,
+    playByPlay, headToHead, restDays, goalieSeasonStats,
+  } = await fetchMatch(id);
 
-  // Resolve team info from live data or DB game
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const live = liveData as any;
   const homeAbbrev: string = live?.homeTeam?.abbrev ?? game?.home_team?.abbrev ?? '?';
@@ -63,17 +125,21 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const isLive    = gameState === 'LIVE' || gameState === 'CRIT';
   const isFinal   = gameState === 'FINAL' || gameState === 'OFF';
   const gameDate  = game?.game_date ?? live?.gameDate ?? '';
+  const dateLabel = gameDate
+    ? new Date(gameDate + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : 'Scheduled';
 
   const prediction = predictions?.[0] ?? null;
   const outcome    = prediction?.prediction_outcomes?.[0] ?? null;
+  const favoredIsHome = prediction ? prediction.home_win_probability >= prediction.away_win_probability : null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const threeStars: any[] = (game as any)?.three_stars ?? [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const teamGameStats: any[] = (game as any)?.team_game_stats ?? [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const youtubeId: string | null = (game as any)?.youtube_highlight_id ?? null;
 
-  // Construct NHL.com gamecenter link
   const nhlUrl = game?.id && gameDate
     ? `https://www.nhl.com/gamecenter/${awayAbbrev.toLowerCase()}-vs-${homeAbbrev.toLowerCase()}/${gameDate.replaceAll('-', '/')}/${game.id}`
     : null;
@@ -82,206 +148,290 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const homeSnap = (snapshots ?? []).find((s: any) => s.is_home);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const awaySnap = (snapshots ?? []).find((s: any) => !s.is_home);
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const homeSkaters = (homeSnap?.skater_snapshots as any[]) ?? [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const awaySkaters = (awaySnap?.skater_snapshots as any[]) ?? [];
 
-  // Split player stats by team (DB — fallback when boxscore unavailable)
   const homeStats = (playerStats ?? []).filter((p: { team_id: number }) => p.team_id === homeId);
   const awayStats = (playerStats ?? []).filter((p: { team_id: number }) => p.team_id === awayId);
   const homeGoalie = (goalieStats ?? []).find((g: { team_id: number }) => g.team_id === homeId);
   const awayGoalie = (goalieStats ?? []).find((g: { team_id: number }) => g.team_id === awayId);
 
-  // Live boxscore stats — available for LIVE, CRIT, and FINAL games directly from the NHL API.
-  // This is the primary data source for game stats: it updates every 5 min via the fetch cache,
-  // so live games show current stats without waiting for the nightly pipeline.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const liveBoxscore = (live?.playerByGameStats as any) ?? null;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function normPlayers(teamPlayers: any, teamId: number): any[] {
-    return [
-      ...(teamPlayers?.forwards ?? []),
-      ...(teamPlayers?.defense ?? []),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ].map((p: any) => {
-      const full: string = p.name?.default ?? '';
-      const sp = full.indexOf(' ');
-      return {
-        player_id: p.playerId,
-        team_id: teamId,
-        goals: p.goals ?? 0,
-        assists: p.assists ?? 0,
-        plus_minus: p.plusMinus ?? 0,
-        players: {
-          first_name: sp > 0 ? full.slice(0, sp) : '',
-          last_name: sp > 0 ? full.slice(sp + 1) : full,
-          position_code: p.position,
-        },
-      };
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }).sort((a: any, b: any) => (b.goals + b.assists) - (a.goals + a.assists));
-  }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function normGoalie(goalies: any[], teamId: number): any | null {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const g = (goalies ?? []).find((x: any) => x.starter) ?? goalies?.[0] ?? null;
-    if (!g) return null;
-    const full: string = g.name?.default ?? '';
-    const sp = full.indexOf(' ');
-    return {
-      player_id: g.playerId,
-      team_id: teamId,
-      shots_against: g.shotsAgainst ?? 0,
-      goals_against: g.goalsAgainst ?? 0,
-      save_pct: (g.shotsAgainst ?? 0) > 0 ? (g.saves ?? 0) / g.shotsAgainst : null,
-      players: {
-        first_name: sp > 0 ? full.slice(0, sp) : '',
-        last_name: sp > 0 ? full.slice(sp + 1) : full,
-      },
-    };
-  }
-  // Normalize boxscore whenever available — used as primary source for live games
-  // and as fallback for final games where the pipeline hasn't run yet.
   const hasBoxscore = liveBoxscore != null;
   const homeBoxPlayers = hasBoxscore ? normPlayers(liveBoxscore.homeTeam, homeId) : null;
   const awayBoxPlayers = hasBoxscore ? normPlayers(liveBoxscore.awayTeam, awayId) : null;
   const homeBoxGoalie  = hasBoxscore ? normGoalie(liveBoxscore.homeTeam?.goalies ?? [], homeId) : null;
   const awayBoxGoalie  = hasBoxscore ? normGoalie(liveBoxscore.awayTeam?.goalies ?? [], awayId) : null;
 
-  return (
-    <div className="max-w-5xl mx-auto pb-20 md:pb-0">
+  // ── Period breakdown (real, from play-by-play goal sequence) ──────────────
+  const currentPeriod = live?.periodDescriptor?.number ?? (isFinal ? Math.max(3, ...playByPlay.momentum.map(m => m.period)) : 1);
+  const periodScores = (isLive || isFinal) ? periodScoresFromMomentum(playByPlay.momentum, currentPeriod) : undefined;
+  const clockLabel = isLive ? `${periodScores?.find(p => p.isCurrent)?.label ?? ''} · ${live?.clock?.timeRemaining ?? ''}`.trim() : null;
 
-      {/* Match header */}
-      <div className="rounded-xl border p-4 sm:p-6 mb-4" style={{ background: 'var(--bg-card)', borderColor: isLive ? 'var(--red)' : 'var(--border)' }}>
-        <div className="text-center text-xs mb-4 font-mono" style={{ color: isLive ? 'var(--red)' : 'var(--text)' }}>
-          {isLive ? '● LIVE' : isFinal ? 'FINAL' : `${gameDate?.slice(5)} · Scheduled`}
-          {live?.periodDescriptor?.periodType && (
-            <span className="ml-2">· P{live.periodDescriptor.number}</span>
+  // ── Heating Up Tonight / Players to Watch — top real Heat scores in this game ──
+  const heatRoster: HeatPlayerRow[] = [...awaySkaters, ...homeSkaters]
+    .map(s => ({
+      playerId: s.playerId,
+      href: playerUrl(s.playerId, ...(splitName(s.playerName))),
+      name: s.playerName,
+      teamAbbrev: awaySkaters.includes(s) ? awayAbbrev : homeAbbrev,
+      heat: ppmToHeat(s.momentumPpm ?? s.compositePpm),
+      delta: ppmToHeat(s.momentumPpm ?? s.compositePpm) - ppmToHeat(s.seasonPpm ?? s.compositePpm),
+      line: `${s.position ?? ''} · Energy ${s.energyBar ?? 100}`,
+    }))
+    .sort((a, b) => b.heat - a.heat)
+    .slice(0, 4);
+
+  function splitName(full: string): [string, string] {
+    const sp = full.indexOf(' ');
+    return sp > 0 ? [full.slice(0, sp), full.slice(sp + 1)] : [full, ''];
+  }
+
+  // ── Live stats grid (real per-game team stats, once the pipeline has captured them) ──
+  const statCategory = (cat: string) => teamGameStats.find(s => s.category === cat);
+  const liveStatsRows = (() => {
+    if (!(isLive || isFinal) || teamGameStats.length === 0) return [];
+    const rows: { label: string; away: string | number; home: string | number }[] = [];
+    const sog = statCategory('sog');
+    if (sog) rows.push({ label: 'Shots', away: sog.awayValue, home: sog.homeValue });
+    const hits = statCategory('hits');
+    if (hits) rows.push({ label: 'Hits', away: hits.awayValue, home: hits.homeValue });
+    const blocked = statCategory('blockedShots');
+    if (blocked) rows.push({ label: 'Blocks', away: blocked.awayValue, home: blocked.homeValue });
+    const fo = statCategory('faceoffWinningPctg');
+    if (fo) rows.push({ label: 'Faceoff %', away: Math.round(fo.awayValue * 100), home: Math.round(fo.homeValue * 100) });
+    const give = statCategory('giveaways');
+    if (give) rows.push({ label: 'Giveaways', away: give.awayValue, home: give.homeValue });
+    const pp = statCategory('powerPlay');
+    if (pp) rows.push({ label: 'Power play', away: pp.awayValue, home: pp.homeValue });
+    return rows;
+  })();
+
+  // ── Prediction card chips (real, derived from the model's own factor inputs) ──
+  const predictionChips: string[] = [];
+  if (prediction) {
+    const favAbbrev = favoredIsHome ? homeAbbrev : awayAbbrev;
+    const favEnergy = favoredIsHome ? prediction.home_energy_bar : prediction.away_energy_bar;
+    const oppEnergy = favoredIsHome ? prediction.away_energy_bar : prediction.home_energy_bar;
+    if (favEnergy != null && oppEnergy != null && favEnergy - oppEnergy >= 8) predictionChips.push(`${favAbbrev} energy edge`);
+    const favSos = favoredIsHome ? prediction.home_sos_multiplier : prediction.away_sos_multiplier;
+    const oppSos = favoredIsHome ? prediction.away_sos_multiplier : prediction.home_sos_multiplier;
+    if (favSos != null && oppSos != null && favSos - oppSos >= 0.1) predictionChips.push(`${favAbbrev} easier schedule`);
+    const favRoster = favoredIsHome ? homeSkaters : awaySkaters;
+    const topStar = [...favRoster].sort((a, b) => (b.compositePpm ?? 0) - (a.compositePpm ?? 0))[0];
+    if (topStar) predictionChips.push(`${topStar.playerName} Heat ${ppmToHeat(topStar.compositePpm)}`);
+  }
+
+  // ── Accuracy for the "Our Pick" card ──────────────────────────────────────
+  let accuracyYtd: number | null = null;
+  if (prediction) {
+    const accuracy = await fetchAccuracy().catch(() => null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const active = (accuracy?.modelStats as any[])?.find((m: any) => m.version === prediction.model_version);
+    accuracyYtd = active?.winnerAccuracyPct ?? null;
+  }
+
+  // ── Heat Impact (FINAL only): pre-game snapshot Heat vs. most recent Heat ──
+  let heatImpactUp: Mover[] = [];
+  let heatImpactDown: Mover[] = [];
+  if (isFinal) {
+    const allSkaters = [...awaySkaters.map(s => ({ ...s, teamAbbrev: awayAbbrev })), ...homeSkaters.map(s => ({ ...s, teamAbbrev: homeAbbrev }))];
+    const postHeat = await fetchPostGameHeat(allSkaters.map(s => s.playerId)).catch(() => new Map<number, number>());
+    const movers: Mover[] = allSkaters
+      .filter(s => postHeat.has(s.playerId))
+      .map(s => {
+        const before = ppmToHeat(s.compositePpm);
+        const after = ppmToHeat(postHeat.get(s.playerId));
+        return { playerId: s.playerId, href: playerUrl(s.playerId, ...splitName(s.playerName)), name: s.playerName, teamAbbrev: s.teamAbbrev, before, after, delta: after - before };
+      })
+      .filter(m => m.delta !== 0);
+    heatImpactUp = movers.filter(m => m.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3);
+    heatImpactDown = movers.filter(m => m.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 3);
+  }
+
+  // ── Recap (FINAL only): factual, templated from real box-score data ────────
+  let recapHeadline = '';
+  let recapBody = '';
+  let recapHref: string | null = null;
+  if (isFinal) {
+    const winnerAbbrev = (homeScore ?? 0) > (awayScore ?? 0) ? homeAbbrev : awayAbbrev;
+    const loserAbbrev = winnerAbbrev === homeAbbrev ? awayAbbrev : homeAbbrev;
+    const topStar = threeStars[0];
+    recapHeadline = topStar
+      ? `${topStar.name?.default ?? 'Top performer'} leads ${winnerAbbrev} past ${loserAbbrev}`
+      : `${winnerAbbrev} defeats ${loserAbbrev} ${Math.max(homeScore ?? 0, awayScore ?? 0)}–${Math.min(homeScore ?? 0, awayScore ?? 0)}`;
+    const statLine = topStar
+      ? topStar.position === 'G'
+        ? `${topStar.savePctg !== undefined ? (topStar.savePctg * 100).toFixed(1) + '% save percentage' : 'strong night in net'}`
+        : `${topStar.points ?? 0} points (${topStar.goals ?? 0}G ${topStar.assists ?? 0}A)`
+      : '';
+    const pp = statCategory('powerPlay');
+    const ppNote = pp ? ` Power play went ${awayAbbrev} ${pp.awayValue} and ${homeAbbrev} ${pp.homeValue}.` : '';
+    recapBody = topStar
+      ? `${topStar.name?.default} finished with ${statLine}. Final score: ${awayAbbrev} ${awayScore}–${homeScore} ${homeAbbrev}.${ppNote}`
+      : `Final score: ${awayAbbrev} ${awayScore}–${homeScore} ${homeAbbrev}.${ppNote}`;
+
+    const dailyRecap = await fetchRecap(gameDate).catch(() => null);
+    if (dailyRecap) recapHref = recapUrl(gameDate, dailyRecap.title);
+  }
+
+  // ── Series tracker (playoff games only) ────────────────────────────────────
+  let seriesInfo = null;
+  if (isPlayoffGameId(Number(id))) {
+    const gameSeasonYear = Math.floor(Number(id) / 1000000);
+    const allSeries = await fetchSeriesStandings(gameSeasonYear).catch(() => new Map());
+    const { round, series } = parsePlayoffGameId(Number(id));
+    seriesInfo = allSeries.get(`${round}-${series}`) ?? null;
+  }
+  const seriesLabel = seriesInfo ? `R${seriesInfo.round} G${(seriesInfo.seriesGames.length || 0) + (seriesInfo.isComplete ? 0 : 1)}` : null;
+
+  // ── Pregame-only context: goalie matchup, players to watch, special teams ──
+  const isUpcoming = !isLive && !isFinal;
+  type SpecialTeamsSide = { powerPlayPct: number | null; penaltyKillPct: number | null };
+  let specialTeams: { home: SpecialTeamsSide; away: SpecialTeamsSide } | null = null;
+  if (isUpcoming && homeId && awayId) {
+    const [homeST, awayST] = await Promise.all([
+      fetchTeamSpecialTeams(homeId).catch(() => ({ powerPlayPct: null, penaltyKillPct: null })),
+      fetchTeamSpecialTeams(awayId).catch(() => ({ powerPlayPct: null, penaltyKillPct: null })),
+    ]);
+    specialTeams = { home: homeST, away: awayST };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const homeGoalieSnap = (homeSnap?.goalie_snapshot as any) ?? null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const awayGoalieSnap = (awaySnap?.goalie_snapshot as any) ?? null;
+
+  const homeOutCount = homeSkaters.filter(s => s.injuryStatus).length;
+  const awayOutCount = awaySkaters.filter(s => s.injuryStatus).length;
+
+  return (
+    <div className="max-w-6xl mx-auto pb-20 md:pb-0">
+
+      <GameHero
+        state={isLive ? 'LIVE' : isFinal ? 'FINAL' : 'UPCOMING'}
+        away={{ id: awayId, abbrev: awayAbbrev, name: awayName, logo: awayLogo, score: awayScore }}
+        home={{ id: homeId, abbrev: homeAbbrev, name: homeName, logo: homeLogo, score: homeScore }}
+        periodScores={periodScores}
+        clock={clockLabel}
+        dateLabel={dateLabel}
+        seriesLabel={seriesLabel}
+        pickResult={isFinal && outcome ? (outcome.correct_winner ? 'hit' : 'miss') : null}
+        storyline={isFinal ? recapBody.split('.')[0] + '.' : null}
+        favoredIsHome={favoredIsHome}
+      />
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+        {/* ── Main column ── */}
+        <div className="lg:col-span-2 space-y-4">
+          {isLive && (
+            <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+              <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text)' }}>Momentum Tracker · Live</div>
+              <h2 className="text-lg font-bold font-editorial mb-2" style={{ color: 'var(--text-bright)' }}>Who&apos;s pushing right now.</h2>
+              <MomentumTracker momentum={playByPlay.momentum} homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev} />
+            </div>
+          )}
+
+          {isLive && (
+            <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+              <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text)' }}>Play-by-Play</div>
+              <h2 className="text-lg font-bold font-editorial mb-2" style={{ color: 'var(--text-bright)' }}>Recent action.</h2>
+              <RecentActionFeed plays={playByPlay.recentPlays} />
+            </div>
+          )}
+
+          {isFinal && (
+            <>
+              <ThreeStarsRow stars={threeStars} />
+              {prediction && (
+                <PredictionCard
+                  mode="final"
+                  favoredAbbrev={favoredIsHome ? homeAbbrev : awayAbbrev}
+                  favoredPct={Math.round(Math.max(prediction.home_win_probability, prediction.away_win_probability) * 100)}
+                  correct={outcome?.correct_winner ?? null}
+                  accuracyYtd={accuracyYtd}
+                  chips={predictionChips}
+                />
+              )}
+              <HeatImpactCard up={heatImpactUp} down={heatImpactDown} />
+            </>
+          )}
+
+          {isUpcoming && prediction && (
+            <PredictionCard
+              mode="pregame"
+              favoredAbbrev={favoredIsHome ? homeAbbrev : awayAbbrev}
+              favoredPct={Math.round(Math.max(prediction.home_win_probability, prediction.away_win_probability) * 100)}
+              accuracyYtd={accuracyYtd}
+              chips={predictionChips}
+            />
+          )}
+
+          {isUpcoming && (homeGoalieSnap || awayGoalieSnap) && (
+            <GoalieMatchupCard
+              away={{
+                name: awayGoalieSnap?.playerName ?? 'TBD',
+                abbrev: awayAbbrev,
+                savePct: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.savePct ?? awayGoalieSnap?.seasonSavePct ?? null,
+                gaa: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.gaa ?? null,
+                gamesPlayed: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.gamesPlayed ?? 0,
+              }}
+              home={{
+                name: homeGoalieSnap?.playerName ?? 'TBD',
+                abbrev: homeAbbrev,
+                savePct: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.savePct ?? homeGoalieSnap?.seasonSavePct ?? null,
+                gaa: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.gaa ?? null,
+                gamesPlayed: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.gamesPlayed ?? 0,
+              }}
+            />
+          )}
+
+          {isUpcoming && (
+            <PlayersToWatchCard
+              players={heatRoster.map(p => ({ playerId: p.playerId, href: p.href, name: p.name, teamAbbrev: p.teamAbbrev, position: p.line.split(' · ')[0] || null, heat: p.heat, line: p.line }))}
+            />
+          )}
+
+          {isUpcoming && specialTeams && (
+            <SpecialTeamsCard away={specialTeams.away} home={specialTeams.home} />
+          )}
+
+          {isUpcoming && headToHead.length > 0 && (
+            <HeadToHeadCard meetings={headToHead} homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev} />
+          )}
+
+          {isUpcoming && (
+            <LineupContextCard
+              homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev}
+              homeOutCount={homeOutCount} awayOutCount={awayOutCount}
+              restDays={restDays}
+            />
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-4">
-          {/* Away team */}
-          <Link href={awayId ? teamUrl(awayId, awayName) : '#'} className="flex flex-col items-center gap-2 flex-1 hover:opacity-80">
-            <img src={awayLogo} alt={awayAbbrev} className="w-16 h-16 object-contain" />
-            <span className="text-sm font-bold" style={{ color: 'var(--text-bright)' }}>{awayAbbrev}</span>
-            <span className="text-xs text-center leading-tight" style={{ color: 'var(--text)' }}>{awayName}</span>
-          </Link>
-
-          {/* Score */}
-          <div className="text-center flex-shrink-0">
-            {(isLive || isFinal) && homeScore !== null ? (
-              <div className="flex items-center gap-4">
-                <span className="text-4xl font-bold font-mono" style={{ color: 'var(--text-bright)' }}>{awayScore}</span>
-                <span className="text-2xl" style={{ color: 'var(--border)' }}>–</span>
-                <span className="text-4xl font-bold font-mono" style={{ color: 'var(--text-bright)' }}>{homeScore}</span>
-              </div>
-            ) : (
-              <span className="text-xl font-bold" style={{ color: 'var(--text)' }}>vs</span>
-            )}
-            {live?.clock?.timeRemaining && isLive && (
-              <div className="text-xs font-mono mt-1" style={{ color: 'var(--amber)' }}>{live.clock.timeRemaining}</div>
-            )}
-          </div>
-
-          {/* Home team */}
-          <Link href={homeId ? teamUrl(homeId, homeName) : '#'} className="flex flex-col items-center gap-2 flex-1 hover:opacity-80">
-            <img src={homeLogo} alt={homeAbbrev} className="w-16 h-16 object-contain" />
-            <span className="text-sm font-bold" style={{ color: 'var(--text-bright)' }}>{homeAbbrev}</span>
-            <span className="text-xs text-center leading-tight" style={{ color: 'var(--text)' }}>{homeName}</span>
-          </Link>
+        {/* ── Side column ── */}
+        <div className="space-y-4">
+          {heatRoster.length > 0 && (isLive || isFinal) && <HeatingUpCard players={heatRoster} />}
+          {prediction && (isLive || isFinal) && (
+            <WinProbabilityCard
+              title={isLive ? 'Live Win Probability' : 'Win Probability'}
+              homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev}
+              homeWinPct={Math.round(prediction.home_win_probability * 100)}
+              awayWinPct={Math.round(prediction.away_win_probability * 100)}
+            />
+          )}
+          {liveStatsRows.length > 0 && <LiveStatsGrid rows={liveStatsRows} awayAbbrev={awayAbbrev} homeAbbrev={homeAbbrev} />}
+          {isFinal && <RecapCard headline={recapHeadline} body={recapBody} recapHref={recapHref} />}
+          {isFinal && <HighlightsCard youtubeId={youtubeId} nhlUrl={nhlUrl} awayAbbrev={awayAbbrev} homeAbbrev={homeAbbrev} />}
+          {isFinal && seriesInfo && <SeriesTrackerCard series={seriesInfo} />}
+          {isUpcoming && seriesInfo && <SeriesTrackerCard series={seriesInfo} />}
         </div>
       </div>
 
-      {/* YouTube highlight embed — shown for completed games once NHL posts the video */}
-      {isFinal && youtubeId && (
-        <div className="rounded-xl overflow-hidden mb-4" style={{ aspectRatio: '16/9' }}>
-          <iframe
-            width="100%" height="100%"
-            src={`https://www.youtube.com/embed/${youtubeId}?rel=0&modestbranding=1`}
-            title={`${awayAbbrev} vs ${homeAbbrev} Highlights`}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-            style={{ display: 'block' }}
-          />
-        </div>
-      )}
-
-      {/* Prediction breakdown */}
-      {prediction && (
-        <div className="rounded-xl border p-4 mb-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-              Prediction · {prediction.model_version}
-            </h2>
-            {outcome && (
-              <span className="text-xs px-2 py-0.5 rounded font-semibold"
-                style={{
-                  background: outcome.correct_winner ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)',
-                  color: outcome.correct_winner ? 'var(--green)' : 'var(--red)',
-                }}>
-                {outcome.correct_winner ? '✓ Correct' : '✗ Wrong'}
-              </span>
-            )}
-          </div>
-
-          {/* xG scores */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-center">
-              <div className="text-2xl font-bold font-mono" style={{ color: 'var(--silver)' }}>
-                {prediction.predicted_away_score}
-              </div>
-              <div className="text-xs" style={{ color: 'var(--text)' }}>xG {awayAbbrev}</div>
-            </div>
-            <div className="text-xs" style={{ color: 'var(--text)' }}>Expected Score</div>
-            <div className="text-center">
-              <div className="text-2xl font-bold font-mono" style={{ color: 'var(--neon)' }}>
-                {prediction.predicted_home_score}
-              </div>
-              <div className="text-xs" style={{ color: 'var(--text)' }}>xG {homeAbbrev}</div>
-            </div>
-          </div>
-
-          {/* Win probability bar */}
-          <div className="mb-2">
-            <div className="flex justify-between text-xs mb-1" style={{ color: 'var(--text)' }}>
-              <span style={{ color: 'var(--silver)' }}>{awayAbbrev} {Math.round(prediction.away_win_probability * 100)}%</span>
-              <span style={{ color: 'var(--neon)' }}>{homeAbbrev} {Math.round(prediction.home_win_probability * 100)}%</span>
-            </div>
-            <div className="flex h-3 rounded-full overflow-hidden">
-              <div style={{ flexGrow: Math.round(prediction.away_win_probability * 1000), background: 'var(--silver)' }} />
-              <div style={{ flexGrow: Math.round(prediction.home_win_probability * 1000), background: 'var(--neon)' }} />
-            </div>
-          </div>
-
-          {/* Factor grid */}
-          <div className="grid grid-cols-2 gap-3 mt-4">
-            {[
-              { label: 'Offensive Potential', away: prediction.away_offensive_potential, home: prediction.home_offensive_potential },
-              { label: 'Defensive Filter',    away: prediction.away_defensive_filter,    home: prediction.home_defensive_filter },
-              { label: 'SOS Multiplier',      away: prediction.away_sos_multiplier,      home: prediction.home_sos_multiplier },
-              { label: 'Energy Bar',          away: prediction.away_energy_bar,           home: prediction.home_energy_bar },
-            ].map(row => (
-              <div key={row.label} className="rounded-lg p-3" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                <div className="text-xs mb-2" style={{ color: 'var(--text)' }}>{row.label}</div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-mono font-bold" style={{ color: 'var(--silver)' }}>
-                    {typeof row.away === 'number' ? row.away.toFixed(2) : row.away ?? '—'}
-                  </span>
-                  <span className="text-xs" style={{ color: 'var(--text)' }}>{awayAbbrev} / {homeAbbrev}</span>
-                  <span className="text-sm font-mono font-bold" style={{ color: 'var(--neon)' }}>
-                    {typeof row.home === 'number' ? row.home.toFixed(2) : row.home ?? '—'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Market Odds */}
+      {/* ── Market Odds (unchanged — already real, no-vig, multi-book) ── */}
       {externalOdds && externalOdds.length > 0 && (() => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const allRows = externalOdds as any[];
@@ -302,222 +452,80 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         const ProbBar = ({ a, h, opacity = 1 }: { a: number; h: number; opacity?: number }) => (
           <div className="flex h-3 rounded-full overflow-hidden" style={{ opacity }}>
             <div style={{ flexGrow: Math.round(a * 1000), background: 'var(--silver)' }} />
-            <div style={{ flexGrow: Math.round(h * 1000), background: 'var(--neon)' }} />
+            <div style={{ flexGrow: Math.round(h * 1000), background: 'var(--heat)' }} />
           </div>
         );
 
         return (
           <div className="rounded-xl border p-4 mb-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-
-            {/* Header */}
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h2 className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
-                  Betting Markets
-                </h2>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text)', opacity: 0.6 }}>
-                  For reference — {rows.length} bookmaker{rows.length !== 1 ? 's' : ''}
-                </p>
+                <h2 className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Betting Markets</h2>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text)', opacity: 0.6 }}>For reference — {rows.length} bookmaker{rows.length !== 1 ? 's' : ''}</p>
               </div>
             </div>
-
-            {/* ── Best bookmaker (full row with prob bar) ── */}
-            <div className="rounded-lg p-3 mb-3"
-              style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
+            <div className="rounded-lg p-3 mb-3" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs flex items-center gap-1.5" style={{ color: 'var(--text)' }}>
                   <span style={{ color: 'var(--amber)', opacity: 0.7 }}>◆</span>
                   {formatBookmaker(pinnacle.bookmaker)}
                   {pinnacle.bookmaker === 'pinnacle' && (
-                    <span className="font-mono px-1 rounded"
-                      style={{ background: 'var(--border)', color: 'var(--text)', fontSize: '10px' }}>
-                      sharpest
-                    </span>
+                    <span className="font-mono px-1 rounded" style={{ background: 'var(--border)', color: 'var(--text)', fontSize: '10px' }}>sharpest</span>
                   )}
                 </span>
-                <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.5 }}>
-                  hover for odds
-                </span>
+                <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.5 }}>hover for odds</span>
               </div>
               <div className="flex items-center gap-2 mb-1.5">
                 <img src={awayLogo} alt={awayAbbrev} className="w-5 h-5 object-contain flex-shrink-0" />
-                <div className="flex-1">
-                  <ProbBar a={pinA} h={pinH} opacity={0.6} />
-                </div>
+                <div className="flex-1"><ProbBar a={pinA} h={pinH} opacity={0.6} /></div>
                 <img src={homeLogo} alt={homeAbbrev} className="w-5 h-5 object-contain flex-shrink-0" />
               </div>
-              <div
-                className="flex justify-between text-xs font-mono cursor-default"
-                title={`${awayAbbrev} ${pinnacle.away_odds.toFixed(2)}${pinnacle.draw_odds ? ` · OT ${pinnacle.draw_odds.toFixed(2)}` : ''} · ${homeAbbrev} ${pinnacle.home_odds.toFixed(2)}`}
-              >
-                <span style={{ color: pinA >= pinH ? 'var(--neon)' : 'var(--text)', opacity: pinA >= pinH ? 1 : 0.4, fontWeight: pinA >= pinH ? 600 : 400 }}>{awayAbbrev} {pinA}%</span>
+              <div className="flex justify-between text-xs font-mono cursor-default"
+                title={`${awayAbbrev} ${pinnacle.away_odds.toFixed(2)}${pinnacle.draw_odds ? ` · OT ${pinnacle.draw_odds.toFixed(2)}` : ''} · ${homeAbbrev} ${pinnacle.home_odds.toFixed(2)}`}>
+                <span style={{ color: pinA >= pinH ? 'var(--heat)' : 'var(--text)', opacity: pinA >= pinH ? 1 : 0.4, fontWeight: pinA >= pinH ? 600 : 400 }}>{awayAbbrev} {pinA}%</span>
                 {pinOT > 0 && <span style={{ color: 'var(--text)', opacity: 0.5 }}>OT {pinOT}%</span>}
-                <span style={{ color: pinH > pinA ? 'var(--neon)' : 'var(--text)', opacity: pinH > pinA ? 1 : 0.4, fontWeight: pinH > pinA ? 600 : 400 }}>{homeAbbrev} {pinH}%</span>
+                <span style={{ color: pinH > pinA ? 'var(--heat)' : 'var(--text)', opacity: pinH > pinA ? 1 : 0.4, fontWeight: pinH > pinA ? 600 : 400 }}>{homeAbbrev} {pinH}%</span>
               </div>
             </div>
-
-            {/* ── Other bookmakers ── */}
             {otherBooks.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {otherBooks.map((o: any) => {
-                    const op = decimalToNormProb(o.home_odds, o.away_odds, o.draw_odds);
-                    const oH = Math.round(op.home * 100);
-                    const oA = Math.round(op.away * 100);
+                  const op = decimalToNormProb(o.home_odds, o.away_odds, o.draw_odds);
+                  const oH = Math.round(op.home * 100);
+                  const oA = Math.round(op.away * 100);
                   return (
                     <div key={o.id} className="rounded-lg p-2.5 flex flex-col gap-1 cursor-default"
                       style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}
-                      title={`${awayAbbrev} ${o.away_odds.toFixed(2)}${o.draw_odds ? ` · OT ${o.draw_odds.toFixed(2)}` : ''} · ${homeAbbrev} ${o.home_odds.toFixed(2)}`}
-                    >
-                      <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>
-                        {formatBookmaker(o.bookmaker)}
-                      </span>
+                      title={`${awayAbbrev} ${o.away_odds.toFixed(2)}${o.draw_odds ? ` · OT ${o.draw_odds.toFixed(2)}` : ''} · ${homeAbbrev} ${o.home_odds.toFixed(2)}`}>
+                      <span className="text-xs font-medium" style={{ color: 'var(--text)' }}>{formatBookmaker(o.bookmaker)}</span>
                       <div className="flex justify-between text-xs font-mono">
-                        <span style={{ color: oA >= oH ? 'var(--neon)' : 'var(--text)', opacity: oA >= oH ? 1 : 0.4, fontWeight: oA >= oH ? 600 : 400 }}>{awayAbbrev} {oA}%</span>
-                        <span style={{ color: oH > oA ? 'var(--neon)' : 'var(--text)', opacity: oH > oA ? 1 : 0.4, fontWeight: oH > oA ? 600 : 400 }}>{homeAbbrev} {oH}%</span>
+                        <span style={{ color: oA >= oH ? 'var(--heat)' : 'var(--text)', opacity: oA >= oH ? 1 : 0.4, fontWeight: oA >= oH ? 600 : 400 }}>{awayAbbrev} {oA}%</span>
+                        <span style={{ color: oH > oA ? 'var(--heat)' : 'var(--text)', opacity: oH > oA ? 1 : 0.4, fontWeight: oH > oA ? 600 : 400 }}>{homeAbbrev} {oH}%</span>
                       </div>
                     </div>
                   );
                 })}
               </div>
             )}
-
-            <p className="text-xs mt-3" style={{ color: 'var(--text)', opacity: 0.4 }}>
-              Win % removes bookmaker margin · hover for decimal odds
-            </p>
+            <p className="text-xs mt-3" style={{ color: 'var(--text)', opacity: 0.4 }}>Win % removes bookmaker margin · hover for decimal odds</p>
           </div>
         );
       })()}
 
-      {/* Three Stars — only shown for completed games with data */}
-      {isFinal && threeStars.length > 0 && (
-        <div className="rounded-xl border p-4 mb-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>Three Stars</h2>
-            {nhlUrl && !youtubeId && (
-              <a href={nhlUrl} target="_blank" rel="noopener noreferrer"
-                className="text-xs px-3 py-1 rounded-full font-medium hover:opacity-80 transition-opacity"
-                style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
-                Watch on NHL.com ↗
-              </a>
-            )}
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            {threeStars.map((star) => (
-              <a key={star.star} href={star.playerId ? `/players/${star.playerId}` : '#'}
-                className="flex flex-col items-center gap-1.5 p-2 rounded-lg hover:opacity-80 transition-opacity"
-                style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
-                <span className="text-xs font-mono" style={{ color: 'var(--amber)' }}>#{star.star} Star</span>
-                {star.headshot && (
-                  <img src={star.headshot} alt={star.name?.default ?? ''} className="w-12 h-12 rounded-full object-cover" />
-                )}
-                <span className="text-xs font-semibold text-center leading-tight" style={{ color: 'var(--text-bright)' }}>
-                  {star.name?.default ?? ''}
-                </span>
-                <span className="text-xs" style={{ color: 'var(--text)' }}>
-                  {star.position === 'G'
-                    ? `${star.savePctg !== undefined ? (star.savePctg * 100).toFixed(1) + '% SV' : ''}`
-                    : `${star.points ?? 0}pts (${star.goals ?? 0}G ${star.assists ?? 0}A)`}
-                </span>
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Team Box Score — only shown for completed games with data */}
-      {isFinal && teamGameStats.length > 0 && (
-        <div className="rounded-xl border p-4 mb-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>Team Stats</h2>
-            <div className="flex items-center gap-4 text-xs font-semibold" style={{ color: 'var(--text)' }}>
-              <span style={{ color: 'var(--silver)' }}>{awayAbbrev}</span>
-              <span style={{ color: 'var(--neon)' }}>{homeAbbrev}</span>
-            </div>
-          </div>
-          <div className="space-y-2">
-            {teamGameStats
-              .filter(s => ['sog', 'hits', 'faceoffWinningPctg', 'powerPlay', 'blockedShots', 'giveaways', 'takeaways'].includes(s.category))
-              .map((stat) => {
-                const label: Record<string, string> = {
-                  sog: 'Shots on Goal', hits: 'Hits', faceoffWinningPctg: 'Faceoff %',
-                  powerPlay: 'Power Play', blockedShots: 'Blocked Shots',
-                  giveaways: 'Giveaways', takeaways: 'Takeaways',
-                };
-                const awayVal = stat.category === 'faceoffWinningPctg'
-                  ? `${Math.round(stat.awayValue * 100)}%`
-                  : String(stat.awayValue);
-                const homeVal = stat.category === 'faceoffWinningPctg'
-                  ? `${Math.round(stat.homeValue * 100)}%`
-                  : String(stat.homeValue);
-                return (
-                  <div key={stat.category} className="flex items-center gap-3 text-xs">
-                    <span className="font-mono w-10 text-right" style={{ color: 'var(--silver)' }}>{awayVal}</span>
-                    <div className="flex-1 text-center" style={{ color: 'var(--text)' }}>{label[stat.category]}</div>
-                    <span className="font-mono w-10 text-left" style={{ color: 'var(--neon)' }}>{homeVal}</span>
-                  </div>
-                );
-              })}
-          </div>
-          {!nhlUrl && null}
-          {!threeStars.length && nhlUrl && (
-            <a href={nhlUrl} target="_blank" rel="noopener noreferrer"
-              className="mt-3 inline-block text-xs px-3 py-1 rounded-full font-medium hover:opacity-80 transition-opacity"
-              style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
-              Watch on NHL.com ↗
-            </a>
-          )}
-        </div>
-      )}
-
-      {/* NHL.com link fallback — shown for final games with no stars/stats yet */}
-      {isFinal && threeStars.length === 0 && teamGameStats.length === 0 && nhlUrl && (
-        <div className="mb-4">
-          <a href={nhlUrl} target="_blank" rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 text-xs px-4 py-2 rounded-full font-medium hover:opacity-80 transition-opacity"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text)' }}>
-            Watch highlights on NHL.com ↗
-          </a>
-        </div>
-      )}
-
-      {/* Side-by-side lineups */}
+      {/* ── Full lineups — depth on demand ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-
-        {/* Away lineup */}
         <LineupCard
-          abbrev={awayAbbrev}
-          teamName={awayName}
-          logo={awayLogo}
-          skaters={
-            isLive  ? (awayBoxPlayers ?? awaySkaters) :          // live: API always
-            isFinal ? (awayStats.length ? awayStats : (awayBoxPlayers ?? awaySkaters)) : // final: DB, fallback API
-            awaySkaters                                           // pre-game: snapshots
-          }
-          goalie={
-            isLive  ? awayBoxGoalie :
-            isFinal ? (awayGoalie ?? awayBoxGoalie) :
-            null
-          }
+          abbrev={awayAbbrev} teamName={awayName} logo={awayLogo}
+          skaters={isLive ? (awayBoxPlayers ?? awaySkaters) : isFinal ? (awayStats.length ? awayStats : (awayBoxPlayers ?? awaySkaters)) : awaySkaters}
+          goalie={isLive ? awayBoxGoalie : isFinal ? (awayGoalie ?? awayBoxGoalie) : awayGoalieSnap ? { players: { first_name: '', last_name: awayGoalieSnap.playerName }, shots_against: null, goals_against: null, save_pct: awayGoalieSnap.seasonSavePct } : null}
           isLive={isLive || isFinal}
           teamId={awayId}
         />
-
-        {/* Home lineup */}
         <LineupCard
-          abbrev={homeAbbrev}
-          teamName={homeName}
-          logo={homeLogo}
-          skaters={
-            isLive  ? (homeBoxPlayers ?? homeSkaters) :
-            isFinal ? (homeStats.length ? homeStats : (homeBoxPlayers ?? homeSkaters)) :
-            homeSkaters
-          }
-          goalie={
-            isLive  ? homeBoxGoalie :
-            isFinal ? (homeGoalie ?? homeBoxGoalie) :
-            null
-          }
+          abbrev={homeAbbrev} teamName={homeName} logo={homeLogo}
+          skaters={isLive ? (homeBoxPlayers ?? homeSkaters) : isFinal ? (homeStats.length ? homeStats : (homeBoxPlayers ?? homeSkaters)) : homeSkaters}
+          goalie={isLive ? homeBoxGoalie : isFinal ? (homeGoalie ?? homeBoxGoalie) : homeGoalieSnap ? { players: { first_name: '', last_name: homeGoalieSnap.playerName }, shots_against: null, goals_against: null, save_pct: homeGoalieSnap.seasonSavePct } : null}
           isLive={isLive || isFinal}
           teamId={homeId}
         />
@@ -543,22 +551,16 @@ function LineupCard({
 
   return (
     <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
-      <div className="px-4 py-3 border-b flex items-center gap-2"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <div className="px-4 py-3 border-b flex items-center gap-2" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
         <img src={logo} alt={abbrev} className="w-6 h-6 object-contain" />
-        <Link href={teamId ? teamUrl(teamId, teamName) : '#'} className="text-sm font-semibold hover:opacity-80" style={{ color: 'var(--text-bright)' }}>
-          {abbrev}
-        </Link>
-        <span className="text-xs" style={{ color: 'var(--text)' }}>
-          {isLive ? 'Game Stats' : 'Momentum Inputs'}
-        </span>
+        <Link href={teamId ? teamUrl(teamId, teamName) : '#'} className="text-sm font-semibold hover:opacity-80" style={{ color: 'var(--text-bright)' }}>{abbrev}</Link>
+        <span className="text-xs" style={{ color: 'var(--text)' }}>{isLive ? 'Game Stats' : 'Momentum Inputs'}</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead style={{ background: 'var(--bg-card)' }}>
             <tr>
-              <th className="px-3 py-1.5 text-left text-xs font-semibold uppercase"
-                style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>Player</th>
+              <th className="px-3 py-1.5 text-left text-xs font-semibold uppercase" style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>Player</th>
               {isLive
                 ? <>
                     <th className="px-3 py-1.5 text-right text-xs font-semibold uppercase" style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>G</th>
@@ -575,25 +577,18 @@ function LineupCard({
           </thead>
           <tbody>
             {skaters.slice(0, 12).map((p, i) => {
-              const name = isLive
-                ? `${p.players?.first_name?.[0]}. ${p.players?.last_name}`
-                : `${p.playerName ?? ''}`;
+              const name = isLive ? `${p.players?.first_name?.[0]}. ${p.players?.last_name}` : `${p.playerName ?? ''}`;
               const playerId = isLive ? p.player_id : p.playerId;
               const playerHref = isLive && p.player_id && p.players?.first_name
                 ? playerUrl(p.player_id, p.players.first_name, p.players.last_name)
                 : playerId ? `/players/${playerId}` : '#';
               return (
-                <tr key={i} className="border-t"
-                  style={{ borderColor: 'var(--border)', background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)' }}>
+                <tr key={i} className="border-t" style={{ borderColor: 'var(--border)', background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)' }}>
                   <td className="px-3 py-1.5">
-                    <Link href={playerHref}
-                      className="text-xs hover:opacity-80 flex items-center gap-1" style={{ color: 'var(--text-bright)' }}>
+                    <Link href={playerHref} className="text-xs hover:opacity-80 flex items-center gap-1" style={{ color: 'var(--text-bright)' }}>
                       {name}
                       {p.injuryStatus && (
-                        <span className="text-xs px-1 py-0.5 rounded font-bold"
-                          style={{ background: 'rgba(239,68,68,0.18)', color: 'var(--red)' }}>
-                          INJURED
-                        </span>
+                        <span className="text-xs px-1 py-0.5 rounded font-bold" style={{ background: 'rgba(239,68,68,0.18)', color: 'var(--red)' }}>INJURED</span>
                       )}
                     </Link>
                   </td>
@@ -601,20 +596,14 @@ function LineupCard({
                     ? <>
                         <td className="px-3 py-1.5 text-right font-mono text-xs" style={{ color: 'var(--text-bright)' }}>{p.goals ?? 0}</td>
                         <td className="px-3 py-1.5 text-right font-mono text-xs" style={{ color: 'var(--text-bright)' }}>{p.assists ?? 0}</td>
-                        <td className="px-3 py-1.5 text-right font-mono text-xs font-bold" style={{ color: 'var(--neon)' }}>
-                          {(p.goals ?? 0) + (p.assists ?? 0)}
-                        </td>
-                        <td className="px-3 py-1.5 text-right font-mono text-xs" style={{ color: Number(p.plus_minus) > 0 ? 'var(--green)' : Number(p.plus_minus) < 0 ? 'var(--red)' : 'var(--text)' }}>
+                        <td className="px-3 py-1.5 text-right font-mono text-xs font-bold" style={{ color: 'var(--heat)' }}>{(p.goals ?? 0) + (p.assists ?? 0)}</td>
+                        <td className="px-3 py-1.5 text-right font-mono text-xs" style={{ color: Number(p.plus_minus) > 0 ? 'var(--rise)' : Number(p.plus_minus) < 0 ? 'var(--red)' : 'var(--text)' }}>
                           {Number(p.plus_minus) > 0 ? `+${p.plus_minus}` : p.plus_minus ?? 0}
                         </td>
                       </>
                     : <>
-                        <td className="px-3 py-1.5 text-right font-mono text-xs" style={{ color: 'var(--neon)' }}>
-                          {Number(p.compositePpm ?? 0).toFixed(4)}
-                        </td>
-                        <td className="px-3 py-1.5 text-right font-mono text-xs" style={{ color: 'var(--amber)' }}>
-                          {p.energyBar ?? 100}
-                        </td>
+                        <td className="px-3 py-1.5 text-right font-mono text-xs" style={{ color: 'var(--heat)' }}>{Number(p.compositePpm ?? 0).toFixed(4)}</td>
+                        <td className="px-3 py-1.5 text-right font-mono text-xs" style={{ color: 'var(--amber)' }}>{p.energyBar ?? 100}</td>
                       </>
                   }
                 </tr>
@@ -623,17 +612,12 @@ function LineupCard({
           </tbody>
         </table>
       </div>
-
-      {/* Goalie row */}
       {goalie && (
-        <div className="px-4 py-2 border-t flex items-center justify-between"
-          style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}>
-          <span className="text-xs" style={{ color: 'var(--text)' }}>
-            G: {goalie.players?.first_name?.[0]}. {goalie.players?.last_name}
-          </span>
+        <div className="px-4 py-2 border-t flex items-center justify-between" style={{ borderColor: 'var(--border)', background: 'var(--bg-card)' }}>
+          <span className="text-xs" style={{ color: 'var(--text)' }}>G: {goalie.players?.first_name?.[0]}. {goalie.players?.last_name}</span>
           <span className="text-xs font-mono" style={{ color: 'var(--silver)' }}>
-            {goalie.shots_against - goalie.goals_against}/{goalie.shots_against} SV
-            · {goalie.save_pct ? (Number(goalie.save_pct) * 100).toFixed(1) : '—'}%
+            {goalie.shots_against != null && goalie.goals_against != null ? `${goalie.shots_against - goalie.goals_against}/${goalie.shots_against} SV · ` : ''}
+            {goalie.save_pct ? (Number(goalie.save_pct) * 100).toFixed(1) : '—'}%
           </span>
         </div>
       )}
