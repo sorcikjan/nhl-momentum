@@ -9,12 +9,12 @@ export const metadata: Metadata = {
   title: 'Last Night — NHL Stories',
   description: 'Data-driven stories from every NHL game night — top performers, momentum analytics, and how our model did.',
   openGraph: {
-    title: 'Last Night — Hockey Momentum',
+    title: 'Last Night — momentum.',
     description: 'Data-driven stories from every NHL game night — top performers, momentum analytics, and prediction accuracy.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Last Night — Hockey Momentum',
+    title: 'Last Night — momentum.',
     description: 'Data-driven stories from every NHL game night — top performers, predictions, and momentum analytics.',
   },
 };

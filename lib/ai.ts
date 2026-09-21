@@ -119,7 +119,7 @@ function buildBioPrompt(input: PlayerAIInput): string {
     ? `Drafted ${input.draftYear}, Round ${input.draftRound}, Pick #${input.draftPick}${input.draftTeam ? ` by ${input.draftTeam}` : ''}`
     : 'Undrafted';
 
-  return `You are a sports writer at Hockey Momentum profiling a player for fans who care about who a player actually is, not just their stats. Your job is to translate the numbers into a compelling portrait — their archetype, their value, their story on the ice.
+  return `You are a sports writer at Momentum profiling a player for fans who care about who a player actually is, not just their stats. Your job is to translate the numbers into a compelling portrait — their archetype, their value, their story on the ice.
 
 Player: ${input.name} (${input.team}, ${input.position})
 ${input.age ? `Age: ${input.age}` : ''}${input.birthCity ? ` · From: ${input.birthCity}, ${input.birthCountry}` : ''}
@@ -147,7 +147,7 @@ function buildPerfEvalPrompt(input: PlayerAIInput): string {
     `  ${g.date}: vs ${g.opponent} — ${g.goals}G ${g.assists}A (${sign(g.plusMinus)}), ${g.toiMin.toFixed(1)} min`
   ).join('\n');
 
-  return `You are a beat writer at Hockey Momentum. Your job is to tell fans what's actually happening with a player's form right now — not to recite numbers, but to interpret what the numbers mean. Is this player a must-watch right now, or someone to monitor from a distance?
+  return `You are a beat writer at Momentum. Your job is to tell fans what's actually happening with a player's form right now — not to recite numbers, but to interpret what the numbers mean. Is this player a must-watch right now, or someone to monitor from a distance?
 
 Player: ${input.name} (${input.team}, ${input.position})${input.rank ? ` · Currently ranked #${input.rank} globally` : ''}
 
@@ -257,7 +257,7 @@ async function _generateNightlyStories(input: NightlyStoriesInput): Promise<stri
     `  ${p.name} (${p.team}, ${p.position}): ${p.goals}G ${p.assists}A ${sign(p.plusMinus)}, ${p.toiMin.toFixed(1)} min`
   ).join('\n');
 
-  const prompt = `You are a sports writer at Hockey Momentum. Your job is to write the "last night" briefing that a hockey fan reads over their morning coffee — punchy, specific, and worth their time. These are fans who love the game and trust the data, but they want to read a story, not a spreadsheet.
+  const prompt = `You are a sports writer at Momentum. Your job is to write the "last night" briefing that a hockey fan reads over their morning coffee — punchy, specific, and worth their time. These are fans who love the game and trust the data, but they want to read a story, not a spreadsheet.
 
 Date: ${input.date}
 
@@ -368,7 +368,7 @@ export async function generateDailyRecap(input: DailyRecapInput): Promise<DailyR
     return `${g.awayTeam} ${g.awayScore} @ ${g.homeTeam} ${g.homeScore}${context ? ` [${context}]` : ''}${seriesPart}${g.predictedCorrectly !== null ? ` [model: ${g.predictedCorrectly ? '✓' : '✗'}]` : ''}${g.homeWinProbability != null ? ` [gave ${winner} ${awayWon ? ((1 - g.homeWinProbability) * 100).toFixed(0) : (g.homeWinProbability * 100).toFixed(0)}% win prob]` : ''}`;
   }).join('\n');
 
-  const prompt = `You are a senior sports writer at Hockey Momentum. Your voice is ESPN energy meets data credibility — you love the game, you trust the numbers, and you know how to make both come alive on the page. Write a daily recap article for ${input.dateLabel} that reads like real sports journalism. Not a data dump. Not a press release. A story.${newsSection}
+  const prompt = `You are a senior sports writer at Momentum. Your voice is ESPN energy meets data credibility — you love the game, you trust the numbers, and you know how to make both come alive on the page. Write a daily recap article for ${input.dateLabel} that reads like real sports journalism. Not a data dump. Not a press release. A story.${newsSection}
 
 GAMES (${input.games.length}):
 ${gameHeaders}

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   title: 'NHL Schedule & Predictions',
   description: 'Every NHL game, every AI win prediction, grouped by day — with live scores, betting-market comparisons, and who to watch.',
   openGraph: {
-    title: 'NHL Schedule & Predictions — Hockey Momentum',
+    title: 'NHL Schedule & Predictions — momentum.',
     description: 'Every NHL game with AI win predictions, live scores, and who to watch tonight.',
   },
 };

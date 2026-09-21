@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   title: 'NHL Player Rankings 2025–26',
   description: 'Full NHL player rankings — top 100 skaters by momentum score, season totals, and rolling form.',
   openGraph: {
-    title: 'NHL Player Rankings — Hockey Momentum',
+    title: 'NHL Player Rankings — momentum.',
     description: 'Top 100 NHL skaters ranked by momentum score and season performance.',
   },
   twitter: {

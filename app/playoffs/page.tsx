@@ -6,7 +6,7 @@ import { notFound } from 'next/navigation';
 export const revalidate = 120;
 
 export const metadata: Metadata = {
-  title: 'Stanley Cup Playoffs — Hockey Momentum',
+  title: 'Stanley Cup Playoffs — momentum.',
   description: 'Live NHL playoff bracket: series standings, wins, and next game schedules for all active series.',
 };
 

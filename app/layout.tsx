@@ -14,20 +14,20 @@ const siteUrl = 'https://nhl-momentum.netlify.app';
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'Hockey Momentum — Hockey Intelligence, Daily',
-    template: '%s — Hockey Momentum',
+    default: 'momentum. — Hockey Intelligence, Daily',
+    template: '%s — momentum.',
   },
   description: 'Hockey intelligence powered by AI. Daily stories, predictions and player rankings for every NHL game — updated live.',
   openGraph: {
-    siteName: 'Hockey Momentum',
+    siteName: 'momentum.',
     type: 'website',
     url: siteUrl,
-    title: 'Hockey Momentum — Hockey Intelligence, Daily',
+    title: 'momentum. — Hockey Intelligence, Daily',
     description: 'Hockey intelligence powered by AI. Daily stories, predictions and player rankings for every NHL game — updated live.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Hockey Momentum — Hockey Intelligence, Daily',
+    title: 'momentum. — Hockey Intelligence, Daily',
     description: 'Hockey intelligence powered by AI. Daily stories, predictions and player rankings — updated live.',
   },
   robots: { index: true, follow: true },

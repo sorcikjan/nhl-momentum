@@ -8,12 +8,12 @@ export const metadata: Metadata = {
   title: "Who's Hot",
   description: 'The hottest players in the NHL right now — skaters, goalies, and breakout newcomers ranked by 5-game momentum.',
   openGraph: {
-    title: "Who's Hot — Hockey Momentum",
+    title: "Who's Hot — momentum.",
     description: 'Skaters, goalies and fresh faces ranked by 5-game momentum score.',
   },
   twitter: {
     card: 'summary_large_image',
-    title: "Who's Hot — Hockey Momentum",
+    title: "Who's Hot — momentum.",
     description: 'The hottest players in the NHL right now. Updated daily.',
   },
 };

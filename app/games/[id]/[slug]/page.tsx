@@ -52,7 +52,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     title,
     description: desc,
     openGraph: {
-      title: `${awayName} vs ${homeName} — Hockey Momentum`,
+      title: `${awayName} vs ${homeName} — momentum.`,
       description: desc,
       images: [{ url: teamLogoUrl(home), width: 80, height: 80, alt: home }],
     },

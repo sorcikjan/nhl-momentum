@@ -9,12 +9,12 @@ export const metadata: Metadata = {
   title: 'NHL Teams 2025–26',
   description: 'All 32 NHL teams — roster momentum rankings, energy levels, standings, and upcoming schedule. Updated daily.',
   openGraph: {
-    title: 'NHL Teams — Hockey Momentum',
+    title: 'NHL Teams — momentum.',
     description: 'All 32 NHL teams — roster energy, top skaters by momentum, and upcoming schedule.',
   },
   twitter: {
     card: 'summary',
-    title: 'NHL Teams 2025–26 — Hockey Momentum',
+    title: 'NHL Teams 2025–26 — momentum.',
     description: 'All 32 NHL teams — roster momentum, standings, and upcoming schedule.',
   },
 };

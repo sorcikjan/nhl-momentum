@@ -20,16 +20,16 @@ import { ppmToHeat } from '@/lib/heat';
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: 'Hockey Momentum — Hockey Intelligence, Daily',
+  title: 'momentum. — Hockey Intelligence, Daily',
   description: 'Hockey intelligence powered by AI. Daily stories, predictions and player rankings for every NHL game — updated live.',
   openGraph: {
-    title: 'Hockey Momentum — Hockey Intelligence, Daily',
+    title: 'momentum. — Hockey Intelligence, Daily',
     description: 'Hockey intelligence powered by AI. Stories, predictions and rankings for every NHL game.',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Hockey Momentum — Hockey Intelligence, Daily',
+    title: 'momentum. — Hockey Intelligence, Daily',
     description: 'Hockey intelligence powered by AI. Stories, predictions and rankings — updated live.',
   },
 };
