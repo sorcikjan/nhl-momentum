@@ -255,7 +255,8 @@ export default function RecapFeed({ recaps, hideHeader = false }: { recaps: Reca
       {!hideHeader && (
         <div className="flex items-end justify-between">
           <div>
-            <h2 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05 }}>
+            <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>STORIES · LAST NIGHT</p>
+            <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.04em', lineHeight: 1.05 }}>
               <span style={{ color: 'var(--text-bright)' }}>Last </span>
               <span style={{ color: 'var(--heat)' }}>night.</span>
             </h2>

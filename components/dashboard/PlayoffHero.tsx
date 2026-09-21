@@ -387,7 +387,7 @@ export default function PlayoffHero({ seriesMap, rankings, todayGames, predMap, 
           style={{ color: 'var(--heat)' }}>
           ● STANLEY CUP PLAYOFFS · {CONF_LABELS[featured.round] ?? `ROUND ${featured.round}`} · NIGHT {gameInSeriesTonight > 7 ? 7 : gameInSeriesTonight}
         </p>
-        <h2 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontWeight: 900, fontSize: 'clamp(1.8rem, 4vw, 2.5rem)', letterSpacing: '-0.03em', lineHeight: 1.0, color: 'var(--text-bright)' }}>
+        <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: 'clamp(1.8rem, 4vw, 2.5rem)', letterSpacing: '-0.04em', lineHeight: 1.0, color: 'var(--text-bright)' }}>
           Game {gameInSeriesTonight} tonight:{' '}
           <span style={{ color: 'var(--heat)' }}>{seriesStatusLine}.</span>
         </h2>

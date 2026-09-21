@@ -228,15 +228,15 @@ export default function TonightSection({
 
   return (
     <section>
-      <div className="flex items-end justify-between mb-3">
+      <div className="flex items-end justify-between mb-5">
         <div>
-          <h2 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05 }}>
+          <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>
+            TONIGHT · {upcoming.length} GAME{upcoming.length !== 1 ? 'S' : ''}
+          </p>
+          <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.04em', lineHeight: 1.05 }}>
             <span style={{ color: 'var(--text-bright)' }}>Tonight&apos;s </span>
             <span style={{ color: 'var(--heat)' }}>slate.</span>
           </h2>
-          <p style={{ color: 'var(--silver)', opacity: 0.55, fontSize: '0.78rem', marginTop: '0.25rem' }}>
-            {upcoming.length} game{upcoming.length !== 1 ? 's' : ''} on the ice.
-          </p>
         </div>
         <a href="/games" className="text-xs font-semibold flex-shrink-0" style={{ color: 'var(--heat)' }}>
           FULL SCHEDULE →

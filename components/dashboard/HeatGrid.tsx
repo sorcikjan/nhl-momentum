@@ -390,8 +390,8 @@ function DesktopColumn({ tag, subtitle, listLink, children }: ColumnProps) {
   return (
     <div className="rounded-xl border flex flex-col" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
       <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
-        <p className="font-bold text-sm mb-0.5" style={{ color: 'var(--text-bright)' }}>{tag}</p>
-        <p className="text-xs" style={{ color: 'var(--text)', opacity: 0.5 }}>{subtitle}</p>
+        <p style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '1.125rem', letterSpacing: '-0.025em', color: 'var(--text-bright)', marginBottom: '3px' }}>{tag}</p>
+        <p style={{ fontSize: '0.6875rem', color: 'var(--text)', opacity: 0.5 }}>{subtitle}</p>
       </div>
       <div className="flex flex-col flex-1">
         {children}
@@ -437,7 +437,8 @@ export default function HeatGrid({
 
       {/* Section headline */}
       <div>
-        <h2 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05 }}>
+        <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>RANKINGS · LIVE</p>
+        <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.04em', lineHeight: 1.05 }}>
           <span style={{ color: 'var(--text-bright)' }}>Who&apos;s </span>
           <span style={{ color: 'var(--heat)' }}>burning.</span>
         </h2>

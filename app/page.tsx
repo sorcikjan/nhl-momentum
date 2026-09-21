@@ -157,7 +157,10 @@ async function LastNightSection() {
       {/* Shared header */}
       <div className="flex items-end justify-between">
         <div>
-          <h2 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05 }}>
+          <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>
+            LAST NIGHT{meta ? ` · ${meta.gameCount} GAME${meta.gameCount !== 1 ? 'S' : ''}` : ''}
+          </p>
+          <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.04em', lineHeight: 1.05 }}>
             {isStale ? (
               <span style={{ color: 'var(--text-bright)' }}>Most recent night.</span>
             ) : (
@@ -168,13 +171,15 @@ async function LastNightSection() {
             )}
           </h2>
           <p style={{ color: 'var(--silver)', opacity: 0.55, fontSize: '0.78rem', marginTop: '0.25rem' }}>
-            {dateLabel}{meta ? ` · ${meta.gameCount} game${meta.gameCount !== 1 ? 's' : ''}` : ''}
+            {dateLabel}
           </p>
         </div>
         {meta?.pct !== null && meta?.pct !== undefined && (
-          <span className="text-xs font-semibold flex-shrink-0" style={{ color: 'var(--neon)' }}>
-            WE GOT {meta.hits}/{meta.total} right · {meta.pct}%
-          </span>
+          <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg flex-shrink-0" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.625rem', color: 'var(--text)', opacity: 0.6, fontWeight: 700, letterSpacing: '0.06em' }}>WE GOT</span>
+            <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '1.375rem', color: 'var(--neon)', fontWeight: 800, letterSpacing: '-0.03em' }}>{meta.hits}/{meta.total}</span>
+            <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.625rem', color: 'var(--text)', opacity: 0.6, fontWeight: 600 }}>right · {meta.pct}%</span>
+          </div>
         )}
       </div>
 
@@ -448,7 +453,7 @@ export default function DashboardPage() {
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 md:pb-0 flex flex-col gap-8">
+    <div className="max-w-5xl mx-auto pb-20 md:pb-0 flex flex-col gap-12">
 
       {/* 0. Top banner — preseason countdown once we're within season-start window, NEW HERE? otherwise */}
       <Suspense fallback={<NewHereBanner />}>
@@ -476,13 +481,14 @@ export default function DashboardPage() {
       </Suspense>
 
       {/* 6. Explore — feature entry points */}
-      <div className="flex flex-col gap-3">
-        <p className="text-xs font-semibold tracking-widest uppercase"
-          style={{ color: 'var(--text)', opacity: 0.4 }}>Explore</p>
-        <h2 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05 }}>
-          <span style={{ color: 'var(--text-bright)' }}>More ways to </span>
-          <span style={{ color: 'var(--heat)' }}>dig in.</span>
-        </h2>
+      <div className="flex flex-col gap-4">
+        <div>
+          <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>EXPLORE</p>
+          <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.05em', lineHeight: 1.05 }}>
+            <span style={{ color: 'var(--text-bright)' }}>More ways to </span>
+            <span style={{ color: 'var(--heat)' }}>dig in.</span>
+          </h2>
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {([
             { href: '/rankings', category: 'RANKINGS', title: 'Heat Rankings', desc: "Who's playing the best hockey right now", color: 'var(--heat)' },
@@ -491,11 +497,11 @@ export default function DashboardPage() {
             { href: '/playoffs', category: 'BRACKET', title: 'Playoff Bracket', desc: 'Series standings round by round', color: 'var(--heat)' },
           ] as const).map(({ href, category, title, desc, color }) => (
             <a key={href} href={href}
-              className="rounded-xl border p-4 hover:opacity-90 transition-opacity flex flex-col gap-1"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-              <p className="text-xs font-bold tracking-widest uppercase" style={{ color, opacity: 0.7 }}>{category}</p>
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>{title}</p>
-              <p className="text-xs" style={{ color: 'var(--text)', opacity: 0.6 }}>{desc}</p>
+              className="rounded-xl border hover:opacity-90 transition-opacity flex flex-col gap-2"
+              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', padding: '20px 22px' }}>
+              <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5625rem', color, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{category}</p>
+              <p style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '1.25rem', color: 'var(--text-bright)', letterSpacing: '-0.025em' }}>{title}</p>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text)', lineHeight: 1.5 }}>{desc}</p>
             </a>
           ))}
         </div>

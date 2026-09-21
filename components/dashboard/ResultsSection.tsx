@@ -206,20 +206,22 @@ export default function ResultsSection({
   return (
     <section>
       {!hideHeader && (
-        <div className="flex items-baseline justify-between mb-3">
+        <div className="flex items-end justify-between mb-5">
           <div>
-            <h2 style={{ fontFamily: 'var(--font-fraunces), Georgia, serif', fontWeight: 900, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05 }}>
+            <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>
+              YESTERDAY · {lastNightGames.length} GAME{lastNightGames.length !== 1 ? 'S' : ''}
+            </p>
+            <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.04em', lineHeight: 1.05 }}>
               <span style={{ color: 'var(--text-bright)' }}>Results &amp; </span>
               <span style={{ color: 'var(--heat)' }}>predictions.</span>
             </h2>
-            <p style={{ color: 'var(--silver)', opacity: 0.55, fontSize: '0.78rem', marginTop: '0.25rem' }}>
-              {formatNightLabel(lastNight)} · {lastNightGames.length} game{lastNightGames.length !== 1 ? 's' : ''}
-            </p>
           </div>
           {pct !== null && (
-            <span className="text-xs font-semibold flex-shrink-0" style={{ color: 'var(--neon)' }}>
-              WE GOT {hits}/{total} right · {pct}%
-            </span>
+            <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg flex-shrink-0" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+              <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.625rem', color: 'var(--text)', opacity: 0.6, fontWeight: 700, letterSpacing: '0.06em' }}>WE GOT</span>
+              <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '1.375rem', color: 'var(--neon)', fontWeight: 800, letterSpacing: '-0.03em' }}>{hits}/{total}</span>
+              <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.625rem', color: 'var(--text)', opacity: 0.6, fontWeight: 600 }}>right · {pct}%</span>
+            </div>
           )}
         </div>
       )}
