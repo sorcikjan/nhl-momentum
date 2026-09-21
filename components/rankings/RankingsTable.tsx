@@ -80,7 +80,7 @@ function Sparkline({ values }: { values: number[] }) {
     >
       <polyline
         fill="none"
-        stroke={trending ? 'var(--heat)' : 'var(--silver)'}
+        stroke={trending ? 'var(--heat)' : 'var(--cold)'}
         strokeWidth="1.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -453,21 +453,16 @@ export default function RankingsTable({
         </div>
       </div>
 
-      {/* Show more / pagination */}
+      {/* Show more / pagination — matches the full-width secondary pattern used by
+          BreakoutWatch/CoolingOff/TodaysGames/SpotlightGames/PlayerLeaderboard */}
       {hasMore && (
-        <div className="mt-4 text-center">
-          <button
-            onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
-            className="px-6 py-3 rounded-lg text-sm font-semibold transition-all cursor-pointer"
-            style={{
-              background: 'var(--bg-card)',
-              color: 'var(--neon)',
-              border: '1px solid var(--border)',
-            }}
-          >
-            Show {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more players
-          </button>
-        </div>
+        <button
+          onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+          className="mt-4 w-full text-xs py-1.5 rounded-lg transition-opacity hover:opacity-80"
+          style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}
+        >
+          ↓ Show {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more players
+        </button>
       )}
     </div>
   );

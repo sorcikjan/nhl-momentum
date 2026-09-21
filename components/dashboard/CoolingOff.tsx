@@ -139,7 +139,7 @@ export default function CoolingOff({
       <div className="mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
         <div className="flex items-center justify-between">
           <span className="text-xs" style={{ color: 'var(--text)' }}>
-            Showing top {visible.length}
+            Showing {visible.length} biggest droppers
           </span>
           <Link href="/rankings"
             className="text-xs font-medium hover:underline"

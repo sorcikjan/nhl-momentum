@@ -5,7 +5,7 @@ import { fetchRankings, fetchSeasonPhase } from '@/lib/data';
 export const revalidate = 120;
 
 export const metadata: Metadata = {
-  title: 'NHL Player Rankings 2025–26',
+  title: 'NHL Player Rankings 2026–27',
   description: 'Full NHL player rankings — top 100 skaters by momentum score, season totals, and rolling form.',
   openGraph: {
     title: 'NHL Player Rankings — momentum.',
@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'NHL Player Rankings 2025–26',
+    title: 'NHL Player Rankings 2026–27',
     description: 'Full NHL player rankings. Updated daily.',
   },
 };
@@ -29,7 +29,16 @@ export default async function RankingsPage() {
   return (
     <div className="max-w-6xl mx-auto pb-20 md:pb-0">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-bright)' }}>Rankings</h1>
+        <h1 style={{
+          fontFamily: 'var(--font-fraunces), Georgia, serif',
+          fontWeight: 900,
+          fontSize: '1.75rem',
+          letterSpacing: '-0.025em',
+          lineHeight: 1.05,
+        }}>
+          <span style={{ color: 'var(--text-bright)' }}>The </span>
+          <span style={{ color: 'var(--heat)' }}>rankings.</span>
+        </h1>
         <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>
           Top 100 skaters by momentum score.{' '}
           <span style={{ color: 'var(--silver)' }}>Heat is 0–100.</span>

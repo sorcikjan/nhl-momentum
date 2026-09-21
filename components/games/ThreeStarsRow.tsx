@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import HeatBadge from '@/components/ui/HeatBadge';
 
 const MEDAL = { 1: '★1', 2: '★2', 3: '★3' } as const;
@@ -14,7 +15,7 @@ export default function ThreeStarsRow({ stars, heatByPlayerId }: { stars: any[];
           const medal = (star.star as 1 | 2 | 3) ?? 3;
           const heat = heatByPlayerId?.get(star.playerId) ?? null;
           return (
-            <a
+            <Link
               key={star.star}
               href={star.playerId ? `/players/${star.playerId}` : '#'}
               className="flex flex-col items-center gap-1.5 p-3 rounded-lg hover:opacity-80 transition-opacity"
@@ -33,7 +34,7 @@ export default function ThreeStarsRow({ stars, heatByPlayerId }: { stars: any[];
                   : `${star.points ?? 0}pts (${star.goals ?? 0}G ${star.assists ?? 0}A)`}
               </span>
               {heat !== null && <HeatBadge heat={heat} size="sm" />}
-            </a>
+            </Link>
           );
         })}
       </div>

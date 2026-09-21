@@ -47,10 +47,10 @@ export default function BreakoutWatch({
   return (
     <div className="rounded-xl border p-4 flex flex-col" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
       <div className="flex items-center justify-between mb-1">
-        <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--amber)' }}>
+        <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--rise)' }}>
           🔥 Breakout Watch
         </h2>
-        <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'rgba(245,158,11,0.1)', color: 'var(--amber)' }}>
+        <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--rise-glow, rgba(0,229,160,0.12))', color: 'var(--rise)' }}>
           Recent vs Season
         </span>
       </div>
@@ -106,12 +106,12 @@ export default function BreakoutWatch({
                       );
                     })()}
                   </span>
-                  <span className="text-xs font-mono font-semibold ml-2 flex-shrink-0" style={{ color: 'var(--amber)' }}>
+                  <span className="text-xs font-mono font-semibold ml-2 flex-shrink-0" style={{ color: 'var(--rise)' }}>
                     {pctAbove >= 0 ? '+' : ''}{pctAbove}% vs avg
                   </span>
                 </div>
                 <div className="w-full h-1.5 rounded-full" style={{ background: 'var(--border)' }}>
-                  <div className="h-1.5 rounded-full transition-all" style={{ width: `${barPct}%`, background: 'var(--amber)' }} />
+                  <div className="h-1.5 rounded-full transition-all" style={{ width: `${barPct}%`, background: 'var(--rise)' }} />
                 </div>
                 <div className="flex justify-between mt-1">
                   <span className="text-xs" style={{ color: 'var(--text)' }}>
@@ -143,7 +143,7 @@ export default function BreakoutWatch({
           </span>
           <Link href="/rankings"
             className="text-xs font-medium hover:underline"
-            style={{ color: 'var(--amber)' }}>
+            style={{ color: 'var(--rise)' }}>
             View full rankings →
           </Link>
         </div>
