@@ -228,10 +228,24 @@ function CompactStoryRow({ recap }: { recap: Recap }) {
 
 // ── Main RecapFeed export ─────────────────────────────────────────────────────
 
-export default function RecapFeed({ recaps, hideHeader = false }: { recaps: Recap[]; hideHeader?: boolean }) {
-  if (!recaps.length) return null;
+// A failed/truncated AI generation can leave a title with no real words (e.g. a
+// bare "{") sitting in the DB — never render one of those as a story card.
+function hasRealWords(title: string | null | undefined): boolean {
+  return (title ?? '').replace(/[^a-zA-Z]/g, '').length >= 8;
+}
 
-  const [hero, ...stories] = recaps;
+export default function RecapFeed({ recaps, hideHeader = false }: { recaps: Recap[]; hideHeader?: boolean }) {
+  const usable = recaps.filter((r: Recap) => hasRealWords(r.title));
+  if (!usable.length) return null;
+
+  // recaps can span a real gap (e.g. offseason) if there simply aren't enough
+  // rows to fill the layout — only pull secondary stories from near the hero's
+  // date so a 3-month-old playoff recap never gets presented as "last night."
+  const heroDate = new Date(`${usable[0].date}T00:00:00Z`).getTime();
+  const RECENT_WINDOW_MS = 4 * 24 * 60 * 60 * 1000;
+  const recent = usable.filter((r: Recap) => heroDate - new Date(`${r.date}T00:00:00Z`).getTime() <= RECENT_WINDOW_MS);
+
+  const [hero, ...stories] = recent;
   const secondaryStories = stories.slice(0, 3);
   const mobileExtra = stories.slice(0, 2);
 

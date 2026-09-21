@@ -453,6 +453,11 @@ Respond with valid JSON (no markdown, no code blocks):
     return -1;
   }
 
+  // A truncated or empty model response (e.g. "{" alone) parses/falls-through
+  // "successfully" but produces a title/content with no real words — reject
+  // rather than let it reach the DB and render as broken text on the site.
+  const hasRealWords = (s: string | undefined | null) => (s ?? '').replace(/[^a-zA-Z]/g, '').length >= 8;
+
   try {
     // Strip markdown code fences, then extract the outermost JSON object
     const stripped = raw.trim()
@@ -463,15 +468,17 @@ Respond with valid JSON (no markdown, no code blocks):
       ? stripped.slice(jsonStart, jsonEnd + 1)
       : stripped;
     const parsed = JSON.parse(repairJsonStrings(extracted)) as DailyRecapOutput;
-    if (!parsed.title || !parsed.content) return null;
+    if (!hasRealWords(parsed.title) || !hasRealWords(parsed.content)) return null;
     return parsed;
   } catch {
     // Fallback: treat whole response as content, stripping any code fence header
     const stripped = raw.trim()
       .replace(/^```json\s*/im, '').replace(/^```\s*/im, '').replace(/\s*```\s*$/im, '').trim();
     const lines = stripped.split('\n');
+    const title = lines[0]?.replace(/^#+\s*/, '').slice(0, 100);
+    if (!hasRealWords(title) || !hasRealWords(stripped)) return null;
     return {
-      title: lines[0]?.replace(/^#+\s*/, '').slice(0, 100) ?? `NHL Recap — ${input.dateLabel}`,
+      title: title ?? `NHL Recap — ${input.dateLabel}`,
       summary: lines[1]?.slice(0, 160) ?? '',
       content: stripped,
     };
