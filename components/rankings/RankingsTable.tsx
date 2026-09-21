@@ -1,10 +1,9 @@
 'use client';
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
-import { playerUrl, teamUrl } from '@/lib/urls';
+import { playerUrl } from '@/lib/urls';
 import { deriveOutStatus, daysAgo } from '@/lib/player-status';
-import { ppmToHeat } from '@/lib/heat';
-import HeatBadge from '@/components/ui/HeatBadge';
+import { ppmToHeat, heatColor, heatBorderColor } from '@/lib/heat';
 
 interface Player {
   player_id: number;
@@ -53,42 +52,40 @@ type SortKey =
 
 const PAGE_SIZE = 25;
 
-function Sparkline({ values }: { values: number[] }) {
+// Matches design reference: 90×28, strokeWidth 1.8, endpoint dot r=2.5
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  const W = 90, H = 28;
   if (values.length < 2) {
-    return <span className="inline-block" style={{ width: 64, height: 22 }} />;
+    return <span style={{ display: 'inline-block', width: W, height: H, flexShrink: 0 }} />;
   }
-  const W = 64;
-  const H = 22;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
+  const maxV = 100;
   const pts = values
     .map((v, i) => {
       const x = (i / (values.length - 1)) * (W - 2) + 1;
-      const y = H - 1 - ((v - min) / range) * (H - 2);
+      const y = H - 2 - ((v / maxV) * (H - 4));
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(' ');
-  const trending = values[values.length - 1] >= values[0];
+  const lastV = values[values.length - 1];
+  const lastX = W - 1;
+  const lastY = H - 2 - ((lastV / maxV) * (H - 4));
   return (
-    <svg
-      width={W}
-      height={H}
-      viewBox={`0 0 ${W} ${H}`}
-      aria-hidden="true"
-      style={{ flexShrink: 0 }}
-    >
+    <svg width={W} height={H} aria-hidden style={{ flexShrink: 0, display: 'block' }}>
       <polyline
+        points={pts}
         fill="none"
-        stroke={trending ? 'var(--heat)' : 'var(--cold)'}
-        strokeWidth="1.5"
+        stroke={color}
+        strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
-        points={pts}
       />
+      <circle cx={lastX} cy={lastY} r="2.5" fill={color} />
     </svg>
   );
 }
+
+// Desktop grid column template — matches reference: RANK PLAYER TEAM·POS G A PTS HEAT TREND Δ →
+const GRID = '56px 1fr 80px 52px 52px 60px 72px 100px 72px 32px';
 
 export default function RankingsTable({
   players,
@@ -104,11 +101,8 @@ export default function RankingsTable({
   const [search, setSearch] = useState('');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  const positions = ['ALL', 'C', 'L', 'R', 'D'];
+  const positions = ['ALL', 'C', 'L', 'R', 'D', 'G'];
 
-  // Group sparkline history by player_id.
-  // sparklineSnapshots is ordered calculated_at desc (newest first) from the query.
-  // We take up to 6 per player then reverse to get chronological order for the chart.
   const sparklineByPlayer = useMemo(() => {
     const grouped = new Map<number, number[]>();
     for (const snap of sparklineSnapshots) {
@@ -142,9 +136,7 @@ export default function RankingsTable({
             return (a.momentum_rank ?? 999) - (b.momentum_rank ?? 999);
           if (sort === 'energy_bar')
             return (b.energy_bar ?? 0) - (a.energy_bar ?? 0);
-          return (
-            ((b[sort] as number) ?? 0) - ((a[sort] as number) ?? 0)
-          );
+          return ((b[sort] as number) ?? 0) - ((a[sort] as number) ?? 0);
         }),
     [players, pos, sort, searchLower]
   );
@@ -152,73 +144,62 @@ export default function RankingsTable({
   const visible = filtered.slice(0, visibleCount);
   const hasMore = filtered.length > visibleCount;
 
-  const th = (label: string, key: SortKey, hideOnMobile = false) => (
-    <th
-      onClick={() => setSort(key)}
-      className={`px-2 md:px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider cursor-pointer select-none transition-colors${hideOnMobile ? ' hidden md:table-cell' : ''}`}
-      style={{ color: sort === key ? 'var(--neon)' : 'var(--text)' }}
-    >
-      {label} {sort === key ? '↓' : ''}
-    </th>
-  );
-
   const sortPills: { label: string; key: SortKey }[] = [
-    { label: 'Heat', key: 'momentum_rank' },
-    { label: 'G', key: 'season_goals' },
-    { label: 'A', key: 'season_assists' },
-    { label: 'PTS', key: 'season_points' },
+    { label: 'Heat',    key: 'momentum_rank' },
+    { label: 'Points',  key: 'season_points' },
+    { label: 'Goals',   key: 'season_goals' },
+    { label: 'Assists', key: 'season_assists' },
   ];
+
+  const activePill = (key: SortKey) => key === sort;
 
   return (
     <div>
-      {/* Row 1: Position filter + player count */}
-      <div className="flex gap-2 mb-3 flex-wrap items-center">
-        {positions.map(p => (
-          <button
-            key={p}
-            onClick={() => { setPos(p); setVisibleCount(PAGE_SIZE); }}
-            className="px-3 py-2.5 rounded-lg text-sm font-semibold transition-all cursor-pointer min-h-[44px]"
-            style={{
-              background: pos === p ? 'var(--neon-glow)' : 'var(--bg-card)',
-              color: pos === p ? 'var(--neon)' : 'var(--text)',
-              border: `1px solid ${pos === p ? 'var(--neon)' : 'var(--border)'}`,
-            }}
-          >
-            {p}
-          </button>
-        ))}
-        <span className="ml-auto text-xs self-center" style={{ color: 'var(--text)' }}>
-          {filtered.length} players
-        </span>
-      </div>
-
-      {/* Row 2: Search input + Sort pills */}
-      <div className="flex flex-col sm:flex-row gap-2 mb-4 items-stretch sm:items-center">
-        <input
-          type="text"
-          value={search}
-          onChange={e => {
-            setSearch(e.target.value);
-            setVisibleCount(PAGE_SIZE);
-          }}
-          placeholder="Search players…"
-          className="flex-1 rounded-lg px-3 py-2 text-sm min-h-[40px] outline-none"
-          style={{
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border)',
+      {/* ── Page header: kicker + title on left, sort pills on right ── */}
+      <div className="flex items-end justify-between mb-6">
+        <div>
+          <p style={{
+            fontFamily: 'var(--font-geist-mono), monospace',
+            fontSize: '0.69rem',
+            color: 'var(--heat)',
+            fontWeight: 700,
+            letterSpacing: '0.12em',
+            marginBottom: '0.5rem',
+            textTransform: 'uppercase',
+          }}>
+            ALL SKATERS · {filtered.length}
+          </p>
+          <h1 style={{
+            fontFamily: 'var(--font-geist-sans), sans-serif',
+            fontWeight: 800,
+            fontSize: 'clamp(2.25rem, 5vw, 2.75rem)',
+            letterSpacing: '-0.04em',
+            lineHeight: 1,
             color: 'var(--text-bright)',
-          }}
-        />
-        <div className="flex gap-1.5 flex-shrink-0 flex-wrap">
+          }}>
+            Rankings
+          </h1>
+          <p className="text-sm mt-2" style={{ color: 'var(--text)' }}>
+            Sorted by Heat. The current state of every player in one place.
+          </p>
+        </div>
+
+        {/* Sort pills — desktop only, right of title */}
+        <div className="hidden md:flex gap-2 flex-shrink-0 mb-1">
           {sortPills.map(pill => (
             <button
               key={pill.key}
               onClick={() => { setSort(pill.key); setVisibleCount(PAGE_SIZE); }}
-              className="px-3 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer min-h-[40px]"
               style={{
-                background: sort === pill.key ? 'var(--neon-glow)' : 'var(--bg-card)',
-                color: sort === pill.key ? 'var(--neon)' : 'var(--text)',
-                border: `1px solid ${sort === pill.key ? 'var(--neon)' : 'var(--border)'}`,
+                padding: '8px 14px',
+                borderRadius: 999,
+                fontSize: 12,
+                fontWeight: 600,
+                color: activePill(pill.key) ? 'var(--heat)' : 'var(--text)',
+                background: activePill(pill.key) ? 'rgba(255,90,36,0.12)' : 'var(--bg-card)',
+                border: `1px solid ${activePill(pill.key) ? 'rgba(255,90,36,0.4)' : 'var(--border)'}`,
+                cursor: 'pointer',
+                transition: 'all 0.15s',
               }}
             >
               {pill.label}
@@ -227,239 +208,377 @@ export default function RankingsTable({
         </div>
       </div>
 
-      {/* Table */}
-      <div className="rounded-xl border overflow-hidden" style={{ borderColor: 'var(--border)' }}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }}>
-              <tr>
-                <th className="w-1 p-0" />
-                <th
-                  className="px-2 md:px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider w-8 md:w-12"
-                  style={{ color: 'var(--text)' }}
-                >
-                  #
-                </th>
-                <th
-                  className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider"
-                  style={{ color: 'var(--text)' }}
-                >
-                  Player
-                </th>
-                {th('Heat', 'momentum_ppm')}
-                {th('Δ Avg', 'breakout_delta')}
-                {th('SOS', 'sos_coefficient', true)}
-                {th('Energy', 'energy_bar', true)}
-                <th
-                  className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider hidden md:table-cell"
-                  style={{ color: 'var(--text)' }}
-                >
-                  Last 5
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.map((p, i) => {
-                const name = `${p.players.first_name} ${p.players.last_name}`;
-                const delta = p.breakout_delta ?? 0;
-                const energy = p.energy_bar ?? 100;
-                const energyColor =
-                  energy >= 70
-                    ? 'var(--green)'
-                    : energy >= 40
-                    ? 'var(--amber)'
-                    : 'var(--red)';
-                const lastPlayedDaysAgo = p.last_played_date
-                  ? daysAgo(p.last_played_date)
-                  : null;
-                const outStatus = p.players.injury_status
-                  ? null
-                  : deriveOutStatus(
-                      p.consecutive_games_missed ?? null,
-                      lastPlayedDaysAgo,
-                      p.players.in_minors ?? false,
-                      seasonHasStarted
-                    );
-
-                const statusBadge = p.players.injury_status
-                  ? { label: 'INJURED',   color: 'var(--red)',   bg: 'rgba(239,68,68,0.18)' }
-                  : outStatus === 'minors'
-                  ? { label: 'MINORS',    color: 'var(--neon)',  bg: 'rgba(99,179,237,0.15)' }
-                  : outStatus === 'injured'
-                  ? { label: 'INJURED',   color: 'var(--red)',   bg: 'rgba(239,68,68,0.18)' }
-                  : outStatus === 'out'
-                  ? { label: 'OUT',       color: 'var(--amber)', bg: 'rgba(245,158,11,0.18)' }
-                  : outStatus === 'scratch'
-                  ? { label: 'SCRATCHED', color: 'var(--amber)', bg: 'rgba(245,158,11,0.18)' }
-                  : null;
-
-                const heat = ppmToHeat(p.momentum_ppm);
-                const heatStripeColor = `rgba(255,90,36,${Math.max(0.15, heat / 100).toFixed(2)})`;
-                const sparkValues = sparklineByPlayer.get(p.player_id) ?? [];
-
-                return (
-                  <tr
-                    key={p.player_id}
-                    className="border-t transition-colors"
-                    style={{
-                      borderColor: 'var(--border)',
-                      background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)',
-                    }}
-                    onMouseEnter={e =>
-                      (e.currentTarget.style.background = 'var(--bg-hover)')
-                    }
-                    onMouseLeave={e =>
-                      (e.currentTarget.style.background =
-                        i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)')
-                    }
-                  >
-                    {/* Heat stripe */}
-                    <td className="w-1 p-0">
-                      <div
-                        className="h-full min-h-[52px]"
-                        style={{ width: 5, background: heatStripeColor }}
-                      />
-                    </td>
-                    <td
-                      className="px-2 md:px-3 py-3.5 font-mono text-xs w-8 md:w-12"
-                      style={{ color: 'var(--text)' }}
-                    >
-                      {p.momentum_rank}
-                    </td>
-                    <td className="px-3 py-3.5">
-                      <Link
-                        href={playerUrl(
-                          p.player_id,
-                          p.players.first_name,
-                          p.players.last_name
-                        )}
-                        className="flex items-center gap-2 hover:opacity-80"
-                      >
-                        <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-800 flex-shrink-0">
-                          {p.players.headshot_url ? (
-                            <img
-                              src={p.players.headshot_url}
-                              alt={name}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div
-                              className="w-full h-full flex items-center justify-center text-xs"
-                              style={{ color: 'var(--text)' }}
-                            >
-                              {p.players.first_name[0]}
-                            </div>
-                          )}
-                        </div>
-                        <div>
-                          <div
-                            className="font-medium text-sm flex items-center gap-1.5 flex-wrap"
-                            style={{ color: 'var(--text-bright)' }}
-                          >
-                            {name}
-                            {statusBadge && (
-                              <span
-                                className="text-xs px-1.5 py-0.5 rounded font-bold"
-                                style={{
-                                  background: statusBadge.bg,
-                                  color: statusBadge.color,
-                                }}
-                              >
-                                {statusBadge.label}
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs" style={{ color: 'var(--text)' }}>
-                            <Link
-                              href={teamUrl(
-                                p.players.teams.id,
-                                p.players.teams.name
-                              )}
-                              className="hover:opacity-80"
-                              style={{ color: 'var(--neon)' }}
-                              onClick={e => e.stopPropagation()}
-                            >
-                              {p.players.teams.abbrev}
-                            </Link>
-                            {' · '}
-                            {p.players.position_code}
-                          </div>
-                        </div>
-                      </Link>
-                    </td>
-                    {/* Heat badge + sparkline */}
-                    <td className="px-2 py-3.5">
-                      <div className="flex items-center gap-1.5">
-                        <Sparkline values={sparkValues} />
-                        <HeatBadge heat={heat} size="sm" />
-                      </div>
-                    </td>
-                    <td
-                      className="px-2 py-3.5 font-mono text-xs md:text-sm"
-                      style={{
-                        color:
-                          delta > 0
-                            ? 'var(--heat)'
-                            : delta < 0
-                            ? 'var(--silver)'
-                            : 'var(--text)',
-                      }}
-                    >
-                      {delta > 0 ? '+' : ''}
-                      {delta > 0 || delta < 0
-                        ? `${(
-                            (delta / (p.season_ppm || 0.001)) *
-                            100
-                          ).toFixed(0)}%`
-                        : '—'}
-                    </td>
-                    <td
-                      className="px-3 py-3.5 font-mono text-xs hidden md:table-cell"
-                      style={{ color: 'var(--text)' }}
-                    >
-                      {(p.sos_coefficient ?? 1).toFixed(2)}
-                    </td>
-                    <td className="px-3 py-3.5 hidden md:table-cell">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-16 h-1.5 rounded-full"
-                          style={{ background: 'var(--border)' }}
-                        >
-                          <div
-                            className="h-1.5 rounded-full"
-                            style={{ width: `${energy}%`, background: energyColor }}
-                          />
-                        </div>
-                        <span
-                          className="text-xs font-mono"
-                          style={{ color: energyColor }}
-                        >
-                          {energy}
-                        </span>
-                      </div>
-                    </td>
-                    <td
-                      className="px-3 py-3.5 font-mono text-xs hidden md:table-cell"
-                      style={{ color: 'var(--text-bright)' }}
-                    >
-                      {p.momentum_goals}G {p.momentum_assists}A
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      {/* ── Filter row: position chips + search ── */}
+      <div className="flex gap-2 mb-4 items-center flex-wrap">
+        {positions.map(p => (
+          <button
+            key={p}
+            onClick={() => { setPos(p); setVisibleCount(PAGE_SIZE); }}
+            style={{
+              padding: '6px 14px',
+              borderRadius: 4,
+              fontFamily: 'var(--font-geist-mono), monospace',
+              fontSize: 11,
+              fontWeight: 700,
+              color: pos === p ? 'var(--heat)' : 'var(--text)',
+              background: pos === p ? 'rgba(255,90,36,0.12)' : 'var(--bg-card)',
+              border: `1px solid ${pos === p ? 'rgba(255,90,36,0.4)' : 'var(--border)'}`,
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+          >
+            {p}
+          </button>
+        ))}
+        <span className="hidden md:block flex-1" />
+        {/* Search — desktop only */}
+        <input
+          type="text"
+          value={search}
+          onChange={e => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }}
+          placeholder="Search players or teams"
+          className="hidden md:block"
+          style={{
+            padding: '6px 14px',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border)',
+            borderRadius: 4,
+            color: 'var(--text)',
+            fontSize: 12,
+            fontFamily: 'var(--font-geist-sans), sans-serif',
+            width: 240,
+            outline: 'none',
+          }}
+        />
       </div>
 
-      {/* Show more / pagination — matches the full-width secondary pattern used by
-          BreakoutWatch/CoolingOff/TodaysGames/SpotlightGames/PlayerLeaderboard */}
+      {/* Mobile sort pills */}
+      <div className="flex md:hidden gap-2 mb-4 flex-wrap">
+        {sortPills.map(pill => (
+          <button
+            key={pill.key}
+            onClick={() => { setSort(pill.key); setVisibleCount(PAGE_SIZE); }}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 999,
+              fontSize: 11,
+              fontWeight: 600,
+              color: activePill(pill.key) ? 'var(--heat)' : 'var(--text)',
+              background: activePill(pill.key) ? 'rgba(255,90,36,0.12)' : 'var(--bg-card)',
+              border: `1px solid ${activePill(pill.key) ? 'rgba(255,90,36,0.4)' : 'var(--border)'}`,
+              cursor: 'pointer',
+            }}
+          >
+            {pill.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Desktop table ── */}
+      <div
+        className="hidden md:block rounded-2xl border overflow-hidden"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+      >
+        {/* Header row */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: GRID,
+            gap: 12,
+            padding: '14px 24px',
+            fontFamily: 'var(--font-geist-mono), monospace',
+            fontSize: 10,
+            fontWeight: 700,
+            color: 'var(--text)',
+            letterSpacing: '0.1em',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+          }}
+        >
+          <span>RANK</span>
+          <span>PLAYER</span>
+          <span>TEAM · POS</span>
+          <span style={{ textAlign: 'right' }}>G</span>
+          <span style={{ textAlign: 'right' }}>A</span>
+          <span style={{ textAlign: 'right' }}>PTS</span>
+          <span style={{ textAlign: 'right' }}>HEAT</span>
+          <span>TREND (6W)</span>
+          <span style={{ textAlign: 'right' }}>Δ AVG</span>
+          <span />
+        </div>
+
+        {/* Data rows */}
+        {visible.map(p => {
+          const heat = ppmToHeat(p.momentum_ppm);
+          const seasonHeat = ppmToHeat(p.season_ppm);
+          const heatDelta = heat - seasonHeat;
+          const borderColor = heatBorderColor(heat);
+          const textCol = heatColor(heat);
+          const sparkValues = sparklineByPlayer.get(p.player_id) ?? [];
+          const name = `${p.players.first_name} ${p.players.last_name}`;
+
+          const lastPlayedDaysAgo = p.last_played_date ? daysAgo(p.last_played_date) : null;
+          const outStatus = p.players.injury_status
+            ? null
+            : deriveOutStatus(
+                p.consecutive_games_missed ?? null,
+                lastPlayedDaysAgo,
+                p.players.in_minors ?? false,
+                seasonHasStarted
+              );
+          const statusBadge = p.players.injury_status
+            ? { label: 'INJURED',   color: 'var(--red)',   bg: 'rgba(239,68,68,0.18)' }
+            : outStatus === 'minors'
+            ? { label: 'MINORS',    color: 'var(--neon)',  bg: 'rgba(99,179,237,0.15)' }
+            : outStatus === 'injured'
+            ? { label: 'INJURED',   color: 'var(--red)',   bg: 'rgba(239,68,68,0.18)' }
+            : outStatus === 'out'
+            ? { label: 'OUT',       color: 'var(--amber)', bg: 'rgba(245,158,11,0.18)' }
+            : outStatus === 'scratch'
+            ? { label: 'SCRATCHED', color: 'var(--amber)', bg: 'rgba(245,158,11,0.18)' }
+            : null;
+
+          return (
+            <Link
+              key={p.player_id}
+              href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
+              className="hover:opacity-80 transition-opacity"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: GRID,
+                gap: 12,
+                padding: '14px 24px',
+                alignItems: 'center',
+                borderTop: '1px solid rgba(255,255,255,0.05)',
+                borderLeft: `3px solid ${borderColor}`,
+                textDecoration: 'none',
+              }}
+            >
+              {/* Rank */}
+              <span style={{
+                fontFamily: 'var(--font-geist-mono), monospace',
+                fontSize: 14,
+                fontWeight: 700,
+                color: 'var(--text-bright)',
+              }}>
+                {p.momentum_rank}
+              </span>
+
+              {/* Player */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 14,
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  overflow: 'hidden',
+                  flexShrink: 0,
+                }}>
+                  {p.players.headshot_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.players.headshot_url}
+                      alt={name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div style={{
+                      width: '100%', height: '100%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 10, color: 'var(--text)',
+                    }}>
+                      {p.players.first_name[0]}
+                    </div>
+                  )}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{
+                    fontWeight: 700, fontSize: 14, color: 'var(--text-bright)',
+                    display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+                  }}>
+                    {name}
+                    {statusBadge && (
+                      <span style={{
+                        fontSize: 9, padding: '2px 6px', borderRadius: 3, fontWeight: 700,
+                        background: statusBadge.bg, color: statusBadge.color,
+                        letterSpacing: '0.05em', flexShrink: 0,
+                      }}>
+                        {statusBadge.label}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Team · Pos */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`https://assets.nhle.com/logos/nhl/svg/${p.players.teams.abbrev}_light.svg`}
+                  alt={p.players.teams.abbrev}
+                  style={{ width: 22, height: 22, flexShrink: 0 }}
+                />
+                <span style={{
+                  fontFamily: 'var(--font-geist-mono), monospace',
+                  fontSize: 10,
+                  color: 'var(--text)',
+                }}>
+                  {p.players.position_code}
+                </span>
+              </div>
+
+              {/* G */}
+              <span style={{
+                fontFamily: 'var(--font-geist-mono), monospace',
+                fontSize: 13, color: 'var(--text)', textAlign: 'right',
+              }}>
+                {p.season_goals ?? '—'}
+              </span>
+
+              {/* A */}
+              <span style={{
+                fontFamily: 'var(--font-geist-mono), monospace',
+                fontSize: 13, color: 'var(--text)', textAlign: 'right',
+              }}>
+                {p.season_assists ?? '—'}
+              </span>
+
+              {/* PTS */}
+              <span style={{
+                fontFamily: 'var(--font-geist-mono), monospace',
+                fontSize: 13, fontWeight: 700,
+                color: 'var(--text-bright)', textAlign: 'right',
+              }}>
+                {p.season_points ?? '—'}
+              </span>
+
+              {/* Heat pill */}
+              <div style={{ textAlign: 'right' }}>
+                <span style={{
+                  fontFamily: 'var(--font-geist-mono), monospace',
+                  fontSize: 13, fontWeight: 800,
+                  color: textCol,
+                  padding: '3px 8px',
+                  borderRadius: 4,
+                  background: `${borderColor}18`,
+                  border: `1px solid ${borderColor}55`,
+                }}>
+                  {heat}
+                </span>
+              </div>
+
+              {/* Sparkline */}
+              <Sparkline values={sparkValues} color={borderColor} />
+
+              {/* Δ AVG */}
+              <span style={{
+                fontFamily: 'var(--font-geist-mono), monospace',
+                fontSize: 12, fontWeight: 700,
+                color: heatDelta > 0
+                  ? 'var(--rise)'
+                  : heatDelta < 0
+                  ? 'var(--red)'
+                  : 'var(--text)',
+                textAlign: 'right',
+              }}>
+                {heatDelta > 0 ? '+' : ''}{heatDelta}
+              </span>
+
+              {/* Arrow */}
+              <span style={{ color: 'var(--text)', fontSize: 18, textAlign: 'right' }}>›</span>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* ── Mobile list ── */}
+      <div className="md:hidden flex flex-col gap-1.5">
+        {visible.map(p => {
+          const heat = ppmToHeat(p.momentum_ppm);
+          const seasonHeat = ppmToHeat(p.season_ppm);
+          const heatDelta = heat - seasonHeat;
+          const borderColor = heatBorderColor(heat);
+          const textCol = heatColor(heat);
+          const up = heatDelta >= 0;
+
+          return (
+            <Link
+              key={p.player_id}
+              href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '12px',
+                background: 'var(--bg-card)',
+                borderRadius: 10,
+                border: '1px solid rgba(255,255,255,0.06)',
+                borderLeft: `3px solid ${borderColor}`,
+                textDecoration: 'none',
+              }}
+            >
+              {/* Rank */}
+              <span style={{
+                width: 22, flexShrink: 0,
+                fontFamily: 'var(--font-geist-mono), monospace',
+                fontSize: 13, fontWeight: 700,
+                color: 'var(--text-bright)',
+              }}>
+                {p.momentum_rank}
+              </span>
+
+              {/* Team logo */}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`https://assets.nhle.com/logos/nhl/svg/${p.players.teams.abbrev}_light.svg`}
+                alt={p.players.teams.abbrev}
+                style={{ width: 26, height: 26, flexShrink: 0 }}
+              />
+
+              {/* Name + sub */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-bright)' }}>
+                  {p.players.last_name}
+                </div>
+                <div style={{
+                  fontFamily: 'var(--font-geist-mono), monospace',
+                  fontSize: 10, color: 'var(--text)',
+                }}>
+                  {p.season_points ?? 0} pts · {heatDelta > 0 ? '+' : ''}{heatDelta}
+                  <span style={{ color: up ? 'var(--rise)' : 'var(--red)', marginLeft: 4 }}>
+                    {up ? '↑' : '↓'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Heat pill */}
+              <span style={{
+                fontFamily: 'var(--font-geist-mono), monospace',
+                fontSize: 11, fontWeight: 800,
+                color: textCol,
+                padding: '3px 8px',
+                borderRadius: 4,
+                background: `${borderColor}18`,
+                border: `1px solid ${borderColor}55`,
+                flexShrink: 0,
+              }}>
+                {heat}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Pagination */}
       {hasMore && (
         <button
           onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
           className="mt-4 w-full text-xs py-1.5 rounded-lg transition-opacity hover:opacity-80"
-          style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}
+          style={{
+            background: 'var(--bg)',
+            border: '1px solid var(--border)',
+            color: 'var(--text)',
+            cursor: 'pointer',
+          }}
         >
           ↓ Show {Math.min(PAGE_SIZE, filtered.length - visibleCount)} more players
         </button>

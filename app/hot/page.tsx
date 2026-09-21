@@ -68,17 +68,16 @@ export default async function HotPage() {
         <h1 style={{
           fontFamily: 'var(--font-geist-sans), sans-serif',
           fontWeight: 800,
-          fontSize: 'clamp(1.75rem, 5vw, 2.75rem)',
+          fontSize: 'clamp(1.875rem, 5vw, 2.75rem)',
           letterSpacing: '-0.04em',
           lineHeight: 1,
           color: 'var(--text-bright)',
         }}>
-          <span>Burning </span>
-          <span style={{ color: 'var(--heat)' }}>right now.</span>
+          <span style={{ color: 'var(--heat)' }}>Burning </span>
+          <span>right now.</span>
         </h1>
         <p className="text-sm mt-2" style={{ color: 'var(--text)' }}>
-          Last 5 games vs season average — higher = hotter.{' '}
-          <span style={{ color: 'var(--silver)' }}>Heat is 0–100.</span>
+          Players above their season pace. Updated every hour.
         </p>
       </div>
 
@@ -95,16 +94,16 @@ export default async function HotPage() {
               href={playerUrl(hero.player_id, hero.players.first_name, hero.players.last_name)}
               className="relative rounded-2xl block hover:opacity-95 transition-opacity overflow-hidden"
               style={{
-                background: `linear-gradient(155deg, ${heatBg(heroHeat)}cc 0%, var(--bg-card) 55%)`,
+                background: `linear-gradient(155deg, ${heatBg(heroHeat)}cc 0%, var(--bg-card) 50%)`,
                 border: `1px solid ${heatBorderColor(heroHeat)}`,
-                boxShadow: `0 0 40px rgba(255,90,36,0.12)`,
-                padding: 28,
+                boxShadow: `0 0 40px rgba(255,90,36,0.18)`,
+                padding: 32,
               }}
             >
               {/* #1 badge */}
               <div
                 style={{
-                  position: 'absolute', top: 18, right: 18,
+                  position: 'absolute', top: 24, right: 24,
                   fontFamily: 'var(--font-geist-mono), monospace',
                   fontSize: '0.625rem', color: 'var(--heat)', fontWeight: 700,
                   letterSpacing: '0.12em', padding: '4px 10px',
@@ -120,7 +119,7 @@ export default async function HotPage() {
               <img
                 src={`https://assets.nhle.com/logos/nhl/svg/${hero.players.teams.abbrev}_light.svg`}
                 alt={hero.players.teams.abbrev}
-                style={{ width: 40, height: 40 }}
+                style={{ width: 42, height: 42 }}
               />
 
               {/* Player name */}
@@ -128,11 +127,11 @@ export default async function HotPage() {
                 style={{
                   fontFamily: 'var(--font-geist-sans), sans-serif',
                   fontWeight: 800,
-                  fontSize: 'clamp(2rem, 4vw, 3rem)',
-                  letterSpacing: '-0.04em',
+                  fontSize: 'clamp(2.5rem, 4vw, 3.5rem)',
+                  letterSpacing: '-0.05em',
                   lineHeight: 1,
-                  marginTop: 16,
-                  marginBottom: 6,
+                  marginTop: 18,
+                  marginBottom: 8,
                 }}
               >
                 <span style={{ color: 'var(--text-bright)' }}>
@@ -144,7 +143,7 @@ export default async function HotPage() {
               </div>
 
               {/* Position + team */}
-              <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 22 }}>
+              <div style={{ fontSize: 13, color: 'var(--text)', marginBottom: 24 }}>
                 {hero.players.position_code} · {hero.players.teams.abbrev}
               </div>
 
@@ -174,28 +173,37 @@ export default async function HotPage() {
               >
                 RANKED 2–9
               </p>
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 {restSkaters.map((p, i) => {
                   const ph = ppmToHeat(p.momentum_ppm);
+                  const bc = heatBorderColor(ph);
+                  const recentSub = p.momentum_goals != null
+                    ? `${p.momentum_goals}G · ${p.momentum_assists}A L5`
+                    : null;
                   return (
                     <Link
                       key={p.player_id}
                       href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:opacity-80 transition-opacity"
+                      className="hover:opacity-80 transition-opacity"
                       style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: '11px 14px',
                         background: 'var(--bg-card)',
-                        border: `1px solid var(--border)`,
-                        borderLeft: `3px solid ${heatBorderColor(ph)}`,
+                        borderRadius: 10,
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        borderLeft: `3px solid ${bc}`,
+                        textDecoration: 'none',
                       }}
                     >
                       <span
                         style={{
-                          width: 18,
+                          width: 18, flexShrink: 0,
                           fontFamily: 'var(--font-geist-mono), monospace',
-                          fontSize: '0.69rem',
+                          fontSize: 11,
                           color: 'var(--text)',
                           fontWeight: 700,
-                          flexShrink: 0,
                         }}
                       >
                         {i + 2}
@@ -204,20 +212,26 @@ export default async function HotPage() {
                       <img
                         src={`https://assets.nhle.com/logos/nhl/svg/${p.players.teams.abbrev}_light.svg`}
                         alt={p.players.teams.abbrev}
-                        style={{ width: 24, height: 24, flexShrink: 0 }}
+                        style={{ width: 26, height: 26, flexShrink: 0 }}
                       />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-bright)', lineHeight: 1.2 }}>
+                          {p.players.first_name[0]}. {p.players.last_name}
+                        </div>
+                        {recentSub && (
+                          <div style={{ fontSize: 11, color: 'var(--text)' }}>{recentSub}</div>
+                        )}
+                      </div>
                       <span
-                        className="flex-1 truncate text-sm font-semibold"
-                        style={{ color: 'var(--text-bright)' }}
-                      >
-                        {p.players.first_name[0]}. {p.players.last_name}
-                      </span>
-                      <span
-                        className="text-xs font-mono font-bold px-1.5 py-0.5 rounded"
                         style={{
-                          background: `rgba(255,90,36,${Math.max(0.08, ph / 500).toFixed(2)})`,
+                          fontFamily: 'var(--font-geist-mono), monospace',
+                          fontSize: 13, fontWeight: 800,
                           color: heatColor(ph),
-                          border: `1px solid ${heatBorderColor(ph)}`,
+                          padding: '3px 8px',
+                          borderRadius: 4,
+                          background: `${bc}18`,
+                          border: `1px solid ${bc}55`,
+                          flexShrink: 0,
                         }}
                       >
                         {ph}
@@ -229,7 +243,7 @@ export default async function HotPage() {
             </div>
           </div>
 
-          {/* Mobile: hero card only (HeatGrid below covers the rest) */}
+          {/* Mobile: hero card only */}
           <div className="md:hidden">
             <Link
               href={playerUrl(hero.player_id, hero.players.first_name, hero.players.last_name)}
@@ -237,7 +251,7 @@ export default async function HotPage() {
               style={{
                 background: `linear-gradient(155deg, ${heatBg(heroHeat)}cc 0%, var(--bg-card) 60%)`,
                 border: `1px solid ${heatBorderColor(heroHeat)}`,
-                boxShadow: `0 0 20px rgba(255,90,36,0.13)`,
+                boxShadow: `0 0 20px rgba(255,90,36,0.18)`,
                 padding: 18,
               }}
             >
@@ -245,7 +259,7 @@ export default async function HotPage() {
                 <span
                   style={{
                     fontFamily: 'var(--font-geist-mono), monospace',
-                    fontSize: '0.625rem',
+                    fontSize: 9,
                     color: 'var(--heat)',
                     fontWeight: 700,
                     letterSpacing: '0.12em',
@@ -269,7 +283,7 @@ export default async function HotPage() {
                 style={{
                   fontFamily: 'var(--font-geist-sans), sans-serif',
                   fontWeight: 800,
-                  fontSize: '1.875rem',
+                  fontSize: 30,
                   letterSpacing: '-0.04em',
                   lineHeight: 1,
                   marginBottom: 4,
@@ -288,7 +302,7 @@ export default async function HotPage() {
               </div>
 
               <div className="flex items-center gap-4">
-                <HeatCircle heat={heroHeat} size={72} label="HEAT" />
+                <HeatCircle heat={heroHeat} size={70} label="HEAT" />
                 <p style={{ flex: 1, fontSize: 12, color: 'var(--text)', lineHeight: 1.5 }}>
                   {heroSurge !== null && heroSurge > 0
                     ? `${heroSurge}% above season pace. Heat score ${heroHeat}.`
@@ -303,11 +317,12 @@ export default async function HotPage() {
       <HeatGrid
         skaters={skaters}
         goalies={goalies}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         newcomers={newcomers as any[]}
         limit={16}
       />
 
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="mt-8 flex flex-col gap-6">
         <BreakoutWatch
           players={breakoutPlayers}
           lastUpdated={lastUpdated}
