@@ -1,0 +1,56 @@
+import type { Metadata } from 'next';
+import { Geist, Geist_Mono } from 'next/font/google';
+import Script from 'next/script';
+import './globals.css';
+import Sidebar from '@/components/layout/Sidebar';
+
+const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
+const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
+
+const siteUrl = 'https://nhl-momentum.netlify.app';
+
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: 'NHL Momentum',
+    template: '%s — NHL Momentum',
+  },
+  description: 'Real-time NHL momentum analytics, game predictions, and player rankings powered by a rolling 5-game model.',
+  openGraph: {
+    siteName: 'NHL Momentum',
+    type: 'website',
+    url: siteUrl,
+    title: 'NHL Momentum',
+    description: 'Real-time NHL momentum analytics, game predictions, and player rankings powered by a rolling 5-game model.',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'NHL Momentum',
+    description: 'Real-time NHL momentum analytics and game predictions.',
+  },
+  robots: { index: true, follow: true },
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" className="dark">
+      <head>
+        <Script async src="https://www.googletagmanager.com/gtag/js?id=G-Z7EWZE1NGP" strategy="afterInteractive" />
+        <Script id="gtag-init" strategy="afterInteractive">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-Z7EWZE1NGP');
+        `}</Script>
+      </head>
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}>
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <main className="flex-1 ml-0 md:ml-56 p-4 md:p-6">
+            {children}
+          </main>
+        </div>
+      </body>
+    </html>
+  );
+}
