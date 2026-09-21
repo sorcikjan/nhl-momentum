@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import HeatGrid from '@/components/dashboard/HeatGrid';
 import BreakoutWatch from '@/components/dashboard/BreakoutWatch';
 import CoolingOff from '@/components/dashboard/CoolingOff';
-import { fetchRankings, fetchGoalieRankings, fetchNewcomerWatch } from '@/lib/data';
+import { fetchRankings, fetchGoalieRankings, fetchNewcomerWatch, fetchSeasonPhase } from '@/lib/data';
 
 export const revalidate = 120;
 
@@ -21,11 +21,13 @@ export const metadata: Metadata = {
 };
 
 export default async function HotPage() {
-  const [data, goalies, newcomers] = await Promise.all([
+  const [data, goalies, newcomers, seasonPhase] = await Promise.all([
     fetchRankings().catch(() => null),
     fetchGoalieRankings().catch(() => []),
     fetchNewcomerWatch().catch(() => []),
+    fetchSeasonPhase().catch(() => ({ isPreseason: false })),
   ]);
+  const seasonHasStarted = !seasonPhase.isPreseason;
 
   const skaters = data?.momentumLeaders?.skaters ?? [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -68,10 +70,12 @@ export default async function HotPage() {
         <BreakoutWatch
           players={breakoutPlayers}
           lastUpdated={lastUpdated}
+          seasonHasStarted={seasonHasStarted}
         />
         <CoolingOff
           players={coolingPlayers}
           lastUpdated={lastUpdated}
+          seasonHasStarted={seasonHasStarted}
         />
       </div>
     </div>
