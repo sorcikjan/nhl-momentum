@@ -18,7 +18,7 @@ export default function PredictionCard({
   return (
     <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
+        <span className="text-xs font-mono font-bold uppercase tracking-widest" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>
           {mode === 'pregame' ? 'Our Pick' : 'Our Pick · How It Played'}
         </span>
         {mode === 'final' && correct != null && (
@@ -32,7 +32,7 @@ export default function PredictionCard({
       </div>
 
       <div className="flex items-center gap-3 mb-3">
-        <span className="text-3xl font-bold font-editorial" style={{ color: 'var(--heat)' }}>{favoredPct}%</span>
+        <span className="font-mono font-bold" style={{ fontSize: '2rem', color: 'var(--heat)', letterSpacing: '-0.02em' }}>{favoredPct}%</span>
         <span className="text-sm" style={{ color: 'var(--text-bright)' }}>
           {favoredAbbrev} {mode === 'pregame' ? 'to win' : correct ? 'won — the model called it' : 'was favored'}
         </span>
@@ -48,7 +48,7 @@ export default function PredictionCard({
 
       {factors && factors.length > 0 && (
         <div className="mb-3 rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
-          <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+          <div className="px-3 py-1.5 text-xs font-mono font-bold uppercase tracking-widest" style={{ background: 'var(--bg)', color: 'var(--text)', opacity: 0.7, letterSpacing: '0.08em' }}>
             Why {awayAbbrev && homeAbbrev ? `${awayAbbrev} @ ${homeAbbrev}` : ''}
           </div>
           {factors.map(f => {

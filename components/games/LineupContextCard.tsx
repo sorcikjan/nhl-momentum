@@ -26,7 +26,7 @@ export default function LineupContextCard({
 }) {
   return (
     <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text)' }}>Lineup & Context</div>
+      <div className="text-xs font-mono font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Lineup & Context</div>
       <LineupRow abbrev={awayAbbrev} outCount={awayOutCount} />
       <LineupRow abbrev={homeAbbrev} outCount={homeOutCount} />
       {(restDays.home != null || restDays.away != null) && (

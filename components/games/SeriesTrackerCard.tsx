@@ -7,8 +7,8 @@ export default function SeriesTrackerCard({ series }: { series: SeriesInfo }) {
 
   return (
     <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text)' }}>Series Now</div>
-      <div className="text-xl font-bold font-editorial mb-1" style={{ color: 'var(--text-bright)' }}>
+      <div className="text-xs font-mono font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Series Now</div>
+      <div className="font-sans font-extrabold mb-1" style={{ fontSize: '1.35rem', color: 'var(--text-bright)', letterSpacing: '-0.04em' }}>
         {series.awayTeam.abbrev} {series.awayWins} — {series.homeWins} {series.homeTeam.abbrev}
       </div>
       {!series.isComplete && leaderWins > 0 && (

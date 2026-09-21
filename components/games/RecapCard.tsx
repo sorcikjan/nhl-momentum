@@ -9,8 +9,8 @@ export default function RecapCard({
 }) {
   return (
     <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--heat)' }}>Recap</div>
-      <h3 className="text-base font-bold font-editorial leading-snug mb-2" style={{ color: 'var(--text-bright)' }}>{headline}</h3>
+      <div className="text-xs font-mono font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Recap</div>
+      <h3 className="font-sans font-extrabold leading-snug mb-2" style={{ fontSize: '1rem', color: 'var(--text-bright)', letterSpacing: '-0.02em' }}>{headline}</h3>
       <p className="text-sm leading-relaxed mb-3" style={{ color: 'var(--text)' }}>{body}</p>
       {recapHref && (
         <Link href={recapHref} className="text-xs font-semibold hover:opacity-80" style={{ color: 'var(--heat)' }}>

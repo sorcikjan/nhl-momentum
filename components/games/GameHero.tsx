@@ -43,9 +43,6 @@ export default function GameHero({
 }) {
   const isLive = state === 'LIVE';
   const isFinal = state === 'FINAL';
-  const glowColor = favoredIsHome === null || favoredIsHome === undefined
-    ? 'transparent'
-    : favoredIsHome ? 'var(--heat-glow)' : 'var(--cold-glow)';
 
   return (
     <div
@@ -53,84 +50,175 @@ export default function GameHero({
       style={{
         borderColor: isLive ? 'var(--heat)' : 'var(--border)',
         background: isLive
-          ? `linear-gradient(120deg, var(--cold-glow), var(--bg-card) 45%, var(--heat-glow))`
+          ? `linear-gradient(135deg, var(--cold-glow) 0%, var(--bg-card) 50%, var(--heat-glow) 100%)`
           : isFinal
-          ? `linear-gradient(120deg, var(--bg-card), ${glowColor})`
+          ? `linear-gradient(135deg, var(--bg-card) 0%, var(--bg-card) 60%, rgba(255,90,36,0.08) 100%)`
           : 'var(--bg-card)',
       }}
     >
-      {/* Status strip */}
-      <div className="px-4 sm:px-6 pt-4 flex items-center justify-between text-xs font-mono">
-        <div className="flex items-center gap-2" style={{ color: isLive ? 'var(--heat)' : 'var(--text)' }}>
-          {isLive && <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: 'var(--heat)' }} />}
-          <span className="font-semibold tracking-wide">
-            {isLive ? `LIVE${clock ? ` · ${clock}` : ''}` : isFinal ? `FINAL · ${dateLabel}` : dateLabel}
+      {/* ── Eyebrow / status strip ──────────────────────────────────── */}
+      <div className="px-4 sm:px-6 pt-4 pb-2 flex items-center gap-3">
+        {isLive && (
+          <span
+            className="w-2 h-2 rounded-full flex-shrink-0 animate-pulse"
+            style={{ background: 'var(--heat)', boxShadow: '0 0 10px var(--heat)' }}
+          />
+        )}
+        <span
+          className="text-xs font-mono font-bold tracking-widest uppercase"
+          style={{ color: isLive ? 'var(--heat)' : isFinal ? 'var(--text)' : 'var(--text)', letterSpacing: '0.1em' }}
+        >
+          {isLive
+            ? `LIVE${clock ? ` · ${clock}` : ''}`
+            : isFinal
+            ? `FINAL · ${dateLabel}`
+            : dateLabel}
+        </span>
+        {seriesLabel && (
+          <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.55 }}>
+            · {seriesLabel}
           </span>
-          {seriesLabel && <span style={{ color: 'var(--text)', opacity: 0.7 }}>· {seriesLabel}</span>}
-          {isFinal && pickResult && (
-            <span
-              className="px-2 py-0.5 rounded-full text-[10px] font-bold"
-              style={{
-                background: pickResult === 'hit' ? 'rgba(0,229,160,0.15)' : 'rgba(239,68,68,0.15)',
-                color: pickResult === 'hit' ? 'var(--rise)' : 'var(--red)',
-              }}
-            >
-              {pickResult === 'hit' ? '✓ OUR PICK HIT' : '✗ OUR PICK MISSED'}
-            </span>
-          )}
-        </div>
+        )}
+        {isFinal && pickResult && (
+          <span
+            className="text-[10px] font-mono font-bold px-2 py-0.5 rounded"
+            style={{
+              background: pickResult === 'hit' ? 'rgba(0,229,160,0.15)' : 'rgba(239,68,68,0.15)',
+              color: pickResult === 'hit' ? 'var(--rise)' : 'var(--red)',
+              border: `1px solid ${pickResult === 'hit' ? 'rgba(0,229,160,0.35)' : 'rgba(239,68,68,0.35)'}`,
+            }}
+          >
+            {pickResult === 'hit' ? '✓ OUR PICK HIT' : '✗ OUR PICK MISSED'}
+          </span>
+        )}
+        <span className="flex-1 h-px" style={{ background: 'var(--border)' }} />
       </div>
 
-      {/* Score row */}
-      <div className="px-4 sm:px-6 py-5 flex items-center justify-between gap-3">
-        <Link href={teamUrl(away.id, away.name)} className="flex flex-col items-center gap-2 flex-1 min-w-0 hover:opacity-80">
+      {/* ── Main matchup row ────────────────────────────────────────── */}
+      <div className="px-4 sm:px-6 py-4 sm:py-6 flex items-center gap-4 sm:gap-6">
+
+        {/* Away side */}
+        <Link
+          href={teamUrl(away.id, away.name)}
+          className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 hover:opacity-80 group"
+        >
           <div
             className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: favoredIsHome === false ? 'var(--heat-glow)' : 'var(--bg)', border: `1px solid ${favoredIsHome === false ? 'var(--heat)' : 'var(--border)'}` }}
+            style={{
+              background: favoredIsHome === false ? 'var(--heat-glow)' : 'var(--bg)',
+              border: `1px solid ${favoredIsHome === false ? 'var(--heat)' : 'var(--border)'}`,
+            }}
           >
             <img src={away.logo} alt={away.abbrev} className="w-8 h-8 sm:w-11 sm:h-11 object-contain" />
           </div>
-          <span className="text-base sm:text-xl font-bold truncate" style={{ color: 'var(--text-bright)' }}>{away.name}</span>
+          <div className="min-w-0">
+            <div
+              className="font-sans font-extrabold leading-none tracking-tight truncate"
+              style={{
+                fontSize: isLive ? 'clamp(20px, 4vw, 32px)' : isFinal ? 'clamp(22px, 4.5vw, 40px)' : 'clamp(24px, 5vw, 48px)',
+                color: favoredIsHome === false ? 'var(--heat)' : 'var(--text-bright)',
+                letterSpacing: '-0.03em',
+              }}
+            >
+              {away.name}
+            </div>
+            <div className="text-xs font-mono mt-1 font-bold tracking-widest uppercase" style={{ color: 'var(--text)', opacity: 0.55 }}>
+              {away.abbrev}
+            </div>
+          </div>
         </Link>
 
-        <div className="text-center flex-shrink-0 px-2">
+        {/* Center: score or vs */}
+        <div className="flex-shrink-0 text-center flex items-center gap-2 sm:gap-3">
           {(isLive || isFinal) && away.score !== null && home.score !== null ? (
-            <div className="flex items-center gap-3 sm:gap-4 font-editorial">
-              <span className="text-4xl sm:text-6xl font-bold" style={{ color: favoredIsHome === false ? 'var(--heat)' : 'var(--text-bright)' }}>{away.score}</span>
-              <span className="text-xl sm:text-3xl" style={{ color: 'var(--border)' }}>–</span>
-              <span className="text-4xl sm:text-6xl font-bold" style={{ color: favoredIsHome ? 'var(--heat)' : 'var(--text-bright)' }}>{home.score}</span>
-            </div>
+            <>
+              <span
+                className="font-sans font-extrabold leading-none"
+                style={{
+                  fontSize: isLive ? 'clamp(48px, 8vw, 80px)' : 'clamp(52px, 9vw, 96px)',
+                  color: favoredIsHome === false ? 'var(--heat)' : 'var(--text-bright)',
+                  letterSpacing: '-0.05em',
+                }}
+              >
+                {away.score}
+              </span>
+              <span
+                className="font-mono font-bold"
+                style={{ fontSize: 'clamp(18px, 3vw, 28px)', color: 'var(--border)' }}
+              >
+                —
+              </span>
+              <span
+                className="font-sans font-extrabold leading-none"
+                style={{
+                  fontSize: isLive ? 'clamp(48px, 8vw, 80px)' : 'clamp(52px, 9vw, 96px)',
+                  color: favoredIsHome === true ? 'var(--heat)' : 'var(--text-bright)',
+                  letterSpacing: '-0.05em',
+                }}
+              >
+                {home.score}
+              </span>
+            </>
           ) : (
-            <span className="text-2xl sm:text-3xl font-bold font-editorial" style={{ color: 'var(--text)' }}>vs</span>
+            <span
+              className="font-mono font-bold"
+              style={{ fontSize: 'clamp(18px, 3vw, 26px)', color: 'var(--text)', opacity: 0.5 }}
+            >
+              vs
+            </span>
           )}
         </div>
 
-        <Link href={teamUrl(home.id, home.name)} className="flex flex-col items-center gap-2 flex-1 min-w-0 hover:opacity-80">
+        {/* Home side */}
+        <Link
+          href={teamUrl(home.id, home.name)}
+          className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 hover:opacity-80 justify-end group"
+        >
+          <div className="min-w-0 text-right">
+            <div
+              className="font-sans font-extrabold leading-none tracking-tight truncate"
+              style={{
+                fontSize: isLive ? 'clamp(20px, 4vw, 32px)' : isFinal ? 'clamp(22px, 4.5vw, 40px)' : 'clamp(24px, 5vw, 48px)',
+                color: favoredIsHome === true ? 'var(--heat)' : 'var(--text-bright)',
+                letterSpacing: '-0.03em',
+              }}
+            >
+              {home.name}
+            </div>
+            <div className="text-xs font-mono mt-1 font-bold tracking-widest uppercase text-right" style={{ color: 'var(--text)', opacity: 0.55 }}>
+              {home.abbrev}
+            </div>
+          </div>
           <div
             className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: favoredIsHome === true ? 'var(--heat-glow)' : 'var(--bg)', border: `1px solid ${favoredIsHome === true ? 'var(--heat)' : 'var(--border)'}` }}
+            style={{
+              background: favoredIsHome === true ? 'var(--heat-glow)' : 'var(--bg)',
+              border: `1px solid ${favoredIsHome === true ? 'var(--heat)' : 'var(--border)'}`,
+            }}
           >
             <img src={home.logo} alt={home.abbrev} className="w-8 h-8 sm:w-11 sm:h-11 object-contain" />
           </div>
-          <span className="text-base sm:text-xl font-bold truncate" style={{ color: 'var(--text-bright)' }}>{home.name}</span>
         </Link>
       </div>
 
-      {/* Storyline (FINAL only) */}
+      {/* ── Storyline (FINAL only) ────────────────────────────────────── */}
       {isFinal && storyline && (
-        <div className="px-4 sm:px-6 pb-4 text-sm leading-snug" style={{ color: 'var(--text)' }}>
+        <div
+          className="px-4 sm:px-6 pb-4 text-sm font-sans leading-relaxed"
+          style={{ color: 'var(--text)' }}
+        >
           <span className="font-semibold" style={{ color: 'var(--heat)' }}>The story: </span>
           {storyline}
         </div>
       )}
 
-      {/* Period breakdown */}
+      {/* ── Period breakdown (LIVE / FINAL) ──────────────────────────── */}
       {periodScores && periodScores.length > 0 && (isLive || isFinal) && (
         <div className="flex gap-2 px-4 sm:px-6 pb-4">
           {periodScores.map(p => (
             <div
               key={p.period}
-              className="flex-1 text-center rounded-lg py-1.5 text-xs font-mono"
+              className="flex-1 text-center rounded-lg py-2 text-xs font-mono"
               style={{
                 background: p.isCurrent ? 'var(--heat-glow)' : 'var(--bg)',
                 border: `1px solid ${p.isCurrent ? 'var(--heat)' : 'var(--border)'}`,
@@ -138,8 +226,8 @@ export default function GameHero({
                 opacity: p.played || p.isCurrent ? 1 : 0.4,
               }}
             >
-              <div className="opacity-60">{p.label}</div>
-              <div className="font-semibold">
+              <div className="opacity-60 text-[10px] font-bold tracking-wider uppercase">{p.label}</div>
+              <div className="font-bold mt-0.5">
                 {p.played || p.isCurrent ? `${p.away}-${p.home}` : '–'}
                 {p.isCurrent && isLive && <span style={{ color: 'var(--heat)' }}> ●</span>}
               </div>

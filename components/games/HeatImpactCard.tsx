@@ -15,7 +15,7 @@ function MoverColumn({ title, color, movers }: { title: string; color: string; m
   if (!movers.length) return null;
   return (
     <div className="rounded-xl border p-4 flex-1" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color }}>{title}</div>
+      <div className="text-xs font-mono font-bold uppercase tracking-widest mb-3" style={{ color, letterSpacing: '0.1em' }}>{title}</div>
       <div className="space-y-2.5">
         {movers.map(m => (
           <Link key={m.playerId} href={m.href} className="flex items-center justify-between gap-2 hover:opacity-80">
@@ -40,7 +40,7 @@ export default function HeatImpactCard({ up, down }: { up: Mover[]; down: Mover[
   if (!up.length && !down.length) return null;
   return (
     <div>
-      <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text)' }}>Heat Impact · Who Moved</div>
+      <div className="text-xs font-mono font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Heat Impact · Who Moved</div>
       <div className="flex flex-col sm:flex-row gap-3">
         <MoverColumn title="↑ Heating Up" color="var(--rise)" movers={up} />
         <MoverColumn title="↓ Cooling Off" color="var(--cold)" movers={down} />

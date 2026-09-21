@@ -16,7 +16,7 @@ export default function GoalieMatchupCard({ away, home }: { away: GoalieSide; ho
 
   return (
     <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text)' }}>Goalie Matchup</div>
+      <div className="text-xs font-mono font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Goalie Matchup</div>
       <div className="flex items-center justify-between">
         <div className="text-center flex-1">
           <div className="text-sm font-bold" style={{ color: 'var(--text-bright)' }}>{away.name}</div>

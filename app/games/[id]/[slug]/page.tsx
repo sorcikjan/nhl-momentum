@@ -357,16 +357,16 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         <div className="lg:col-span-2 space-y-4">
           {isLive && (
             <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-              <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text)' }}>Momentum Tracker · Live</div>
-              <h2 className="text-lg font-bold font-editorial mb-2" style={{ color: 'var(--text-bright)' }}>Who&apos;s pushing right now.</h2>
+              <div className="text-xs font-mono font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Momentum Tracker · Live</div>
+              <h2 className="font-sans font-extrabold tracking-tight mb-2" style={{ fontSize: '1.35rem', color: 'var(--text-bright)', letterSpacing: '-0.02em' }}>Who&apos;s pushing right now.</h2>
               <MomentumTracker momentum={playByPlay.momentum} homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev} />
             </div>
           )}
 
           {isLive && (
             <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-              <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text)' }}>Play-by-Play</div>
-              <h2 className="text-lg font-bold font-editorial mb-2" style={{ color: 'var(--text-bright)' }}>Recent action.</h2>
+              <div className="text-xs font-mono font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Play-by-Play</div>
+              <h2 className="font-sans font-extrabold tracking-tight mb-2" style={{ fontSize: '1.35rem', color: 'var(--text-bright)', letterSpacing: '-0.02em' }}>Recent action.</h2>
               <RecentActionFeed plays={playByPlay.recentPlays} />
             </div>
           )}
@@ -494,7 +494,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           <div className="rounded-xl border p-4 mb-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h2 className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>Betting Markets</h2>
+                <h2 className="text-xs font-mono font-bold uppercase tracking-widest" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Betting Markets</h2>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text)', opacity: 0.6 }}>For reference — {rows.length} bookmaker{rows.length !== 1 ? 's' : ''}</p>
               </div>
             </div>
@@ -588,7 +588,7 @@ function LineupCard({
       <div className="px-4 py-3 border-b flex items-center gap-2" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
         <img src={logo} alt={abbrev} className="w-6 h-6 object-contain" />
         <Link href={teamId ? teamUrl(teamId, teamName) : '#'} className="text-sm font-semibold hover:opacity-80" style={{ color: 'var(--text-bright)' }}>{abbrev}</Link>
-        <span className="text-xs" style={{ color: 'var(--text)' }}>{isLive ? 'Game Stats' : 'Momentum Inputs'}</span>
+        <span className="text-xs font-mono font-bold uppercase tracking-widest" style={{ color: 'var(--text)', opacity: 0.6, letterSpacing: '0.08em' }}>{isLive ? 'Game Stats' : 'Momentum Inputs'}</span>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">

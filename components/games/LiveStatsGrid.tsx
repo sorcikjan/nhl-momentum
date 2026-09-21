@@ -8,7 +8,7 @@ export default function LiveStatsGrid({
   return (
     <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
       <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>Live Stats</span>
+        <span className="text-xs font-mono font-bold uppercase tracking-widest" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Live Stats</span>
         <div className="flex items-center gap-4 text-xs font-semibold">
           <span style={{ color: 'var(--silver)' }}>{awayAbbrev}</span>
           <span style={{ color: 'var(--heat)' }}>{homeAbbrev}</span>

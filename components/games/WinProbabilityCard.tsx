@@ -10,7 +10,7 @@ export default function WinProbabilityCard({
   const homeFavored = homeWinPct >= awayWinPct;
   return (
     <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text)' }}>{title}</div>
+      <div className="text-xs font-mono font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>{title}</div>
       <div className="flex items-baseline justify-between mb-2">
         <span className="text-2xl font-bold font-mono" style={{ color: homeFavored ? 'var(--silver)' : 'var(--heat)' }}>
           {awayAbbrev} {awayWinPct}%
