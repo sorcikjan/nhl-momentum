@@ -211,6 +211,8 @@ export async function fetchRankings() {
   // count team games with game_id > player's last game_id.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const allSkaterIds = sortedSkaters.map((s: any) => s.player_id);
+  // Top-100 player IDs for the sparkline history query (run in parallel below)
+  const top100Ids = allSkaterIds.slice(0, 100);
 
   // Step 1: last game_id per player.
   // Chunked into groups of 50 × limit 250 = safely under Supabase's 1000-row cap.
@@ -236,8 +238,9 @@ export async function fetchRankings() {
   }
 
   // Step 2: recent completed games for all teams — run in parallel with step 1 chunks.
+  // Step 2b: sparkline history for top-100 players (last ~6 snapshots each).
   // NOTE: the games table PK is `id`, not `game_id`.
-  const [allChunkData, { data: recentTeamGames }] = await Promise.all([
+  const [allChunkData, { data: recentTeamGames }, { data: rawSparklines }] = await Promise.all([
     Promise.all(chunkPromises),
     supabaseAdmin
       .from('games')
@@ -245,6 +248,12 @@ export async function fetchRankings() {
       .in('game_state', ['FINAL', 'OFF'])
       .gte('game_date', sinceDate)
       .order('id', { ascending: false })
+      .limit(700),
+    supabaseAdmin
+      .from('player_metric_snapshots')
+      .select('player_id, calculated_at, momentum_ppm')
+      .in('player_id', top100Ids.length ? top100Ids : [-1])
+      .order('calculated_at', { ascending: false })
       .limit(700),
   ]);
 
@@ -286,6 +295,7 @@ export async function fetchRankings() {
     top100,
     breakoutWatch,
     momentumLeaders: { skaters: momentumLeaderSkaters, goalies: momentumLeaderGoalies },
+    sparklineSnapshots: (rawSparklines ?? []) as { player_id: number; calculated_at: string; momentum_ppm: number }[],
   };
 }
 

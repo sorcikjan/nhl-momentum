@@ -24,6 +24,7 @@ export default async function RankingsPage() {
     fetchSeasonPhase().catch(() => ({ isPreseason: false, regularSeasonStartDate: null, daysUntilStart: null })),
   ]);
   const players = data?.top100 ?? [];
+  const sparklineSnapshots = data?.sparklineSnapshots ?? [];
 
   return (
     <div className="max-w-6xl mx-auto pb-20 md:pb-0">
@@ -35,7 +36,11 @@ export default async function RankingsPage() {
         </p>
       </div>
 
-      <RankingsTable players={players} seasonHasStarted={!seasonPhase.isPreseason} />
+      <RankingsTable
+        players={players}
+        seasonHasStarted={!seasonPhase.isPreseason}
+        sparklineSnapshots={sparklineSnapshots}
+      />
     </div>
   );
 }
