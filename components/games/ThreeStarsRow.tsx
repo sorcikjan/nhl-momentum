@@ -1,8 +1,10 @@
+import HeatBadge from '@/components/ui/HeatBadge';
+
 const MEDAL = { 1: '★1', 2: '★2', 3: '★3' } as const;
 const MEDAL_COLOR = { 1: 'var(--heat)', 2: '#c9a961', 3: 'var(--silver)' } as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default function ThreeStarsRow({ stars }: { stars: any[] }) {
+export default function ThreeStarsRow({ stars, heatByPlayerId }: { stars: any[]; heatByPlayerId?: Map<number, number> }) {
   if (!stars.length) return null;
   return (
     <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
@@ -10,6 +12,7 @@ export default function ThreeStarsRow({ stars }: { stars: any[] }) {
       <div className="grid grid-cols-3 gap-3">
         {stars.map((star) => {
           const medal = (star.star as 1 | 2 | 3) ?? 3;
+          const heat = heatByPlayerId?.get(star.playerId) ?? null;
           return (
             <a
               key={star.star}
@@ -29,6 +32,7 @@ export default function ThreeStarsRow({ stars }: { stars: any[] }) {
                   ? `${star.savePctg !== undefined ? (star.savePctg * 100).toFixed(1) + '% SV' : ''}`
                   : `${star.points ?? 0}pts (${star.goals ?? 0}G ${star.assists ?? 0}A)`}
               </span>
+              {heat !== null && <HeatBadge heat={heat} size="sm" />}
             </a>
           );
         })}

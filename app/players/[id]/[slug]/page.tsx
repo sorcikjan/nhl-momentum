@@ -238,8 +238,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     energy: leagueAvg.energyBar,
   } : undefined;
 
-  // ── AI inputs ────────────────────────────────────────────────────────────────
+  // ── Team hero color ────────────────────────────────────────────────────────
   const playerTeamAbbrev = player.teams?.abbrev ?? '';
+  const teamHeroColor = TEAM_BG_COLORS[playerTeamAbbrev] ?? null;
   const age = player.birth_date
     ? Math.floor((Date.now() - new Date(player.birth_date).getTime()) / (365.25 * 86400000))
     : null;
@@ -420,7 +421,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       <div className="md:hidden space-y-3">
 
         {/* Photo card */}
-        <div className="relative rounded-xl overflow-hidden" style={{ height: 220, background: 'var(--bg-card)' }}>
+        <div className="relative rounded-xl overflow-hidden" style={{ height: 220, background: teamHeroColor ? `linear-gradient(135deg, ${teamHeroColor} 0%, var(--bg-card) 60%)` : 'var(--bg-card)' }}>
           {player.headshot_url ? (
             <img src={player.headshot_url} alt={name} className="w-full h-full object-cover object-top" />
           ) : (
@@ -562,7 +563,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
       {/* 2b. Cinematic hero — desktop only ─────────────────────────────────── */}
       <div className="hidden md:block">
-      <div className="relative rounded-xl overflow-hidden" style={{ background: 'var(--bg-card)', minHeight: 380 }}>
+      <div className="relative rounded-xl overflow-hidden" style={{ background: teamHeroColor ? `linear-gradient(135deg, ${teamHeroColor} 0%, var(--bg-card) 60%)` : 'var(--bg-card)', minHeight: 380 }}>
 
         {/* Jersey ghost — full background */}
         {player.sweater_number && (

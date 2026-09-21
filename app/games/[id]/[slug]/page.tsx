@@ -350,7 +350,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
 
           {isFinal && (
             <>
-              <ThreeStarsRow stars={threeStars} />
+              <ThreeStarsRow stars={threeStars} heatByPlayerId={new Map([...awaySkaters, ...homeSkaters].map(s => [s.playerId as number, ppmToHeat(s.momentumPpm ?? s.compositePpm)]))} />
               {prediction && (
                 <PredictionCard
                   mode="final"

@@ -90,7 +90,7 @@ export default function GameHero({
           >
             <img src={away.logo} alt={away.abbrev} className="w-8 h-8 sm:w-11 sm:h-11 object-contain" />
           </div>
-          <span className="text-sm sm:text-lg font-bold truncate" style={{ color: 'var(--text-bright)' }}>{away.name}</span>
+          <span className="text-base sm:text-xl font-bold truncate" style={{ color: 'var(--text-bright)' }}>{away.name}</span>
         </Link>
 
         <div className="text-center flex-shrink-0 px-2">
@@ -101,7 +101,7 @@ export default function GameHero({
               <span className="text-4xl sm:text-6xl font-bold" style={{ color: favoredIsHome ? 'var(--heat)' : 'var(--text-bright)' }}>{home.score}</span>
             </div>
           ) : (
-            <span className="text-lg sm:text-xl font-bold" style={{ color: 'var(--text)' }}>vs</span>
+            <span className="text-2xl sm:text-3xl font-bold font-editorial" style={{ color: 'var(--text)' }}>vs</span>
           )}
         </div>
 
@@ -112,7 +112,7 @@ export default function GameHero({
           >
             <img src={home.logo} alt={home.abbrev} className="w-8 h-8 sm:w-11 sm:h-11 object-contain" />
           </div>
-          <span className="text-sm sm:text-lg font-bold truncate" style={{ color: 'var(--text-bright)' }}>{home.name}</span>
+          <span className="text-base sm:text-xl font-bold truncate" style={{ color: 'var(--text-bright)' }}>{home.name}</span>
         </Link>
       </div>
 
