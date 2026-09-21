@@ -10,6 +10,7 @@ import {
   buildGoalieLayerMetrics,
 } from '@/lib/metrics';
 import { calcSOSCoefficient } from '@/lib/sos';
+import { fetchSeasonPhase } from '@/lib/data';
 
 // GET /api/ingest/metrics
 // Reads game_player_stats from DB, computes 3-layer metrics, writes snapshots.
@@ -27,6 +28,29 @@ export async function GET(req: NextRequest) {
   const offset = Math.max(0, Number(req.nextUrl.searchParams.get('offset') ?? '0'));
 
   try {
+    // Determine the current season-start year so we can scope "season" stats to the
+    // correct season. NHL game IDs encode the season-start year as the first 4 digits
+    // (e.g. 2025020006 = season starting 2025, type 02 = regular season, game 0006).
+    //
+    // We use fetchSeasonPhase() — which reads regularSeasonStartDate from the NHL
+    // schedule API — rather than currentSeason() from lib/nhl-api.ts. The latter has
+    // an Oct-1 rollover assumption that breaks for Sept 29-30 (the NHL has started
+    // seasons in late September). fetchSeasonPhase() is authoritative and already
+    // has a 6-hour module-level cache, so this adds negligible overhead.
+    const seasonPhase = await fetchSeasonPhase();
+    let seasonStartYear: number;
+    if (seasonPhase.regularSeasonStartDate) {
+      seasonStartYear = new Date(seasonPhase.regularSeasonStartDate).getUTCFullYear();
+    } else {
+      // Fallback when the NHL schedule API is unavailable: derive from calendar.
+      // Sept 29+ is treated as the new season's start year; before that, prior year.
+      const now = new Date();
+      const m = now.getUTCMonth(); // 0-indexed (8 = September)
+      seasonStartYear = (m >= 9 || (m === 8 && now.getUTCDate() >= 29))
+        ? now.getUTCFullYear()
+        : now.getUTCFullYear() - 1;
+    }
+
     // Fetch active players with pagination
     const { data: players, error: pErr } = await supabaseAdmin
       .from('players')
@@ -97,8 +121,18 @@ export async function GET(req: NextRequest) {
       const playerStats = statsByPlayer.get(player.id);
       if (!playerStats?.length) continue;
 
-      const last5      = playerStats.slice(0, 5); // newest-first → top 5 = momentum
-      const fullSeason = playerStats;              // all rows = full season
+      const last5      = playerStats.slice(0, 5); // newest-first → top 5 = momentum window (not season-scoped by design)
+
+      // Scope "season" to the current season-start year only (game_id prefix = seasonStartYear).
+      // Without this filter the query's 100-row cap spans the previous season, which means
+      // once the new season starts, early new-season games get mixed with nearly all of last
+      // season's rows and the site displays wrong numbers labeled as the new season's stats.
+      // Preseason (type 01) games are also excluded; they have no player stats in practice
+      // (NHL API does not publish them) so this is moot but explicit is better.
+      const fullSeason = playerStats.filter(r => {
+        const gid = String(r.game_id);
+        return gid.startsWith(String(seasonStartYear)) && gid.slice(4, 6) !== '01';
+      });
 
       const momentum  = buildLayerMetrics(last5);
       const season    = buildLayerMetrics(fullSeason);
