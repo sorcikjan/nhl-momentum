@@ -103,13 +103,20 @@ export async function GET(req: NextRequest) {
   // and game_goalie_stats (goalies) rows exist. Checked independently — a game
   // can pass skater coverage but have zero goalie rows (and vice versa).
   {
-    const { data: finalGames } = await supabaseAdmin
+    const { data: finalGamesRaw } = await supabaseAdmin
       .from('games')
       .select('id, game_date, home_team:teams!games_home_team_id_fkey(abbrev), away_team:teams!games_away_team_id_fkey(abbrev)')
       .gte('game_date', since3d)
       .in('game_state', ['FINAL', 'OFF']);
 
-    const gameIds = (finalGames ?? []).map(g => g.id);
+    // NHL game IDs encode type in digits 5-6 (e.g. 2026 01 0003): 01 = preseason.
+    // The NHL stats API never publishes skater/goalie game logs for preseason games
+    // (confirmed against live boxscores — even star players return empty game-log
+    // data), so preseason games can never pass this check. Exclude them rather than
+    // flag a permanent, unfixable false positive every September.
+    const finalGames = (finalGamesRaw ?? []).filter(g => String(g.id).slice(4, 6) !== '01');
+
+    const gameIds = finalGames.map(g => g.id);
 
     // Fetch skater and goalie coverage in parallel
     const [{ data: skaterCounts }, { data: goalieCounts }, { data: newestStat }] = await Promise.all([
