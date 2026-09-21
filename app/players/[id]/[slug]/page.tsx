@@ -9,6 +9,7 @@ import { ppmToHeat, heatColor as getHeatColor } from '@/lib/heat';
 import { getPlayerInsights } from '@/lib/ai';
 import type { PlayerAIInput } from '@/lib/ai';
 import { teamUrl } from '@/lib/urls';
+import { deriveArchetype } from '@/lib/archetype';
 import Link from 'next/link';
 
 // Deduplicate fetchPlayer between generateMetadata and the page component
@@ -140,6 +141,17 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const prevSnapshot = metricTimeline && metricTimeline.length >= 2 ? metricTimeline[metricTimeline.length - 2] : null;
   const prevHeat = prevSnapshot ? ppmToHeat(Number(prevSnapshot.momentum_ppm ?? 0)) : null;
   const heatDelta = prevHeat !== null && currentHeat !== prevHeat ? currentHeat - prevHeat : undefined;
+
+  const archetype = deriveArchetype({
+    positionCode: player.position_code,
+    seasonGames: seaGames,
+    seasonGoals: seaGoals,
+    seasonAssists: seaAssists,
+    seasonShootingPct: seaShootPct,
+    seasonShots: Number(latestSnapshot.season_shots ?? 0),
+    seasonPpPoints: Number(latestSnapshot.season_pp_points ?? 0),
+    seasonPim: Number(latestSnapshot.season_pim ?? 0),
+  });
 
   const lastPlayedDaysAgo = lastPlayedDate ? daysAgo(lastPlayedDate) : null;
   const outStatus = deriveOutStatus(consecutiveGamesMissed ?? null, lastPlayedDaysAgo, player.in_minors ?? false, !seasonPhase.isPreseason);
@@ -697,6 +709,28 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                 </div>
               )}
             </div>
+
+            {/* ARCHETYPE — deterministic, computed from real season stats, never AI-guessed */}
+            {archetype && (
+              <div className="mb-4">
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full mb-1.5 text-xs font-bold tracking-widest uppercase"
+                  style={{ background: 'rgba(58,136,255,0.15)', color: 'var(--cold)', border: '1px solid rgba(58,136,255,0.3)' }}
+                  title={archetype.basis}>
+                  {archetype.label}
+                </div>
+                {archetype.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {archetype.tags.map(t => (
+                      <span key={t.text} title={t.basis} className="text-xs px-2 py-0.5 rounded-md"
+                        style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                        {t.text}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs mt-1" style={{ color: 'var(--text)', opacity: 0.6 }}>{archetype.basis}</p>
+              </div>
+            )}
 
             {/* AI CHARACTER */}
             <div>
