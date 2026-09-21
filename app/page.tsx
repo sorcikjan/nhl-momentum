@@ -14,6 +14,7 @@ import {
   fetchSeriesStandings,
   fetchGoalieRankings,
   fetchNewcomerWatch,
+  fetchSeasonPhase,
 } from '@/lib/data';
 import { ppmToHeat } from '@/lib/heat';
 
@@ -365,11 +366,19 @@ function GameSkeleton() {
   );
 }
 
-// ── NEW HERE? Banner ──────────────────────────────────────────────────────────
+// ── NEW HERE? / Preseason countdown banner ────────────────────────────────────
+
+function TopBannerShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }} className="px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
+      {children}
+    </div>
+  );
+}
 
 function NewHereBanner() {
   return (
-    <div style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border)' }} className="px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
+    <TopBannerShell>
       <div className="flex items-start gap-3">
         <span className="text-xs font-bold tracking-widest uppercase shrink-0" style={{ color: 'var(--heat)' }}>NEW HERE?</span>
         <p className="text-xs" style={{ color: 'var(--text)' }}>
@@ -380,7 +389,36 @@ function NewHereBanner() {
         <span style={{ color: 'var(--text)', opacity: 0.5 }}>67% pick accuracy · YTD</span>
         <a href="/games" style={{ color: 'var(--heat)' }} className="font-semibold">How it works →</a>
       </div>
-    </div>
+    </TopBannerShell>
+  );
+}
+
+async function TopBanner() {
+  const { daysUntilStart, isPreseason, regularSeasonStartDate } = await fetchSeasonPhase().catch(() => ({
+    daysUntilStart: null, isPreseason: false, regularSeasonStartDate: null,
+  }));
+
+  if (!isPreseason || daysUntilStart === null || !regularSeasonStartDate) {
+    return <NewHereBanner />;
+  }
+
+  const startLabel = new Date(`${regularSeasonStartDate}T00:00:00Z`).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', timeZone: 'UTC',
+  });
+  const dayWord = daysUntilStart === 1 ? 'day' : 'days';
+
+  return (
+    <TopBannerShell>
+      <div className="flex items-start gap-3">
+        <span className="text-xs font-bold tracking-widest uppercase shrink-0" style={{ color: 'var(--heat)' }}>PRESEASON</span>
+        <p className="text-xs" style={{ color: 'var(--text)' }}>
+          Puck drop on the regular season is <strong style={{ color: 'var(--heat)' }}>{daysUntilStart} {dayWord} away</strong> ({startLabel}). Heat scores below still reflect final 2025-26 stats — they&apos;ll start moving the moment new games count.
+        </p>
+      </div>
+      <div className="flex items-center gap-3 shrink-0 text-xs">
+        <a href="/games" style={{ color: 'var(--heat)' }} className="font-semibold">How it works →</a>
+      </div>
+    </TopBannerShell>
   );
 }
 
@@ -412,8 +450,10 @@ export default function DashboardPage() {
   return (
     <div className="max-w-5xl mx-auto pb-20 md:pb-0 flex flex-col gap-8">
 
-      {/* 0. NEW HERE? banner — static, no Suspense */}
-      <NewHereBanner />
+      {/* 0. Top banner — preseason countdown once we're within season-start window, NEW HERE? otherwise */}
+      <Suspense fallback={<NewHereBanner />}>
+        <TopBanner />
+      </Suspense>
 
       {/* 1. Playoff Hero — only rendered during playoffs */}
       <Suspense fallback={null}>

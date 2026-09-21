@@ -25,6 +25,14 @@ export async function getGamesByDate(date: string) {
   return data.gameWeek?.find(d => d.date === date)?.games ?? [];
 }
 
+export async function getSeasonDates(date: string) {
+  // Same /schedule/{date} response also carries season-level fields alongside
+  // the gameWeek — separate typed accessor so callers don't need `as` casts.
+  return get<{ preSeasonStartDate?: string; regularSeasonStartDate?: string; regularSeasonEndDate?: string; playoffEndDate?: string }>(
+    `/schedule/${date}`
+  );
+}
+
 // ─── Player Game Logs ─────────────────────────────────────────────────────────
 
 export async function getSkaterGameLog(playerId: number, season: string) {

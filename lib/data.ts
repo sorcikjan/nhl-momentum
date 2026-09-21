@@ -2,7 +2,7 @@
 // Pages should call these directly — never fetch their own API over HTTP.
 
 import { supabaseAdmin } from '@/lib/supabase';
-import { getGamesByDate, getGameBoxscore, getGamePlayByPlay, getStandings, getTeamSeasonStats } from '@/lib/nhl-api';
+import { getGamesByDate, getGameBoxscore, getGamePlayByPlay, getStandings, getTeamSeasonStats, getSeasonDates } from '@/lib/nhl-api';
 export { deriveOutStatus, daysAgo } from '@/lib/player-status';
 import { daysAgo } from '@/lib/player-status';
 import { processPlayByPlay } from '@/lib/play-by-play';
@@ -635,6 +635,39 @@ export async function fetchPlayoffActiveTeams(): Promise<Set<number>> {
   }
   _playoffTeamsCache = { teams: active, ts: now };
   return active;
+}
+
+let _seasonPhaseCache: { data: { regularSeasonStartDate: string | null; daysUntilStart: number | null; isPreseason: boolean }; ts: number } | null = null;
+
+// How many days until the NHL regular season starts (negative once it's underway).
+// Used to show a preseason countdown banner instead of the standard "new here" copy.
+export async function fetchSeasonPhase() {
+  const now = Date.now();
+  if (_seasonPhaseCache && now - _seasonPhaseCache.ts < 6 * 60 * 60_000) {
+    return _seasonPhaseCache.data;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  let regularSeasonStartDate: string | null = null;
+  try {
+    const info = await getSeasonDates(today);
+    regularSeasonStartDate = info.regularSeasonStartDate ?? null;
+  } catch {
+    regularSeasonStartDate = null;
+  }
+
+  let daysUntilStart: number | null = null;
+  let isPreseason = false;
+  if (regularSeasonStartDate) {
+    const msPerDay = 24 * 60 * 60 * 1000;
+    daysUntilStart = Math.ceil(
+      (new Date(`${regularSeasonStartDate}T00:00:00Z`).getTime() - new Date(`${today}T00:00:00Z`).getTime()) / msPerDay
+    );
+    isPreseason = daysUntilStart > 0;
+  }
+
+  const result = { regularSeasonStartDate, daysUntilStart, isPreseason };
+  _seasonPhaseCache = { data: result, ts: now };
+  return result;
 }
 
 // seasonYear defaults to the current in-progress season (for the playoffs page's
