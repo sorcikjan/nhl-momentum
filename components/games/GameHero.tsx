@@ -113,17 +113,17 @@ export default function GameHero({
           </div>
           <div className="min-w-0">
             <div
-              className="font-sans font-extrabold leading-none tracking-tight truncate"
+              className="font-sans font-extrabold leading-none tracking-tight"
               style={{
                 fontSize: isLive ? 'clamp(20px, 4vw, 32px)' : isFinal ? 'clamp(22px, 4.5vw, 40px)' : 'clamp(24px, 5vw, 48px)',
                 color: favoredIsHome === false ? 'var(--heat)' : 'var(--text-bright)',
                 letterSpacing: '-0.03em',
               }}
             >
-              {away.name}
-            </div>
-            <div className="text-xs font-mono mt-1 font-bold tracking-widest uppercase" style={{ color: 'var(--text)', opacity: 0.55 }}>
               {away.abbrev}
+            </div>
+            <div className="text-xs sm:text-sm font-medium mt-1 truncate" style={{ color: 'var(--text)', opacity: 0.65 }}>
+              {away.name}
             </div>
           </div>
         </Link>
@@ -176,17 +176,17 @@ export default function GameHero({
         >
           <div className="min-w-0 text-right">
             <div
-              className="font-sans font-extrabold leading-none tracking-tight truncate"
+              className="font-sans font-extrabold leading-none tracking-tight"
               style={{
                 fontSize: isLive ? 'clamp(20px, 4vw, 32px)' : isFinal ? 'clamp(22px, 4.5vw, 40px)' : 'clamp(24px, 5vw, 48px)',
                 color: favoredIsHome === true ? 'var(--heat)' : 'var(--text-bright)',
                 letterSpacing: '-0.03em',
               }}
             >
-              {home.name}
-            </div>
-            <div className="text-xs font-mono mt-1 font-bold tracking-widest uppercase text-right" style={{ color: 'var(--text)', opacity: 0.55 }}>
               {home.abbrev}
+            </div>
+            <div className="text-xs sm:text-sm font-medium mt-1 truncate text-right" style={{ color: 'var(--text)', opacity: 0.65 }}>
+              {home.name}
             </div>
           </div>
           <div
