@@ -55,10 +55,10 @@ const PAGE_SIZE = 25;
 
 function Sparkline({ values }: { values: number[] }) {
   if (values.length < 2) {
-    return <span className="inline-block" style={{ width: 48, height: 18 }} />;
+    return <span className="inline-block" style={{ width: 64, height: 22 }} />;
   }
-  const W = 48;
-  const H = 18;
+  const W = 64;
+  const H = 22;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
@@ -294,7 +294,7 @@ export default function RankingsTable({
                   : null;
 
                 const heat = ppmToHeat(p.momentum_ppm);
-                const heatOpacity = Math.max(0.15, heat / 100);
+                const heatStripeColor = `rgba(255,90,36,${Math.max(0.15, heat / 100).toFixed(2)})`;
                 const sparkValues = sparklineByPlayer.get(p.player_id) ?? [];
 
                 return (
@@ -316,17 +316,17 @@ export default function RankingsTable({
                     {/* Heat stripe */}
                     <td className="w-1 p-0">
                       <div
-                        className="w-1 h-full min-h-[48px]"
-                        style={{ background: 'var(--heat)', opacity: heatOpacity }}
+                        className="h-full min-h-[52px]"
+                        style={{ width: 5, background: heatStripeColor }}
                       />
                     </td>
                     <td
-                      className="px-2 md:px-3 py-3 font-mono text-xs w-8 md:w-12"
+                      className="px-2 md:px-3 py-3.5 font-mono text-xs w-8 md:w-12"
                       style={{ color: 'var(--text)' }}
                     >
                       {p.momentum_rank}
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3.5">
                       <Link
                         href={playerUrl(
                           p.player_id,
@@ -389,14 +389,14 @@ export default function RankingsTable({
                       </Link>
                     </td>
                     {/* Heat badge + sparkline */}
-                    <td className="px-2 py-3">
+                    <td className="px-2 py-3.5">
                       <div className="flex items-center gap-1.5">
                         <Sparkline values={sparkValues} />
                         <HeatBadge heat={heat} size="sm" />
                       </div>
                     </td>
                     <td
-                      className="px-2 py-3 font-mono text-xs md:text-sm"
+                      className="px-2 py-3.5 font-mono text-xs md:text-sm"
                       style={{
                         color:
                           delta > 0
@@ -415,12 +415,12 @@ export default function RankingsTable({
                         : '—'}
                     </td>
                     <td
-                      className="px-3 py-3 font-mono text-xs hidden md:table-cell"
+                      className="px-3 py-3.5 font-mono text-xs hidden md:table-cell"
                       style={{ color: 'var(--text)' }}
                     >
                       {(p.sos_coefficient ?? 1).toFixed(2)}
                     </td>
-                    <td className="px-3 py-3 hidden md:table-cell">
+                    <td className="px-3 py-3.5 hidden md:table-cell">
                       <div className="flex items-center gap-2">
                         <div
                           className="w-16 h-1.5 rounded-full"
@@ -440,7 +440,7 @@ export default function RankingsTable({
                       </div>
                     </td>
                     <td
-                      className="px-3 py-3 font-mono text-xs hidden md:table-cell"
+                      className="px-3 py-3.5 font-mono text-xs hidden md:table-cell"
                       style={{ color: 'var(--text-bright)' }}
                     >
                       {p.momentum_goals}G {p.momentum_assists}A
