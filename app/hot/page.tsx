@@ -33,10 +33,7 @@ export default async function HotPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const breakoutPlayers: any[] = data?.breakoutWatch ?? [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const coolingPlayers: any[] = [...(data?.top100 ?? [])]
-    .filter(p => (p.breakout_delta ?? 0) < 0)
-    .sort((a, b) => (a.breakout_delta ?? 0) - (b.breakout_delta ?? 0))
-    .slice(0, 10);
+  const coolingPlayers: any[] = data?.coolingWatch ?? [];
 
   const lastUpdated = breakoutPlayers[0]?.calculated_at ?? null;
 

@@ -48,7 +48,7 @@ export default function BreakoutWatch({
     <div className="rounded-xl border p-4 flex flex-col" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--rise)' }}>
-          🔥 Breakout Watch
+          Breakout Watch
         </h2>
         <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--rise-glow, rgba(0,229,160,0.12))', color: 'var(--rise)' }}>
           Recent vs Season

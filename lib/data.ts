@@ -194,6 +194,10 @@ export async function fetchRankings() {
   const breakoutWatch = [...skaters]
     .sort((a, b) => (b.breakout_delta ?? 0) - (a.breakout_delta ?? 0))
     .slice(0, 10);
+  const coolingWatch = [...skaters]
+    .filter((r: any) => (r.breakout_delta ?? 0) < 0)
+    .sort((a, b) => (a.breakout_delta ?? 0) - (b.breakout_delta ?? 0))
+    .slice(0, 10);
   // Layer 2: momentum window floor — at least 3 of last 5 games played.
   const momentumLeaderSkaters = [...skaters]
     .filter((r: any) => (r.momentum_games ?? 0) >= 3)
@@ -294,6 +298,7 @@ export async function fetchRankings() {
   return {
     top100,
     breakoutWatch,
+    coolingWatch,
     momentumLeaders: { skaters: momentumLeaderSkaters, goalies: momentumLeaderGoalies },
     sparklineSnapshots: (rawSparklines ?? []) as { player_id: number; calculated_at: string; momentum_ppm: number }[],
   };
