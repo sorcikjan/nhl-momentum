@@ -68,18 +68,33 @@ const TEAM_BG_COLORS: Record<string, string> = {
   VGK: '#252f34', WSH: '#041e42', WPG: '#041e42',
 };
 
-function SectionTitle({ main, accent }: { main: string; accent: string }) {
+function SectionTitle({ main, accent, kicker }: { main: string; accent: string; kicker?: string }) {
   return (
-    <h2 style={{
-      fontFamily: 'var(--font-fraunces), Georgia, serif',
-      fontWeight: 900,
-      fontSize: '1.3rem',
-      letterSpacing: '-0.025em',
-      lineHeight: 1.1,
-    }}>
-      <span style={{ color: 'var(--text-bright)' }}>{main} </span>
-      <span style={{ color: 'var(--heat)' }}>{accent}</span>
-    </h2>
+    <div>
+      {kicker && (
+        <div style={{
+          fontFamily: 'var(--font-geist-mono), monospace',
+          fontSize: '0.67rem',
+          fontWeight: 700,
+          color: 'var(--heat)',
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          marginBottom: '0.4rem',
+        }}>
+          {kicker}
+        </div>
+      )}
+      <h2 style={{
+        fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
+        fontWeight: 800,
+        fontSize: 'clamp(1.35rem, 2.5vw, 1.75rem)',
+        letterSpacing: '-0.04em',
+        lineHeight: 1.1,
+      }}>
+        <span style={{ color: 'var(--text-bright)' }}>{main} </span>
+        <span style={{ color: 'var(--heat)' }}>{accent}</span>
+      </h2>
+    </div>
   );
 }
 
@@ -375,7 +390,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   })).filter((e: any) => e.date && e.fullDate);
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 md:pb-0 space-y-4">
+    <div className="max-w-5xl mx-auto pb-20 md:pb-0 space-y-6">
 
       {/* 1. Injury banner — unchanged ─────────────────────────────────────────── */}
       {outStatus && (() => {
@@ -515,7 +530,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                 <span className="text-xs font-bold" style={{ color: energyColor }}>{energyLabel}</span>
               </div>
               <div className="rounded-full overflow-hidden" style={{ background: 'var(--border)', height: 6 }}>
-                <div className="h-full rounded-full" style={{ width: `${energyBar}%`, background: energyColor }} />
+                <div className="h-full rounded-full" style={{ width: `${energyBar}%`, background: `linear-gradient(90deg, ${energyColor}88 0%, ${energyColor} 100%)` }} />
               </div>
             </div>
             <span className="text-xs leading-snug" style={{ color: 'var(--text)', opacity: 0.55 }}>
@@ -575,7 +590,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
       {/* 2b. Cinematic hero — desktop only ─────────────────────────────────── */}
       <div className="hidden md:block">
-      <div className="relative rounded-xl overflow-hidden" style={{ background: teamHeroColor ? `linear-gradient(135deg, ${teamHeroColor} 0%, var(--bg-card) 60%)` : 'var(--bg-card)', minHeight: 380 }}>
+      <div className="relative rounded-xl overflow-hidden" style={{ background: teamHeroColor ? `linear-gradient(135deg, ${teamHeroColor} 0%, var(--bg-card) 60%)` : 'var(--bg-card)', minHeight: 420 }}>
 
         {/* Jersey ghost — full background */}
         {player.sweater_number && (
@@ -590,10 +605,10 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           style={{ background: 'linear-gradient(to right, transparent 35%, rgba(160,50,0,0.09) 100%)', zIndex: 0 }} />
 
         {/* 3-column grid: photo | content | stats */}
-        <div className="relative z-10 grid p-5 gap-5 items-start" style={{ gridTemplateColumns: '260px 1fr 220px' }}>
+        <div className="relative z-10 grid p-6 gap-6 items-start" style={{ gridTemplateColumns: '280px 1fr 220px' }}>
 
           {/* LEFT: Photo — blends into hero background */}
-          <div className="relative" style={{ height: 340 }}>
+          <div className="relative" style={{ height: 380 }}>
             {player.headshot_url && (
               <img src={player.headshot_url} alt={name}
                 className="absolute inset-0 w-full h-full object-cover object-top"
@@ -666,11 +681,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
             </div>
 
             {/* Big name */}
-            <h1 style={{ lineHeight: 0.88, letterSpacing: '-0.03em', fontFamily: 'var(--font-fraunces), Georgia, serif' }}>
-              <span className="block font-black" style={{ fontSize: 'clamp(3rem, 5.5vw, 4.5rem)', color: 'var(--text-bright)' }}>
+            <h1 style={{ lineHeight: 0.88, letterSpacing: '-0.035em', fontFamily: 'var(--font-fraunces), Georgia, serif' }}>
+              <span className="block font-black" style={{ fontSize: 'clamp(3.5rem, 6.5vw, 5.5rem)', color: 'var(--text-bright)' }}>
                 {player.first_name}
               </span>
-              <span className="block font-black" style={{ fontSize: 'clamp(3rem, 5.5vw, 4.5rem)', color: 'var(--heat)' }}>
+              <span className="block font-black" style={{ fontSize: 'clamp(3.5rem, 6.5vw, 5.5rem)', color: 'var(--heat)' }}>
                 {player.last_name}.
               </span>
             </h1>
@@ -712,23 +727,28 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
             {/* ARCHETYPE — deterministic, computed from real season stats, never AI-guessed */}
             {archetype && (
-              <div className="mb-4">
-                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full mb-1.5 text-xs font-bold tracking-widest uppercase"
-                  style={{ background: 'rgba(58,136,255,0.15)', color: 'var(--cold)', border: '1px solid rgba(58,136,255,0.3)' }}
-                  title={archetype.basis}>
-                  {archetype.label}
+              <div className="mb-4 flex flex-col gap-2 p-3 rounded-xl border"
+                style={{ background: 'rgba(255,90,36,0.07)', borderColor: 'rgba(255,90,36,0.25)', boxShadow: '0 0 14px rgba(255,90,36,0.08)' }}>
+                <div className="flex items-center gap-2">
+                  <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6rem', fontWeight: 700, color: 'var(--heat)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                    ARCHETYPE
+                  </div>
+                  <span className="font-extrabold tracking-tight" style={{ fontSize: '1.1rem', color: 'var(--text-bright)', letterSpacing: '-0.02em' }}
+                    title={archetype.basis}>
+                    {archetype.label}
+                  </span>
                 </div>
                 {archetype.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {archetype.tags.map(t => (
-                      <span key={t.text} title={t.basis} className="text-xs px-2 py-0.5 rounded-md"
+                      <span key={t.text} title={t.basis} className="text-xs px-2 py-0.5 rounded-md font-mono"
                         style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                         {t.text}
                       </span>
                     ))}
                   </div>
                 )}
-                <p className="text-xs mt-1" style={{ color: 'var(--text)', opacity: 0.6 }}>{archetype.basis}</p>
+                <p className="text-xs" style={{ color: 'var(--text)', opacity: 0.6, fontFamily: 'var(--font-geist-mono), monospace' }}>{archetype.basis}</p>
               </div>
             )}
 
@@ -779,7 +799,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                 <span className="text-xs font-bold tracking-widest uppercase" style={{ color: energyColor }}>{energyLabel}</span>
               </div>
               <div className="rounded-full overflow-hidden mb-2" style={{ background: 'var(--border)', height: 6 }}>
-                <div className="h-full rounded-full" style={{ width: `${energyBar}%`, background: energyColor }} />
+                <div className="h-full rounded-full" style={{ width: `${energyBar}%`, background: `linear-gradient(90deg, ${energyColor}88 0%, ${energyColor} 100%)` }} />
               </div>
               <div className="text-2xl font-black font-mono mb-1" style={{ color: energyColor }}>{energyBar}</div>
               <span className="text-xs leading-snug" style={{ color: 'rgba(255,255,255,0.38)' }}>
@@ -803,7 +823,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {(metricTimeline?.length ?? 0) > 0 && (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="px-5 pt-5 pb-1">
-            <SectionTitle main="Form" accent="tracker." />
+            <SectionTitle kicker="FORM TRACKER" main="Heat over" accent="time." />
           </div>
           <HeatTimeline snapshots={metricTimeline ?? []} leaguePpm={lgPpm} gameEvents={gameEvents}
             leagueGoalsPerGame={lgG} leagueAssistsPerGame={lgA}
@@ -816,7 +836,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {/* 5a. Recent form — AI perf eval ──────────────────────────────────────── */}
       {last5Games.length > 0 && (
         <div className="rounded-xl border p-5" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <SectionTitle main="Recent" accent="form." />
+          <SectionTitle kicker="RECENT FORM" main="Recent" accent="form." />
           <div className="mt-3">
             <Suspense fallback={<div className="h-8 rounded animate-pulse" style={{ background: 'var(--border)', opacity: 0.4 }} />}>
               <AIPerfSection playerId={Number(id)} aiInput={aiInput} />
@@ -828,7 +848,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {/* 5b. Last 5 stats ─────────────────────────────────────────────────────── */}
       {!isGoalie && last5Games.length > 0 && momGames > 0 && (
         <div className="rounded-xl border p-5" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <SectionTitle main="Last 5" accent="stats." />
+          <SectionTitle kicker="LAST 5 STATS" main="The hot" accent="stretch." />
           <div className="grid grid-cols-4 gap-3 mt-4">
             {l5Cells.map((cell) => (
               <div key={cell.label} className="relative rounded-xl border flex flex-col items-center py-3 px-2 gap-0.5"
@@ -857,7 +877,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {last5Games.length > 0 && (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-            <SectionTitle main="Game" accent="log." />
+            <SectionTitle kicker="GAME LOG" main="Game" accent="by game." />
             {!isGoalie && (
               <span className="text-xs font-mono font-semibold" style={{ color: 'var(--heat)' }}>
                 {l5W}W–{l5L}L–{l5OT}OT
@@ -956,7 +976,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {!isGoalie && latestSnapshot.momentum_rank && (
         <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="mb-3">
-            <SectionTitle main={`Where ${player.first_name}`} accent="ranks." />
+            <SectionTitle kicker="MOMENTUM RANK" main={`Where ${player.first_name}`} accent="ranks." />
           </div>
           <div className="flex flex-col gap-3">
             {[
@@ -987,7 +1007,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {isGoalie && goalieStats ? (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="px-5 pt-5 pb-3 border-b" style={{ borderColor: 'var(--border)' }}>
-            <SectionTitle main="Season" accent="stats." />
+            <SectionTitle kicker="SEASON STATS" main="The full" accent="picture." />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -1039,7 +1059,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       ) : seaGames > 0 ? (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="px-5 pt-5 pb-3 border-b" style={{ borderColor: 'var(--border)' }}>
-            <SectionTitle main="Season" accent="stats." />
+            <SectionTitle kicker="SEASON STATS" main="The full" accent="picture." />
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -1116,11 +1136,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {/* 10. Momentum Radar (skaters only, full-width) ────────────────────────── */}
       {!isGoalie && (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="px-4 pt-3 pb-1 flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-              Momentum Radar
-            </span>
-            <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text)' }}>
+          <div className="px-5 pt-5 pb-1 flex items-start justify-between gap-4">
+            <SectionTitle kicker="PERFORMANCE RADAR" main="Shape of" accent="the game." />
+            <div className="flex items-center gap-3 text-xs flex-shrink-0 mt-1" style={{ color: 'var(--text)' }}>
               <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--heat)' }} />Momentum</span>
               <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--text)' }} />Season</span>
               {leagueAvgRadar && <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full" style={{ background: 'var(--amber)' }} />Lg Avg</span>}
@@ -1133,12 +1151,10 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {/* 11. Performance vs League (skaters only) ─────────────────────────────── */}
       {!isGoalie && (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="px-4 py-3 border-b flex items-center justify-between"
+          <div className="px-5 pt-5 pb-3 border-b flex items-start justify-between gap-4"
             style={{ borderColor: 'var(--border)' }}>
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-              Performance vs League
-            </span>
-            <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--text)' }}>
+            <SectionTitle kicker="VS LEAGUE" main="Performance" accent="vs league." />
+            <div className="flex items-center gap-3 text-xs flex-shrink-0 mt-1" style={{ color: 'var(--text)' }}>
               <span className="flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm" style={{ background: 'var(--silver)' }}/>Season</span>
               <span className="flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm" style={{ background: 'var(--heat)' }}/>Momentum</span>
               <span className="flex items-center gap-1"><span className="inline-block w-2 h-1.5 rounded-sm" style={{ background: 'var(--amber)' }}/>League Avg</span>
@@ -1305,7 +1321,7 @@ async function AIBioSection({ playerId, aiInput }: { playerId: number; aiInput: 
   if (!bio) return null;
   return (
     <div className="pl-3" style={{ borderLeft: '2px solid var(--heat)' }}>
-      <p className="text-sm leading-relaxed" style={{ color: 'var(--text-bright)', fontFamily: 'var(--font-fraunces), Georgia, serif', fontStyle: 'italic' }}>
+      <p className="text-sm leading-relaxed" style={{ color: 'var(--text-bright)' }}>
         {bio}
       </p>
     </div>
@@ -1331,7 +1347,7 @@ async function AIBioMobileCard({ playerId, aiInput }: { playerId: number; aiInpu
         style={{ background: 'rgba(255,90,36,0.15)', color: 'var(--heat)', border: '1px solid rgba(255,90,36,0.3)' }}>
         AI Character
       </div>
-      <p className="text-sm leading-relaxed" style={{ color: 'var(--text-bright)', fontFamily: 'var(--font-fraunces), Georgia, serif', fontStyle: 'italic' }}>
+      <p className="text-sm leading-relaxed" style={{ color: 'var(--text-bright)' }}>
         {bio}
       </p>
     </div>
