@@ -3,6 +3,7 @@ import { cache, Suspense } from 'react';
 import PlayerRadarChart from '@/components/players/RadarChart';
 import HeatTimeline from '@/components/players/HeatTimeline';
 import HeatCircle from '@/components/ui/HeatCircle';
+import ShareButton from '@/components/ui/ShareButton';
 import { fetchPlayer, fetchLeagueAverages, daysAgo, deriveOutStatus } from '@/lib/data';
 import { ppmToHeat, heatColor as getHeatColor } from '@/lib/heat';
 import { getPlayerInsights } from '@/lib/ai';
@@ -756,6 +757,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         </div>
       </div>
       </div>{/* end hidden md:block */}
+
+      {/* Share button */}
+      <div className="flex justify-end">
+        <ShareButton title={`${name} — momentum.`} />
+      </div>
 
       {/* 4. Form tracker ─────────────────────────────────────────────────────── */}
       {(metricTimeline?.length ?? 0) > 0 && (

@@ -9,6 +9,7 @@ import { decimalToNormProb, formatBookmaker } from '@/lib/odds-api';
 import { ppmToHeat } from '@/lib/heat';
 import { periodScoresFromMomentum } from '@/lib/play-by-play';
 
+import ShareButton from '@/components/ui/ShareButton';
 import GameHero from '@/components/games/GameHero';
 import MomentumTracker from '@/components/games/MomentumTracker';
 import RecentActionFeed from '@/components/games/RecentActionFeed';
@@ -323,6 +324,10 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         storyline={isFinal ? recapBody.split('.')[0] + '.' : null}
         favoredIsHome={favoredIsHome}
       />
+
+      <div className="flex justify-end mb-4">
+        <ShareButton title={`${awayName} vs ${homeName} — momentum.`} />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
         {/* ── Main column ── */}
