@@ -4,20 +4,32 @@ import { getSchedule } from '@/lib/nhl-api';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 
 // ─── Full Season Games Download ────────────────────────────────────────────────
-// Downloads every 2025-26 regular season AND playoff game from the NHL schedule
-// API and upserts into the games table, including final scores for completed games.
+// Downloads every regular season (gameType 2) AND playoff (gameType 3) game for
+// a season from the NHL schedule API and upserts into the games table, including
+// final scores for completed games.
 //
 // Steps through the season in 7-day increments — each /schedule/{date} call
 // returns the full gameWeek (7 days) so ~35 calls covers Oct → Jun.
 //
-// GET /api/ingest/season-games
+// GET /api/ingest/season-games              ← defaults to the season currently
+//                                              starting/active (Oct-year rollover)
+// GET /api/ingest/season-games?startYear=2026 ← explicit override, e.g. to backfill
+//                                                 a specific season on demand
 // ─────────────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
   const authError = requireIngestAuth(req);
   if (authError) return authError;
 
-  const SEASON_START = '2025-10-01';
+  const now = new Date();
+  // Default start year mirrors currentSeason()'s Oct rollover, but this route is
+  // for bulk-loading a season's schedule ahead of/at its start, so also flip over
+  // starting September (preseason) rather than waiting for Oct 1.
+  const defaultStartYear = now.getUTCMonth() + 1 >= 9 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+  const startYear = Number(req.nextUrl.searchParams.get('startYear') ?? defaultStartYear);
+  const seasonStr = `${startYear}${startYear + 1}`;
+
+  const SEASON_START = `${startYear}-10-01`;
   const today = new Date().toISOString().slice(0, 10);
 
   // Build list of weekly anchor dates from season start to today
@@ -58,7 +70,7 @@ export async function GET(req: NextRequest) {
             away_score:    g.awayTeam?.score ?? null,
             game_state:    g.gameState ?? 'FUT',
             venue:         g.venue?.default ?? null,
-            season:        '20252026',
+            season:        seasonStr,
           });
         }
       }
