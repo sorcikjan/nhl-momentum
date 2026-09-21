@@ -4,7 +4,7 @@ import PlayerRadarChart from '@/components/players/RadarChart';
 import HeatTimeline from '@/components/players/HeatTimeline';
 import HeatCircle from '@/components/ui/HeatCircle';
 import ShareButton from '@/components/ui/ShareButton';
-import { fetchPlayer, fetchLeagueAverages, daysAgo, deriveOutStatus } from '@/lib/data';
+import { fetchPlayer, fetchLeagueAverages, fetchSeasonPhase, daysAgo, deriveOutStatus } from '@/lib/data';
 import { ppmToHeat, heatColor as getHeatColor } from '@/lib/heat';
 import { getPlayerInsights } from '@/lib/ai';
 import type { PlayerAIInput } from '@/lib/ai';
@@ -97,9 +97,10 @@ function rankBadge(rank: number | undefined) {
 
 export default async function PlayerPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
   const { id } = await params;
-  const [data, leagueAvg] = await Promise.all([
+  const [data, leagueAvg, seasonPhase] = await Promise.all([
     cachedFetchPlayer(id),
     fetchLeagueAverages().catch(() => null),
+    fetchSeasonPhase().catch(() => ({ isPreseason: false, regularSeasonStartDate: null, daysUntilStart: null })),
   ]);
 
   if (!data?.player) {
@@ -141,7 +142,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const heatDelta = prevHeat !== null && currentHeat !== prevHeat ? currentHeat - prevHeat : undefined;
 
   const lastPlayedDaysAgo = lastPlayedDate ? daysAgo(lastPlayedDate) : null;
-  const outStatus = deriveOutStatus(consecutiveGamesMissed ?? null, lastPlayedDaysAgo, player.in_minors ?? false);
+  const outStatus = deriveOutStatus(consecutiveGamesMissed ?? null, lastPlayedDaysAgo, player.in_minors ?? false, !seasonPhase.isPreseason);
 
   const lgPpm    = leagueAvg?.seasonPpm      ?? 0;
   const lgG      = leagueAvg?.goalsPerGame   ?? 0;

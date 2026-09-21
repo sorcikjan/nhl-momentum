@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { fetchTeam, teamLogoUrl, deriveOutStatus } from '@/lib/data';
+import { fetchTeam, teamLogoUrl, fetchSeasonPhase, deriveOutStatus } from '@/lib/data';
 import { playerUrl, gameUrl } from '@/lib/urls';
 
 export const revalidate = 120;
@@ -31,7 +31,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function TeamPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
   const { id } = await params;
-  const { team, roster, recentGames, upcoming, standing } = await fetchTeam(id);
+  const [{ team, roster, recentGames, upcoming, standing }, seasonPhase] = await Promise.all([
+    fetchTeam(id),
+    fetchSeasonPhase().catch(() => ({ isPreseason: false, regularSeasonStartDate: null, daysUntilStart: null })),
+  ]);
 
   if (!team) return <p style={{ color: 'var(--text)' }}>Team not found</p>;
 
@@ -115,7 +118,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                     {(() => {
                       const status = p.players.injury_status
                         ? 'injured'
-                        : deriveOutStatus(p.consecutive_games_missed ?? null, null, p.players.in_minors ?? false);
+                        : deriveOutStatus(p.consecutive_games_missed ?? null, null, p.players.in_minors ?? false, !seasonPhase.isPreseason);
                       if (!status) return null;
                       const label = status === 'minors' ? 'MINORS' : status === 'injured' ? 'INJURED' : status === 'scratch' ? 'SCRATCHED' : 'OUT';
                       const color = status === 'minors' ? 'var(--neon)' : status === 'injured' ? 'var(--red)' : 'var(--amber)';

@@ -46,11 +46,13 @@ export default function PlayerLeaderboard({
   players,
   lastUpdated,
   compact = false,
+  seasonHasStarted = true,
 }: {
   config: LeaderboardConfig;
   players: AnyPlayer[];
   lastUpdated?: string | null;
   compact?: boolean;
+  seasonHasStarted?: boolean;
 }) {
   const defaultCount = compact ? 5 : 5;
   const [expanded, setExpanded] = useState(false);
@@ -123,7 +125,7 @@ export default function PlayerLeaderboard({
                   const lastPlayedDaysAgo = p.last_played_date ? daysAgo(p.last_played_date) : null;
                   const outStatus = p.players?.injury_status
                     ? 'injured'
-                    : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo, p.players?.in_minors ?? false);
+                    : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo, p.players?.in_minors ?? false, seasonHasStarted);
                   const badge = p.players?.injury_status || outStatus === 'injured'
                     ? { label: 'INJURED',   color: 'var(--red)',   bg: 'rgba(239,68,68,0.18)' }
                     : outStatus === 'minors'

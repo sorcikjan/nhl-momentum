@@ -241,6 +241,16 @@ export default function HeatTimeline({
     );
   }
 
+  if (data.length === 0) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-sm" style={{ color: 'var(--text)' }}>
+          Heat trend will appear once games are played this season.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Row 1: title + narrative + window toggle */}

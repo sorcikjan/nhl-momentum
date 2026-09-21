@@ -8,6 +8,10 @@ export function daysAgo(dateStr: string): number {
  * Derives player out-status from absence data.
  * Returns 'minors' | 'injured' | 'out' | 'scratch' | null.
  *
+ * Pass seasonHasStarted = false (i.e. isPreseason = true) to suppress all
+ * badges during the preseason window — day-count and game-count heuristics
+ * are meaningless when the regular season hasn't started yet.
+ *
  * When inMinors is true and the player has missed games, returns 'minors' immediately.
  *
  * When game count is available, cross-checks with days to avoid false positives
@@ -29,7 +33,11 @@ export function deriveOutStatus(
   consecutiveGamesMissed: number | null,
   lastPlayedDaysAgo: number | null,
   inMinors = false,
+  seasonHasStarted = true,
 ): 'minors' | 'injured' | 'out' | 'scratch' | null {
+  // Suppress all absence badges during preseason — there are no regular-season
+  // games to be "absent from", so every heuristic produces false positives.
+  if (!seasonHasStarted) return null;
   if (consecutiveGamesMissed !== null) {
     if (consecutiveGamesMissed === 0) return null;
     // Require the player to also be absent for 3+ days — prevents false

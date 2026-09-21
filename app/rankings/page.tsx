@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import RankingsTable from '@/components/rankings/RankingsTable';
-import { fetchRankings } from '@/lib/data';
+import { fetchRankings, fetchSeasonPhase } from '@/lib/data';
 
 export const revalidate = 120;
 
@@ -19,7 +19,10 @@ export const metadata: Metadata = {
 };
 
 export default async function RankingsPage() {
-  const data = await fetchRankings().catch(() => null);
+  const [data, seasonPhase] = await Promise.all([
+    fetchRankings().catch(() => null),
+    fetchSeasonPhase().catch(() => ({ isPreseason: false, regularSeasonStartDate: null, daysUntilStart: null })),
+  ]);
   const players = data?.top100 ?? [];
 
   return (
@@ -32,7 +35,7 @@ export default async function RankingsPage() {
         </p>
       </div>
 
-      <RankingsTable players={players} />
+      <RankingsTable players={players} seasonHasStarted={!seasonPhase.isPreseason} />
     </div>
   );
 }

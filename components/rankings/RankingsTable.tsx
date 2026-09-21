@@ -35,7 +35,7 @@ interface Player {
 
 type SortKey = 'momentum_rank' | 'momentum_ppm' | 'breakout_delta' | 'season_ppm' | 'energy_bar' | 'sos_coefficient';
 
-export default function RankingsTable({ players }: { players: Player[] }) {
+export default function RankingsTable({ players, seasonHasStarted = true }: { players: Player[]; seasonHasStarted?: boolean }) {
   const [sort, setSort] = useState<SortKey>('momentum_rank');
   const [pos, setPos] = useState<string>('ALL');
 
@@ -113,7 +113,7 @@ export default function RankingsTable({ players }: { players: Player[] }) {
                 const lastPlayedDaysAgo = p.last_played_date ? daysAgo(p.last_played_date) : null;
                 const outStatus = p.players.injury_status
                   ? null
-                  : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo, p.players.in_minors ?? false);
+                  : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo, p.players.in_minors ?? false, seasonHasStarted);
 
                 const statusBadge = p.players.injury_status
                   ? { label: 'INJURED',   color: 'var(--red)',   bg: 'rgba(239,68,68,0.18)' }

@@ -34,9 +34,11 @@ function relativeTime(iso: string): string {
 export default function BreakoutWatch({
   players,
   lastUpdated,
+  seasonHasStarted = true,
 }: {
   players: Player[];
   lastUpdated?: string | null;
+  seasonHasStarted?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const visible = players.slice(0, expanded ? 10 : 5);
@@ -93,7 +95,7 @@ export default function BreakoutWatch({
                       const outStatus = p.players?.injury_status
                         ? 'injured'
                         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                        : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo, (p.players as any)?.in_minors ?? false);
+                        : deriveOutStatus(p.consecutive_games_missed ?? null, lastPlayedDaysAgo, (p.players as any)?.in_minors ?? false, seasonHasStarted);
                       if (!outStatus) return null;
                       const label = outStatus === 'minors' ? 'MINORS' : outStatus === 'injured' ? 'INJURED' : outStatus === 'scratch' ? 'SCRATCHED' : 'OUT';
                       const color = outStatus === 'minors' ? 'var(--neon)' : outStatus === 'injured' ? 'var(--red)' : 'var(--amber)';
