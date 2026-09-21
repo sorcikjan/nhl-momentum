@@ -74,22 +74,22 @@ function SectionTitle({ main, accent, kicker }: { main: string; accent: string; 
       {kicker && (
         <div style={{
           fontFamily: 'var(--font-geist-mono), monospace',
-          fontSize: '0.67rem',
+          fontSize: 11,
           fontWeight: 700,
           color: 'var(--heat)',
-          letterSpacing: '0.12em',
+          letterSpacing: '0.13em',
           textTransform: 'uppercase',
-          marginBottom: '0.4rem',
+          marginBottom: 6,
         }}>
           {kicker}
         </div>
       )}
-      <h2 style={{
+      <h2 className="text-[22px] md:text-[28px]" style={{
         fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
         fontWeight: 800,
-        fontSize: 'clamp(1.35rem, 2.5vw, 1.75rem)',
-        letterSpacing: '-0.04em',
+        letterSpacing: '-0.05em',
         lineHeight: 1.1,
+        margin: 0,
       }}>
         <span style={{ color: 'var(--text-bright)' }}>{main} </span>
         <span style={{ color: 'var(--heat)' }}>{accent}</span>
@@ -445,24 +445,33 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       })()}
 
       {/* 2a. Mobile hero — stacked layout ──────────────────────────────────── */}
-      <div className="md:hidden space-y-3">
+      <div className="md:hidden flex flex-col gap-3">
 
-        {/* Photo card */}
-        <div className="relative rounded-xl overflow-hidden" style={{ height: 220, background: teamHeroColor ? `linear-gradient(135deg, ${teamHeroColor} 0%, var(--bg-card) 60%)` : 'var(--bg-card)' }}>
+        {/* Photo card — 5:3 aspect ratio */}
+        <div className="relative rounded-xl overflow-hidden" style={{ aspectRatio: '5/3', background: teamHeroColor ? `linear-gradient(135deg, ${teamHeroColor} 0%, var(--bg-card) 60%)` : 'var(--bg-card)' }}>
+          {/* Ghost jersey number */}
+          {player.sweater_number && (
+            <div className="absolute select-none pointer-events-none"
+              style={{ top: -40, right: -20, fontSize: 240, fontWeight: 900, lineHeight: 0.8,
+                color: 'rgba(255,255,255,0.05)', letterSpacing: '-0.05em',
+                fontFamily: 'var(--font-fraunces), Georgia, serif', zIndex: 0 }}>
+              {player.sweater_number}
+            </div>
+          )}
           {player.headshot_url ? (
-            <img src={player.headshot_url} alt={name} className="w-full h-full object-cover object-top" />
+            <img src={player.headshot_url} alt={name} className="w-full h-full object-cover object-top" style={{ position: 'relative', zIndex: 1 }} />
           ) : (
             <div className="w-full h-full" style={{ background: 'var(--bg-card)' }} />
           )}
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 50%)' }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 50%)', zIndex: 2 }} />
 
           {/* Team logo — top left */}
           {player.teams?.abbrev && (
-            <div className="absolute top-3 left-3 z-10">
+            <div className="absolute top-3 left-3" style={{ zIndex: 3 }}>
               <img
                 src={`https://assets.nhle.com/logos/nhl/svg/${player.teams.abbrev}_light.svg`}
                 alt={player.teams.abbrev}
-                style={{ width: 44, height: 44, objectFit: 'contain', filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.7))' }}
+                style={{ width: 30, height: 30, objectFit: 'contain', filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.7))' }}
               />
             </div>
           )}
@@ -473,130 +482,146 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
             const bg = outStatus === 'minors' ? 'rgba(99,179,237,0.85)' : outStatus === 'scratch' ? 'rgba(251,191,36,0.85)' : 'rgba(239,68,68,0.85)';
             return (
               <div className="absolute top-3 right-3 px-2 py-0.5 rounded font-bold text-xs"
-                style={{ background: bg, color: '#fff' }}>{label}</div>
+                style={{ background: bg, color: '#fff', zIndex: 3 }}>{label}</div>
             );
           })()}
 
-          {/* Jersey number — bottom right ghost */}
+          {/* Jersey number — bottom right */}
           {player.sweater_number && (
-            <div className="absolute bottom-2 right-3 font-black leading-none select-none pointer-events-none"
-              style={{ fontSize: 52, color: 'rgba(255,255,255,0.13)', letterSpacing: '-0.05em' }}>
-              {player.sweater_number}
+            <div className="absolute font-black"
+              style={{ bottom: 10, right: 10, padding: '4px 10px', borderRadius: 999,
+                background: 'rgba(10,11,15,0.7)', backdropFilter: 'blur(8px)',
+                fontFamily: 'var(--font-geist-mono), monospace', fontSize: 11, color: 'var(--text-bright)', fontWeight: 700, zIndex: 3 }}>
+              #{player.sweater_number}
             </div>
           )}
         </div>
 
         {/* Name block */}
         <div>
-          <div className="flex items-center flex-wrap gap-1.5 text-xs font-semibold tracking-widest uppercase mb-1.5" style={{ color: 'var(--text)', opacity: 0.7 }}>
+          <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 10, color: 'rgba(255,255,255,0.85)', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase' }}>
             {player.teams?.id ? (
               <Link href={teamUrl(player.teams.id, player.teams.name ?? player.teams.abbrev ?? '')}
-                style={{ color: 'var(--heat)' }}>{player.teams.abbrev}</Link>
+                style={{ color: 'rgba(255,255,255,0.85)', textDecoration: 'none' }}>
+                {(player.teams.name ?? player.teams.abbrev ?? '').toUpperCase()}
+              </Link>
             ) : (
-              <span style={{ color: 'var(--heat)' }}>{player.teams?.abbrev}</span>
+              (player.teams?.name ?? player.teams?.abbrev ?? '').toUpperCase()
             )}
-            {player.position_code && <><span>·</span><span>{player.position_code}</span></>}
-            {age && <><span>·</span><span>Age {age}</span></>}
+            {player.position_code && ` · ${player.position_code}`}
+            {age && ` · AGE ${age}`}
           </div>
-          <h1 style={{ lineHeight: 0.9, letterSpacing: '-0.025em', fontFamily: 'var(--font-fraunces), Georgia, serif' }}>
-            <span className="block font-black" style={{ fontSize: '2.4rem', color: 'var(--text-bright)' }}>
+          <h1 style={{ lineHeight: 0.92, letterSpacing: '-0.041em', fontFamily: 'var(--font-fraunces), Georgia, serif', marginBottom: 14 }}>
+            <span className="block font-black" style={{ fontSize: '2.75rem', color: 'var(--text-bright)' }}>
               {player.first_name}
             </span>
-            <span className="block font-black" style={{ fontSize: '2.4rem', color: 'var(--heat)' }}>
+            <span className="block font-black" style={{ fontSize: '2.75rem', color: 'var(--heat)' }}>
               {player.last_name}.
             </span>
           </h1>
         </div>
 
-        {/* 2-col: HEAT + ENERGY */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl border p-4 flex flex-col items-center gap-2"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <span className="text-xs font-semibold tracking-widest uppercase self-start" style={{ color: 'var(--text)', opacity: 0.6 }}>Heat</span>
-            <HeatCircle heat={currentHeat} size={72} delta={heatDelta} />
-            {latestSnapshot.momentum_rank && (
-              <span className="text-xs" style={{ color: 'var(--text)' }}>
-                <span className="font-bold" style={{ color: 'var(--heat)' }}>#{latestSnapshot.momentum_rank}</span> ranked
-              </span>
-            )}
+        {/* Compact archetype badge — mobile */}
+        {archetype && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 999, background: 'rgba(255,90,36,0.14)', border: '1px solid rgba(255,90,36,0.33)', alignSelf: 'flex-start' }}>
+            <span style={{ fontSize: 16 }}>🎯</span>
+            <span style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontSize: 12, fontWeight: 700, color: 'var(--heat)', letterSpacing: '0.01em' }}>
+              {archetype.label}
+            </span>
+            <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: 600, letterSpacing: '0.1em' }}>
+              · ARCHETYPE
+            </span>
           </div>
+        )}
 
-          <div className="rounded-xl border p-4 flex flex-col gap-2 justify-center"
-            style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'var(--text)', opacity: 0.6 }}>Energy</span>
-            <div>
-              <div className="flex items-baseline justify-between mb-1.5">
-                <span className="text-3xl font-black font-mono" style={{ color: energyColor }}>{energyBar}</span>
-                <span className="text-xs font-bold" style={{ color: energyColor }}>{energyLabel}</span>
+        {/* 2-col: HEAT + ENERGY */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* Heat card */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid rgba(255,90,36,0.4)', borderRadius: 10, padding: 12, boxShadow: '0 0 12px rgba(255,90,36,0.2)' }}>
+            <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>HEAT · L5</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Mini conic dial */}
+              <div style={{ width: 44, height: 44, borderRadius: 22, flexShrink: 0, position: 'relative',
+                background: `conic-gradient(var(--heat) ${currentHeat}%, rgba(28,32,48,0.8) 0)` }}>
+                <div style={{ position: 'absolute', inset: 4, borderRadius: 22, background: 'var(--bg-card)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 14, fontWeight: 800, color: 'var(--heat)' }}>{currentHeat}</span>
+                </div>
               </div>
-              <div className="rounded-full overflow-hidden" style={{ background: 'var(--border)', height: 6 }}>
-                <div className="h-full rounded-full" style={{ width: `${energyBar}%`, background: `linear-gradient(90deg, ${energyColor}88 0%, ${energyColor} 100%)` }} />
+              <div>
+                {heatDelta !== undefined && heatDelta !== 0 && (
+                  <div style={{ fontSize: 10, color: heatDelta > 0 ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--font-geist-mono), monospace', fontWeight: 700 }}>
+                    {heatDelta > 0 ? '↑' : '↓'} {heatDelta > 0 ? '+' : ''}{heatDelta}
+                  </div>
+                )}
+                {latestSnapshot.momentum_rank && (
+                  <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>#{latestSnapshot.momentum_rank} of 312</div>
+                )}
               </div>
             </div>
-            <span className="text-xs leading-snug" style={{ color: 'var(--text)', opacity: 0.55 }}>
-              {energyBar >= 70 ? 'Fresh — low workload' : energyBar >= 40 ? 'Moderate fatigue' : 'Drained — heavy load'}
-            </span>
+          </div>
+
+          {/* Energy card */}
+          <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10, padding: 12 }}>
+            <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: energyColor, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 6 }}>ENERGY</div>
+            <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 22, fontWeight: 800, color: energyColor, lineHeight: 1, marginBottom: 4 }}>{energyBar}</div>
+            <div style={{ height: 5, background: 'var(--border)', borderRadius: 3, overflow: 'hidden', marginBottom: 4 }}>
+              <div style={{ width: `${energyBar}%`, height: '100%', background: `linear-gradient(90deg, ${energyColor}88 0%, ${energyColor} 100%)`, borderRadius: 3 }} />
+            </div>
+            <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>
+              {energyBar >= 70 ? 'Fresh' : energyBar >= 40 ? 'Moderate' : 'Drained'}{lastPlayedDaysAgo !== null ? ` · ${lastPlayedDaysAgo}d rest` : ''}
+            </div>
           </div>
         </div>
 
         {/* 2-col: BORN + DRAFTED */}
         {(player.birth_city || player.birth_country || player.draft_year) && (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-              <span className="text-xs font-semibold tracking-widest uppercase block mb-2" style={{ color: 'var(--text)', opacity: 0.6 }}>Born</span>
-              {(player.birth_city || player.birth_country) && (
-                <div className="text-sm font-semibold leading-snug" style={{ color: 'var(--text-bright)' }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {(player.birth_city || player.birth_country) && (
+              <div style={{ flex: 1, padding: '8px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 8, color: 'rgba(255,255,255,0.4)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>BORN</div>
+                <div style={{ fontSize: 11, color: 'var(--text-bright)', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                  {player.birth_country && COUNTRY_FLAG[player.birth_country] && (
+                    <span>{COUNTRY_FLAG[player.birth_country]}</span>
+                  )}
                   {[player.birth_city, player.birth_country].filter(Boolean).join(', ')}
                 </div>
-              )}
-              {player.birth_country && COUNTRY_FLAG[player.birth_country] && (
-                <div className="text-2xl mt-1">{COUNTRY_FLAG[player.birth_country]}</div>
-              )}
-              {player.height_inches && (
-                <div className="text-xs mt-2 font-mono" style={{ color: 'var(--text)', opacity: 0.7 }}>
-                  {Math.floor(player.height_inches / 12)}′{player.height_inches % 12}″{player.weight_pounds ? ` · ${player.weight_pounds} lb` : ''}
+              </div>
+            )}
+            {player.draft_year && (
+              <div style={{ flex: 1, padding: '8px 10px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 8, color: 'rgba(255,255,255,0.4)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>DRAFTED</div>
+                <div style={{ fontSize: 11, color: 'var(--text-bright)', fontWeight: 600, marginTop: 2 }}>
+                  {player.draft_year}{player.draft_round === 1 && player.draft_pick === 1 ? ' · #1 OVR' : player.draft_round ? ` · R${player.draft_round} #${player.draft_pick}` : ''}
                 </div>
-              )}
-            </div>
-
-            <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-              <span className="text-xs font-semibold tracking-widest uppercase block mb-2" style={{ color: 'var(--text)', opacity: 0.6 }}>Drafted</span>
-              {player.draft_year ? (
-                <>
-                  <div className="text-2xl font-black font-mono" style={{ color: 'var(--text-bright)' }}>{player.draft_year}</div>
-                  <div className="text-xs mt-1 leading-snug" style={{ color: 'var(--text)' }}>
-                    R{player.draft_round} Pick #{player.draft_pick}
-                    {player.draft_team_abbrev && <div style={{ color: 'var(--heat)' }}>{player.draft_team_abbrev}</div>}
-                  </div>
-                </>
-              ) : (
-                <div className="text-sm font-semibold mt-1" style={{ color: 'var(--text)' }}>Undrafted</div>
-              )}
-              {player.career_games ? (
-                <div className="text-xs mt-2 font-mono" style={{ color: 'var(--text)', opacity: 0.6 }}>
-                  {player.career_games} GP · {player.career_goals ?? 0}G {player.career_assists ?? 0}A
-                </div>
-              ) : null}
-            </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* AI CHARACTER card */}
+        {/* AI CHARACTER card — floating label */}
         <Suspense fallback={<div className="h-20 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)', opacity: 0.5 }} />}>
           <AIBioMobileCard playerId={Number(id)} aiInput={aiInput} />
         </Suspense>
+
 
       </div>
 
       {/* 2b. Cinematic hero — desktop only ─────────────────────────────────── */}
       <div className="hidden md:block">
-      <div className="relative rounded-xl overflow-hidden" style={{ background: teamHeroColor ? `linear-gradient(135deg, ${teamHeroColor} 0%, var(--bg-card) 60%)` : 'var(--bg-card)', minHeight: 420 }}>
+      <div className="relative overflow-hidden" style={{
+        background: teamHeroColor ? `linear-gradient(115deg, ${teamHeroColor} 0%, var(--bg-card) 65%)` : 'var(--bg-card)',
+        minHeight: 440, borderRadius: 12, borderBottom: '1px solid var(--border)',
+      }}>
+        {/* Heat radial overlay */}
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(circle at 75% 30%, rgba(255,90,36,0.18) 0%, transparent 55%)', zIndex: 0 }} />
 
         {/* Jersey ghost — full background */}
         {player.sweater_number && (
           <div className="absolute select-none pointer-events-none"
-            style={{ right: -15, top: -40, fontSize: 380, fontWeight: 900, lineHeight: 1,
-                     color: 'rgba(255,90,36,0.055)', letterSpacing: '-0.05em', zIndex: 0 }}>
+            style={{ right: 40, top: -80, fontSize: 560, fontWeight: 900, lineHeight: 0.8,
+                     color: 'rgba(255,255,255,0.04)', letterSpacing: '-0.05em',
+                     fontFamily: 'var(--font-fraunces), Georgia, serif', zIndex: 0 }}>
             {player.sweater_number}
           </div>
         )}
@@ -605,18 +630,18 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           style={{ background: 'linear-gradient(to right, transparent 35%, rgba(160,50,0,0.09) 100%)', zIndex: 0 }} />
 
         {/* 3-column grid: photo | content | stats */}
-        <div className="relative z-10 grid p-6 gap-6 items-start" style={{ gridTemplateColumns: '280px 1fr 220px' }}>
+        <div className="relative z-10 grid items-end" style={{ padding: '40px 48px 36px', gap: 36, gridTemplateColumns: '320px 1fr 200px' }}>
 
           {/* LEFT: Photo — blends into hero background */}
-          <div className="relative" style={{ height: 380 }}>
+          <div className="relative" style={{ height: 360 }}>
             {player.headshot_url && (
               <img src={player.headshot_url} alt={name}
                 className="absolute inset-0 w-full h-full object-cover object-top"
-                style={{ borderRadius: 12 }} />
+                style={{ borderRadius: 16 }} />
             )}
             {/* Fade photo edges into card background */}
             <div className="absolute inset-x-0 bottom-0 pointer-events-none"
-              style={{ height: '45%', background: 'linear-gradient(to top, var(--bg-card) 10%, transparent 100%)', borderRadius: '0 0 12px 12px' }} />
+              style={{ height: '45%', background: 'linear-gradient(to top, var(--bg-card) 10%, transparent 100%)', borderRadius: '0 0 16px 16px' }} />
             <div className="absolute inset-y-0 right-0 pointer-events-none"
               style={{ width: '35%', background: 'linear-gradient(to right, transparent 0%, var(--bg-card) 100%)' }} />
 
@@ -651,64 +676,68 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           </div>
 
           {/* CENTER: Meta + name + info trio + AI */}
-          <div className="flex flex-col gap-4">
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
 
             {/* Meta row */}
-            <div className="flex items-center flex-wrap gap-2 text-xs font-semibold tracking-widest uppercase"
-              style={{ color: 'rgba(255,255,255,0.38)' }}>
-              {player.teams?.id ? (
-                <Link href={teamUrl(player.teams.id, player.teams.name ?? player.teams.abbrev ?? '')}
-                  className="hover:opacity-80 transition-opacity"
-                  style={{ color: 'rgba(255,255,255,0.38)' }}>
-                  {player.teams.name ?? player.teams.abbrev}
-                </Link>
-              ) : (
-                <span>{player.teams?.name ?? player.teams?.abbrev}</span>
-              )}
-              {player.position_code && <><span style={{ color: 'rgba(255,255,255,0.18)' }}>·</span><span>{player.position_code}</span></>}
-              {age && <><span style={{ color: 'rgba(255,255,255,0.18)' }}>·</span><span>Age {age}</span></>}
-              {player.shoots_catches && (
-                <><span style={{ color: 'rgba(255,255,255,0.18)' }}>·</span>
-                <span>{player.shoots_catches === 'L' ? 'L' : 'R'}-{player.position_code === 'G' ? 'catches' : 'shoots'}</span></>
-              )}
-              {player.height_inches && (
-                <><span style={{ color: 'rgba(255,255,255,0.18)' }}>·</span>
-                <span>{Math.floor(player.height_inches / 12)}′{player.height_inches % 12}″</span></>
-              )}
-              {player.weight_pounds && (
-                <><span style={{ color: 'rgba(255,255,255,0.18)' }}>·</span><span>{player.weight_pounds} lb</span></>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 11, fontWeight: 700, letterSpacing: 1, color: 'rgba(255,255,255,0.85)' }}>
+                {player.teams?.id ? (
+                  <Link href={teamUrl(player.teams.id, player.teams.name ?? player.teams.abbrev ?? '')}
+                    style={{ color: 'rgba(255,255,255,0.85)', textDecoration: 'none' }}>
+                    {(player.teams.name ?? player.teams.abbrev ?? '').toUpperCase()}
+                  </Link>
+                ) : (
+                  (player.teams?.name ?? player.teams?.abbrev ?? '').toUpperCase()
+                )}
+                {player.position_code && ` · ${player.position_code}`}
+                {age && ` · AGE ${age}`}
+              </span>
+              {(player.shoots_catches || player.height_inches || player.weight_pounds) && (
+                <>
+                  <span style={{ width: 4, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.3)', flexShrink: 0, display: 'inline-block' }} />
+                  <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>
+                    {[
+                      player.shoots_catches && `${player.shoots_catches}-${player.position_code === 'G' ? 'catches' : 'shoots'}`,
+                      player.height_inches && `${Math.floor(player.height_inches / 12)}′${player.height_inches % 12}″`,
+                      player.weight_pounds && `${player.weight_pounds} lb`,
+                    ].filter(Boolean).join(' · ')}
+                  </span>
+                </>
               )}
             </div>
 
             {/* Big name */}
-            <h1 style={{ lineHeight: 0.88, letterSpacing: '-0.035em', fontFamily: 'var(--font-fraunces), Georgia, serif' }}>
-              <span className="block font-black" style={{ fontSize: 'clamp(3.5rem, 6.5vw, 5.5rem)', color: 'var(--text-bright)' }}>
+            <h1 style={{ lineHeight: 0.9, letterSpacing: '-0.0364em', fontFamily: 'var(--font-fraunces), Georgia, serif', marginBottom: 18 }}>
+              <span className="block font-black" style={{ fontSize: '5.5rem', color: 'var(--text-bright)', textShadow: '0 4px 24px rgba(0,0,0,0.5)' }}>
                 {player.first_name}
               </span>
-              <span className="block font-black" style={{ fontSize: 'clamp(3.5rem, 6.5vw, 5.5rem)', color: 'var(--heat)' }}>
+              <span className="block font-black" style={{ fontSize: '5.5rem', color: 'var(--heat)', textShadow: '0 4px 24px rgba(0,0,0,0.5)' }}>
                 {player.last_name}.
               </span>
             </h1>
 
             {/* Info trio: BORN · DRAFTED · SEASON */}
-            <div className="flex gap-8">
+            <div style={{ display: 'flex', gap: 24, marginBottom: 18, alignItems: 'flex-start' }}>
               {(player.birth_city || player.birth_country) && (
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Born</span>
-                  <div className="flex items-center gap-1.5">
+                <div>
+                  <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>BORN</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     {player.birth_country && COUNTRY_FLAG[player.birth_country] && (
-                      <span style={{ fontSize: 14, lineHeight: 1 }}>{COUNTRY_FLAG[player.birth_country]}</span>
+                      <span style={{ fontSize: 16 }}>{COUNTRY_FLAG[player.birth_country]}</span>
                     )}
-                    <span className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-bright)' }}>
                       {[player.birth_city, player.birth_country].filter(Boolean).join(', ')}
                     </span>
                   </div>
                 </div>
               )}
+              {(player.birth_city || player.birth_country) && player.draft_year && (
+                <div style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
+              )}
               {player.draft_year && (
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Drafted</span>
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>DRAFTED</div>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-bright)' }}>
                     {player.draft_year}{player.draft_round === 1 && player.draft_pick === 1
                       ? ' · 1st overall'
                       : player.draft_round ? ` · R${player.draft_round} #${player.draft_pick}` : ''}
@@ -716,47 +745,63 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                 </div>
               )}
               {seaGames > 0 && (
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs font-semibold tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.3)' }}>Season</span>
-                  <span className="text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
-                    {seaGoals}G · {seaAssists}A · {seaGoals + seaAssists} pts
-                  </span>
-                </div>
+                <>
+                  <div style={{ width: 1, alignSelf: 'stretch', background: 'rgba(255,255,255,0.1)' }} />
+                  <div>
+                    <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 }}>SEASON</div>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-bright)' }}>
+                      {seaGoals}G · {seaAssists}A · {seaGoals + seaAssists} pts
+                    </span>
+                  </div>
+                </>
               )}
             </div>
 
             {/* ARCHETYPE — deterministic, computed from real season stats, never AI-guessed */}
             {archetype && (
-              <div className="mb-4 flex flex-col gap-2 p-3 rounded-xl border"
-                style={{ background: 'rgba(255,90,36,0.07)', borderColor: 'rgba(255,90,36,0.25)', boxShadow: '0 0 14px rgba(255,90,36,0.08)' }}>
-                <div className="flex items-center gap-2">
-                  <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6rem', fontWeight: 700, color: 'var(--heat)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+              <div style={{
+                display: 'flex', alignItems: 'flex-start', gap: 14, marginBottom: 14,
+                padding: '12px 16px', borderRadius: 12,
+                background: 'rgba(255,90,36,0.14)', border: '1px solid rgba(255,90,36,0.33)',
+                boxShadow: '0 0 14px rgba(255,90,36,0.13)',
+              }}>
+                <div style={{
+                  width: 38, height: 38, borderRadius: 8, background: 'var(--bg)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: '1px solid rgba(255,90,36,0.33)', flexShrink: 0,
+                  fontSize: 20,
+                }}>
+                  🎯
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 2 }}>
                     ARCHETYPE
                   </div>
-                  <span className="font-extrabold tracking-tight" style={{ fontSize: '1.1rem', color: 'var(--text-bright)', letterSpacing: '-0.02em' }}
+                  <div style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontSize: 18, fontWeight: 800, color: 'var(--text-bright)', letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 6 }}
                     title={archetype.basis}>
                     {archetype.label}
-                  </span>
-                </div>
-                {archetype.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {archetype.tags.map(t => (
-                      <span key={t.text} title={t.basis} className="text-xs px-2 py-0.5 rounded-md font-mono"
-                        style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
-                        {t.text}
-                      </span>
-                    ))}
                   </div>
-                )}
-                <p className="text-xs" style={{ color: 'var(--text)', opacity: 0.6, fontFamily: 'var(--font-geist-mono), monospace' }}>{archetype.basis}</p>
+                  {archetype.tags.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                      {archetype.tags.map(t => (
+                        <span key={t.text} title={t.basis}
+                          style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, fontWeight: 700, letterSpacing: '0.04em',
+                            color: 'var(--text)', padding: '3px 8px', borderRadius: 4,
+                            background: 'var(--bg)', border: '1px solid var(--border)' }}>
+                          {t.text}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
-            {/* AI CHARACTER */}
-            <div>
-              <div className="inline-flex items-center px-2.5 py-1 rounded-full mb-3 text-xs font-bold tracking-widest uppercase"
-                style={{ background: 'rgba(255,90,36,0.15)', color: 'var(--heat)', border: '1px solid rgba(255,90,36,0.3)' }}>
-                AI Character
+            {/* AI CHARACTER — floating label box */}
+            <div style={{ position: 'relative', padding: '14px 18px', background: 'rgba(10,11,15,0.4)', backdropFilter: 'blur(8px)', border: '1px solid rgba(28,32,48,0.8)', borderRadius: 10 }}>
+              <div style={{ position: 'absolute', top: -8, left: 14, padding: '2px 8px', background: 'var(--bg)',
+                fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: '#e5508b', fontWeight: 700, letterSpacing: '0.12em', borderRadius: 3, border: '1px solid rgba(229,80,139,0.33)', textTransform: 'uppercase' }}>
+                AI CHARACTER
               </div>
               <Suspense fallback={<div className="h-12 rounded animate-pulse" style={{ background: 'var(--border)', opacity: 0.4 }} />}>
                 <AIBioSection playerId={Number(id)} aiInput={aiInput} />
@@ -766,46 +811,64 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
           </div>
 
           {/* RIGHT: Heat + Energy cards */}
-          <div className="flex flex-col gap-3">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
             {/* HEAT · L5 */}
-            <div className="rounded-xl border p-4" style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'var(--border)' }}>
-              <div className="flex items-center gap-1.5 mb-3">
-                <span className="text-xs font-bold tracking-widest uppercase" style={{ color: 'var(--heat)' }}>Heat</span>
-                <span style={{ color: 'rgba(255,255,255,0.2)' }}>·</span>
-                <span className="text-xs font-bold tracking-widest uppercase" style={{ color: 'rgba(255,255,255,0.35)' }}>L5</span>
+            <div style={{
+              background: 'var(--bg-card)', border: '1px solid rgba(255,90,36,0.33)',
+              borderRadius: 14, padding: 16, boxShadow: '0 0 24px rgba(255,90,36,0.2)',
+            }}>
+              <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 8 }}>
+                HEAT · L5
               </div>
-              <div className="flex items-center gap-3">
-                <HeatCircle heat={currentHeat} size={80} delta={heatDelta} />
-                <div className="flex flex-col gap-1">
-                  {heatDelta !== undefined && heatDelta !== 0 && (
-                    <span className="text-sm font-bold" style={{ color: heatDelta > 0 ? 'var(--green)' : 'var(--red)' }}>
-                      {heatDelta > 0 ? '↑' : '↓'} {heatDelta > 0 ? '+' : ''}{heatDelta}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                {/* Conic dial */}
+                <div style={{
+                  width: 80, height: 80, borderRadius: 40, flexShrink: 0,
+                  background: `conic-gradient(var(--heat) ${currentHeat}%, rgba(28,32,48,0.8) 0)`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative',
+                }}>
+                  <div style={{
+                    position: 'absolute', inset: 6, borderRadius: 40, background: 'var(--bg-card)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 26, fontWeight: 800, color: 'var(--heat)', lineHeight: 1 }}>
+                      {currentHeat}
                     </span>
+                  </div>
+                </div>
+                <div style={{ flex: 1 }}>
+                  {heatDelta !== undefined && heatDelta !== 0 && (
+                    <div style={{ fontSize: 12, color: heatDelta > 0 ? 'var(--green)' : 'var(--red)', fontFamily: 'var(--font-geist-mono), monospace', fontWeight: 700, letterSpacing: '0.05em' }}>
+                      {heatDelta > 0 ? '↑' : '↓'} {heatDelta > 0 ? '+' : ''}{heatDelta}
+                    </div>
                   )}
                   {latestSnapshot.momentum_rank && (
-                    <span className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.45)' }}>
-                      #{latestSnapshot.momentum_rank} overall
-                    </span>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                      #{latestSnapshot.momentum_rank} of 312
+                    </div>
                   )}
                 </div>
               </div>
             </div>
 
             {/* ENERGY */}
-            <div className="rounded-xl border p-4" style={{ background: 'rgba(0,0,0,0.3)', borderColor: 'var(--border)' }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-bold tracking-widest uppercase" style={{ color: energyColor }}>Energy</span>
-                <span className="text-xs font-bold tracking-widest uppercase" style={{ color: energyColor }}>{energyLabel}</span>
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: energyColor, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>ENERGY</span>
+                <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>{energyLabel}</span>
               </div>
-              <div className="rounded-full overflow-hidden mb-2" style={{ background: 'var(--border)', height: 6 }}>
-                <div className="h-full rounded-full" style={{ width: `${energyBar}%`, background: `linear-gradient(90deg, ${energyColor}88 0%, ${energyColor} 100%)` }} />
+              {/* Bar */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flex: 1, height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ width: `${energyBar}%`, height: '100%', background: `linear-gradient(90deg, ${energyColor}88 0%, ${energyColor} 100%)`, borderRadius: 4 }} />
+                </div>
+                <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 12, color: energyColor, fontWeight: 700 }}>{energyBar}</span>
               </div>
-              <div className="text-2xl font-black font-mono mb-1" style={{ color: energyColor }}>{energyBar}</div>
-              <span className="text-xs leading-snug" style={{ color: 'rgba(255,255,255,0.38)' }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 8, lineHeight: 1.4 }}>
                 {lastPlayedDaysAgo !== null ? `Last game ${lastPlayedDaysAgo}d ago. ` : ''}
-                {energyBar >= 70 ? 'Fresh — manageable workload' : energyBar >= 40 ? 'Moderate — watch for fatigue' : 'Drained — heavy recent load'}
-              </span>
+                {energyBar >= 70 ? 'Below season fatigue average.' : energyBar >= 40 ? 'Moderate fatigue load.' : 'Heavy recent load.'}
+              </div>
             </div>
 
           </div>
@@ -1320,11 +1383,9 @@ async function AIBioSection({ playerId, aiInput }: { playerId: number; aiInput: 
   const { bio } = await getPlayerInsights(playerId, aiInput).catch(() => ({ bio: null, perfEval: null }));
   if (!bio) return null;
   return (
-    <div className="pl-3" style={{ borderLeft: '2px solid var(--heat)' }}>
-      <p className="text-sm leading-relaxed" style={{ color: 'var(--text-bright)' }}>
-        {bio}
-      </p>
-    </div>
+    <p style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>
+      {bio}
+    </p>
   );
 }
 
@@ -1342,12 +1403,13 @@ async function AIBioMobileCard({ playerId, aiInput }: { playerId: number; aiInpu
   const { bio } = await getPlayerInsights(playerId, aiInput).catch(() => ({ bio: null, perfEval: null }));
   if (!bio) return null;
   return (
-    <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="inline-flex items-center px-2.5 py-1 rounded-full mb-3 text-xs font-bold tracking-widest uppercase"
-        style={{ background: 'rgba(255,90,36,0.15)', color: 'var(--heat)', border: '1px solid rgba(255,90,36,0.3)' }}>
-        AI Character
+    <div style={{ position: 'relative', padding: '12px 14px', background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 10 }}>
+      <div style={{ position: 'absolute', top: -8, left: 12, padding: '2px 7px', background: 'var(--bg)',
+        fontFamily: 'var(--font-geist-mono), monospace', fontSize: 8, color: '#e5508b', fontWeight: 700,
+        letterSpacing: '0.12em', borderRadius: 3, border: '1px solid rgba(229,80,139,0.33)', textTransform: 'uppercase' }}>
+        AI CHARACTER
       </div>
-      <p className="text-sm leading-relaxed" style={{ color: 'var(--text-bright)' }}>
+      <p style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.55, margin: 0 }}>
         {bio}
       </p>
     </div>
