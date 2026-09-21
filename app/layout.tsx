@@ -37,13 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <head>
-        <Script async src="https://www.googletagmanager.com/gtag/js?id=G-Z7EWZE1NGP" strategy="afterInteractive" />
-        <Script id="gtag-init" strategy="afterInteractive">{`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-Z7EWZE1NGP');
-        `}</Script>
+        <Script defer data-domain="hockeymomentum.com" src="https://plausible.io/js/script.js" strategy="afterInteractive" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} antialiased min-h-screen`}>
         <TopLoader />
