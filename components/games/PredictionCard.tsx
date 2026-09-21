@@ -52,14 +52,15 @@ export default function PredictionCard({
             Why {awayAbbrev && homeAbbrev ? `${awayAbbrev} @ ${homeAbbrev}` : ''}
           </div>
           {factors.map(f => {
-            const awayBetter = (f.away.value ?? 0) >= (f.home.value ?? 0);
+            const awayBetter = (f.away.value ?? 0) > (f.home.value ?? 0);
+            const homeBetter = (f.home.value ?? 0) > (f.away.value ?? 0);
             return (
               <div key={f.label} className="flex items-center justify-between px-3 py-2 border-t" style={{ borderColor: 'var(--border)' }}>
                 <span className="text-xs font-mono font-semibold" style={{ color: awayBetter ? 'var(--heat)' : 'var(--text)' }}>
                   {f.away.name ? `${f.away.name} ` : ''}{f.away.value ?? '—'}
                 </span>
                 <span className="text-xs uppercase tracking-wider" style={{ color: 'var(--text)', opacity: 0.6 }}>{f.label}</span>
-                <span className="text-xs font-mono font-semibold" style={{ color: !awayBetter ? 'var(--heat)' : 'var(--text)' }}>
+                <span className="text-xs font-mono font-semibold" style={{ color: homeBetter ? 'var(--heat)' : 'var(--text)' }}>
                   {f.home.value ?? '—'}{f.home.name ? ` ${f.home.name}` : ''}
                 </span>
               </div>

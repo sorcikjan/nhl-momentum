@@ -221,9 +221,6 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     const favSos = favoredIsHome ? prediction.home_sos_multiplier : prediction.away_sos_multiplier;
     const oppSos = favoredIsHome ? prediction.away_sos_multiplier : prediction.home_sos_multiplier;
     if (favSos != null && oppSos != null && favSos - oppSos >= 0.1) predictionChips.push(`${favAbbrev} easier schedule`);
-    const favRoster = favoredIsHome ? homeSkaters : awaySkaters;
-    const topStar = [...favRoster].sort((a, b) => (b.compositePpm ?? 0) - (a.compositePpm ?? 0))[0];
-    if (topStar) predictionChips.push(`${topStar.playerName} Heat ${ppmToHeat(topStar.compositePpm)}`);
   }
 
   // ── Prediction factors (two-sided comparison strip) ─────────────────────────
