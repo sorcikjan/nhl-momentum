@@ -1,5 +1,8 @@
+type PredictionFactor = { label: string; away: { name?: string; value: number | null }; home: { name?: string; value: number | null } };
+
 export default function PredictionCard({
   mode, favoredAbbrev, favoredPct, correct, accuracyYtd, accuracyRound, chips,
+  factors, awayAbbrev, homeAbbrev,
 }: {
   mode: 'pregame' | 'final';
   favoredAbbrev: string;
@@ -8,6 +11,9 @@ export default function PredictionCard({
   accuracyYtd?: number | null;
   accuracyRound?: number | null;
   chips: string[];
+  factors?: PredictionFactor[];
+  awayAbbrev?: string;
+  homeAbbrev?: string;
 }) {
   return (
     <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
@@ -37,6 +43,28 @@ export default function PredictionCard({
           {accuracyYtd != null && <>YTD accuracy <span style={{ color: 'var(--text-bright)', fontWeight: 600 }}>{accuracyYtd}%</span></>}
           {accuracyYtd != null && accuracyRound != null && ' · '}
           {accuracyRound != null && <>This round <span style={{ color: 'var(--text-bright)', fontWeight: 600 }}>{accuracyRound}%</span></>}
+        </div>
+      )}
+
+      {factors && factors.length > 0 && (
+        <div className="mb-3 rounded-lg overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+          <div className="px-3 py-1.5 text-xs font-semibold uppercase tracking-wider" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+            Why {awayAbbrev && homeAbbrev ? `${awayAbbrev} @ ${homeAbbrev}` : ''}
+          </div>
+          {factors.map(f => {
+            const awayBetter = (f.away.value ?? 0) >= (f.home.value ?? 0);
+            return (
+              <div key={f.label} className="flex items-center justify-between px-3 py-2 border-t" style={{ borderColor: 'var(--border)' }}>
+                <span className="text-xs font-mono font-semibold" style={{ color: awayBetter ? 'var(--heat)' : 'var(--text)' }}>
+                  {f.away.name ? `${f.away.name} ` : ''}{f.away.value ?? '—'}
+                </span>
+                <span className="text-xs uppercase tracking-wider" style={{ color: 'var(--text)', opacity: 0.6 }}>{f.label}</span>
+                <span className="text-xs font-mono font-semibold" style={{ color: !awayBetter ? 'var(--heat)' : 'var(--text)' }}>
+                  {f.home.value ?? '—'}{f.home.name ? ` ${f.home.name}` : ''}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 

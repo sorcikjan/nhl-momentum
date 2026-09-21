@@ -226,6 +226,32 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     if (topStar) predictionChips.push(`${topStar.playerName} Heat ${ppmToHeat(topStar.compositePpm)}`);
   }
 
+  // ── Prediction factors (two-sided comparison strip) ─────────────────────────
+  // Built entirely from data already computed and displayed elsewhere on this
+  // page (skater snapshot Heat, prediction snapshot energy bars) — never from
+  // the model's internal weights. Deliberately narrow: two rows, not a new
+  // analytics surface.
+  type PredictionFactor = { label: string; away: { name?: string; value: number | null }; home: { name?: string; value: number | null } };
+  const predictionFactors: PredictionFactor[] = [];
+  if (prediction) {
+    const awayTopStar = [...awaySkaters].sort((a, b) => (b.compositePpm ?? 0) - (a.compositePpm ?? 0))[0];
+    const homeTopStar = [...homeSkaters].sort((a, b) => (b.compositePpm ?? 0) - (a.compositePpm ?? 0))[0];
+    if (awayTopStar && homeTopStar) {
+      predictionFactors.push({
+        label: 'Top Heat',
+        away: { name: awayTopStar.playerName, value: ppmToHeat(awayTopStar.compositePpm) },
+        home: { name: homeTopStar.playerName, value: ppmToHeat(homeTopStar.compositePpm) },
+      });
+    }
+    if (prediction.away_energy_bar != null && prediction.home_energy_bar != null) {
+      predictionFactors.push({
+        label: 'Energy',
+        away: { value: prediction.away_energy_bar },
+        home: { value: prediction.home_energy_bar },
+      });
+    }
+  }
+
   // ── Accuracy for the "Our Pick" card ──────────────────────────────────────
   let accuracyYtd: number | null = null;
   if (prediction) {
@@ -359,6 +385,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                   correct={outcome?.correct_winner ?? null}
                   accuracyYtd={accuracyYtd}
                   chips={predictionChips}
+                  factors={predictionFactors}
+                  awayAbbrev={awayAbbrev}
+                  homeAbbrev={homeAbbrev}
                 />
               )}
               <HeatImpactCard up={heatImpactUp} down={heatImpactDown} />
@@ -372,6 +401,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
               favoredPct={Math.round(Math.max(prediction.home_win_probability, prediction.away_win_probability) * 100)}
               accuracyYtd={accuracyYtd}
               chips={predictionChips}
+              factors={predictionFactors}
+              awayAbbrev={awayAbbrev}
+              homeAbbrev={homeAbbrev}
             />
           )}
 
