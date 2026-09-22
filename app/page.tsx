@@ -255,7 +255,7 @@ async function StorylinesSection() {
 
 // ── Section: Tonight (upcoming / live games) ──────────────────────────────────
 
-async function TonightSlate({ today }: { today: string }) {
+async function TonightSlate({ today, newLayout = false }: { today: string; newLayout?: boolean }) {
   const [{ games, predictions, odds }, rankings, seriesMap] = await Promise.all([
     getTodayGames(today),
     getRankings(),
@@ -364,6 +364,7 @@ async function TonightSlate({ today }: { today: string }) {
       watchPlayers={watchPlayers}
       watchabilityMap={watchabilityMap}
       excludeGameId={featuredGameId}
+      newLayout={newLayout}
     />
   );
 }
@@ -412,7 +413,7 @@ async function WeekScheduleSection({ today }: { today: string }) {
 
 // ── Section: Who's burning (Heat grid / rankings) ────────────────────────────
 
-async function BurningSection() {
+async function BurningSection({ newLayout = false }: { newLayout?: boolean }) {
   const [rankings, goalies, newcomers] = await Promise.all([
     getRankings(),
     getGoalieRankings(),
@@ -431,6 +432,7 @@ async function BurningSection() {
       goalies={goalies as any[]}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       newcomers={newcomers as any[]}
+      newLayout={newLayout}
     />
   );
 }
@@ -693,18 +695,22 @@ export default async function DashboardPage() {
             <StorylinesSection />
           </Suspense>
         );
-      case 'matches-to-watch':
+      case 'matches-to-watch': {
+        const usesNewLayout = phase === 'season-start' || phase === 'regular';
         return (
           <Suspense key={key} fallback={<GameSkeleton />}>
-            <TonightSlate today={today} />
+            <TonightSlate today={today} newLayout={usesNewLayout} />
           </Suspense>
         );
-      case 'rankings':
+      }
+      case 'rankings': {
+        const rankingsNewLayout = phase === 'season-start' || phase === 'regular';
         return (
           <Suspense key={key} fallback={<HeatGridSkeleton />}>
-            <BurningSection />
+            <BurningSection newLayout={rankingsNewLayout} />
           </Suspense>
         );
+      }
       case 'week-schedule':
         return (
           <Suspense key={key} fallback={<WeekSkeleton />}>

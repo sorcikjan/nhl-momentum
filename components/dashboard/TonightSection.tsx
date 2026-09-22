@@ -570,6 +570,152 @@ function MobileGameCard({
   );
 }
 
+// ── Full-width featured game row (new layout for season-start / regular) ──────
+
+function FeaturedGameRow({
+  game,
+  pred,
+  watchPlayers,
+  watchability,
+}: {
+  game: Game;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pred: any;
+  watchPlayers?: WatchPlayer[];
+  watchability?: number;
+}) {
+  const away = game.awayTeam?.abbrev ?? '???';
+  const home = game.homeTeam?.abbrev ?? '???';
+  const isLive = ['LIVE', 'CRIT'].includes(game.gameState);
+  const awayScore = game.awayTeam?.score ?? null;
+  const homeScore = game.homeTeam?.score ?? null;
+  const periodNum = game.periodDescriptor?.number as number | undefined;
+  const period = periodLabel(periodNum);
+  const clock = game.clock?.timeRemaining as string | undefined;
+
+  const homeProb = pred?.home_win_probability ?? null;
+  const awayConf = homeProb != null ? Math.round((1 - homeProb) * 100) : 50;
+  const homeConf = homeProb != null ? Math.round(homeProb * 100) : 50;
+  const favorHome = homeProb != null ? homeProb >= 0.5 : null;
+  const favoredAbbrev = favorHome === true ? home : favorHome === false ? away : null;
+
+  const awayPlayers = (watchPlayers ?? []).filter(p => p.team === away).slice(0, 3);
+  const homePlayers = (watchPlayers ?? []).filter(p => p.team === home).slice(0, 3);
+
+  return (
+    <div
+      className="rounded-xl overflow-hidden"
+      style={{
+        background: 'var(--bg-card)',
+        border: isLive ? '1px solid rgba(255,68,68,0.35)' : '1px solid var(--border)',
+      }}
+    >
+      {/* Full-width probability band */}
+      {homeProb != null ? (
+        <ProbabilityBand
+          awayAbbrev={away}
+          homeAbbrev={home}
+          awayConf={awayConf}
+          homeConf={homeConf}
+          favoredAbbrev={favoredAbbrev}
+        />
+      ) : (
+        <div style={{
+          height: 52,
+          background: `linear-gradient(90deg, ${TEAM_COLORS[away] ?? '#1a1d26'}80 0%, ${TEAM_COLORS[home] ?? '#1a1d26'}80 100%)`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px',
+        }}>
+          <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoUrl(away)} alt={away} style={{ width: 24, height: 24 }} />
+            <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#fff' }}>{away}</span>
+          </div>
+          <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem' }}>at</span>
+          <div className="flex items-center gap-2">
+            <span style={{ fontWeight: 700, fontSize: '0.875rem', color: '#fff' }}>{home}</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoUrl(home)} alt={home} style={{ width: 24, height: 24 }} />
+          </div>
+        </div>
+      )}
+
+      {/* Meta row: time + watchability */}
+      <div
+        style={{
+          padding: '8px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          borderBottom: '1px solid var(--border-soft, var(--border))',
+          flexWrap: 'wrap',
+        }}
+      >
+        {isLive ? (
+          <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.625rem', fontWeight: 700, color: '#ff4444' }}>
+            ● LIVE{period ? ` · ${period}` : ''}{clock ? ` · ${clock}` : ''}
+            {awayScore != null && homeScore != null && ` · ${away} ${awayScore}–${homeScore} ${home}`}
+          </span>
+        ) : (
+          <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-bright)' }}>
+            {formatTime(game.startTimeUTC)}
+          </span>
+        )}
+        <span style={{ flex: 1 }} />
+        {watchability != null && (
+          <span style={{
+            fontFamily: 'var(--font-geist-mono), monospace',
+            fontSize: '0.5625rem',
+            color: 'var(--gold)',
+            fontWeight: 700,
+            letterSpacing: '0.06em',
+            background: 'rgba(255,181,71,0.1)',
+            border: '1px solid rgba(255,181,71,0.25)',
+            padding: '2px 6px',
+            borderRadius: 4,
+          }}>
+            WATCHABILITY {watchability}
+          </span>
+        )}
+        <Link
+          href={gameUrl(game.id, away, home, game.gameDate ?? '')}
+          style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5625rem', color: 'var(--heat)', fontWeight: 600 }}
+        >
+          FULL PREVIEW →
+        </Link>
+      </div>
+
+      {/* Player columns: away left, home right */}
+      {(awayPlayers.length > 0 || homePlayers.length > 0) && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, padding: '10px 12px 12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5rem', color: 'var(--text)', opacity: 0.45, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2 }}>
+              {away} · WATCH
+            </div>
+            {awayPlayers.map(p => (
+              <WatchPlayerCell key={p.player_id} p={p} />
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5rem', color: 'var(--text)', opacity: 0.45, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2, textAlign: 'right' }}>
+              {home} · WATCH
+            </div>
+            {homePlayers.map(p => (
+              <WatchPlayerCell key={p.player_id} p={p} alignRight />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Headline helpers ───────────────────────────────────────────────────────────
+
+function numberWord(n: number): string {
+  const words = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
+  return words[n] ?? String(n);
+}
+
 // ── Main Tonight section ──────────────────────────────────────────────────────
 
 export default function TonightSection({
@@ -579,6 +725,7 @@ export default function TonightSection({
   watchPlayers,
   watchabilityMap,
   excludeGameId,
+  newLayout = false,
 }: {
   games: Game[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -588,6 +735,7 @@ export default function TonightSection({
   watchPlayers?: Map<number, WatchPlayer[]>;
   watchabilityMap?: Map<number, number>;
   excludeGameId?: number;
+  newLayout?: boolean;
 }) {
   const upcoming = games
     .filter((g: Game) => ['FUT', 'PRE', 'LIVE', 'CRIT'].includes(g.gameState))
@@ -616,60 +764,99 @@ export default function TonightSection({
   const featuredIds = new Set(featuredGames.map(g => g.id));
   const compactGames = [...liveGames, ...upcomingOnly.filter(g => !featuredIds.has(g.id))];
 
+  const featuredCount = Math.min(featuredGames.length, 2);
+  const headlineText = newLayout
+    ? `${numberWord(featuredCount)} game${featuredCount !== 1 ? 's' : ''} worth your evening.`
+    : "What's on tonight.";
+
   return (
     <section>
       {/* Section header */}
       <div className="flex items-end justify-between mb-5">
         <div>
           <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.13em', textTransform: 'uppercase', marginBottom: '6px' }}>
-            TONIGHT · {upcoming.length} GAME{upcoming.length !== 1 ? 'S' : ''}
+            {newLayout ? 'TONIGHT · MATCHES TO WATCH' : `TONIGHT · ${upcoming.length} GAME${upcoming.length !== 1 ? 'S' : ''}`}
           </p>
           <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.03125rem', lineHeight: 1.05, color: 'var(--text-bright)' }}>
-            What&apos;s on tonight.
+            {headlineText}
           </h2>
+          {newLayout && (
+            <p style={{ fontSize: '0.75rem', color: 'var(--text)', marginTop: 6, maxWidth: '520px' }}>
+              Our pick on every game, plus the three players from each team most likely to decide it — ranked by the Heat they carried out of last season.
+            </p>
+          )}
         </div>
         <Link href="/games" style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 600, flexShrink: 0 }}>
-          FULL SCHEDULE →
+          ALL {upcoming.length} GAME{upcoming.length !== 1 ? 'S' : ''} →
         </Link>
       </div>
 
-      {/* Desktop: featured cards + compact rows */}
-      <div className="hidden md:flex flex-col gap-3">
-        {/* Featured game cards (top 2 by watchability) */}
-        {featuredGames.length > 0 && (
-          <div className={`grid gap-3 ${featuredGames.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-            {featuredGames.map(g => (
-              <FeaturedGameCard
-                key={g.id}
-                game={g}
-                pred={predMap[g.id]}
-                watchPlayers={watchPlayers?.get(g.id)}
-                watchability={watchabilityMap?.get(g.id)}
-              />
-            ))}
-          </div>
-        )}
+      {/* Desktop layout */}
+      {newLayout ? (
+        /* New layout: full-width rows for featured, compact rows for the rest */
+        <div className="hidden md:flex flex-col gap-3">
+          {featuredGames.map(g => (
+            <FeaturedGameRow
+              key={g.id}
+              game={g}
+              pred={predMap[g.id]}
+              watchPlayers={watchPlayers?.get(g.id)}
+              watchability={watchabilityMap?.get(g.id)}
+            />
+          ))}
+          {compactGames.length > 0 && (
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+            >
+              {compactGames.map((g, i) => (
+                <DesktopGameRow
+                  key={g.id}
+                  game={g}
+                  pred={predMap[g.id]}
+                  watchPlayers={watchPlayers?.get(g.id)}
+                  isFirst={i === 0}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Classic layout: 2-column card grid for featured, compact rows for the rest */
+        <div className="hidden md:flex flex-col gap-3">
+          {featuredGames.length > 0 && (
+            <div className={`grid gap-3 ${featuredGames.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+              {featuredGames.map(g => (
+                <FeaturedGameCard
+                  key={g.id}
+                  game={g}
+                  pred={predMap[g.id]}
+                  watchPlayers={watchPlayers?.get(g.id)}
+                  watchability={watchabilityMap?.get(g.id)}
+                />
+              ))}
+            </div>
+          )}
+          {compactGames.length > 0 && (
+            <div
+              className="rounded-xl overflow-hidden"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+            >
+              {compactGames.map((g, i) => (
+                <DesktopGameRow
+                  key={g.id}
+                  game={g}
+                  pred={predMap[g.id]}
+                  watchPlayers={watchPlayers?.get(g.id)}
+                  isFirst={i === 0}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-        {/* Rest of slate: compact rows */}
-        {compactGames.length > 0 && (
-          <div
-            className="rounded-xl overflow-hidden"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-          >
-            {compactGames.map((g, i) => (
-              <DesktopGameRow
-                key={g.id}
-                game={g}
-                pred={predMap[g.id]}
-                watchPlayers={watchPlayers?.get(g.id)}
-                isFirst={i === 0}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Mobile: individual compact cards for all games */}
+      {/* Mobile: individual compact cards for all games (same for both layouts) */}
       <div className="md:hidden flex flex-col gap-2">
         {sorted.map(g => (
           <MobileGameCard

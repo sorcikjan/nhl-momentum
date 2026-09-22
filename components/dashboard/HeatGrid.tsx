@@ -448,27 +448,51 @@ export default function HeatGrid({
   goalies,
   newcomers,
   limit = 8,
+  newLayout = false,
 }: {
   skaters: SkaterPlayer[];
   goalies: GoaliePlayer[];
   newcomers: NewcomerPlayer[];
   limit?: number;
+  newLayout?: boolean;
 }) {
   const [tab, setTab] = useState<Tab>('skaters');
 
+  // For new layout: hero = index 0, compact = indices 1-4
   const top5Skaters = skaters.slice(0, 5);
   const top5Goalies = goalies.slice(0, 5);
   const top5Newcomers = newcomers.slice(0, 5);
+
+  const heroSkater = top5Skaters[0];
+  const heroGoalie = top5Goalies[0];
+  const heroNewcomer = top5Newcomers[0];
+  const compactSkaters = top5Skaters.slice(1);
+  const compactGoalies = top5Goalies.slice(1);
+  const compactNewcomers = top5Newcomers.slice(1);
 
   return (
     <section className="flex flex-col gap-4">
 
       {/* Section headline */}
-      <div>
-        <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.13em', textTransform: 'uppercase', marginBottom: '6px' }}>RANKINGS · LIVE</p>
-        <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.03125rem', lineHeight: 1.05, color: 'var(--text-bright)' }}>
-          Who&apos;s hot. Right now.
-        </h2>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.13em', textTransform: 'uppercase', marginBottom: '6px' }}>
+            {newLayout ? 'PLAYERS TO WATCH · CARRIED FROM LAST SEASON' : 'RANKINGS · LIVE'}
+          </p>
+          <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.03125rem', lineHeight: 1.05, color: 'var(--text-bright)' }}>
+            {newLayout ? 'Nobody starts from zero.' : "Who's hot. Right now."}
+          </h2>
+          {newLayout && (
+            <p style={{ fontSize: '0.75rem', color: 'var(--text)', marginTop: 6, maxWidth: '560px' }}>
+              Heat carries over. These are the three lists we seeded from final 2025-26 form — so night one already has a leaderboard, and it starts moving again immediately.
+            </p>
+          )}
+        </div>
+        {newLayout && (
+          <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5rem', color: 'var(--text-muted)', letterSpacing: '0.08em', textAlign: 'right', flexShrink: 0, paddingTop: 4 }}>
+            SEEDED FROM<br />2025-26 FINAL
+          </p>
+        )}
       </div>
 
       {/* Desktop: 3-column layout */}
@@ -477,36 +501,85 @@ export default function HeatGrid({
           kicker="HEAT · TOP 5"
           kickerColor="var(--heat)"
           tag="Hottest skaters"
-          subtitle="Last 5 games · all positions"
+          subtitle={newLayout ? 'Seeded from final 2025-26 form' : 'Last 5 games · all positions'}
           listLink="/rankings"
         >
-          {top5Skaters.map((p, i) => (
-            <SkaterRow key={p.player_id} p={p} rank={i + 1} index={i} />
-          ))}
+          {newLayout && heroSkater ? (
+            <>
+              <div className="mb-3">
+                <SkaterCard p={heroSkater} rank={1} />
+                {/* SEEDED tag below the hero card */}
+                <div style={{ marginTop: 4 }}>
+                  <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.45rem', color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                    SEEDED FROM LAST SEASON FINAL
+                  </span>
+                </div>
+              </div>
+              {compactSkaters.map((p, i) => (
+                <SkaterRow key={p.player_id} p={p} rank={i + 2} index={i} />
+              ))}
+            </>
+          ) : (
+            top5Skaters.map((p, i) => (
+              <SkaterRow key={p.player_id} p={p} rank={i + 1} index={i} />
+            ))
+          )}
         </DesktopColumn>
 
         <DesktopColumn
           kicker="GOALIES · TOP 5"
           kickerColor="var(--neon)"
           tag="Best in net"
-          subtitle="Save % last 5 starts"
+          subtitle={newLayout ? 'Seeded from final 2025-26 form' : 'Save % last 5 starts'}
           listLink="/rankings?tab=goalies"
         >
-          {top5Goalies.map((g, i) => (
-            <GoalieRow key={g.id} g={g} rank={i + 1} index={i} />
-          ))}
+          {newLayout && heroGoalie ? (
+            <>
+              <div className="mb-3">
+                <GoalieCard g={heroGoalie} rank={1} />
+                <div style={{ marginTop: 4 }}>
+                  <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.45rem', color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                    SEEDED FROM LAST SEASON FINAL
+                  </span>
+                </div>
+              </div>
+              {compactGoalies.map((g, i) => (
+                <GoalieRow key={g.id} g={g} rank={i + 2} index={i} />
+              ))}
+            </>
+          ) : (
+            top5Goalies.map((g, i) => (
+              <GoalieRow key={g.id} g={g} rank={i + 1} index={i} />
+            ))
+          )}
         </DesktopColumn>
 
         <DesktopColumn
           kicker="FRESH FACES · TOP 5"
           kickerColor="#00e5a0"
-          tag="Rookies on the rise"
-          subtitle="Career-year skaters, breakout pace"
+          tag={newLayout ? 'Young & rising' : 'Rookies on the rise'}
+          subtitle={newLayout ? 'Seeded from final 2025-26 form' : 'Career-year skaters, breakout pace'}
           listLink="/rankings?tab=newcomers"
         >
-          {top5Newcomers.map((p, i) => (
-            <NewcomerRow key={p.player_id} p={p} rank={i + 1} index={i} />
-          ))}
+          {newLayout && heroNewcomer ? (
+            <>
+              <div className="mb-3">
+                <NewcomerCard p={heroNewcomer} rank={1} />
+                <div style={{ marginTop: 4 }}>
+                  <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.45rem', color: 'var(--text-muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                    SEEDED FROM LAST SEASON FINAL
+                  </span>
+                </div>
+              </div>
+              {compactNewcomers.map((p, i) => (
+                <NewcomerRow key={p.player_id} p={p} rank={i + 2} index={i} />
+              ))}
+            </>
+          ) : (
+            top5Newcomers.map((p, i) => (
+              <NewcomerRow key={p.player_id} p={p} rank={i + 1} index={i} />
+            ))
+          )}
         </DesktopColumn>
       </div>
 
@@ -526,29 +599,74 @@ export default function HeatGrid({
                 cursor: 'pointer',
               }}
             >
-              {label}
+              {label === 'Heat' ? (newLayout ? 'Skaters' : label) : label === 'Fresh faces' ? (newLayout ? 'Fresh faces' : label) : label}
             </button>
           ))}
         </div>
 
-        {/* Row list — same format as desktop columns */}
-        <div className="overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '14px', padding: '0 16px' }}>
-          {tab === 'skaters' && top5Skaters.map((p, i) => (
-            <SkaterRow key={p.player_id} p={p} rank={i + 1} index={i} />
-          ))}
-          {tab === 'goalies' && top5Goalies.map((g, i) => (
-            <GoalieRow key={g.id} g={g} rank={i + 1} index={i} />
-          ))}
-          {tab === 'newcomers' && top5Newcomers.map((p, i) => (
-            <NewcomerRow key={p.player_id} p={p} rank={i + 1} index={i} />
-          ))}
-          <div style={{ padding: '12px 0', borderTop: '1px solid var(--border)', marginTop: 2 }}>
-            <a href={tab === 'skaters' ? '/rankings' : tab === 'goalies' ? '/rankings?tab=goalies' : '/rankings?tab=newcomers'}
-              style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.05em', color: 'var(--heat)' }}>
-              FULL LIST →
-            </a>
+        {/* Mobile hero card (new layout only) + row list */}
+        {newLayout ? (
+          <div className="flex flex-col gap-3">
+            {tab === 'skaters' && heroSkater && (
+              <>
+                <SkaterCard p={heroSkater} rank={1} />
+                <div className="overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '14px', padding: '0 16px' }}>
+                  {compactSkaters.map((p, i) => (
+                    <SkaterRow key={p.player_id} p={p} rank={i + 2} index={i} />
+                  ))}
+                  <div style={{ padding: '12px 0', borderTop: '1px solid var(--border)', marginTop: 2 }}>
+                    <a href="/rankings" style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.05em', color: 'var(--heat)' }}>FULL LIST →</a>
+                  </div>
+                </div>
+              </>
+            )}
+            {tab === 'goalies' && heroGoalie && (
+              <>
+                <GoalieCard g={heroGoalie} rank={1} />
+                <div className="overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '14px', padding: '0 16px' }}>
+                  {compactGoalies.map((g, i) => (
+                    <GoalieRow key={g.id} g={g} rank={i + 2} index={i} />
+                  ))}
+                  <div style={{ padding: '12px 0', borderTop: '1px solid var(--border)', marginTop: 2 }}>
+                    <a href="/rankings?tab=goalies" style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.05em', color: 'var(--heat)' }}>FULL LIST →</a>
+                  </div>
+                </div>
+              </>
+            )}
+            {tab === 'newcomers' && heroNewcomer && (
+              <>
+                <NewcomerCard p={heroNewcomer} rank={1} />
+                <div className="overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '14px', padding: '0 16px' }}>
+                  {compactNewcomers.map((p, i) => (
+                    <NewcomerRow key={p.player_id} p={p} rank={i + 2} index={i} />
+                  ))}
+                  <div style={{ padding: '12px 0', borderTop: '1px solid var(--border)', marginTop: 2 }}>
+                    <a href="/rankings?tab=newcomers" style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.05em', color: 'var(--heat)' }}>FULL LIST →</a>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-        </div>
+        ) : (
+          /* Classic mobile layout: rows only */
+          <div className="overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '14px', padding: '0 16px' }}>
+            {tab === 'skaters' && top5Skaters.map((p, i) => (
+              <SkaterRow key={p.player_id} p={p} rank={i + 1} index={i} />
+            ))}
+            {tab === 'goalies' && top5Goalies.map((g, i) => (
+              <GoalieRow key={g.id} g={g} rank={i + 1} index={i} />
+            ))}
+            {tab === 'newcomers' && top5Newcomers.map((p, i) => (
+              <NewcomerRow key={p.player_id} p={p} rank={i + 1} index={i} />
+            ))}
+            <div style={{ padding: '12px 0', borderTop: '1px solid var(--border)', marginTop: 2 }}>
+              <a href={tab === 'skaters' ? '/rankings' : tab === 'goalies' ? '/rankings?tab=goalies' : '/rankings?tab=newcomers'}
+                style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.05em', color: 'var(--heat)' }}>
+                FULL LIST →
+              </a>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Legend */}
