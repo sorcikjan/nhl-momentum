@@ -173,11 +173,13 @@ export default function ResultsSection({
   predMap,
   topPlayers,
   hideHeader = false,
+  seasonStart = false,
 }: {
   games: Game[];
   predMap: Map<number, Pred>;
   topPlayers?: Map<number, TopPlayer>;
   hideHeader?: boolean;
+  seasonStart?: boolean;
 }) {
   const completed = games.filter((g: Game) => ['FINAL', 'OFF'].includes(g.game_state));
   if (!completed.length) return null;
@@ -212,7 +214,7 @@ export default function ResultsSection({
               YESTERDAY · {lastNightGames.length} GAME{lastNightGames.length !== 1 ? 'S' : ''}
             </p>
             <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.03125rem', lineHeight: 1.05, color: 'var(--text-bright)' }}>
-              Results &amp; predictions.
+              {seasonStart ? 'Night one is in the books.' : 'Results & predictions.'}
             </h2>
           </div>
           {pct !== null && (

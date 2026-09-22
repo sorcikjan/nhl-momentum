@@ -109,7 +109,7 @@ function computeResultsMeta(games: any[], predMap: Map<number, any>) {
 
 // ── Section: Last Night — combined results + recaps ───────────────────────────
 
-async function LastNightSection() {
+async function LastNightSection({ seasonStart = false }: { seasonStart?: boolean }) {
   const [[{ games, predMap }, rankings], recaps] = await Promise.all([
     Promise.all([getRecentGames(), getRankings()]),
     getRecentRecaps(),
@@ -157,6 +157,7 @@ async function LastNightSection() {
           games={games as any[]}
           predMap={predMap}
           topPlayers={topPlayers}
+          seasonStart={seasonStart}
         />
       )}
 
@@ -498,7 +499,7 @@ export default async function DashboardPage() {
       case 'last-night':
         return (
           <Suspense key={key} fallback={<ResultsSkeleton />}>
-            <LastNightSection />
+            <LastNightSection seasonStart={phase === 'season-start'} />
           </Suspense>
         );
       case 'matches-to-watch':
