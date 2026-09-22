@@ -1,14 +1,15 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import LiveBadge from './LiveBadge';
+import TonightPill from './TonightPill';
 
 const NAV_DESKTOP = [
-  { href: '/',          label: 'Home' },
+  { href: '/',          label: 'Tonight' },
   { href: '/games',     label: 'Games' },
-  { href: '/hot',       label: 'Hot' },
+  { href: '/hot',       label: 'Heat map' },
   { href: '/rankings',  label: 'Rankings' },
-  { href: '/search',    label: 'Search' },
+  { href: '/search',    label: 'Players' },
+  { href: '/recaps',    label: 'Stories' },
 ];
 
 const NAV_MOBILE = [
@@ -113,9 +114,9 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* Right — LIVE badge */}
-        <div className="shrink-0 w-[200px] flex justify-end">
-          <LiveBadge />
+        {/* Right — Tonight pill + avatar */}
+        <div className="shrink-0 flex justify-end">
+          <TonightPill />
         </div>
       </header>
 
@@ -134,7 +135,7 @@ export default function Sidebar() {
             momentum<span style={{ color: 'var(--heat)' }}>.</span>
           </span>
         </Link>
-        <LiveBadge />
+        <TonightPill />
       </header>
 
       {/* Mobile bottom nav */}
