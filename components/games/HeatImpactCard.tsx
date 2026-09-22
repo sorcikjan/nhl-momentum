@@ -14,12 +14,17 @@ export interface Mover {
 function MoverColumn({ title, color, movers }: { title: string; color: string; movers: Mover[] }) {
   if (!movers.length) return null;
   return (
-    <div className="rounded-xl border p-4 flex-1" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="text-xs font-mono font-bold uppercase tracking-widest mb-3" style={{ color, letterSpacing: '0.1em' }}>{title}</div>
+    <div className="flex-1" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 12, padding: 18 }}>
+      <div className="font-mono font-bold uppercase mb-2.5" style={{ fontSize: 10, color, letterSpacing: '0.12em' }}>{title}</div>
       <div className="space-y-2.5">
-        {movers.map(m => (
-          <Link key={m.playerId} href={m.href} className="flex items-center justify-between gap-2 hover:opacity-80">
-            <div className="min-w-0 flex items-center gap-1.5">
+        {movers.map((m, i) => (
+          <Link
+            key={m.playerId}
+            href={m.href}
+            className="flex items-center gap-2 hover:opacity-80"
+            style={{ paddingTop: i > 0 ? 8 : 0, borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}
+          >
+            <div className="min-w-0 flex items-center gap-1.5 flex-1">
               <span className="text-[10px] font-bold px-1 rounded flex-shrink-0" style={{ background: 'var(--border)', color: 'var(--text)' }}>{m.teamAbbrev}</span>
               <span className="text-sm font-semibold truncate" style={{ color: 'var(--text-bright)' }}>{m.name}</span>
             </div>
@@ -27,7 +32,7 @@ function MoverColumn({ title, color, movers }: { title: string; color: string; m
               <span style={{ color: 'var(--text)', opacity: 0.6 }}>{m.before}</span>
               <span style={{ color: 'var(--text)', opacity: 0.4 }}>→</span>
               <HeatBadge heat={m.after} size="sm" />
-              <span style={{ color }}>{m.delta > 0 ? '+' : ''}{m.delta}</span>
+              <span className="font-bold w-6 text-right" style={{ color }}>{m.delta > 0 ? '+' : ''}{m.delta}</span>
             </div>
           </Link>
         ))}
@@ -39,12 +44,9 @@ function MoverColumn({ title, color, movers }: { title: string; color: string; m
 export default function HeatImpactCard({ up, down }: { up: Mover[]; down: Mover[] }) {
   if (!up.length && !down.length) return null;
   return (
-    <div>
-      <div className="text-xs font-mono font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Heat Impact · Who Moved</div>
-      <div className="flex flex-col sm:flex-row gap-3">
-        <MoverColumn title="↑ Heating Up" color="var(--rise)" movers={up} />
-        <MoverColumn title="↓ Cooling Off" color="var(--cold)" movers={down} />
-      </div>
+    <div className="flex flex-col sm:flex-row gap-3">
+      <MoverColumn title="↑ Heating Up" color="var(--rise)" movers={up} />
+      <MoverColumn title="↓ Cooling Off" color="var(--cold)" movers={down} />
     </div>
   );
 }

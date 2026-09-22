@@ -38,9 +38,8 @@ export default function HeadToHeadCard({
   const avgMargin = results.filter(r => r.margin != null).reduce((s, r) => s + (r.margin ?? 0), 0) / (results.length || 1);
 
   return (
-    <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="text-xs font-mono font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Head-to-Head</div>
-      <div className="font-sans font-extrabold mb-0.5" style={{ fontSize: '1.2rem', color: 'var(--text-bright)', letterSpacing: '-0.03em' }}>
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
+      <div className="font-sans font-extrabold mb-0.5" style={{ fontSize: 'clamp(18px, 2vw, 28px)', color: 'var(--text-bright)', letterSpacing: '-0.04em' }}>
         {homeAbbrev} {wins} — {losses} {awayAbbrev}
       </div>
       <div className="text-xs mb-3" style={{ color: 'var(--text)' }}>

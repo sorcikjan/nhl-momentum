@@ -14,8 +14,7 @@ export interface WatchPlayer {
 export default function PlayersToWatchCard({ players }: { players: WatchPlayer[] }) {
   if (!players.length) return null;
   return (
-    <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="text-xs font-mono font-bold uppercase tracking-widest mb-3" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Players to Watch</div>
+    <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 14, padding: 24 }}>
       <div className="space-y-2.5">
         {players.map(p => (
           <Link key={p.playerId} href={p.href} className="flex items-center justify-between gap-2 hover:opacity-80">

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import type React from 'react';
 import Link from 'next/link';
 import {
   fetchMatch, fetchAccuracy, fetchRecap, fetchSeriesStandings, fetchTeamSpecialTeams,
@@ -344,7 +345,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         dateLabel={dateLabel}
         seriesLabel={seriesLabel}
         pickResult={isFinal && outcome ? (outcome.correct_winner ? 'hit' : 'miss') : null}
-        storyline={isFinal ? recapBody.split('.')[0] + '.' : null}
+        storyline={isFinal && recapHeadline ? recapHeadline : null}
         favoredIsHome={favoredIsHome}
       />
 
@@ -352,97 +353,113 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         <ShareButton title={`${awayName} vs ${homeName} — momentum.`} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-4">
         {/* ── Main column ── */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="lg:col-span-2 space-y-8">
           {isLive && (
-            <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-              <div className="text-xs font-mono font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Momentum Tracker · Live</div>
-              <h2 className="font-sans font-extrabold tracking-tight mb-2" style={{ fontSize: '1.35rem', color: 'var(--text-bright)', letterSpacing: '-0.02em' }}>Who&apos;s pushing right now.</h2>
-              <MomentumTracker momentum={playByPlay.momentum} homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev} />
-            </div>
+            <GameSectionBlock kicker="Momentum Tracker · Live" title="Who's pushing right now.">
+              <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+                <MomentumTracker momentum={playByPlay.momentum} homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev} />
+              </div>
+            </GameSectionBlock>
           )}
 
           {isLive && (
-            <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-              <div className="text-xs font-mono font-bold uppercase tracking-widest mb-1" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Play-by-Play</div>
-              <h2 className="font-sans font-extrabold tracking-tight mb-2" style={{ fontSize: '1.35rem', color: 'var(--text-bright)', letterSpacing: '-0.02em' }}>Recent action.</h2>
-              <RecentActionFeed plays={playByPlay.recentPlays} />
-            </div>
+            <GameSectionBlock kicker="Play-by-Play" title="Recent action.">
+              <div className="rounded-xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+                <RecentActionFeed plays={playByPlay.recentPlays} />
+              </div>
+            </GameSectionBlock>
           )}
 
           {isFinal && (
             <>
               <ThreeStarsRow stars={threeStars} heatByPlayerId={new Map([...awaySkaters, ...homeSkaters].map(s => [s.playerId as number, ppmToHeat(s.momentumPpm ?? s.compositePpm)]))} />
               {prediction && (
-                <PredictionCard
-                  mode="final"
-                  favoredAbbrev={favoredIsHome ? homeAbbrev : awayAbbrev}
-                  favoredPct={Math.round(Math.max(prediction.home_win_probability, prediction.away_win_probability) * 100)}
-                  correct={outcome?.correct_winner ?? null}
-                  accuracyYtd={accuracyYtd}
-                  chips={predictionChips}
-                  factors={predictionFactors}
-                  awayAbbrev={awayAbbrev}
-                  homeAbbrev={homeAbbrev}
-                />
+                <GameSectionBlock kicker="Our Pick · How It Played" title="The model nailed this one.">
+                  <PredictionCard
+                    mode="final"
+                    favoredAbbrev={favoredIsHome ? homeAbbrev : awayAbbrev}
+                    favoredPct={Math.round(Math.max(prediction.home_win_probability, prediction.away_win_probability) * 100)}
+                    correct={outcome?.correct_winner ?? null}
+                    accuracyYtd={accuracyYtd}
+                    chips={predictionChips}
+                    factors={predictionFactors}
+                    awayAbbrev={awayAbbrev}
+                    homeAbbrev={homeAbbrev}
+                  />
+                </GameSectionBlock>
               )}
-              <HeatImpactCard up={heatImpactUp} down={heatImpactDown} />
+              <GameSectionBlock kicker="Heat Impact" title="Who moved up. Who moved down.">
+                <HeatImpactCard up={heatImpactUp} down={heatImpactDown} />
+              </GameSectionBlock>
             </>
           )}
 
           {isUpcoming && prediction && (
-            <PredictionCard
-              mode="pregame"
-              favoredAbbrev={favoredIsHome ? homeAbbrev : awayAbbrev}
-              favoredPct={Math.round(Math.max(prediction.home_win_probability, prediction.away_win_probability) * 100)}
-              accuracyYtd={accuracyYtd}
-              chips={predictionChips}
-              factors={predictionFactors}
-              awayAbbrev={awayAbbrev}
-              homeAbbrev={homeAbbrev}
-            />
+            <GameSectionBlock kicker="Our Prediction" title={`${favoredIsHome ? homeAbbrev : awayAbbrev} win.`}>
+              <PredictionCard
+                mode="pregame"
+                favoredAbbrev={favoredIsHome ? homeAbbrev : awayAbbrev}
+                favoredPct={Math.round(Math.max(prediction.home_win_probability, prediction.away_win_probability) * 100)}
+                accuracyYtd={accuracyYtd}
+                chips={predictionChips}
+                factors={predictionFactors}
+                awayAbbrev={awayAbbrev}
+                homeAbbrev={homeAbbrev}
+              />
+            </GameSectionBlock>
           )}
 
           {isUpcoming && (homeGoalieSnap || awayGoalieSnap) && (
-            <GoalieMatchupCard
-              away={{
-                name: awayGoalieSnap?.playerName ?? 'TBD',
-                abbrev: awayAbbrev,
-                savePct: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.savePct ?? awayGoalieSnap?.seasonSavePct ?? null,
-                gaa: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.gaa ?? null,
-                gamesPlayed: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.gamesPlayed ?? 0,
-              }}
-              home={{
-                name: homeGoalieSnap?.playerName ?? 'TBD',
-                abbrev: homeAbbrev,
-                savePct: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.savePct ?? homeGoalieSnap?.seasonSavePct ?? null,
-                gaa: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.gaa ?? null,
-                gamesPlayed: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.gamesPlayed ?? 0,
-              }}
-            />
+            <GameSectionBlock kicker="Starting Goalies" title="The matchup in net.">
+              <GoalieMatchupCard
+                away={{
+                  name: awayGoalieSnap?.playerName ?? 'TBD',
+                  abbrev: awayAbbrev,
+                  savePct: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.savePct ?? awayGoalieSnap?.seasonSavePct ?? null,
+                  gaa: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.gaa ?? null,
+                  gamesPlayed: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.gamesPlayed ?? 0,
+                }}
+                home={{
+                  name: homeGoalieSnap?.playerName ?? 'TBD',
+                  abbrev: homeAbbrev,
+                  savePct: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.savePct ?? homeGoalieSnap?.seasonSavePct ?? null,
+                  gaa: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.gaa ?? null,
+                  gamesPlayed: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.gamesPlayed ?? 0,
+                }}
+              />
+            </GameSectionBlock>
           )}
 
           {isUpcoming && (
-            <PlayersToWatchCard
-              players={heatRoster.map(p => ({ playerId: p.playerId, href: p.href, name: p.name, teamAbbrev: p.teamAbbrev, position: p.line.split(' · ')[0] || null, heat: p.heat, line: p.line }))}
-            />
+            <GameSectionBlock kicker="Players to Watch" title="Watch these tonight.">
+              <PlayersToWatchCard
+                players={heatRoster.map(p => ({ playerId: p.playerId, href: p.href, name: p.name, teamAbbrev: p.teamAbbrev, position: p.line.split(' · ')[0] || null, heat: p.heat, line: p.line }))}
+              />
+            </GameSectionBlock>
           )}
 
           {isUpcoming && specialTeams && (
-            <SpecialTeamsCard away={specialTeams.away} home={specialTeams.home} />
+            <GameSectionBlock kicker="Special Teams" title="Where games are won.">
+              <SpecialTeamsCard away={specialTeams.away} home={specialTeams.home} />
+            </GameSectionBlock>
           )}
 
           {isUpcoming && headToHead.length > 0 && (
-            <HeadToHeadCard meetings={headToHead} homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev} />
+            <GameSectionBlock kicker="Head-to-Head" title="Recent meetings.">
+              <HeadToHeadCard meetings={headToHead} homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev} />
+            </GameSectionBlock>
           )}
 
           {isUpcoming && (
-            <LineupContextCard
-              homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev}
-              homeOutCount={homeOutCount} awayOutCount={awayOutCount}
-              restDays={restDays}
-            />
+            <GameSectionBlock kicker="Lineup & Context" title="Tonight's roster picture.">
+              <LineupContextCard
+                homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev}
+                homeOutCount={homeOutCount} awayOutCount={awayOutCount}
+                restDays={restDays}
+              />
+            </GameSectionBlock>
           )}
         </div>
 
@@ -656,5 +673,27 @@ function LineupCard({
         </div>
       )}
     </div>
+  );
+}
+
+function GameSectionBlock({ kicker, title, children }: { kicker: string; title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <div className="mb-4">
+        <div
+          className="font-mono font-bold uppercase"
+          style={{ fontSize: 11, color: 'var(--heat)', letterSpacing: '0.12em', marginBottom: 6 }}
+        >
+          {kicker}
+        </div>
+        <div
+          className="font-sans font-extrabold"
+          style={{ fontSize: 'clamp(18px, 2.2vw, 24px)', color: 'var(--text-bright)', letterSpacing: '-0.03em' }}
+        >
+          {title}
+        </div>
+      </div>
+      {children}
+    </section>
   );
 }
