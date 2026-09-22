@@ -51,8 +51,8 @@ export default function CoolingOff({
         <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--cold)' }}>
           Cooling Off
         </h2>
-        <span className="text-xs px-2 py-0.5 rounded" style={{ background: 'var(--cold-glow)', color: 'var(--cold)' }}>
-          Recent vs Season
+        <span className="text-xs px-2 py-0.5 rounded font-mono" style={{ background: 'rgba(58,136,255,0.12)', color: 'var(--cold)', letterSpacing: '0.06em' }}>
+          HEAT DROP
         </span>
       </div>
       <p className="text-xs mb-2" style={{ color: 'var(--text)' }}>
@@ -73,6 +73,8 @@ export default function CoolingOff({
           const pctBelow = p.season_ppm > 0
             ? Math.round(((p.momentum_ppm - p.season_ppm) / p.season_ppm) * 100)
             : 0;
+          const previousHeat = ppmToHeat(p.season_ppm);
+          const currentHeat = ppmToHeat(p.momentum_ppm);
 
           return (
             <Link key={p.player_id}
@@ -107,8 +109,18 @@ export default function CoolingOff({
                       );
                     })()}
                   </span>
-                  <span className="text-xs font-mono font-semibold ml-2 flex-shrink-0" style={{ color: 'var(--cold)' }}>
-                    {pctBelow >= 0 ? '+' : ''}{pctBelow}% vs avg
+                  {/* Headline visual: struck-through previous Heat → current Heat */}
+                  <span
+                    className="flex items-center gap-1 font-mono ml-2 flex-shrink-0"
+                    style={{ fontSize: 13 }}
+                  >
+                    <span style={{ textDecoration: 'line-through', color: 'var(--text)', fontWeight: 600 }}>
+                      {previousHeat}
+                    </span>
+                    <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>→</span>
+                    <span style={{ fontWeight: 800, color: heatColor(currentHeat) }}>
+                      {currentHeat}
+                    </span>
                   </span>
                 </div>
                 <div className="w-full h-1.5 rounded-full" style={{ background: 'var(--border)' }}>
@@ -118,8 +130,8 @@ export default function CoolingOff({
                   <span className="text-xs" style={{ color: 'var(--text)' }}>
                     {p.players.teams.abbrev} · {p.players.position_code}
                   </span>
-                  <span className="text-xs font-mono font-bold" style={{ color: heatColor(ppmToHeat(p.momentum_ppm)) }}>
-                    Heat {ppmToHeat(p.momentum_ppm)}
+                  <span className="text-xs font-mono font-semibold" style={{ color: 'var(--cold)' }}>
+                    {pctBelow >= 0 ? '+' : ''}{pctBelow}% vs avg
                   </span>
                 </div>
               </div>

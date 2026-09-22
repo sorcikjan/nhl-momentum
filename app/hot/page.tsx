@@ -79,6 +79,30 @@ export default async function HotPage() {
         <p className="text-sm mt-2" style={{ color: 'var(--text)' }}>
           Players above their season pace. Updated every hour.
         </p>
+        {!seasonHasStarted && (
+          <div className="mt-3">
+            <span
+              style={{
+                fontFamily: 'var(--font-geist-mono), monospace',
+                fontSize: '0.625rem',
+                fontWeight: 700,
+                letterSpacing: '0.09em',
+                color: 'var(--text)',
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border)',
+                borderRadius: 999,
+                padding: '4px 10px',
+                textTransform: 'uppercase',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <span style={{ color: 'var(--gold)' }}>●</span>
+              SEEDED FROM LAST SEASON · 2025–26
+            </span>
+          </div>
+        )}
       </div>
 
       {/* ── Hero section: #1 player featured + ranked 2-9 ── */}

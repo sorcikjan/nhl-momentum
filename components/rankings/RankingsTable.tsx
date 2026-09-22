@@ -182,6 +182,30 @@ export default function RankingsTable({
           <p className="text-sm mt-2" style={{ color: 'var(--text)' }}>
             Sorted by Heat. The current state of every player in one place.
           </p>
+          {!seasonHasStarted && (
+            <div className="mt-3">
+              <span
+                style={{
+                  fontFamily: 'var(--font-geist-mono), monospace',
+                  fontSize: '0.625rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.09em',
+                  color: 'var(--text)',
+                  background: 'var(--bg)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 999,
+                  padding: '4px 10px',
+                  textTransform: 'uppercase',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <span style={{ color: 'var(--gold)', marginRight: 2 }}>●</span>
+                SEEDED FROM LAST SEASON · 2025–26
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Sort pills — desktop only, right of title */}
@@ -276,10 +300,10 @@ export default function RankingsTable({
 
       {/* ── Desktop table ── */}
       <div
-        className="hidden md:block rounded-2xl border overflow-hidden"
-        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}
+        className="hidden md:block rounded-2xl border"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', overflow: 'clip' }}
       >
-        {/* Header row */}
+        {/* Header row — sticky: stays below the 64px fixed nav on scroll */}
         <div
           style={{
             display: 'grid',
@@ -292,6 +316,10 @@ export default function RankingsTable({
             color: 'var(--text)',
             letterSpacing: '0.1em',
             borderBottom: '1px solid rgba(255,255,255,0.06)',
+            position: 'sticky',
+            top: 64,
+            zIndex: 10,
+            background: 'var(--bg-card)',
           }}
         >
           <span>RANK</span>
