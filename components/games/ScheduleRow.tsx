@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { gameUrl } from '@/lib/urls';
 import HeatBadge from '@/components/ui/HeatBadge';
+import ProbabilityBand from '@/components/games/ProbabilityBand';
 
 interface Team {
   id: number;
@@ -55,9 +56,14 @@ export default function ScheduleRow({
         {isLive ? '● LIVE' : isFinal ? 'FINAL' : time}
       </div>
 
-      {/* Matchup */}
+      {/* Matchup — favoured team's logo gets a 2px heat-orange ring */}
       <div className="flex items-center gap-2 flex-1 min-w-0" style={{ minWidth: 180 }}>
-        <img src={logoUrl(game.awayTeam.abbrev, game.awayTeam.logo)} alt={game.awayTeam.abbrev} className="w-6 h-6 object-contain flex-shrink-0" />
+        <img
+          src={logoUrl(game.awayTeam.abbrev, game.awayTeam.logo)}
+          alt={game.awayTeam.abbrev}
+          className="w-6 h-6 object-contain flex-shrink-0 rounded-full"
+          style={homeFavored === false ? { outline: '2px solid var(--heat)', outlineOffset: '1px' } : undefined}
+        />
         <span className="font-semibold text-sm" style={{ color: 'var(--text-bright)' }}>{game.awayTeam.abbrev}</span>
         {isFinal || isLive ? (
           <span className="font-mono text-sm font-bold mx-1" style={{ color: 'var(--text-bright)' }}>
@@ -67,19 +73,29 @@ export default function ScheduleRow({
           <span className="text-xs mx-1" style={{ color: 'var(--text)', opacity: 0.6 }}>at</span>
         )}
         <span className="font-semibold text-sm" style={{ color: 'var(--text-bright)' }}>{game.homeTeam.abbrev}</span>
-        <img src={logoUrl(game.homeTeam.abbrev, game.homeTeam.logo)} alt={game.homeTeam.abbrev} className="w-6 h-6 object-contain flex-shrink-0" />
+        <img
+          src={logoUrl(game.homeTeam.abbrev, game.homeTeam.logo)}
+          alt={game.homeTeam.abbrev}
+          className="w-6 h-6 object-contain flex-shrink-0 rounded-full"
+          style={homeFavored === true ? { outline: '2px solid var(--heat)', outlineOffset: '1px' } : undefined}
+        />
       </div>
 
       {/* Our pick */}
       <div className="w-32 flex-shrink-0">
-        {pickAbbrev && pickPct != null ? (
+        {pickAbbrev && pickPct != null && prediction ? (
           <div>
             <div className="text-xs font-mono">
               <span style={{ color: 'var(--text)', opacity: 0.6 }}>PICK </span>
               <span className="font-bold" style={{ color: 'var(--heat)' }}>{pickAbbrev} {pickPct}%</span>
             </div>
-            <div className="h-1 rounded-full mt-1 overflow-hidden" style={{ background: 'var(--border)' }}>
-              <div className="h-full rounded-full" style={{ width: `${pickPct}%`, background: 'var(--heat)' }} />
+            <div className="mt-1">
+              <ProbabilityBand
+                away={Math.round(prediction.away_win_probability * 100)}
+                home={Math.round(prediction.home_win_probability * 100)}
+                pick={homeFavored ? 'home' : 'away'}
+                height={6}
+              />
             </div>
           </div>
         ) : (
@@ -101,9 +117,9 @@ export default function ScheduleRow({
       </div>
 
       {/* Watchability (upcoming) or Recap link (final) */}
-      <div className="w-24 flex-shrink-0 text-right">
+      <div className="w-20 flex-shrink-0 text-right hidden sm:block">
         {isFinal && recapHref ? (
-          <span className="text-xs font-semibold" style={{ color: 'var(--heat)' }}>Recap →</span>
+          <span className="text-xs font-semibold" style={{ color: 'var(--heat)' }}>Recap</span>
         ) : !isFinal && watchability != null ? (
           <div>
             <span className="text-lg font-bold font-mono" style={{ color: 'var(--heat)' }}>{watchability}</span>
@@ -111,6 +127,9 @@ export default function ScheduleRow({
           </div>
         ) : null}
       </div>
+
+      {/* Chevron */}
+      <div className="flex-shrink-0 w-4 text-right" style={{ color: 'var(--text)', opacity: 0.35 }}>›</div>
     </Link>
   );
 }

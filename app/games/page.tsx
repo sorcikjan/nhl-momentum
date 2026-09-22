@@ -22,6 +22,12 @@ export const metadata: Metadata = {
 function datesForRange(range: ScheduleRange, customDate?: string): string[] {
   const today = new Date();
   const iso = (d: Date) => d.toISOString().slice(0, 10);
+  if (range === 'all') {
+    return Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(today); d.setDate(d.getDate() + i);
+      return iso(d);
+    });
+  }
   if (range === 'tomorrow') {
     const d = new Date(today); d.setDate(d.getDate() + 1);
     return [iso(d)];
@@ -42,7 +48,7 @@ export default async function GamesPage({
   searchParams: Promise<{ range?: string; date?: string }>;
 }) {
   const { range: rawRange, date: customDate } = await searchParams;
-  const range: ScheduleRange = (['today', 'tomorrow', 'week', 'custom'] as const).includes(rawRange as ScheduleRange)
+  const range: ScheduleRange = (['all', 'today', 'tomorrow', 'week', 'custom'] as const).includes(rawRange as ScheduleRange)
     ? (rawRange as ScheduleRange)
     : 'today';
   const dates = datesForRange(range, customDate);

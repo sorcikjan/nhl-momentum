@@ -1,9 +1,10 @@
 'use client';
 import { useRouter } from 'next/navigation';
 
-export type ScheduleRange = 'today' | 'tomorrow' | 'week' | 'custom';
+export type ScheduleRange = 'all' | 'today' | 'tomorrow' | 'week' | 'custom';
 
 const OPTIONS: { key: ScheduleRange; label: string }[] = [
+  { key: 'all', label: 'All' },
   { key: 'today', label: 'Today' },
   { key: 'tomorrow', label: 'Tomorrow' },
   { key: 'week', label: 'This week' },

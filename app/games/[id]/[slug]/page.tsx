@@ -224,31 +224,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     if (favSos != null && oppSos != null && favSos - oppSos >= 0.1) predictionChips.push(`${favAbbrev} easier schedule`);
   }
 
-  // ── Prediction factors (two-sided comparison strip) ─────────────────────────
-  // Built entirely from data already computed and displayed elsewhere on this
-  // page (skater snapshot Heat, prediction snapshot energy bars) — never from
-  // the model's internal weights. Deliberately narrow: two rows, not a new
-  // analytics surface.
+  // ── Prediction factor type (used below, after specialTeams is fetched) ──────
   type PredictionFactor = { label: string; away: { name?: string; value: number | null }; home: { name?: string; value: number | null } };
-  const predictionFactors: PredictionFactor[] = [];
-  if (prediction) {
-    const awayTopStar = [...awaySkaters].sort((a, b) => (b.compositePpm ?? 0) - (a.compositePpm ?? 0))[0];
-    const homeTopStar = [...homeSkaters].sort((a, b) => (b.compositePpm ?? 0) - (a.compositePpm ?? 0))[0];
-    if (awayTopStar && homeTopStar) {
-      predictionFactors.push({
-        label: 'Top Heat',
-        away: { name: awayTopStar.playerName, value: ppmToHeat(awayTopStar.compositePpm) },
-        home: { name: homeTopStar.playerName, value: ppmToHeat(homeTopStar.compositePpm) },
-      });
-    }
-    if (prediction.away_energy_bar != null && prediction.home_energy_bar != null) {
-      predictionFactors.push({
-        label: 'Energy',
-        away: { value: prediction.away_energy_bar },
-        home: { value: prediction.home_energy_bar },
-      });
-    }
-  }
 
   // ── Accuracy for the "Our Pick" card ──────────────────────────────────────
   let accuracyYtd: number | null = null;
@@ -332,6 +309,91 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
 
   const homeOutCount = homeSkaters.filter(s => s.injuryStatus).length;
   const awayOutCount = awaySkaters.filter(s => s.injuryStatus).length;
+
+  // ── Prediction factors WHY grid (6 rows) ─────────────────────────────────
+  // Each factor is built from data already fetched/computed elsewhere on this
+  // page. Never touches lib/prediction-models.ts or lib/metrics.ts.
+  // For each row: higher value = better → highlighted in heat-orange.
+  const predictionFactors: PredictionFactor[] = [];
+  if (prediction) {
+    // 1. Top Heat — leading player by composite PPM, each side
+    const awayTopStar = [...awaySkaters].sort((a, b) => (b.compositePpm ?? 0) - (a.compositePpm ?? 0))[0];
+    const homeTopStar = [...homeSkaters].sort((a, b) => (b.compositePpm ?? 0) - (a.compositePpm ?? 0))[0];
+    if (awayTopStar && homeTopStar) {
+      predictionFactors.push({
+        label: 'Top Heat',
+        away: { name: awayTopStar.playerName, value: ppmToHeat(awayTopStar.compositePpm) },
+        home: { name: homeTopStar.playerName, value: ppmToHeat(homeTopStar.compositePpm) },
+      });
+    }
+
+    // 2. Energy bar — team freshness composite (0–100), from prediction snapshot
+    if (prediction.away_energy_bar != null && prediction.home_energy_bar != null) {
+      predictionFactors.push({
+        label: 'Energy',
+        away: { value: prediction.away_energy_bar },
+        home: { value: prediction.home_energy_bar },
+      });
+    }
+
+    // 3. Power Play % — from specialTeams (pregame only); higher is better
+    if (specialTeams) {
+      const awayPP = specialTeams.away.powerPlayPct != null
+        ? Math.round(specialTeams.away.powerPlayPct * 1000) / 10
+        : null;
+      const homePP = specialTeams.home.powerPlayPct != null
+        ? Math.round(specialTeams.home.powerPlayPct * 1000) / 10
+        : null;
+      if (awayPP != null || homePP != null) {
+        predictionFactors.push({
+          label: 'Power Play %',
+          away: { value: awayPP },
+          home: { value: homePP },
+        });
+      }
+    }
+
+    // 4. Goalie Save % — from season stats; higher is better
+    const awayGoalieSvPct = goalieSeasonStats.get(awayGoalieSnap?.playerId)?.savePct
+      ?? awayGoalieSnap?.seasonSavePct ?? null;
+    const homeGoalieSvPct = goalieSeasonStats.get(homeGoalieSnap?.playerId)?.savePct
+      ?? homeGoalieSnap?.seasonSavePct ?? null;
+    if (awayGoalieSvPct != null || homeGoalieSvPct != null) {
+      predictionFactors.push({
+        label: 'Goalie SV%',
+        away: { value: awayGoalieSvPct != null ? Math.round(awayGoalieSvPct * 1000) / 10 : null },
+        home: { value: homeGoalieSvPct != null ? Math.round(homeGoalieSvPct * 1000) / 10 : null },
+      });
+    }
+
+    // 5. Rest days since last game — more rest = fresher team (higher = better)
+    if (restDays.away != null || restDays.home != null) {
+      predictionFactors.push({
+        label: 'Rest Days',
+        away: { value: restDays.away },
+        home: { value: restDays.home },
+      });
+    }
+
+    // 6. Head-to-Head wins in recent meetings — higher wins = better recent record
+    if (headToHead.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const h2hAbbrevOf = (team: any): string | undefined =>
+        Array.isArray(team) ? team[0]?.abbrev : team?.abbrev;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const h2hHomeWins = (headToHead as any[]).filter(m => {
+        const wasHome = h2hAbbrevOf(m.home_team) === homeAbbrev;
+        const homeTeamScore = wasHome ? m.home_score : m.away_score;
+        const otherScore = wasHome ? m.away_score : m.home_score;
+        return homeTeamScore != null && otherScore != null && homeTeamScore > otherScore;
+      }).length;
+      predictionFactors.push({
+        label: `H2H Wins (L${headToHead.length})`,
+        away: { value: headToHead.length - h2hHomeWins },
+        home: { value: h2hHomeWins },
+      });
+    }
+  }
 
   return (
     <div className="max-w-6xl mx-auto pb-20 md:pb-0">
