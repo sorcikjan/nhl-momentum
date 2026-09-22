@@ -208,16 +208,15 @@ export default function ResultsSection({
       {!hideHeader && (
         <div className="flex items-end justify-between mb-5">
           <div>
-            <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>
+            <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.13em', textTransform: 'uppercase', marginBottom: '6px' }}>
               YESTERDAY · {lastNightGames.length} GAME{lastNightGames.length !== 1 ? 'S' : ''}
             </p>
-            <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.04em', lineHeight: 1.05 }}>
-              <span style={{ color: 'var(--text-bright)' }}>Results &amp; </span>
-              <span style={{ color: 'var(--heat)' }}>predictions.</span>
+            <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.03125rem', lineHeight: 1.05, color: 'var(--text-bright)' }}>
+              Results &amp; predictions.
             </h2>
           </div>
           {pct !== null && (
-            <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg flex-shrink-0" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
+            <div className="flex items-center gap-3 px-4 py-2.5 rounded-[10px] flex-shrink-0" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
               <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.625rem', color: 'var(--text)', opacity: 0.6, fontWeight: 700, letterSpacing: '0.06em' }}>WE GOT</span>
               <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '1.375rem', color: 'var(--neon)', fontWeight: 800, letterSpacing: '-0.03em' }}>{hits}/{total}</span>
               <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.625rem', color: 'var(--text)', opacity: 0.6, fontWeight: 600 }}>right · {pct}%</span>
@@ -227,7 +226,7 @@ export default function ResultsSection({
       )}
 
       {/* Desktop: 4-col grid (or 2-col for fewer games). Mobile: 1-col */}
-      <div className={`grid gap-2 grid-cols-1 ${lastNightGames.length >= 4 ? 'md:grid-cols-4' : 'md:grid-cols-2'}`}>
+      <div className={`grid gap-3 grid-cols-1 ${lastNightGames.length >= 4 ? 'md:grid-cols-4' : 'md:grid-cols-2'}`}>
         {lastNightGames.map((g: Game) => (
           <ResultCard
             key={g.id}

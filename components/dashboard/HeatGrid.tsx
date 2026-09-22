@@ -189,28 +189,34 @@ function SkaterCard({ p, rank }: { p: SkaterPlayer; rank: number }) {
 
 // ── Skater row (for desktop column view) ──────────────────────────────────────
 
-function SkaterRow({ p, rank }: { p: SkaterPlayer; rank: number }) {
+function SkaterRow({ p, rank, index }: { p: SkaterPlayer; rank: number; index: number }) {
   const heat = ppmToHeat(p.momentum_ppm);
   const abbrev = p.players.teams.abbrev;
   const initial = p.players.first_name?.[0] ?? '';
+  const pos = p.players.position_code;
+  const posLabel = pos === 'C' ? 'Centre' : pos === 'L' ? 'Left wing' : pos === 'R' ? 'Right wing' : pos === 'D' ? 'Defence' : pos ?? '';
 
   return (
     <Link
       href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
-      className="flex items-center gap-3 rounded-lg px-3 py-2 hover:opacity-80 transition-opacity"
-      style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}
+      className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+      style={{ padding: '10px 0', borderTop: index > 0 ? '1px solid var(--border)' : 'none' }}
     >
-      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', fontFamily: 'monospace', minWidth: '16px' }}>
+      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.625rem', fontFamily: 'var(--font-geist-mono), monospace', fontWeight: 700, minWidth: '16px' }}>
         {rank}
       </span>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={logoUrl(abbrev)} alt={abbrev} style={{ width: 24, height: 24, flexShrink: 0 }} />
-      <span className="flex-1 truncate text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
-        {initial}. {p.players.last_name}
-      </span>
+      <div className="flex-1 min-w-0">
+        <div className="truncate" style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--text-bright)' }}>
+          {initial}. {p.players.last_name}
+        </div>
+        <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5625rem', color: 'var(--text)', opacity: 0.5, marginTop: 1 }}>{posLabel}</div>
+      </div>
       <span
-        className="text-xs font-mono font-bold px-1.5 py-0.5 rounded"
+        className="font-mono font-bold px-1.5 py-0.5 rounded"
         style={{
+          fontSize: '0.6875rem',
           background: `${heatBg(heat)}44`,
           color: heatColor(heat),
           border: `1px solid ${heatBorderColor(heat)}`,
@@ -268,28 +274,40 @@ function GoalieCard({ g, rank }: { g: GoaliePlayer; rank: number }) {
 
 // ── Goalie row ─────────────────────────────────────────────────────────────────
 
-function GoalieRow({ g, rank }: { g: GoaliePlayer; rank: number }) {
+function GoalieRow({ g, rank, index }: { g: GoaliePlayer; rank: number; index: number }) {
   const abbrev = g.teams?.abbrev ?? '?';
   const sv = g.avgSavePct;
   const heat = Math.round(Math.max(0, Math.min(100, (sv - 0.85) / 0.10 * 100)));
   const initial = g.first_name?.[0] ?? '';
+  const svStr = `.${Math.round(sv * 1000).toString().padStart(3, '0')}`;
 
   return (
     <Link
       href={playerUrl(g.id, g.first_name, g.last_name)}
-      className="flex items-center gap-3 rounded-lg px-3 py-2 hover:opacity-80 transition-opacity"
-      style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}
+      className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+      style={{ padding: '10px 0', borderTop: index > 0 ? '1px solid var(--border)' : 'none' }}
     >
-      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', fontFamily: 'monospace', minWidth: '16px' }}>
+      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.625rem', fontFamily: 'var(--font-geist-mono), monospace', fontWeight: 700, minWidth: '16px' }}>
         {rank}
       </span>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={logoUrl(abbrev)} alt={abbrev} style={{ width: 24, height: 24, flexShrink: 0 }} />
-      <span className="flex-1 truncate text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
-        {initial}. {g.last_name}
-      </span>
-      <span className="text-xs font-mono" style={{ color: heatColor(heat) }}>
-        .{Math.round(sv * 1000).toString().padStart(3, '0')}
+      <div className="flex-1 min-w-0">
+        <div className="truncate" style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--text-bright)' }}>
+          {initial}. {g.last_name}
+        </div>
+        <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5625rem', color: 'var(--text)', opacity: 0.5, marginTop: 1 }}>SV% {svStr}</div>
+      </div>
+      <span
+        className="font-mono font-bold px-1.5 py-0.5 rounded"
+        style={{
+          fontSize: '0.6875rem',
+          background: `${heatBg(heat)}44`,
+          color: heatColor(heat),
+          border: `1px solid ${heatBorderColor(heat)}`,
+        }}
+      >
+        {svStr}
       </span>
     </Link>
   );
@@ -344,28 +362,35 @@ function NewcomerCard({ p, rank }: { p: NewcomerPlayer; rank: number }) {
 
 // ── Newcomer row ──────────────────────────────────────────────────────────────
 
-function NewcomerRow({ p, rank }: { p: NewcomerPlayer; rank: number }) {
+function NewcomerRow({ p, rank, index }: { p: NewcomerPlayer; rank: number; index: number }) {
   const heat = ppmToHeat(p.momentum_ppm);
   const abbrev = p.players.teams?.abbrev ?? '?';
   const initial = p.players.first_name?.[0] ?? '';
+  const careerGP = p.players.career_games ?? 0;
 
   return (
     <Link
       href={playerUrl(p.player_id, p.players.first_name, p.players.last_name)}
-      className="flex items-center gap-3 rounded-lg px-3 py-2 hover:opacity-80 transition-opacity"
-      style={{ background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}
+      className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
+      style={{ padding: '10px 0', borderTop: index > 0 ? '1px solid var(--border)' : 'none' }}
     >
-      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.7rem', fontFamily: 'monospace', minWidth: '16px' }}>
+      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.625rem', fontFamily: 'var(--font-geist-mono), monospace', fontWeight: 700, minWidth: '16px' }}>
         {rank}
       </span>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={logoUrl(abbrev)} alt={abbrev} style={{ width: 24, height: 24, flexShrink: 0 }} />
-      <span className="flex-1 truncate text-sm font-semibold" style={{ color: 'var(--text-bright)' }}>
-        {initial}. {p.players.last_name}
-      </span>
+      <div className="flex-1 min-w-0">
+        <div className="truncate" style={{ fontWeight: 700, fontSize: '0.8125rem', color: 'var(--text-bright)' }}>
+          {initial}. {p.players.last_name}
+        </div>
+        <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5625rem', color: 'var(--text)', opacity: 0.5, marginTop: 1 }}>
+          {careerGP > 0 ? `${careerGP} GP` : 'Rookie'}
+        </div>
+      </div>
       <span
-        className="text-xs font-mono font-bold px-1.5 py-0.5 rounded"
+        className="font-mono font-bold px-1.5 py-0.5 rounded"
         style={{
+          fontSize: '0.6875rem',
           background: `${heatBg(heat)}44`,
           color: heatColor(heat),
           border: `1px solid ${heatBorderColor(heat)}`,
@@ -380,24 +405,27 @@ function NewcomerRow({ p, rank }: { p: NewcomerPlayer; rank: number }) {
 // ── Desktop column ─────────────────────────────────────────────────────────────
 
 interface ColumnProps {
+  kicker: string;
+  kickerColor: string;
   tag: string;
   subtitle: string;
   listLink: string;
   children: React.ReactNode;
 }
 
-function DesktopColumn({ tag, subtitle, listLink, children }: ColumnProps) {
+function DesktopColumn({ kicker, kickerColor, tag, subtitle, listLink, children }: ColumnProps) {
   return (
-    <div className="rounded-xl border flex flex-col" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="px-4 pt-4 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
-        <p style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '1.125rem', letterSpacing: '-0.025em', color: 'var(--text-bright)', marginBottom: '3px' }}>{tag}</p>
+    <div className="flex flex-col" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '14px', padding: '22px' }}>
+      <div style={{ marginBottom: '16px' }}>
+        <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.625rem', color: kickerColor, fontWeight: 700, letterSpacing: '0.13em', textTransform: 'uppercase', marginBottom: '6px' }}>{kicker}</p>
+        <p style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '1.25rem', letterSpacing: '-0.025em', color: 'var(--text-bright)', marginBottom: '3px' }}>{tag}</p>
         <p style={{ fontSize: '0.6875rem', color: 'var(--text)', opacity: 0.5 }}>{subtitle}</p>
       </div>
       <div className="flex flex-col flex-1">
         {children}
       </div>
-      <div className="px-4 py-3" style={{ borderTop: '1px solid var(--border)' }}>
-        <a href={listLink} className="text-xs font-semibold" style={{ color: 'var(--heat)' }}>
+      <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid var(--border)' }}>
+        <a href={listLink} style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.05em', color: kickerColor }}>
           FULL LIST →
         </a>
       </div>
@@ -437,45 +465,47 @@ export default function HeatGrid({
 
       {/* Section headline */}
       <div>
-        <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>RANKINGS · LIVE</p>
-        <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.04em', lineHeight: 1.05 }}>
-          <span style={{ color: 'var(--text-bright)' }}>Who&apos;s </span>
-          <span style={{ color: 'var(--heat)' }}>burning.</span>
+        <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.13em', textTransform: 'uppercase', marginBottom: '6px' }}>RANKINGS · LIVE</p>
+        <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.03125rem', lineHeight: 1.05, color: 'var(--text-bright)' }}>
+          Who&apos;s hot. Right now.
         </h2>
-        <p style={{ color: 'var(--silver)', opacity: 0.55, fontSize: '0.78rem', marginTop: '0.25rem' }}>
-          Top skaters, goalies and rookies by recent Heat.
-        </p>
       </div>
 
       {/* Desktop: 3-column layout */}
       <div className="hidden md:grid md:grid-cols-3 gap-4">
         <DesktopColumn
-          tag="Heat"
-          subtitle="Ranked by 5-game momentum"
+          kicker="HEAT · TOP 5"
+          kickerColor="var(--heat)"
+          tag="Hottest skaters"
+          subtitle="Last 5 games · all positions"
           listLink="/rankings"
         >
           {top5Skaters.map((p, i) => (
-            <SkaterRow key={p.player_id} p={p} rank={i + 1} />
+            <SkaterRow key={p.player_id} p={p} rank={i + 1} index={i} />
           ))}
         </DesktopColumn>
 
         <DesktopColumn
-          tag="Goalies"
-          subtitle="Ranked by 5-game save %"
+          kicker="GOALIES · TOP 5"
+          kickerColor="var(--neon)"
+          tag="Best in net"
+          subtitle="Save % last 5 starts"
           listLink="/rankings?tab=goalies"
         >
           {top5Goalies.map((g, i) => (
-            <GoalieRow key={g.id} g={g} rank={i + 1} />
+            <GoalieRow key={g.id} g={g} rank={i + 1} index={i} />
           ))}
         </DesktopColumn>
 
         <DesktopColumn
-          tag="Fresh faces"
-          subtitle="First-year skaters ranked by Heat"
+          kicker="FRESH FACES · TOP 5"
+          kickerColor="#00e5a0"
+          tag="Rookies on the rise"
+          subtitle="Career-year skaters, breakout pace"
           listLink="/rankings?tab=newcomers"
         >
           {top5Newcomers.map((p, i) => (
-            <NewcomerRow key={p.player_id} p={p} rank={i + 1} />
+            <NewcomerRow key={p.player_id} p={p} rank={i + 1} index={i} />
           ))}
         </DesktopColumn>
       </div>
@@ -502,19 +532,19 @@ export default function HeatGrid({
         </div>
 
         {/* Row list — same format as desktop columns */}
-        <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+        <div className="overflow-hidden" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '14px', padding: '0 16px' }}>
           {tab === 'skaters' && top5Skaters.map((p, i) => (
-            <SkaterRow key={p.player_id} p={p} rank={i + 1} />
+            <SkaterRow key={p.player_id} p={p} rank={i + 1} index={i} />
           ))}
           {tab === 'goalies' && top5Goalies.map((g, i) => (
-            <GoalieRow key={g.id} g={g} rank={i + 1} />
+            <GoalieRow key={g.id} g={g} rank={i + 1} index={i} />
           ))}
           {tab === 'newcomers' && top5Newcomers.map((p, i) => (
-            <NewcomerRow key={p.player_id} p={p} rank={i + 1} />
+            <NewcomerRow key={p.player_id} p={p} rank={i + 1} index={i} />
           ))}
-          <div className="px-4 py-3" style={{ borderTop: '1px solid var(--border)' }}>
+          <div style={{ padding: '12px 0', borderTop: '1px solid var(--border)', marginTop: 2 }}>
             <a href={tab === 'skaters' ? '/rankings' : tab === 'goalies' ? '/rankings?tab=goalies' : '/rankings?tab=newcomers'}
-              className="text-xs font-semibold" style={{ color: 'var(--heat)' }}>
+              style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.05em', color: 'var(--heat)' }}>
               FULL LIST →
             </a>
           </div>
@@ -522,7 +552,7 @@ export default function HeatGrid({
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-2">
+      <div className="hidden md:flex items-center gap-2">
         <span style={{
           color: 'var(--silver)', opacity: 0.45, fontSize: '0.6rem',
           fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', flexShrink: 0,

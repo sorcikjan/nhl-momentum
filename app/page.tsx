@@ -84,8 +84,10 @@ async function PlayoffHeroSection({ today }: { today: string }) {
 function computeResultsMeta(games: any[], predMap: Map<number, any>) {
   const completed = games.filter(g => ['FINAL', 'OFF'].includes(g.game_state));
   if (!completed.length) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lastNight = completed.reduce((max: string, g: any) =>
     (g.game_date as string) > max ? (g.game_date as string) : max, '');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lastNightGames = completed.filter((g: any) => g.game_date === lastNight);
   let hits = 0, total = 0;
   for (const g of lastNightGames) {
@@ -134,77 +136,31 @@ async function LastNightSection() {
     if (top) topPlayers.set(g.id, top);
   }
 
-  // Compute header meta from results
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const meta = computeResultsMeta(games as any[], predMap);
   const hasResults = !!meta;
   const hasRecaps = recaps.length > 0;
   if (!hasResults && !hasRecaps) return null;
 
-  // Shared header data — prefer results date, fall back to recap date
-  const refDate = meta?.lastNight ?? recaps[0]?.date ?? '';
-  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-  const isStale = refDate < yesterday;
-  const dateLabel = meta
-    ? new Date((meta.lastNight) + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
-    : recaps[0]
-    ? new Date(recaps[0].date + 'T12:00:00Z').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-    : '';
-
   return (
-    <section className="flex flex-col gap-6">
+    <div className="flex flex-col gap-12">
 
-      {/* Shared header */}
-      <div className="flex items-end justify-between">
-        <div>
-          <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>
-            LAST NIGHT{meta ? ` · ${meta.gameCount} GAME${meta.gameCount !== 1 ? 'S' : ''}` : ''}
-          </p>
-          <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.04em', lineHeight: 1.05 }}>
-            {isStale ? (
-              <span style={{ color: 'var(--text-bright)' }}>Most recent night.</span>
-            ) : (
-              <>
-                <span style={{ color: 'var(--text-bright)' }}>Last </span>
-                <span style={{ color: 'var(--heat)' }}>night.</span>
-              </>
-            )}
-          </h2>
-          <p style={{ color: 'var(--silver)', opacity: 0.55, fontSize: '0.78rem', marginTop: '0.25rem' }}>
-            {dateLabel}
-          </p>
-        </div>
-        {meta?.pct !== null && meta?.pct !== undefined && (
-          <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg flex-shrink-0" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
-            <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.625rem', color: 'var(--text)', opacity: 0.6, fontWeight: 700, letterSpacing: '0.06em' }}>WE GOT</span>
-            <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '1.375rem', color: 'var(--neon)', fontWeight: 800, letterSpacing: '-0.03em' }}>{meta.hits}/{meta.total}</span>
-            <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.625rem', color: 'var(--text)', opacity: 0.6, fontWeight: 600 }}>right · {meta.pct}%</span>
-          </div>
-        )}
-      </div>
-
-      {/* Game results */}
+      {/* Results — section has its own header ("Results & predictions.") */}
       {hasResults && (
         <ResultsSection
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           games={games as any[]}
           predMap={predMap}
           topPlayers={topPlayers}
-          hideHeader
         />
       )}
 
-      {/* Stories divider + recap cards */}
+      {/* Stories — section has its own header ("The night in X stories.") */}
       {hasRecaps && (
-        <div className="flex flex-col gap-4">
-          <p className="text-xs font-bold tracking-widest uppercase" style={{ color: 'var(--text)', opacity: 0.35 }}>
-            STORIES
-          </p>
-          <RecapFeed recaps={recaps} hideHeader />
-        </div>
+        <RecapFeed recaps={recaps} />
       )}
 
-    </section>
+    </div>
   );
 }
 
@@ -453,7 +409,7 @@ export default function DashboardPage() {
   const today = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 md:pb-0 flex flex-col gap-12">
+    <div className="max-w-7xl mx-auto pb-20 md:pb-0 flex flex-col gap-12">
 
       {/* 0. Top banner — preseason countdown once we're within season-start window, NEW HERE? otherwise */}
       <Suspense fallback={<NewHereBanner />}>
@@ -465,41 +421,40 @@ export default function DashboardPage() {
         <PlayoffHeroSection today={today} />
       </Suspense>
 
-      {/* 2. Last night — results + recap stories combined */}
-      <Suspense fallback={<ResultsSkeleton />}>
-        <LastNightSection />
-      </Suspense>
-
-      {/* 4. Who's burning — Heat grid */}
-      <Suspense fallback={<HeatGridSkeleton />}>
-        <BurningSection />
-      </Suspense>
-
-      {/* 5. Tonight — upcoming / live games */}
+      {/* 2. Tonight — upcoming / live games (design: first content section) */}
       <Suspense fallback={<GameSkeleton />}>
         <TonightSlate today={today} />
       </Suspense>
 
-      {/* 6. Explore — feature entry points */}
+      {/* 3. Last night — results then stories as separate sections */}
+      <Suspense fallback={<ResultsSkeleton />}>
+        <LastNightSection />
+      </Suspense>
+
+      {/* 4. Who's hot — Heat grid (rankings) */}
+      <Suspense fallback={<HeatGridSkeleton />}>
+        <BurningSection />
+      </Suspense>
+
+      {/* 5. Explore — feature entry points */}
       <div className="flex flex-col gap-4">
         <div>
-          <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>EXPLORE</p>
-          <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.05em', lineHeight: 1.05 }}>
-            <span style={{ color: 'var(--text-bright)' }}>More ways to </span>
-            <span style={{ color: 'var(--heat)' }}>dig in.</span>
+          <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.13em', textTransform: 'uppercase', marginBottom: '6px' }}>EXPLORE</p>
+          <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05, color: 'var(--text-bright)' }}>
+            More ways to dig in.
           </h2>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {([
-            { href: '/rankings', category: 'RANKINGS', title: 'Heat Rankings', desc: "Who's playing the best hockey right now", color: 'var(--heat)' },
-            { href: '/games', category: 'PREDICTIONS', title: 'Games & Predictions', desc: 'AI win predictions vs bookmaker odds', color: 'var(--neon)' },
-            { href: '/recaps', category: 'STORIES', title: 'AI archive', desc: 'Data-backed stories from every game night', color: 'var(--text-bright)' },
-            { href: '/playoffs', category: 'BRACKET', title: 'Playoff Bracket', desc: 'Series standings round by round', color: 'var(--heat)' },
+            { href: '/rankings', category: 'HEAT MAP', title: 'Heat Rankings', desc: "Who's playing the best hockey right now", color: 'var(--heat)' },
+            { href: '/games', category: 'PREDICTIONS', title: 'Games & Picks', desc: 'AI win predictions vs bookmaker odds', color: 'var(--neon)' },
+            { href: '/recaps', category: 'STORIES', title: 'AI archive', desc: 'Every story written. Searchable.', color: 'var(--text)' },
+            { href: '/playoffs', category: 'ACCURACY', title: 'How we\'re doing', desc: 'Pick history, model drift, calibration.', color: 'var(--neon)' },
           ] as const).map(({ href, category, title, desc, color }) => (
             <a key={href} href={href}
-              className="rounded-xl border hover:opacity-90 transition-opacity flex flex-col gap-2"
-              style={{ background: 'var(--bg-card)', borderColor: 'var(--border)', padding: '20px 22px' }}>
-              <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5625rem', color, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{category}</p>
+              className="hover:opacity-90 transition-opacity flex flex-col gap-2"
+              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px 22px' }}>
+              <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5625rem', color, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase' }}>{category}</p>
               <p style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '1.25rem', color: 'var(--text-bright)', letterSpacing: '-0.025em' }}>{title}</p>
               <p style={{ fontSize: '0.75rem', color: 'var(--text)', lineHeight: 1.5 }}>{desc}</p>
             </a>
@@ -507,7 +462,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 7. Footer */}
+      {/* 6. Footer */}
       <SiteFooter />
 
     </div>

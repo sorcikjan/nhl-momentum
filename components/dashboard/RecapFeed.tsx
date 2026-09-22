@@ -248,6 +248,7 @@ export default function RecapFeed({ recaps, hideHeader = false }: { recaps: Reca
   const [hero, ...stories] = recent;
   const secondaryStories = stories.slice(0, 3);
   const mobileExtra = stories.slice(0, 2);
+  const storyCount = recent.length;
 
   return (
     <section className="flex flex-col gap-4">
@@ -255,24 +256,21 @@ export default function RecapFeed({ recaps, hideHeader = false }: { recaps: Reca
       {!hideHeader && (
         <div className="flex items-end justify-between">
           <div>
-            <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '6px' }}>STORIES · LAST NIGHT</p>
-            <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.04em', lineHeight: 1.05 }}>
-              <span style={{ color: 'var(--text-bright)' }}>Last </span>
-              <span style={{ color: 'var(--heat)' }}>night.</span>
+            <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.13em', textTransform: 'uppercase', marginBottom: '6px' }}>STORIES · LAST NIGHT</p>
+            <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.03125rem', lineHeight: 1.05, color: 'var(--text-bright)' }}>
+              The night in {storyCount} {storyCount === 1 ? 'story' : 'stories'}.
             </h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--silver)', opacity: 0.5 }}>
-              {formatRecapDate(hero.date)}{hero.games_count ? ` · ${hero.games_count} games` : ''}
-            </p>
           </div>
+          <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--text)', opacity: 0.4 }}>
+            AI-assisted · {formatRecapDate(hero.date)}
+          </span>
         </div>
       )}
 
-      {/* Desktop: 3-col grid — hero takes 2/3, right column takes 1/3 */}
-      <div className="hidden md:grid md:grid-cols-3 gap-4">
-        <div className="md:col-span-2">
-          <RecapHeroCard recap={hero} />
-        </div>
-        <div className="flex flex-col gap-3">
+      {/* Desktop: 1.4fr / 1fr grid — hero left, 3 sidebar stories right */}
+      <div className="hidden md:grid gap-4" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
+        <RecapHeroCard recap={hero} />
+        <div className="flex flex-col gap-2.5">
           {secondaryStories.map((recap: Recap) => (
             <SecondaryStoryCard key={recap.date} recap={recap} />
           ))}
