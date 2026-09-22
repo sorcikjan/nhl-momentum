@@ -5,10 +5,9 @@ import TonightPill from './TonightPill';
 
 const NAV_DESKTOP = [
   { href: '/',          label: 'Tonight' },
-  { href: '/games',     label: 'Games' },
   { href: '/hot',       label: 'Heat map' },
-  { href: '/rankings',  label: 'Rankings' },
   { href: '/search',    label: 'Players' },
+  { href: '/rankings',  label: 'Rankings' },
   { href: '/recaps',    label: 'Stories' },
 ];
 

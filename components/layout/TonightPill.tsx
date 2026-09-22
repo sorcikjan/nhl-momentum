@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
 export default function TonightPill() {
@@ -22,8 +23,9 @@ export default function TonightPill() {
   return (
     <div className="flex items-center gap-2">
       {count !== null && (
-        <div
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold"
+        <Link
+          href="/games"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full font-bold hover:opacity-80 transition-opacity"
           style={{
             background: 'rgba(255,90,36,0.12)',
             border: '1px solid rgba(255,90,36,0.3)',
@@ -34,7 +36,7 @@ export default function TonightPill() {
           }}
         >
           TONIGHT · {count}
-        </div>
+        </Link>
       )}
 
       {/* Decorative avatar placeholder — no auth in this app */}
