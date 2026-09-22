@@ -21,9 +21,11 @@ export type SectionKey =
 // Section render order by phase.
 // Critical: for regular and season-start, 'last-night' must be FIRST content section.
 export const SECTION_ORDER: Record<SeasonPhase, SectionKey[]> = {
-  // Preseason: Heat scores from last season are still meaningful; show rankings.
-  // The 'value-prop' TopBanner already handles the countdown copy.
-  preseason: ['value-prop', 'rankings', 'explore'],
+  // Preseason: real exhibition games still happen this window, and last
+  // season's Heat scores are still meaningful — show the same content as
+  // regular season. Both sections already no-op (return null) when there's
+  // genuinely nothing to show, so this never renders empty shells.
+  preseason: ['value-prop', 'last-night', 'matches-to-watch', 'rankings', 'explore'],
 
   // Season start (first 3 weeks after opening night): last-night leads.
   'season-start': ['value-prop', 'last-night', 'matches-to-watch', 'rankings', 'explore'],
