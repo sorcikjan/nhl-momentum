@@ -14,8 +14,11 @@ export type SectionKey =
   | 'value-prop'
   | 'phase-hero'
   | 'last-night'
+  | 'storylines'
   | 'matches-to-watch'
   | 'rankings'
+  | 'season-strip'
+  | 'week-schedule'
   | 'explore';
 
 // Section render order by phase.
@@ -27,11 +30,12 @@ export const SECTION_ORDER: Record<SeasonPhase, SectionKey[]> = {
   // genuinely nothing to show, so this never renders empty shells.
   preseason: ['value-prop', 'last-night', 'matches-to-watch', 'rankings', 'explore'],
 
-  // Season start (first 3 weeks after opening night): last-night leads.
-  'season-start': ['value-prop', 'last-night', 'matches-to-watch', 'rankings', 'explore'],
+  // Season start (first 3 weeks after opening night): stats strip leads, then
+  // last-night hero, storylines, tonight, rankings, first-week schedule.
+  'season-start': ['value-prop', 'season-strip', 'last-night', 'storylines', 'matches-to-watch', 'rankings', 'week-schedule', 'explore'],
 
   // Regular season: same anchor — what happened, what's on tonight.
-  regular: ['value-prop', 'last-night', 'matches-to-watch', 'rankings', 'explore'],
+  regular: ['value-prop', 'last-night', 'storylines', 'matches-to-watch', 'rankings', 'explore'],
 
   // Playoffs: series context first, then tonight, then last night.
   playoffs: ['value-prop', 'phase-hero', 'matches-to-watch', 'last-night', 'rankings', 'explore'],

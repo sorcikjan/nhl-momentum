@@ -7,6 +7,10 @@ import TonightSection from '@/components/dashboard/TonightSection';
 import ResultsSection from '@/components/dashboard/ResultsSection';
 import HeatGrid from '@/components/dashboard/HeatGrid';
 import PlayoffHero from '@/components/dashboard/PlayoffHero';
+import LastNightHero from '@/components/dashboard/LastNightHero';
+import StorylinesGrid from '@/components/dashboard/StorylinesGrid';
+import SeasonStatsStrip from '@/components/dashboard/SeasonStatsStrip';
+import WeekSchedule from '@/components/dashboard/WeekSchedule';
 import {
   fetchRankings,
   fetchGames,
@@ -49,6 +53,11 @@ const getRecentGames = cache(() => fetchRecentCompletedGames(2, 15).catch(() => 
 const getGoalieRankings = cache(() => fetchGoalieRankings().catch(() => []));
 const getNewcomers = cache(() => fetchNewcomerWatch().catch(() => []));
 const getSeriesStandings = cache(() => fetchSeriesStandings().catch(() => new Map()));
+
+// Cache for upcoming games used by WeekSchedule (today + 2 days)
+const getUpcomingDayGames = cache((date: string) =>
+  fetchGames(date).catch(() => ({ games: [], predictions: [], odds: [] }))
+);
 
 // ── Section: Playoff Hero ─────────────────────────────────────────────────────
 
@@ -107,7 +116,7 @@ function computeResultsMeta(games: any[], predMap: Map<number, any>) {
   return { lastNight, gameCount: lastNightGames.length, hits, total, pct: total > 0 ? Math.round((hits / total) * 100) : null };
 }
 
-// ── Section: Last Night — combined results + recaps ───────────────────────────
+// ── Section: Last Night — combined results + recaps (preseason/playoffs) ─────
 
 async function LastNightSection({ seasonStart = false }: { seasonStart?: boolean }) {
   const [[{ games, predMap }, rankings], recaps] = await Promise.all([
@@ -149,8 +158,7 @@ async function LastNightSection({ seasonStart = false }: { seasonStart?: boolean
 
   return (
     <div className="flex flex-col gap-12">
-
-      {/* Results — section has its own header ("Results & predictions.") */}
+      {/* Results — section has its own header */}
       {hasResults && (
         <ResultsSection
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -161,13 +169,88 @@ async function LastNightSection({ seasonStart = false }: { seasonStart?: boolean
         />
       )}
 
-      {/* Stories — section has its own header ("The night in X stories.") */}
+      {/* Stories — section has its own header */}
       {hasRecaps && (
         <RecapFeed recaps={recaps} />
       )}
-
     </div>
   );
+}
+
+// ── Section: Last Night Hero — new layout for season-start / regular ──────────
+
+async function LastNightHeroSection() {
+  const [{ games, predMap }, rankings, recaps] = await Promise.all([
+    getRecentGames(),
+    getRankings(),
+    getRecentRecaps(),
+  ]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const top100 = (rankings?.top100 ?? []) as any[];
+
+  // Build team → top players with headshots (for star-of-the-night mini-card)
+  const teamPlayersMap = new Map<string, Array<{
+    name: string; heat: number; team: string;
+    headshot_url: string | null; season_points: number; season_games: number;
+  }>>();
+  for (const r of top100) {
+    const abbrev = r.players?.teams?.abbrev;
+    if (!abbrev) continue;
+    const heat = ppmToHeat(r.momentum_ppm ?? 0);
+    const name = `${r.players.first_name ?? ''} ${r.players.last_name ?? ''}`.trim();
+    const seasonPoints = (r.season_goals ?? 0) + (r.season_assists ?? 0);
+    if (!teamPlayersMap.has(abbrev)) teamPlayersMap.set(abbrev, []);
+    teamPlayersMap.get(abbrev)!.push({
+      name, heat, team: abbrev,
+      headshot_url: r.players.headshot_url ?? null,
+      season_points: seasonPoints,
+      season_games: r.season_games ?? 0,
+    });
+  }
+  for (const arr of teamPlayersMap.values()) arr.sort((a, b) => b.heat - a.heat);
+
+  const topPlayers = new Map<number, {
+    name: string; heat: number; team: string;
+    headshot_url: string | null; season_points: number; season_games: number;
+  }>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const g of games as any[]) {
+    const awayTop = (teamPlayersMap.get(g.away_team?.abbrev) ?? [])[0] ?? null;
+    const homeTop = (teamPlayersMap.get(g.home_team?.abbrev) ?? [])[0] ?? null;
+    const top = awayTop && homeTop
+      ? (awayTop.heat >= homeTop.heat ? awayTop : homeTop)
+      : awayTop ?? homeTop ?? null;
+    if (top) topPlayers.set(g.id, top);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const completed = (games as any[]).filter((g: any) => ['FINAL', 'OFF'].includes(g.game_state));
+  if (!completed.length) return null;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lastNight = completed.reduce((max: string, g: any) =>
+    (g.game_date as string) > max ? (g.game_date as string) : max, '');
+
+  return (
+    <LastNightHero
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      games={games as any[]}
+      predMap={predMap}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      topPlayers={topPlayers as any}
+      recaps={recaps}
+      lastNight={lastNight}
+    />
+  );
+}
+
+// ── Section: Storylines (for season-start / regular) ─────────────────────────
+
+async function StorylinesSection() {
+  const recaps = await getRecentRecaps();
+  if (!recaps.length) return null;
+  return <StorylinesGrid recaps={recaps} />;
 }
 
 // ── Section: Tonight (upcoming / live games) ──────────────────────────────────
@@ -192,8 +275,7 @@ async function TonightSlate({ today }: { today: string }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const top100 = (rankings?.top100 ?? []) as any[];
 
-  // Build team → players lookup sorted by heat desc — includes full player data
-  // for the featured game cards (headshot, position, season stats).
+  // Build team → players lookup sorted by heat desc
   const teamPlayersMap = new Map<string, WatchPlayer[]>();
   for (const r of top100) {
     const abbrev = r.players?.teams?.abbrev;
@@ -215,7 +297,7 @@ async function TonightSlate({ today }: { today: string }) {
   }
   for (const arr of teamPlayersMap.values()) arr.sort((a, b) => b.heat - a.heat);
 
-  // Build per-game watch players (3 per team, stored with team field for splitting)
+  // Build per-game watch players
   const watchPlayers = new Map<number, WatchPlayer[]>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const g of games as any[]) {
@@ -243,8 +325,7 @@ async function TonightSlate({ today }: { today: string }) {
     watchabilityMap.set(g.id, score);
   }
 
-  // During playoffs: detect the featured series game so it's not shown twice
-  // (PlayoffHero already gives it full coverage — TonightSection shows the rest)
+  // During playoffs: detect the featured series game
   let featuredGameId: number | undefined;
   if (seriesMap.size > 0) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -255,7 +336,6 @@ async function TonightSlate({ today }: { today: string }) {
     );
     const candidates = seriesTonight.length > 0 ? seriesTonight : activeSeries;
 
-    // Score by sum of top-3 Heat per team
     const teamScore = (abbrev: string) => {
       const heats = (teamPlayersMap.get(abbrev) ?? []).slice(0, 3).map(p => p.heat);
       return heats.reduce((s, h) => s + h, 0);
@@ -286,6 +366,48 @@ async function TonightSlate({ today }: { today: string }) {
       excludeGameId={featuredGameId}
     />
   );
+}
+
+// ── Section: Week Schedule (season-start only) ────────────────────────────────
+
+async function WeekScheduleSection({ today }: { today: string }) {
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
+  const dayAfter = new Date(today);
+  dayAfter.setDate(dayAfter.getDate() + 2);
+  const dayAfterStr = dayAfter.toISOString().slice(0, 10);
+
+  const [day1, day2, day3] = await Promise.all([
+    getTodayGames(today),
+    getUpcomingDayGames(tomorrowStr),
+    getUpcomingDayGames(dayAfterStr),
+  ]);
+
+  function formatDayLabel(dateStr: string): string {
+    const d = new Date(dateStr + 'T12:00:00Z');
+    return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }).toUpperCase();
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function buildPredMap(predictions: any[]): Record<number, any> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const m: Record<number, any> = {};
+    for (const p of predictions ?? []) m[p.game_id] = p;
+    return m;
+  }
+
+  const days = [
+    { date: today, label: formatDayLabel(today), games: day1.games ?? [], preds: buildPredMap(day1.predictions ?? []) },
+    { date: tomorrowStr, label: formatDayLabel(tomorrowStr), games: day2.games ?? [], preds: buildPredMap(day2.predictions ?? []) },
+    { date: dayAfterStr, label: formatDayLabel(dayAfterStr), games: day3.games ?? [], preds: buildPredMap(day3.predictions ?? []) },
+  ];
+
+  // Only show if there are games in at least one day
+  const hasAnyGames = days.some(d => d.games.length > 0);
+  if (!hasAnyGames) return null;
+
+  return <WeekSchedule days={days} today={today} />;
 }
 
 // ── Section: Who's burning (Heat grid / rankings) ────────────────────────────
@@ -326,10 +448,34 @@ function ExploreSection() {
       </div>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {([
-          { href: '/rankings', category: 'HEAT MAP', title: 'Heat Rankings', desc: "Who's playing the best hockey right now", color: 'var(--heat)' },
-          { href: '/games', category: 'PREDICTIONS', title: 'Games & Picks', desc: 'AI win predictions vs bookmaker odds', color: 'var(--neon)' },
-          { href: '/recaps', category: 'STORIES', title: 'AI archive', desc: 'Every story written. Searchable.', color: 'var(--text)' },
-          { href: '/playoffs', category: 'ACCURACY', title: 'How we\'re doing', desc: 'Pick history, model drift, calibration.', color: 'var(--neon)' },
+          {
+            href: '/search',
+            category: 'COMPARE',
+            title: 'Player vs player',
+            desc: 'Side by side. Heat, stats, advanced metrics.',
+            color: 'var(--neon)',
+          },
+          {
+            href: '/rankings',
+            category: 'HEAT MAP',
+            title: `All 32 skaters`,
+            desc: 'Live grid. Filter by team, position, streak.',
+            color: 'var(--heat)',
+          },
+          {
+            href: '/recaps',
+            category: 'STORIES',
+            title: 'AI archive',
+            desc: 'Every story we\'ve ever written. Searchable.',
+            color: 'var(--text)',
+          },
+          {
+            href: '/games',
+            category: 'ACCURACY',
+            title: 'How we\'re doing',
+            desc: 'Pick history, model drift, calibration.',
+            color: 'var(--neon)',
+          },
         ] as const).map(({ href, category, title, desc, color }) => (
           <a key={href} href={href}
             className="hover:opacity-90 transition-opacity flex flex-col gap-2"
@@ -362,16 +508,20 @@ function HeroSkeleton() {
 function ResultsSkeleton() {
   return (
     <div className="flex flex-col gap-6">
-      {/* Skeleton header */}
       <div className="h-10 w-48 rounded-lg animate-pulse" style={{ background: 'var(--bg-card)' }} />
-      {/* Game result cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
-        {[...Array(4)].map((_, i) => (
+      <div className="hidden md:grid md:grid-cols-2 gap-4">
+        <div className="h-80 rounded-2xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
+        <div className="flex flex-col gap-2">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-16 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
+          ))}
+        </div>
+      </div>
+      <div className="md:hidden flex flex-col gap-2">
+        {[...Array(3)].map((_, i) => (
           <div key={i} className="h-32 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
         ))}
       </div>
-      {/* Recap hero */}
-      <div className="rounded-2xl animate-pulse" style={{ background: 'var(--bg-card)', minHeight: '280px' }} />
     </div>
   );
 }
@@ -391,6 +541,26 @@ function GameSkeleton() {
     <div className="flex flex-col gap-2">
       {[...Array(4)].map((_, i) => (
         <div key={i} className="h-14 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
+      ))}
+    </div>
+  );
+}
+
+function StorylinesSkleton() {
+  return (
+    <div className="hidden md:grid md:grid-cols-3 gap-3">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="h-48 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
+      ))}
+    </div>
+  );
+}
+
+function WeekSkeleton() {
+  return (
+    <div className="hidden md:grid md:grid-cols-3 gap-3">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="h-40 rounded-xl animate-pulse" style={{ background: 'var(--bg-card)' }} />
       ))}
     </div>
   );
@@ -490,6 +660,12 @@ export default async function DashboardPage() {
             <TopBanner />
           </Suspense>
         );
+      case 'season-strip':
+        return (
+          <Suspense key={key} fallback={null}>
+            <SeasonStatsStrip today={today} />
+          </Suspense>
+        );
       case 'phase-hero':
         return (
           <Suspense key={key} fallback={<HeroSkeleton />}>
@@ -497,9 +673,24 @@ export default async function DashboardPage() {
           </Suspense>
         );
       case 'last-night':
+        // For season-start and regular: new hero layout without RecapFeed
+        if (phase === 'season-start' || phase === 'regular') {
+          return (
+            <Suspense key={key} fallback={<ResultsSkeleton />}>
+              <LastNightHeroSection />
+            </Suspense>
+          );
+        }
+        // For preseason / playoffs: classic layout with RecapFeed embedded
         return (
           <Suspense key={key} fallback={<ResultsSkeleton />}>
-            <LastNightSection seasonStart={phase === 'season-start'} />
+            <LastNightSection seasonStart={false} />
+          </Suspense>
+        );
+      case 'storylines':
+        return (
+          <Suspense key={key} fallback={<StorylinesSkleton />}>
+            <StorylinesSection />
           </Suspense>
         );
       case 'matches-to-watch':
@@ -512,6 +703,12 @@ export default async function DashboardPage() {
         return (
           <Suspense key={key} fallback={<HeatGridSkeleton />}>
             <BurningSection />
+          </Suspense>
+        );
+      case 'week-schedule':
+        return (
+          <Suspense key={key} fallback={<WeekSkeleton />}>
+            <WeekScheduleSection today={today} />
           </Suspense>
         );
       case 'explore':
@@ -528,4 +725,3 @@ export default async function DashboardPage() {
     </div>
   );
 }
-

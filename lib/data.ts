@@ -315,7 +315,7 @@ export async function fetchRecentCompletedGames(days = 3, limit = 20) {
   const { data: games } = await supabaseAdmin
     .from('games')
     .select(`
-      id, game_date, home_score, away_score, game_state,
+      id, game_date, home_score, away_score, game_state, youtube_highlight_id,
       home_team:teams!games_home_team_id_fkey(id, abbrev, name),
       away_team:teams!games_away_team_id_fkey(id, abbrev, name)
     `)
