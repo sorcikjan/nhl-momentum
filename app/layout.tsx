@@ -4,12 +4,13 @@ import Script from 'next/script';
 import './globals.css';
 import Sidebar from '@/components/layout/Sidebar';
 import { TopLoader } from '@/components/top-loader';
+import { SITE_URL } from '@/lib/site';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 const fraunces = Fraunces({ variable: '--font-fraunces', subsets: ['latin'], style: ['normal', 'italic'], weight: ['700', '900'] });
 
-const siteUrl = 'https://nhl-momentum.netlify.app';
+const siteUrl = SITE_URL;
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),

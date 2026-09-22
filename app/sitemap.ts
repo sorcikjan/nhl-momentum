@@ -1,8 +1,9 @@
 import type { MetadataRoute } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { playerUrl, teamUrl, gameUrl } from '@/lib/urls';
+import { SITE_URL } from '@/lib/site';
 
-const base = 'https://nhl-momentum.netlify.app';
+const base = SITE_URL;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date().toISOString();

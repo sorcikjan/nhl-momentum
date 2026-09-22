@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { fetchRecap, fetchRecapData, teamLogoUrl } from '@/lib/data';
 import { recapUrl, gameUrl, playerUrl, teamUrl } from '@/lib/urls';
+import { SITE_URL } from '@/lib/site';
 
 export const revalidate = 3600;
 
@@ -21,7 +22,7 @@ export async function generateMetadata(
     month: 'long', day: 'numeric', year: 'numeric',
   });
 
-  const canonical = `https://nhl-momentum.netlify.app${recapUrl(date, recap.title)}`;
+  const canonical = `${SITE_URL}${recapUrl(date, recap.title)}`;
 
   return {
     title: recap.title,
@@ -603,7 +604,7 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
     publisher: {
       '@type': 'Organization',
       name: 'momentum.',
-      url: 'https://nhl-momentum.netlify.app',
+      url: SITE_URL,
     },
   };
 
