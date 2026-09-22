@@ -129,10 +129,22 @@ export async function GET(req: NextRequest) {
       // season's rows and the site displays wrong numbers labeled as the new season's stats.
       // Preseason (type 01) games are also excluded; they have no player stats in practice
       // (NHL API does not publish them) so this is moot but explicit is better.
-      const fullSeason = playerStats.filter(r => {
+      const inSeason = (r: { game_id: number }, year: number) => {
         const gid = String(r.game_id);
-        return gid.startsWith(String(seasonStartYear)) && gid.slice(4, 6) !== '01';
-      });
+        return gid.startsWith(String(year)) && gid.slice(4, 6) !== '01';
+      };
+      let fullSeason = playerStats.filter(r => inSeason(r, seasonStartYear));
+      // During the gap between a season ending and the next one's first real game
+      // (all of preseason), the current season has zero qualifying rows for every
+      // player — season_games would go to 0 league-wide, which fails every ">= N
+      // games" filter used across rankings/hot/breakout-watch and empties them out.
+      // Fall back to last season's final numbers so the site keeps showing a
+      // meaningful "season" baseline until real current-season games exist —
+      // this is a deliberate carry-forward, not a blend: exactly one season's
+      // games are used, never a mix of two.
+      if (fullSeason.length === 0) {
+        fullSeason = playerStats.filter(r => inSeason(r, seasonStartYear - 1));
+      }
 
       const momentum  = buildLayerMetrics(last5);
       const season    = buildLayerMetrics(fullSeason);
