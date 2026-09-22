@@ -9,16 +9,17 @@ export function ppmToHeat(ppm: number | null | undefined): number {
   return Math.min(100, Math.round((ppm / PPM_MAX) * 100));
 }
 
-// Text/foreground color for a Heat score — accounts for background legibility.
-// Low heat: silver (cold, no momentum)
-// Building: amber
-// Hot: full Heat orange
-// Blazing (80+): white — background is near-orange, needs contrast
+// Canonical Heat color scale — per the design brief, this is not decorative,
+// it IS the metric. Every number, bar, tile, and stripe that represents a
+// Heat value should be colored by this single function so a user can read
+// temperature without reading a number.
 export function heatColor(heat: number): string {
-  if (heat >= 80) return '#ffffff';
-  if (heat >= 60) return 'var(--heat)';
-  if (heat >= 35) return 'var(--amber)';
-  return 'var(--silver)';
+  if (heat >= 85) return '#ff3a0f'; // white-hot
+  if (heat >= 70) return '#ff5a24'; // on fire
+  if (heat >= 55) return '#ff8a47'; // hot
+  if (heat >= 40) return '#f7b267'; // warm
+  if (heat >= 25) return '#8a94a6'; // neutral
+  return '#4a88ff';                 // ice cold
 }
 
 // Background color — continuous gradient from Ink (#0a0b0f) to Heat (#ff5a24).
@@ -45,10 +46,16 @@ export function heatBg(heat: number): string {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-// Border color: Heat orange, opacity scaled by heat level
+// Border/stripe color: scales BOTH hue (via heatColor's temperature bands)
+// AND opacity with heat level — per the design brief, a rankings row's left
+// border should let a user sense temperature without reading the number.
 export function heatBorderColor(heat: number): string {
-  const opacity = Math.max(0.15, Math.min(0.9, heat / 100));
-  return `rgba(255, 90, 36, ${opacity.toFixed(2)})`;
+  const hex = heatColor(heat);
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const opacity = Math.max(0.35, Math.min(0.9, heat / 100));
+  return `rgba(${r}, ${g}, ${b}, ${opacity.toFixed(2)})`;
 }
 
 // Short label for a player's heat state

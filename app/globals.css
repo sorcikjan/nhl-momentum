@@ -1,29 +1,37 @@
 @import "tailwindcss";
 
 :root {
-  /* ── Ink (base dark) ─────────────────────────────── */
-  --bg:          #0a0b0f;
-  --bg-card:     #111318;
-  --bg-hover:    #171c27;
-  --border:      #1d2235;
-  --text:        #a0aec0;
-  --text-bright: #e2e8f0;
+  /* ── Surfaces (per implementation brief §2) ───────── */
+  --bg:           #0a0b0f;  /* page */
+  --bg-card:      #13151c;  /* cards */
+  --bg-raised:    #1a1d26;  /* nested / inputs */
+  --bg-hover:     #1f2330;
+  --border:       #252a38;  /* prominent borders */
+  --border-soft:  #1c2030;  /* dividers, subtle cards */
 
-  /* ── Brand palette ───────────────────────────────── */
-  --heat:        #ff5a24;
-  --heat-glow:   rgba(255, 90, 36, 0.15);
-  --cold:        #3a88ff;   /* brand Cold — links, active state */
-  --cold-glow:   rgba(58, 136, 255, 0.15);
-  --rise:        #00e5a0;   /* brand Rise — positive momentum */
-  --story:       #e5508b;   /* brand Story — editorial content */
+  /* ── Text ──────────────────────────────────────────── */
+  --text-bright:  #f4f5f8;  /* headlines, key numbers */
+  --text:         #8a94a6;  /* body */
+  --text-muted:   #5a6378;  /* labels, meta */
 
-  /* ── Aliases kept for backward compat ───────────── */
-  --neon:        #3a88ff;
-  --neon-glow:   rgba(58, 136, 255, 0.15);
-  --green:       #00e5a0;
-  --silver:      #94a3b8;
-  --red:         #ef4444;
-  --amber:       #f59e0b;
+  /* ── Semantic — heat-orange is PRIMARY, blue means cold ── */
+  --heat:         #ff5a24;
+  --heat-dim:     rgba(255, 90, 36, 0.14);
+  --heat-glow:    rgba(255, 90, 36, 0.15);
+  --cold:         #3a88ff;
+  --cold-glow:    rgba(58, 136, 255, 0.15);
+  --rise:         #00e5a0;
+  --rise-dim:     rgba(0, 229, 160, 0.12);
+  --story:        #e5508b;
+  --gold:         #ffb547;  /* rivalry, watchability, caution */
+  --red:          #ef4444;
+
+  /* ── Aliases kept for backward compat with existing components ── */
+  --neon:         #3a88ff;
+  --neon-glow:    rgba(58, 136, 255, 0.15);
+  --green:        #00e5a0;
+  --silver:       #8a94a6;
+  --amber:        #ffb547;
 }
 
 body {

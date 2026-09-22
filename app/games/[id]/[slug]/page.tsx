@@ -7,7 +7,7 @@ import {
 } from '@/lib/data';
 import { teamUrl, playerUrl, recapUrl } from '@/lib/urls';
 import { decimalToNormProb, formatBookmaker } from '@/lib/odds-api';
-import { ppmToHeat } from '@/lib/heat';
+import { ppmToHeat, heatColor } from '@/lib/heat';
 import { periodScoresFromMomentum } from '@/lib/play-by-play';
 
 import ShareButton from '@/components/ui/ShareButton';
@@ -620,7 +620,7 @@ function LineupCard({
                     <th className="px-3 py-1.5 text-right text-xs font-semibold uppercase" style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>+/-</th>
                   </>
                 : <>
-                    <th className="px-3 py-1.5 text-right text-xs font-semibold uppercase" style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>cPPM</th>
+                    <th className="px-3 py-1.5 text-right text-xs font-semibold uppercase" style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>Heat</th>
                     <th className="px-3 py-1.5 text-right text-xs font-semibold uppercase" style={{ color: 'var(--text)', borderBottom: '1px solid var(--border)' }}>Nrg</th>
                   </>
               }
@@ -653,7 +653,7 @@ function LineupCard({
                         </td>
                       </>
                     : <>
-                        <td className="px-3 py-1.5 text-right font-mono text-xs" style={{ color: 'var(--heat)' }}>{Number(p.compositePpm ?? 0).toFixed(4)}</td>
+                        <td className="px-3 py-1.5 text-right font-mono text-xs font-bold" style={{ color: heatColor(ppmToHeat(p.compositePpm)) }}>{ppmToHeat(p.compositePpm)}</td>
                         <td className="px-3 py-1.5 text-right font-mono text-xs" style={{ color: 'var(--amber)' }}>{p.energyBar ?? 100}</td>
                       </>
                   }

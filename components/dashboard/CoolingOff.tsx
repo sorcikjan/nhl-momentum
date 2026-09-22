@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { playerUrl } from '@/lib/urls';
 import { daysAgo, deriveOutStatus } from '@/lib/player-status';
+import { ppmToHeat, heatColor } from '@/lib/heat';
 
 interface Player {
   player_id: number;
@@ -117,8 +118,8 @@ export default function CoolingOff({
                   <span className="text-xs" style={{ color: 'var(--text)' }}>
                     {p.players.teams.abbrev} · {p.players.position_code}
                   </span>
-                  <span className="text-xs font-mono" style={{ color: 'var(--text)' }}>
-                    {p.momentum_ppm?.toFixed(4)} PPM
+                  <span className="text-xs font-mono font-bold" style={{ color: heatColor(ppmToHeat(p.momentum_ppm)) }}>
+                    Heat {ppmToHeat(p.momentum_ppm)}
                   </span>
                 </div>
               </div>
