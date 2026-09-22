@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { gameUrl } from '@/lib/urls';
-import { ppmToHeat, heatBorderColor, heatColor } from '@/lib/heat';
+import { heatBorderColor, heatColor } from '@/lib/heat';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Game = any;
@@ -37,10 +37,19 @@ export const TEAM_BADGE_COLORS: Record<string, string> = {
   VGK: '#B4975A', WSH: '#C8102E', WPG: '#041E42',
 };
 
-interface WatchPlayer {
+export interface WatchPlayer {
+  player_id: number;
   name: string;
   heat: number;
   team: string;
+  headshot_url?: string | null;
+  position_code?: string;
+  season_points?: number;
+  season_games?: number;
+}
+
+function logoUrl(abbrev: string) {
+  return `https://assets.nhle.com/logos/nhl/svg/${abbrev}_light.svg`;
 }
 
 function formatTime(utc: string): string {
@@ -78,120 +87,313 @@ function HeatBadge({ heat }: { heat: number }) {
   );
 }
 
-// ── Game row (unified format) ──────────────────────────────────────────────────
+// ── Probability band — the card header for featured games ──────────────────────
+//
+// Two flex children whose widths ARE the probabilities, with team colours.
+// Favoured side is full saturation; other side is desaturated.
 
-function GameRow({
+function ProbabilityBand({
+  awayAbbrev,
+  homeAbbrev,
+  awayConf,
+  homeConf,
+  favoredAbbrev,
+}: {
+  awayAbbrev: string;
+  homeAbbrev: string;
+  awayConf: number;
+  homeConf: number;
+  favoredAbbrev: string | null;
+}) {
+  const awayColor = TEAM_COLORS[awayAbbrev] ?? '#1a1d26';
+  const homeColor = TEAM_COLORS[homeAbbrev] ?? '#1a1d26';
+  const awayFavored = favoredAbbrev === awayAbbrev;
+  const homeFavored = favoredAbbrev === homeAbbrev;
+
+  return (
+    <div style={{ display: 'flex', height: '52px', borderRadius: '12px 12px 0 0', overflow: 'hidden' }}>
+      {/* Away side */}
+      <div
+        style={{
+          flex: awayConf,
+          background: awayFavored ? awayColor : `${awayColor}60`,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          paddingLeft: 14,
+          minWidth: 0,
+        }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logoUrl(awayAbbrev)}
+          alt={awayAbbrev}
+          style={{
+            width: 22,
+            height: 22,
+            flexShrink: 0,
+            filter: awayFavored ? 'none' : 'saturate(0.4)',
+            outline: awayFavored ? '2px solid var(--heat)' : 'none',
+            outlineOffset: '2px',
+            borderRadius: '50%',
+          }}
+        />
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+          <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.75rem', fontWeight: 700, color: awayFavored ? '#fff' : 'rgba(255,255,255,0.45)', lineHeight: 1.1 }}>
+            {awayConf}%
+          </span>
+          {awayFavored && (
+            <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.475rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.08em', lineHeight: 1 }}>
+              OUR PICK
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Home side */}
+      <div
+        style={{
+          flex: homeConf,
+          background: homeFavored ? homeColor : `${homeColor}60`,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 8,
+          paddingRight: 14,
+          minWidth: 0,
+        }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', minWidth: 0 }}>
+          <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.75rem', fontWeight: 700, color: homeFavored ? '#fff' : 'rgba(255,255,255,0.45)', lineHeight: 1.1 }}>
+            {homeConf}%
+          </span>
+          {homeFavored && (
+            <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.475rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.08em', lineHeight: 1 }}>
+              OUR PICK
+            </span>
+          )}
+        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={logoUrl(homeAbbrev)}
+          alt={homeAbbrev}
+          style={{
+            width: 22,
+            height: 22,
+            flexShrink: 0,
+            filter: homeFavored ? 'none' : 'saturate(0.4)',
+            outline: homeFavored ? '2px solid var(--heat)' : 'none',
+            outlineOffset: '2px',
+            borderRadius: '50%',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Single watch-player cell inside a featured card ───────────────────────────
+
+function WatchPlayerCell({ p, alignRight }: { p: WatchPlayer; alignRight?: boolean }) {
+  const pts = p.season_points ?? 0;
+  const gp = p.season_games ?? 0;
+  const credential = gp > 0 ? `${pts}pts · ${gp}GP` : p.position_code ?? '';
+
+  return (
+    <div
+      className="flex items-center gap-2 rounded-lg"
+      style={{
+        background: 'rgba(255,255,255,0.04)',
+        padding: '6px 8px',
+        flexDirection: alignRight ? 'row-reverse' : 'row',
+        textAlign: alignRight ? 'right' : 'left',
+      }}
+    >
+      {/* Photo */}
+      <div
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: '50%',
+          overflow: 'hidden',
+          flexShrink: 0,
+          background: 'var(--bg)',
+          border: '1px solid var(--border)',
+        }}
+      >
+        {p.headshot_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={p.headshot_url}
+            alt={p.name}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }}
+          />
+        ) : (
+          <div style={{ width: '100%', height: '100%', background: 'var(--bg-raised)' }} />
+        )}
+      </div>
+      {/* Text */}
+      <div className="flex-1 min-w-0">
+        <div style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-bright)', lineHeight: 1.2 }} className="truncate">
+          {p.name.split(' ').pop()}
+        </div>
+        <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5625rem', color: 'var(--text)', opacity: 0.55, lineHeight: 1.2 }}>
+          {p.position_code ? `${p.position_code} · ` : ''}{credential}
+        </div>
+      </div>
+      {/* Heat pill */}
+      <HeatBadge heat={p.heat} />
+    </div>
+  );
+}
+
+// ── Featured game card (top 2 watchable games) ────────────────────────────────
+
+function FeaturedGameCard({
   game,
   pred,
   watchPlayers,
+  watchability,
 }: {
   game: Game;
-  pred: Game;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  pred: any;
   watchPlayers?: WatchPlayer[];
+  watchability?: number;
 }) {
   const away = game.awayTeam?.abbrev ?? '???';
   const home = game.homeTeam?.abbrev ?? '???';
   const isLive = ['LIVE', 'CRIT'].includes(game.gameState);
+  const awayScore = game.awayTeam?.score ?? null;
+  const homeScore = game.homeTeam?.score ?? null;
   const periodNum = game.periodDescriptor?.number as number | undefined;
   const period = periodLabel(periodNum);
   const clock = game.clock?.timeRemaining as string | undefined;
-  const awayScore = game.awayTeam?.score ?? null;
-  const homeScore = game.homeTeam?.score ?? null;
 
   const homeProb = pred?.home_win_probability ?? null;
-  const awayConf = homeProb != null ? Math.round((1 - homeProb) * 100) : null;
-  const homeConf = homeProb != null ? Math.round(homeProb * 100) : null;
+  const awayConf = homeProb != null ? Math.round((1 - homeProb) * 100) : 50;
+  const homeConf = homeProb != null ? Math.round(homeProb * 100) : 50;
   const favorHome = homeProb != null ? homeProb >= 0.5 : null;
+  const favoredAbbrev = favorHome === true ? home : favorHome === false ? away : null;
+
+  // Split watch players by team (max 3 per side)
+  const awayPlayers = (watchPlayers ?? []).filter(p => p.team === away).slice(0, 3);
+  const homePlayers = (watchPlayers ?? []).filter(p => p.team === home).slice(0, 3);
 
   return (
     <Link
       href={gameUrl(game.id, away, home, game.gameDate ?? '')}
-      className="block rounded-xl hover:opacity-80 transition-opacity"
-      style={{ background: 'var(--bg-card)', border: `1px solid ${isLive ? 'rgba(255,68,68,0.3)' : 'var(--border)'}` }}
+      className="block hover:opacity-90 transition-opacity"
+      style={{
+        background: 'var(--bg-card)',
+        border: isLive ? '1px solid rgba(255,68,68,0.35)' : '1px solid var(--border)',
+        borderRadius: '12px',
+        overflow: 'hidden',
+      }}
     >
-      {/* Main row */}
-      <div className="flex items-center gap-3 px-4 py-3 flex-wrap">
-
-        {/* Time / status */}
-        <div className="flex-shrink-0 w-16">
-          {isLive ? (
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs font-bold animate-pulse" style={{ color: '#ff4444' }}>● LIVE</span>
-              {period && (
-                <span className="text-xs font-mono" style={{ color: 'var(--silver)', opacity: 0.6 }}>{period}{clock ? ` · ${clock}` : ''}</span>
-              )}
-            </div>
-          ) : game.startTimeUTC ? (
-            <span className="text-xs font-mono" style={{ color: 'var(--silver)', opacity: 0.55 }}>
-              {formatTime(game.startTimeUTC)}
-            </span>
-          ) : null}
-        </div>
-
-        {/* Away team */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+      {/* Probability band header */}
+      {homeProb != null ? (
+        <ProbabilityBand
+          awayAbbrev={away}
+          homeAbbrev={home}
+          awayConf={awayConf}
+          homeConf={homeConf}
+          favoredAbbrev={favoredAbbrev}
+        />
+      ) : (
+        /* Fallback header when no prediction */
+        <div
+          style={{
+            height: 52,
+            background: `linear-gradient(90deg, ${TEAM_COLORS[away] ?? '#1a1d26'}80 0%, ${TEAM_COLORS[home] ?? '#1a1d26'}80 100%)`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`https://assets.nhle.com/logos/nhl/svg/${away}_light.svg`}
-            alt={away}
-            style={{ width: '28px', height: '28px', flexShrink: 0 }}
-          />
-          <span className="font-black text-sm" style={{ color: '#fff' }}>{away}</span>
-          {isLive && awayScore != null && (
-            <span className="font-black text-lg font-mono" style={{ color: '#fff' }}>{awayScore}</span>
-          )}
-        </div>
-
-        <span className="text-xs flex-shrink-0" style={{ color: 'rgba(255,255,255,0.3)' }}>@</span>
-
-        {/* Home team */}
-        <div className="flex items-center gap-2 flex-shrink-0">
+          <img src={logoUrl(away)} alt={away} style={{ width: 24, height: 24, marginRight: 8 }} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`https://assets.nhle.com/logos/nhl/svg/${home}_light.svg`}
-            alt={home}
-            style={{ width: '28px', height: '28px', flexShrink: 0 }}
-          />
-          <span className="font-black text-sm" style={{ color: '#fff' }}>{home}</span>
-          {isLive && homeScore != null && (
-            <span className="font-black text-lg font-mono" style={{ color: '#fff' }}>{homeScore}</span>
-          )}
+          <img src={logoUrl(home)} alt={home} style={{ width: 24, height: 24 }} />
         </div>
+      )}
 
-        {/* Probability bar */}
-        {awayConf != null && homeConf != null && (
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-xs font-mono font-semibold flex-shrink-0"
-              style={{ color: favorHome === false ? 'var(--heat)' : 'var(--silver)', fontWeight: favorHome === false ? 700 : 400, minWidth: '32px', textAlign: 'right' }}>
-              {awayConf}%
-            </span>
-            <div className="flex-1 flex rounded-full overflow-hidden" style={{ height: '4px', background: 'var(--border)', minWidth: '60px' }}>
-              <div style={{ width: `${awayConf}%`, background: favorHome === false ? 'var(--heat)' : 'rgba(255,255,255,0.18)', height: '100%' }} />
-              <div style={{ width: `${homeConf}%`, background: favorHome ? 'var(--heat)' : 'rgba(255,255,255,0.18)', height: '100%' }} />
-            </div>
-            <span className="text-xs font-mono font-semibold flex-shrink-0"
-              style={{ color: favorHome ? 'var(--heat)' : 'var(--silver)', fontWeight: favorHome ? 700 : 400, minWidth: '32px' }}>
-              {homeConf}%
-            </span>
-          </div>
+      {/* Meta row: time, game info, watchability */}
+      <div
+        style={{
+          padding: '8px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
+          borderBottom: '1px solid var(--border-soft, var(--border))',
+          flexWrap: 'wrap',
+        }}
+      >
+        {/* Live indicator or time */}
+        {isLive ? (
+          <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.625rem', fontWeight: 700, color: '#ff4444' }}>
+            ● LIVE{period ? ` · ${period}` : ''}{clock ? ` · ${clock}` : ''}
+            {awayScore != null && homeScore != null && ` · ${away} ${awayScore}–${homeScore} ${home}`}
+          </span>
+        ) : (
+          <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', fontWeight: 600, color: 'var(--text-bright)' }}>
+            {formatTime(game.startTimeUTC)}
+          </span>
         )}
 
-        {/* WATCH FOR players */}
-        {watchPlayers && watchPlayers.length > 0 && (
-          <div className="flex flex-col gap-1 flex-shrink-0">
-            <span className="text-xs font-bold tracking-widest uppercase" style={{ color: 'var(--text)', opacity: 0.35 }}>WATCH FOR</span>
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {watchPlayers.map((wp, i) => (
-                <div key={i} className="flex items-center gap-1">
-                  {i > 0 && <span style={{ color: 'var(--text)', opacity: 0.3 }}>·</span>}
-                  <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.6 }}>{wp.name.split(' ').pop()}</span>
-                  <HeatBadge heat={wp.heat} />
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Spacer */}
+        <span style={{ flex: 1 }} />
+
+        {/* Watchability badge */}
+        {watchability != null && (
+          <span
+            style={{
+              fontFamily: 'var(--font-geist-mono), monospace',
+              fontSize: '0.5625rem',
+              color: 'var(--gold)',
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              background: 'rgba(255,181,71,0.1)',
+              border: '1px solid rgba(255,181,71,0.25)',
+              padding: '2px 6px',
+              borderRadius: 4,
+            }}
+          >
+            WATCHABILITY {watchability}
+          </span>
         )}
       </div>
+
+      {/* Players: 2 columns — away left, home right */}
+      {(awayPlayers.length > 0 || homePlayers.length > 0) && (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: 6,
+            padding: '10px 12px 12px',
+          }}
+        >
+          {/* Away team players */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5rem', color: 'var(--text)', opacity: 0.45, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2 }}>
+              {away} · WATCH
+            </div>
+            {awayPlayers.map(p => (
+              <WatchPlayerCell key={p.player_id} p={p} />
+            ))}
+          </div>
+          {/* Home team players */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5rem', color: 'var(--text)', opacity: 0.45, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2, textAlign: 'right' }}>
+              {home} · WATCH
+            </div>
+            {homePlayers.map(p => (
+              <WatchPlayerCell key={p.player_id} p={p} alignRight />
+            ))}
+          </div>
+        </div>
+      )}
     </Link>
   );
 }
@@ -375,6 +577,7 @@ export default function TonightSection({
   predMap,
   oddsMap: _oddsMap,
   watchPlayers,
+  watchabilityMap,
   excludeGameId,
 }: {
   games: Game[];
@@ -383,6 +586,7 @@ export default function TonightSection({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   oddsMap: Record<number, any[]>;
   watchPlayers?: Map<number, WatchPlayer[]>;
+  watchabilityMap?: Map<number, number>;
   excludeGameId?: number;
 }) {
   const upcoming = games
@@ -390,13 +594,27 @@ export default function TonightSection({
     .filter((g: Game) => g.id !== excludeGameId);
   if (!upcoming.length) return null;
 
-  // Sort: live first, then by start time
+  // Sort: live first, then by watchability desc, then by start time
   const sorted = [...upcoming].sort((a, b) => {
     const aLive = ['LIVE', 'CRIT'].includes(a.gameState) ? 1 : 0;
     const bLive = ['LIVE', 'CRIT'].includes(b.gameState) ? 1 : 0;
     if (bLive !== aLive) return bLive - aLive;
+    // Sort non-live by watchability desc
+    if (!aLive && !bLive) {
+      const wa = watchabilityMap?.get(a.id) ?? 0;
+      const wb = watchabilityMap?.get(b.id) ?? 0;
+      if (wb !== wa) return wb - wa;
+    }
     return (a.startTimeUTC ?? '').localeCompare(b.startTimeUTC ?? '');
   });
+
+  // Top 2 non-live upcoming games get the featured card treatment.
+  // Live games always use the compact row format.
+  const upcomingOnly = sorted.filter(g => !['LIVE', 'CRIT'].includes(g.gameState));
+  const liveGames = sorted.filter(g => ['LIVE', 'CRIT'].includes(g.gameState));
+  const featuredGames = upcomingOnly.slice(0, 2);
+  const featuredIds = new Set(featuredGames.map(g => g.id));
+  const compactGames = [...liveGames, ...upcomingOnly.filter(g => !featuredIds.has(g.id))];
 
   return (
     <section>
@@ -410,28 +628,48 @@ export default function TonightSection({
             What&apos;s on tonight.
           </h2>
         </div>
-        <a href="/games" style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 600, flexShrink: 0 }}>
+        <Link href="/games" style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 600, flexShrink: 0 }}>
           FULL SCHEDULE →
-        </a>
+        </Link>
       </div>
 
-      {/* Desktop: single container with rows */}
-      <div
-        className="hidden md:block rounded-xl overflow-hidden"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-      >
-        {sorted.map((g, i) => (
-          <DesktopGameRow
-            key={g.id}
-            game={g}
-            pred={predMap[g.id]}
-            watchPlayers={watchPlayers?.get(g.id)}
-            isFirst={i === 0}
-          />
-        ))}
+      {/* Desktop: featured cards + compact rows */}
+      <div className="hidden md:flex flex-col gap-3">
+        {/* Featured game cards (top 2 by watchability) */}
+        {featuredGames.length > 0 && (
+          <div className={`grid gap-3 ${featuredGames.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {featuredGames.map(g => (
+              <FeaturedGameCard
+                key={g.id}
+                game={g}
+                pred={predMap[g.id]}
+                watchPlayers={watchPlayers?.get(g.id)}
+                watchability={watchabilityMap?.get(g.id)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Rest of slate: compact rows */}
+        {compactGames.length > 0 && (
+          <div
+            className="rounded-xl overflow-hidden"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+          >
+            {compactGames.map((g, i) => (
+              <DesktopGameRow
+                key={g.id}
+                game={g}
+                pred={predMap[g.id]}
+                watchPlayers={watchPlayers?.get(g.id)}
+                isFirst={i === 0}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Mobile: individual compact cards */}
+      {/* Mobile: individual compact cards for all games */}
       <div className="md:hidden flex flex-col gap-2">
         {sorted.map(g => (
           <MobileGameCard

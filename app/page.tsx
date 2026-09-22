@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { cache } from 'react';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import RecapFeed from '@/components/dashboard/RecapFeed';
 import TonightSection from '@/components/dashboard/TonightSection';
 import ResultsSection from '@/components/dashboard/ResultsSection';
@@ -15,8 +16,12 @@ import {
   fetchGoalieRankings,
   fetchNewcomerWatch,
   fetchSeasonPhase,
+  isPlayoffGameId,
 } from '@/lib/data';
 import { ppmToHeat } from '@/lib/heat';
+import { calcWatchability } from '@/lib/watchability';
+import { getSeasonPhase, SECTION_ORDER, type SeasonPhase, type SectionKey } from '@/lib/season';
+import type { WatchPlayer } from '@/components/dashboard/TonightSection';
 
 export const revalidate = 60;
 
@@ -186,25 +191,55 @@ async function TonightSlate({ today }: { today: string }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const top100 = (rankings?.top100 ?? []) as any[];
 
-  // Build team → players lookup sorted by heat desc
-  const teamPlayersMap = new Map<string, Array<{ name: string; heat: number; team: string }>>();
+  // Build team → players lookup sorted by heat desc — includes full player data
+  // for the featured game cards (headshot, position, season stats).
+  const teamPlayersMap = new Map<string, WatchPlayer[]>();
   for (const r of top100) {
     const abbrev = r.players?.teams?.abbrev;
     if (!abbrev) continue;
     const heat = ppmToHeat(r.momentum_ppm ?? 0);
     const name = `${r.players.first_name ?? ''} ${r.players.last_name ?? ''}`.trim();
+    const seasonPoints = (r.season_goals ?? 0) + (r.season_assists ?? 0);
     if (!teamPlayersMap.has(abbrev)) teamPlayersMap.set(abbrev, []);
-    teamPlayersMap.get(abbrev)!.push({ name, heat, team: abbrev });
+    teamPlayersMap.get(abbrev)!.push({
+      player_id: r.player_id,
+      name,
+      heat,
+      team: abbrev,
+      headshot_url: r.players.headshot_url ?? null,
+      position_code: r.players.position_code ?? '',
+      season_points: seasonPoints,
+      season_games: r.season_games ?? 0,
+    });
   }
   for (const arr of teamPlayersMap.values()) arr.sort((a, b) => b.heat - a.heat);
 
-  const watchPlayers = new Map<number, Array<{ name: string; heat: number; team: string }>>();
+  // Build per-game watch players (3 per team, stored with team field for splitting)
+  const watchPlayers = new Map<number, WatchPlayer[]>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const g of games as any[]) {
     const awayPlayers = (teamPlayersMap.get(g.awayTeam?.abbrev) ?? []).slice(0, 3);
     const homePlayers = (teamPlayersMap.get(g.homeTeam?.abbrev) ?? []).slice(0, 3);
     const combined = [...awayPlayers, ...homePlayers];
     if (combined.length > 0) watchPlayers.set(g.id, combined);
+  }
+
+  // Compute watchability score per game
+  const watchabilityMap = new Map<number, number>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const g of games as any[]) {
+    const pred = predMap[g.id];
+    const away = g.awayTeam?.abbrev;
+    const home = g.homeTeam?.abbrev;
+    const awayTop = (teamPlayersMap.get(away) ?? [])[0];
+    const homeTop = (teamPlayersMap.get(home) ?? [])[0];
+    const score = calcWatchability({
+      topHomeHeat: homeTop?.heat ?? 0,
+      topAwayHeat: awayTop?.heat ?? 0,
+      homeWinProbability: pred?.home_win_probability ?? null,
+      isPlayoff: isPlayoffGameId(g.id),
+    });
+    watchabilityMap.set(g.id, score);
   }
 
   // During playoffs: detect the featured series game so it's not shown twice
@@ -246,12 +281,13 @@ async function TonightSlate({ today }: { today: string }) {
       predMap={predMap}
       oddsMap={oddsMap}
       watchPlayers={watchPlayers}
+      watchabilityMap={watchabilityMap}
       excludeGameId={featuredGameId}
     />
   );
 }
 
-// ── Section: Who's burning (Heat grid) ───────────────────────────────────────
+// ── Section: Who's burning (Heat grid / rankings) ────────────────────────────
 
 async function BurningSection() {
   const [rankings, goalies, newcomers] = await Promise.all([
@@ -261,6 +297,7 @@ async function BurningSection() {
   ]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const skaters = ((rankings?.top100 ?? []) as any[])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .sort((a: any, b: any) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0))
     .slice(0, 15);
   return (
@@ -272,6 +309,37 @@ async function BurningSection() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       newcomers={newcomers as any[]}
     />
+  );
+}
+
+// ── Section: Explore ──────────────────────────────────────────────────────────
+
+function ExploreSection() {
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.13em', textTransform: 'uppercase', marginBottom: '6px' }}>EXPLORE</p>
+        <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05, color: 'var(--text-bright)' }}>
+          More ways to dig in.
+        </h2>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {([
+          { href: '/rankings', category: 'HEAT MAP', title: 'Heat Rankings', desc: "Who's playing the best hockey right now", color: 'var(--heat)' },
+          { href: '/games', category: 'PREDICTIONS', title: 'Games & Picks', desc: 'AI win predictions vs bookmaker odds', color: 'var(--neon)' },
+          { href: '/recaps', category: 'STORIES', title: 'AI archive', desc: 'Every story written. Searchable.', color: 'var(--text)' },
+          { href: '/playoffs', category: 'ACCURACY', title: 'How we\'re doing', desc: 'Pick history, model drift, calibration.', color: 'var(--neon)' },
+        ] as const).map(({ href, category, title, desc, color }) => (
+          <a key={href} href={href}
+            className="hover:opacity-90 transition-opacity flex flex-col gap-2"
+            style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px 22px' }}>
+            <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5625rem', color, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase' }}>{category}</p>
+            <p style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '1.25rem', color: 'var(--text-bright)', letterSpacing: '-0.025em' }}>{title}</p>
+            <p style={{ fontSize: '0.75rem', color: 'var(--text)', lineHeight: 1.5 }}>{desc}</p>
+          </a>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -348,7 +416,7 @@ function NewHereBanner() {
       </div>
       <div className="flex items-center gap-3 shrink-0 text-xs">
         <span style={{ color: 'var(--text)', opacity: 0.5 }}>67% pick accuracy · YTD</span>
-        <a href="/games" style={{ color: 'var(--heat)' }} className="font-semibold">How it works →</a>
+        <Link href="/games" style={{ color: 'var(--heat)' }} className="font-semibold">How it works →</Link>
       </div>
     </TopBannerShell>
   );
@@ -377,7 +445,7 @@ async function TopBanner() {
         </p>
       </div>
       <div className="flex items-center gap-3 shrink-0 text-xs">
-        <a href="/games" style={{ color: 'var(--heat)' }} className="font-semibold">How it works →</a>
+        <Link href="/games" style={{ color: 'var(--heat)' }} className="font-semibold">How it works →</Link>
       </div>
     </TopBannerShell>
   );
@@ -405,66 +473,58 @@ function SiteFooter() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
   const today = new Date().toISOString().slice(0, 10);
+
+  // Detect current season phase. Falls back to 'regular' on any error.
+  const phase: SeasonPhase = await getSeasonPhase().catch((): SeasonPhase => 'regular');
+
+  // Section registry — each SectionKey maps to a renderable node.
+  // Add Suspense boundaries here so each section streams independently.
+  function renderSection(key: SectionKey): React.JSX.Element | null {
+    switch (key) {
+      case 'value-prop':
+        return (
+          <Suspense key={key} fallback={<NewHereBanner />}>
+            <TopBanner />
+          </Suspense>
+        );
+      case 'phase-hero':
+        return (
+          <Suspense key={key} fallback={<HeroSkeleton />}>
+            <PlayoffHeroSection today={today} />
+          </Suspense>
+        );
+      case 'last-night':
+        return (
+          <Suspense key={key} fallback={<ResultsSkeleton />}>
+            <LastNightSection />
+          </Suspense>
+        );
+      case 'matches-to-watch':
+        return (
+          <Suspense key={key} fallback={<GameSkeleton />}>
+            <TonightSlate today={today} />
+          </Suspense>
+        );
+      case 'rankings':
+        return (
+          <Suspense key={key} fallback={<HeatGridSkeleton />}>
+            <BurningSection />
+          </Suspense>
+        );
+      case 'explore':
+        return <ExploreSection key={key} />;
+      default:
+        return null;
+    }
+  }
 
   return (
     <div className="max-w-7xl mx-auto pb-20 md:pb-0 flex flex-col gap-12">
-
-      {/* 0. Top banner — preseason countdown once we're within season-start window, NEW HERE? otherwise */}
-      <Suspense fallback={<NewHereBanner />}>
-        <TopBanner />
-      </Suspense>
-
-      {/* 1. Playoff Hero — only rendered during playoffs */}
-      <Suspense fallback={null}>
-        <PlayoffHeroSection today={today} />
-      </Suspense>
-
-      {/* 2. Tonight — upcoming / live games (design: first content section) */}
-      <Suspense fallback={<GameSkeleton />}>
-        <TonightSlate today={today} />
-      </Suspense>
-
-      {/* 3. Last night — results then stories as separate sections */}
-      <Suspense fallback={<ResultsSkeleton />}>
-        <LastNightSection />
-      </Suspense>
-
-      {/* 4. Who's hot — Heat grid (rankings) */}
-      <Suspense fallback={<HeatGridSkeleton />}>
-        <BurningSection />
-      </Suspense>
-
-      {/* 5. Explore — feature entry points */}
-      <div className="flex flex-col gap-4">
-        <div>
-          <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.6875rem', color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.13em', textTransform: 'uppercase', marginBottom: '6px' }}>EXPLORE</p>
-          <h2 style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '1.75rem', letterSpacing: '-0.025em', lineHeight: 1.05, color: 'var(--text-bright)' }}>
-            More ways to dig in.
-          </h2>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {([
-            { href: '/rankings', category: 'HEAT MAP', title: 'Heat Rankings', desc: "Who's playing the best hockey right now", color: 'var(--heat)' },
-            { href: '/games', category: 'PREDICTIONS', title: 'Games & Picks', desc: 'AI win predictions vs bookmaker odds', color: 'var(--neon)' },
-            { href: '/recaps', category: 'STORIES', title: 'AI archive', desc: 'Every story written. Searchable.', color: 'var(--text)' },
-            { href: '/playoffs', category: 'ACCURACY', title: 'How we\'re doing', desc: 'Pick history, model drift, calibration.', color: 'var(--neon)' },
-          ] as const).map(({ href, category, title, desc, color }) => (
-            <a key={href} href={href}
-              className="hover:opacity-90 transition-opacity flex flex-col gap-2"
-              style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: '12px', padding: '20px 22px' }}>
-              <p style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5625rem', color, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase' }}>{category}</p>
-              <p style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontWeight: 800, fontSize: '1.25rem', color: 'var(--text-bright)', letterSpacing: '-0.025em' }}>{title}</p>
-              <p style={{ fontSize: '0.75rem', color: 'var(--text)', lineHeight: 1.5 }}>{desc}</p>
-            </a>
-          ))}
-        </div>
-      </div>
-
-      {/* 6. Footer */}
+      {SECTION_ORDER[phase].map(key => renderSection(key))}
       <SiteFooter />
-
     </div>
   );
 }
+
