@@ -4,11 +4,11 @@ import PlayerRadarChart from '@/components/players/RadarChart';
 import HeatTimeline from '@/components/players/HeatTimeline';
 import HeatCircle from '@/components/ui/HeatCircle';
 import ShareButton from '@/components/ui/ShareButton';
-import { fetchPlayer, fetchLeagueAverages, fetchSeasonPhase, daysAgo, deriveOutStatus } from '@/lib/data';
-import { ppmToHeat, heatColor as getHeatColor } from '@/lib/heat';
+import { fetchPlayer, fetchLeagueAverages, fetchSeasonPhase, fetchComparisonPeers, daysAgo, deriveOutStatus } from '@/lib/data';
+import { ppmToHeat, heatColor as getHeatColor, heatBorderColor } from '@/lib/heat';
 import { getPlayerInsights } from '@/lib/ai';
 import type { PlayerAIInput } from '@/lib/ai';
-import { teamUrl } from '@/lib/urls';
+import { teamUrl, playerUrl } from '@/lib/urls';
 import { deriveArchetype } from '@/lib/archetype';
 import Link from 'next/link';
 
@@ -98,6 +98,84 @@ function SectionTitle({ main, accent, kicker }: { main: string; accent: string; 
   );
 }
 
+function ArchetypeIcon({ label }: { label: string }) {
+  const s: React.SVGProps<SVGSVGElement> = { width: 20, height: 20, viewBox: '0 0 20 20', fill: 'none', 'aria-hidden': true };
+  if (label === 'Sniper') return (
+    <svg {...s}>
+      <circle cx="10" cy="10" r="7" stroke="var(--heat)" strokeWidth="1.5" />
+      <circle cx="10" cy="10" r="2.5" fill="var(--heat)" fillOpacity="0.5" />
+      <line x1="10" y1="1" x2="10" y2="5" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="10" y1="15" x2="10" y2="19" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="1" y1="10" x2="5" y2="10" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="15" y1="10" x2="19" y2="10" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+  if (label === 'Playmaker') return (
+    <svg {...s}>
+      <path d="M3 13 C5 8 9 6 13 9" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M9 6 L13 9 L10 13" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="4" cy="15" r="1.5" fill="var(--heat)" />
+      <circle cx="16" cy="7" r="1.5" fill="var(--heat)" />
+    </svg>
+  );
+  if (label === 'Volume Shooter') return (
+    <svg {...s}>
+      <line x1="3" y1="6" x2="14" y2="6" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" />
+      <polyline points="11,3 14,6 11,9" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="3" y1="14" x2="14" y2="14" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" />
+      <polyline points="11,11 14,14 11,17" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  if (label === 'Grinder') return (
+    <svg {...s}>
+      <rect x="6" y="7" width="8" height="7" rx="1.5" stroke="var(--heat)" strokeWidth="1.5" />
+      <path d="M8 7 V5.5 a2 2 0 0 1 4 0 V7" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="4" y1="10.5" x2="6" y2="10.5" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" />
+      <line x1="14" y1="10.5" x2="16" y2="10.5" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+  if (label === 'Scorer') return (
+    <svg {...s}>
+      <polygon points="10,2 12.4,7.5 18.5,8 14,12 15.6,18 10,14.5 4.4,18 6,12 1.5,8 7.6,7.5" stroke="var(--heat)" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+  if (label === 'Two-Way Forward') return (
+    <svg {...s}>
+      <line x1="10" y1="3" x2="10" y2="17" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" />
+      <polyline points="7,6 10,3 13,6" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="7,14 10,17 13,14" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  if (label === 'Offensive Defenseman') return (
+    <svg {...s}>
+      <path d="M10 2 L17 5 V10.5 C17 14.5 13.5 17.5 10 18.5 C6.5 17.5 3 14.5 3 10.5 V5 Z" stroke="var(--heat)" strokeWidth="1.5" strokeLinejoin="round" />
+      <line x1="10" y1="14" x2="10" y2="8" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" />
+      <polyline points="7,11 10,8 13,11" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  if (label === 'Physical Defenseman') return (
+    <svg {...s}>
+      <path d="M10 2 L17 5 V10.5 C17 14.5 13.5 17.5 10 18.5 C6.5 17.5 3 14.5 3 10.5 V5 Z" stroke="var(--heat)" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M7 10.5 L9 12.5 L13.5 8" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  if (label === 'Two-Way Defenseman') return (
+    <svg {...s}>
+      <path d="M10 2 L17 5 V10.5 C17 14.5 13.5 17.5 10 18.5 C6.5 17.5 3 14.5 3 10.5 V5 Z" stroke="var(--heat)" strokeWidth="1.5" strokeLinejoin="round" />
+      <line x1="10" y1="13.5" x2="10" y2="7.5" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" />
+      <polyline points="7.5,9.5 10,7.5 12.5,9.5" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points="7.5,11.5 10,13.5 12.5,11.5" stroke="var(--heat)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  // Default fallback
+  return (
+    <svg {...s}>
+      <circle cx="10" cy="10" r="7" stroke="var(--heat)" strokeWidth="1.5" />
+      <circle cx="10" cy="10" r="3" stroke="var(--heat)" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
 function rankBadge(rank: number | undefined) {
   if (!rank) return null;
   const label = rank === 1 ? 'ELITE' : rank <= 3 ? 'ELITE' : rank <= 10 ? 'TOP 10' : rank <= 25 ? 'TOP 25' : rank <= 50 ? 'TOP 50' : `#${rank}`;
@@ -129,6 +207,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
   const { player, metricTimeline, recentGames, consecutiveGamesMissed, lastPlayedDate, goalieStats } = data;
   const isGoalie = player.position_code === 'G';
+
+  // Fetch comparison peers for same-position section (skaters only)
+  const comparisonPeers = !isGoalie
+    ? await fetchComparisonPeers(id, player.position_code ?? '').catch(() => [])
+    : [];
   const latestSnapshot = metricTimeline?.[metricTimeline.length - 1] ?? {};
   const name = `${player.first_name} ${player.last_name}`;
 
@@ -346,6 +429,14 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   }).length;
   const l5OT = last5Games.length - l5W - l5L;
 
+  // Points streak: consecutive games from most recent with at least 1 point
+  let pointsStreakCount = 0;
+  for (const g of last5Games) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (Number((g as any).goals ?? 0) + Number((g as any).assists ?? 0) > 0) pointsStreakCount++;
+    else break;
+  }
+
   // L5 stat cells — hoisted so each sub-card can render independently
   const l5PlusMinus = Number(latestSnapshot.momentum_plus_minus ?? 0);
   const l5ToiSec    = Number(latestSnapshot.momentum_toi_sec ?? 0);
@@ -362,21 +453,90 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const l5PlMinPerGm  = momGames > 0 ? l5PlusMinus / momGames : 0;
   const mkTrend = (up: boolean, down: boolean) => up ? 'up' as const : down ? 'down' as const : 'neutral' as const;
 
+  // SOG (shots on goal) — confirmed populated in game_player_stats
+  const l5Shots = Number(latestSnapshot.momentum_shots ?? 0);
+  const seaShots = Number(latestSnapshot.season_shots ?? 0);
+  const seaShotsPerGm = seaGames > 0 ? seaShots / seaGames : 0;
+  const l5ShotsPerGm  = momGames > 0 ? l5Shots / momGames : 0;
+
+  // 7-cell L5 grid: G, A, PTS, +/−, SOG, SH%, TOI
+  // (FOW% and HITS omitted — confirmed unavailable in current DB ingest)
   const l5Cells = [
-    { label: 'Pts',    value: String(momGoals + momAssists), sub: `${momGoals}G · ${momAssists}A`,
+    { label: 'G',    value: String(momGoals), sub: '',
+      highlight: momGoals > 0, negative: false,
+      trend: mkTrend(momGoals / Math.max(1, momGames) > seaGoals / Math.max(1, seaGames) + 0.05,
+                     momGoals / Math.max(1, momGames) < seaGoals / Math.max(1, seaGames) - 0.05) },
+    { label: 'A',    value: String(momAssists), sub: '',
+      highlight: momAssists > 1, negative: false,
+      trend: mkTrend(momAssists / Math.max(1, momGames) > seaAssists / Math.max(1, seaGames) + 0.08,
+                     momAssists / Math.max(1, momGames) < seaAssists / Math.max(1, seaGames) - 0.08) },
+    { label: 'PTS',  value: String(momGoals + momAssists), sub: '',
       highlight: momGoals + momAssists > 2, negative: false,
       trend: mkTrend(l5PtsPerGm > seaPtsPerGm + 0.05, l5PtsPerGm < seaPtsPerGm - 0.05) },
-    { label: 'TOI/gm', value: l5ToiPerGm > 0 ? `${l5ToiMin}:${l5ToiSecPad}` : '—', sub: 'L5 avg',
-      highlight: false, negative: false,
-      trend: mkTrend(l5ToiPerGm > seaToiPerGm + 30, l5ToiPerGm < seaToiPerGm - 30) },
-    { label: 'S%',     value: `${(momShootPct * 100).toFixed(0)}%`,
-      sub: seaShootPct > 0 ? `${l5ShootDiff > 0 ? '+' : ''}${l5ShootDiff.toFixed(1)}% vs avg` : '',
-      highlight: momShootPct > seaShootPct, negative: false,
-      trend: mkTrend(l5ShootDiff > 1, l5ShootDiff < -1) },
-    { label: '+/-',    value: `${l5PlusMinus > 0 ? '+' : ''}${l5PlusMinus}`, sub: 'L5',
+    { label: '+/-',  value: `${l5PlusMinus > 0 ? '+' : ''}${l5PlusMinus}`, sub: '',
       highlight: l5PlusMinus > 0, negative: l5PlusMinus < 0,
       trend: mkTrend(l5PlMinPerGm > seaPlMinPerGm + 0.1, l5PlMinPerGm < seaPlMinPerGm - 0.1) },
+    { label: 'SOG',  value: String(l5Shots), sub: `${l5ShotsPerGm.toFixed(1)}/gm`,
+      highlight: l5ShotsPerGm > seaShotsPerGm, negative: false,
+      trend: mkTrend(l5ShotsPerGm > seaShotsPerGm + 0.3, l5ShotsPerGm < seaShotsPerGm - 0.3) },
+    { label: 'SH%',  value: `${(momShootPct * 100).toFixed(0)}%`,
+      sub: seaShootPct > 0 ? `${l5ShootDiff > 0 ? '+' : ''}${l5ShootDiff.toFixed(1)}%` : '',
+      highlight: momShootPct > seaShootPct, negative: false,
+      trend: mkTrend(l5ShootDiff > 1, l5ShootDiff < -1) },
+    { label: 'TOI',  value: l5ToiPerGm > 0 ? `${l5ToiMin}:${l5ToiSecPad}` : '—', sub: 'per gm',
+      highlight: false, negative: false,
+      trend: mkTrend(l5ToiPerGm > seaToiPerGm + 30, l5ToiPerGm < seaToiPerGm - 30) },
   ];
+
+  // 4 deterministic form readouts for Recent form section
+  const formReadouts = !isGoalie ? [
+    {
+      label: 'Trend',
+      value: breakoutDelta > 0.005 ? 'Rising' : breakoutDelta < -0.005 ? 'Cooling' : 'Steady',
+      detail: breakoutDelta > 0.005
+        ? `+${(breakoutDelta * 100).toFixed(1)} PPM vs season avg`
+        : breakoutDelta < -0.005
+        ? `${(breakoutDelta * 100).toFixed(1)} PPM vs season avg`
+        : 'In line with season average',
+      color: breakoutDelta > 0.005 ? 'var(--green)' : breakoutDelta < -0.005 ? 'var(--red)' : 'var(--text)',
+    },
+    {
+      label: 'Streak',
+      value: pointsStreakCount >= 1 ? `${pointsStreakCount}G pts` : 'No streak',
+      detail: pointsStreakCount > 0
+        ? `${pointsStreakCount} straight game${pointsStreakCount !== 1 ? 's' : ''} with a point`
+        : 'Scoreless in last game',
+      color: pointsStreakCount >= 3 ? 'var(--heat)' : pointsStreakCount >= 1 ? 'var(--green)' : 'var(--text)',
+    },
+    {
+      label: 'Risk',
+      value: energyBar < 40 ? 'High' : energyBar < 70 ? 'Moderate' : 'Low',
+      detail: energyBar < 40
+        ? 'Heavy fatigue — output may dip'
+        : energyBar < 70
+        ? 'Moderate fatigue load'
+        : 'Below fatigue average',
+      color: energyBar < 40 ? 'var(--red)' : energyBar < 70 ? 'var(--amber)' : 'var(--green)',
+    },
+    {
+      label: 'Outlook',
+      value: breakoutDelta > 0.005 && energyBar >= 60
+        ? 'Bright'
+        : breakoutDelta < -0.005 && energyBar < 50
+        ? 'Cautious'
+        : 'Neutral',
+      detail: breakoutDelta > 0.005 && energyBar >= 60
+        ? 'Rising form + fresh legs'
+        : breakoutDelta < -0.005 && energyBar < 50
+        ? 'Cooling form + fatigue load'
+        : 'No strong directional signal',
+      color: breakoutDelta > 0.005 && energyBar >= 60
+        ? 'var(--green)'
+        : breakoutDelta < -0.005 && energyBar < 50
+        ? 'var(--red)'
+        : 'var(--text)',
+    },
+  ] : [];
 
   // Game events for HeatTimeline cumulative overlays (skaters only)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -524,7 +684,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         {/* Compact archetype badge — mobile */}
         {archetype && (
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 999, background: 'rgba(255,90,36,0.14)', border: '1px solid rgba(255,90,36,0.33)', alignSelf: 'flex-start' }}>
-            <span style={{ fontSize: 16 }}>🎯</span>
+            <ArchetypeIcon label={archetype.label} />
             <span style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontSize: 12, fontWeight: 700, color: 'var(--heat)', letterSpacing: '0.01em' }}>
               {archetype.label}
             </span>
@@ -769,9 +929,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                   width: 38, height: 38, borderRadius: 8, background: 'var(--bg)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   border: '1px solid rgba(255,90,36,0.33)', flexShrink: 0,
-                  fontSize: 20,
                 }}>
-                  🎯
+                  <ArchetypeIcon label={archetype.label} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: 'var(--heat)', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 2 }}>
@@ -905,6 +1064,25 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
               <AIPerfSection playerId={Number(id)} aiInput={aiInput} />
             </Suspense>
           </div>
+          {/* Deterministic 4-readout strip: Trend / Streak / Risk / Outlook */}
+          {formReadouts.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
+              {formReadouts.map((r) => (
+                <div key={r.label} className="rounded-lg border p-3"
+                  style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
+                  <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: 'var(--text)', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 4 }}>
+                    {r.label}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-geist-sans), system-ui, sans-serif', fontSize: 14, fontWeight: 800, color: r.color, lineHeight: 1.1, marginBottom: 3 }}>
+                    {r.value}
+                  </div>
+                  <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: 'var(--text)', lineHeight: 1.4 }}>
+                    {r.detail}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -912,23 +1090,23 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       {!isGoalie && last5Games.length > 0 && momGames > 0 && (
         <div className="rounded-xl border p-5" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <SectionTitle kicker="LAST 5 STATS" main="The hot" accent="stretch." />
-          <div className="grid grid-cols-4 gap-3 mt-4">
+          <div className="grid grid-cols-4 sm:grid-cols-7 gap-2 mt-4">
             {l5Cells.map((cell) => (
               <div key={cell.label} className="relative rounded-xl border flex flex-col items-center py-3 px-2 gap-0.5"
                 style={{ background: 'var(--bg)', borderColor: 'var(--border)' }}>
                 {cell.trend !== 'neutral' && (
-                  <span className="absolute top-1.5 right-2 text-xs font-bold leading-none"
+                  <span className="absolute top-1.5 right-1.5 text-xs font-bold leading-none"
                     style={{ color: cell.trend === 'up' ? 'var(--green)' : 'var(--red)' }}>
                     {cell.trend === 'up' ? '▲' : '▼'}
                   </span>
                 )}
-                <span className="text-2xl font-black font-mono"
+                <span className="text-xl font-black font-mono"
                   style={{ color: cell.negative ? 'var(--red)' : cell.highlight ? 'var(--heat)' : 'var(--text-bright)' }}>
                   {cell.value}
                 </span>
                 <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>{cell.label}</span>
                 {cell.sub && (
-                  <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.55 }}>{cell.sub}</span>
+                  <span className="text-[10px] font-mono" style={{ color: 'var(--text)', opacity: 0.55 }}>{cell.sub}</span>
                 )}
               </div>
             ))}
@@ -962,18 +1140,26 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
               const toiMin     = Math.floor(Number(g.toi_seconds ?? 0) / 60);
               const toiSec     = String(Number(g.toi_seconds ?? 0) % 60).padStart(2, '0');
               const gameDate   = String(game?.game_date ?? '').slice(5);
-              const heatRaw    = Math.min(99, Math.round((g.points_per_minute ?? 0) * 600));
+              // Use ppmToHeat for per-game heat — same scale as the rest of the app
+              const heatRaw    = ppmToHeat(g.points_per_minute ?? 0);
               const gameHeatColor = getHeatColor(heatRaw);
 
               return (
                 <div key={i} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3"
                   style={{ background: i % 2 === 0 ? 'var(--bg)' : 'var(--bg-card)' }}>
 
-                  {/* VS + date */}
+                  {/* VS + opponent logo + date */}
                   <div className="flex-shrink-0 w-20">
                     {opponentAbbrev && (
-                      <div className="text-xs mb-0.5" style={{ color: 'var(--text)' }}>
-                        {isHome ? 'VS' : '@'} {opponentAbbrev}
+                      <div className="flex items-center gap-1 mb-0.5">
+                        <span className="text-xs" style={{ color: 'var(--text)', flexShrink: 0 }}>{isHome ? 'VS' : '@'}</span>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`https://assets.nhle.com/logos/nhl/svg/${opponentAbbrev}_light.svg`}
+                          alt={opponentAbbrev}
+                          style={{ width: 16, height: 16, objectFit: 'contain', flexShrink: 0 }}
+                        />
+                        <span className="text-xs font-mono" style={{ color: 'var(--text)' }}>{opponentAbbrev}</span>
                       </div>
                     )}
                     <div className="text-xs font-mono" style={{ color: 'var(--text)' }}>{gameDate || '—'}</div>
@@ -1015,6 +1201,12 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                     <div className="flex items-center gap-2 sm:gap-4 flex-1">
                       <StatPill label="G" value={String(g.goals ?? 0)} highlight={Number(g.goals) > 0} />
                       <StatPill label="A" value={String(g.assists ?? 0)} highlight={Number(g.assists) > 1} />
+                      <div className="flex flex-col items-center min-w-[2rem]">
+                        <span className="text-sm font-mono" style={{ color: Number(g.plus_minus ?? 0) > 0 ? 'var(--green)' : Number(g.plus_minus ?? 0) < 0 ? 'var(--red)' : 'var(--text-bright)' }}>
+                          {Number(g.plus_minus ?? 0) > 0 ? '+' : ''}{g.plus_minus ?? 0}
+                        </span>
+                        <span className="text-xs" style={{ color: 'var(--text)' }}>+/-</span>
+                      </div>
                       <span className="text-xs font-mono hidden sm:block" style={{ color: 'var(--text)' }}>
                         {toiMin}:{toiSec} TOI
                       </span>
@@ -1035,38 +1227,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         </div>
       )}
 
-      {/* 6. Where he ranks (skaters only) ────────────────────────────────────── */}
-      {!isGoalie && latestSnapshot.momentum_rank && (
-        <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="mb-3">
-            <SectionTitle kicker="MOMENTUM RANK" main={`Where ${player.first_name}`} accent="ranks." />
-          </div>
-          <div className="flex flex-col gap-3">
-            {[
-              { label: 'Heat score', fill: Math.min(100, energyBar), rank: latestSnapshot.momentum_rank },
-              { label: 'PPM · momentum', fill: pct(momPpm, 0.15), rank: null },
-              { label: 'Goals · L5', fill: pct(momGoals / Math.max(1, momGames), 0.7), rank: null },
-              { label: 'Points · season', fill: pct(seaPpm, 0.15), rank: null },
-            ].map((row) => (
-              <div key={row.label} className="flex items-center gap-3">
-                <span className="text-xs w-40 flex-shrink-0" style={{ color: 'var(--text-bright)' }}>{row.label}</span>
-                <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
-                  <div className="h-full rounded-full" style={{ width: `${row.fill}%`, background: 'var(--heat)' }} />
-                </div>
-                {row.rank != null ? (
-                  <span className="w-12 text-right text-xs font-mono font-bold" style={{ color: 'var(--heat)' }}>
-                    #{row.rank}
-                  </span>
-                ) : (
-                  <span className="w-12" />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 9. Full season stats (de-emphasized) ────────────────────────────────── */}
+      {/* 5. Full season stats ────────────────────────────────────────────────── */}
       {isGoalie && goalieStats ? (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="px-5 pt-5 pb-3 border-b" style={{ borderColor: 'var(--border)' }}>
@@ -1196,7 +1357,38 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         </div>
       ) : null}
 
-      {/* 10. Momentum Radar (skaters only, full-width) ────────────────────────── */}
+      {/* 6. Where he ranks (skaters only) ────────────────────────────────────── */}
+      {!isGoalie && latestSnapshot.momentum_rank && (
+        <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <div className="mb-3">
+            <SectionTitle kicker="MOMENTUM RANK" main={`Where ${player.first_name}`} accent="ranks." />
+          </div>
+          <div className="flex flex-col gap-3">
+            {[
+              { label: 'Heat score', fill: Math.min(100, currentHeat), rank: latestSnapshot.momentum_rank },
+              { label: 'PPM · momentum', fill: pct(momPpm, 0.15), rank: null },
+              { label: 'Goals · L5', fill: pct(momGoals / Math.max(1, momGames), 0.7), rank: null },
+              { label: 'Points · season', fill: pct(seaPpm, 0.15), rank: null },
+            ].map((row) => (
+              <div key={row.label} className="flex items-center gap-3">
+                <span className="text-xs w-40 flex-shrink-0" style={{ color: 'var(--text-bright)' }}>{row.label}</span>
+                <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
+                  <div className="h-full rounded-full" style={{ width: `${row.fill}%`, background: 'var(--heat)' }} />
+                </div>
+                {row.rank != null ? (
+                  <span className="w-12 text-right text-xs font-mono font-bold" style={{ color: 'var(--heat)' }}>
+                    #{row.rank}
+                  </span>
+                ) : (
+                  <span className="w-12" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 7. Performance Radar (skaters only) ────────────────────────────────── */}
       {!isGoalie && (
         <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="px-5 pt-5 pb-1 flex items-start justify-between gap-4">
@@ -1324,6 +1516,88 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
                     </span>
                   </div>
                 </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 9. Compare to — same-position peers ─────────────────────────────────── */}
+      {!isGoalie && comparisonPeers.length > 0 && (
+        <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+          <div className="px-5 pt-5 pb-3 border-b" style={{ borderColor: 'var(--border)' }}>
+            <SectionTitle kicker="COMPARE TO" main="Same-position" accent="peers." />
+            <p className="text-xs mt-1" style={{ color: 'var(--text)' }}>
+              Top {player.position_code} players ranked by momentum — tap to view their profile
+            </p>
+          </div>
+          <div className="flex gap-3 overflow-x-auto px-4 py-4" style={{ scrollbarWidth: 'none' }}>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            {(comparisonPeers as any[]).map((peer: any) => {
+              const peerHeat = ppmToHeat(peer.momentum_ppm);
+              const peerHeatCol = getHeatColor(peerHeat);
+              const peerHeatBorder = heatBorderColor(peerHeat);
+              const peerFirstName = peer.players?.first_name ?? '';
+              const peerLastName = peer.players?.last_name ?? '';
+              const peerAbbrev = peer.players?.teams?.abbrev ?? '';
+              return (
+                <Link
+                  key={peer.player_id}
+                  href={playerUrl(peer.player_id, peerFirstName, peerLastName)}
+                  className="flex-shrink-0 hover:opacity-80 transition-opacity"
+                  style={{ textDecoration: 'none' }}
+                >
+                  <div style={{
+                    width: 110, background: 'var(--bg)', border: '1px solid var(--border)',
+                    borderRadius: 10, padding: '12px 8px', display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', gap: 5,
+                  }}>
+                    {/* Headshot */}
+                    <div style={{ width: 44, height: 44, borderRadius: 22, overflow: 'hidden', background: 'var(--bg-card)', flexShrink: 0 }}>
+                      {peer.players?.headshot_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={peer.players.headshot_url} alt={`${peerFirstName} ${peerLastName}`}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} />
+                      ) : (
+                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'var(--text)' }}>
+                          {peerFirstName[0] ?? '?'}
+                        </div>
+                      )}
+                    </div>
+                    {/* Last name */}
+                    <div style={{
+                      fontFamily: 'var(--font-geist-sans), system-ui, sans-serif',
+                      fontSize: 11, fontWeight: 700, color: 'var(--text-bright)',
+                      textAlign: 'center', lineHeight: 1.2, maxWidth: '100%',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      width: '94px',
+                    }}>
+                      {peerLastName}
+                    </div>
+                    {/* Team + position */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                      {peerAbbrev && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={`https://assets.nhle.com/logos/nhl/svg/${peerAbbrev}_light.svg`}
+                          alt={peerAbbrev}
+                          style={{ width: 14, height: 14, objectFit: 'contain' }} />
+                      )}
+                      <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: 9, color: 'var(--text)' }}>
+                        {peerAbbrev}
+                      </span>
+                    </div>
+                    {/* Heat pill */}
+                    <div style={{
+                      fontFamily: 'var(--font-geist-mono), monospace', fontSize: 14, fontWeight: 800,
+                      color: peerHeatCol,
+                      background: `${peerHeatCol}1a`,
+                      border: `1px solid ${peerHeatBorder}`,
+                      borderRadius: 6, padding: '3px 10px', textAlign: 'center', minWidth: 36,
+                    }}>
+                      {peerHeat}
+                    </div>
+                  </div>
+                </Link>
               );
             })}
           </div>

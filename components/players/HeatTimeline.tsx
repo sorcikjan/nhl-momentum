@@ -405,8 +405,15 @@ export default function HeatTimeline({
                   dot={(props: any) => {
                     if (props.index === data.length - 1) {
                       return (
-                        <circle key="endpoint" cx={props.cx} cy={props.cy} r={3.5}
-                          fill="var(--heat)" stroke="var(--bg-card)" strokeWidth={1.5} />
+                        <g key="endpoint">
+                          {/* Pulsing ring — the one animation in the product */}
+                          <circle cx={props.cx} cy={props.cy} r={6} fill="none" stroke="var(--heat)" strokeOpacity={0.35}>
+                            <animate attributeName="r" from="3.5" to="13" dur="1.8s" repeatCount="indefinite" />
+                            <animate attributeName="stroke-opacity" from="0.4" to="0" dur="1.8s" repeatCount="indefinite" />
+                          </circle>
+                          <circle cx={props.cx} cy={props.cy} r={3.5}
+                            fill="var(--heat)" stroke="var(--bg-card)" strokeWidth={1.5} />
+                        </g>
                       );
                     }
                     return <g key={`d-${props.index}`} />;

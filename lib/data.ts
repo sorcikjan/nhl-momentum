@@ -577,6 +577,43 @@ export async function fetchPlayer(id: string) {
   return { player, metricTimeline, recentGames, consecutiveGamesMissed, lastPlayedDate, goalieStats };
 }
 
+// ─── Comparison Peers ─────────────────────────────────────────────────────────
+
+// Returns up to 6 same-position players ranked by composite_ppm, excluding the
+// current player. Used by the "Compare to" section on the player profile page.
+export async function fetchComparisonPeers(playerId: string, positionCode: string) {
+  if (!positionCode || positionCode === 'G') return [];
+
+  const { data } = await supabaseAdmin
+    .from('player_metric_snapshots')
+    .select(`
+      player_id, momentum_ppm, season_ppm, composite_ppm,
+      momentum_goals, momentum_assists, momentum_games, season_games,
+      calculated_at,
+      players(first_name, last_name, position_code, headshot_url,
+        teams(abbrev))
+    `)
+    .order('calculated_at', { ascending: false })
+    .limit(2000);
+
+  if (!data) return [];
+
+  const seen = new Set<number>();
+  const pid = Number(playerId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data as any[])
+    .filter(r => {
+      if (r.player_id === pid) return false;
+      if (seen.has(r.player_id)) return false;
+      seen.add(r.player_id);
+      if (r.players?.position_code !== positionCode) return false;
+      if ((r.season_games ?? 0) < 10) return false;
+      return true;
+    })
+    .sort((a, b) => (b.composite_ppm ?? 0) - (a.composite_ppm ?? 0))
+    .slice(0, 6);
+}
+
 // ─── Nightly Story Data ───────────────────────────────────────────────────────
 
 export async function fetchNightlyStoryData(date: string) {
