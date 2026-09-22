@@ -376,18 +376,22 @@ function FeaturedGameCard({
         >
           {/* Away team players */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5rem', color: 'var(--text)', opacity: 0.45, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2 }}>
-              {away} · WATCH
-            </div>
+            {awayPlayers.length > 0 && (
+              <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5rem', color: 'var(--text)', opacity: 0.45, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2 }}>
+                {away} · WATCH
+              </div>
+            )}
             {awayPlayers.map(p => (
               <WatchPlayerCell key={p.player_id} p={p} />
             ))}
           </div>
           {/* Home team players */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5rem', color: 'var(--text)', opacity: 0.45, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2, textAlign: 'right' }}>
-              {home} · WATCH
-            </div>
+            {homePlayers.length > 0 && (
+              <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5rem', color: 'var(--text)', opacity: 0.45, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2, textAlign: 'right' }}>
+                {home} · WATCH
+              </div>
+            )}
             {homePlayers.map(p => (
               <WatchPlayerCell key={p.player_id} p={p} alignRight />
             ))}
@@ -688,17 +692,21 @@ function FeaturedGameRow({
       {(awayPlayers.length > 0 || homePlayers.length > 0) && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, padding: '10px 12px 12px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5rem', color: 'var(--text)', opacity: 0.45, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2 }}>
-              {away} · WATCH
-            </div>
+            {awayPlayers.length > 0 && (
+              <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5rem', color: 'var(--text)', opacity: 0.45, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2 }}>
+                {away} · WATCH
+              </div>
+            )}
             {awayPlayers.map(p => (
               <WatchPlayerCell key={p.player_id} p={p} />
             ))}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5rem', color: 'var(--text)', opacity: 0.45, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2, textAlign: 'right' }}>
-              {home} · WATCH
-            </div>
+            {homePlayers.length > 0 && (
+              <div style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.5rem', color: 'var(--text)', opacity: 0.45, fontWeight: 700, letterSpacing: '0.08em', marginBottom: 2, textAlign: 'right' }}>
+                {home} · WATCH
+              </div>
+            )}
             {homePlayers.map(p => (
               <WatchPlayerCell key={p.player_id} p={p} alignRight />
             ))}
@@ -856,15 +864,36 @@ export default function TonightSection({
         </div>
       )}
 
-      {/* Mobile: individual compact cards for all games (same for both layouts) */}
+      {/* Mobile */}
       <div className="md:hidden flex flex-col gap-2">
-        {sorted.map(g => (
-          <MobileGameCard
-            key={g.id}
-            game={g}
-            pred={predMap[g.id]}
-          />
-        ))}
+        {newLayout ? (
+          <>
+            {featuredGames.map(g => (
+              <FeaturedGameRow
+                key={g.id}
+                game={g}
+                pred={predMap[g.id]}
+                watchPlayers={watchPlayers?.get(g.id)}
+                watchability={watchabilityMap?.get(g.id)}
+              />
+            ))}
+            {compactGames.map(g => (
+              <MobileGameCard
+                key={g.id}
+                game={g}
+                pred={predMap[g.id]}
+              />
+            ))}
+          </>
+        ) : (
+          sorted.map(g => (
+            <MobileGameCard
+              key={g.id}
+              game={g}
+              pred={predMap[g.id]}
+            />
+          ))
+        )}
       </div>
     </section>
   );

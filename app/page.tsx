@@ -248,9 +248,20 @@ async function LastNightHeroSection() {
 // ── Section: Storylines (for season-start / regular) ─────────────────────────
 
 async function StorylinesSection() {
-  const recaps = await getRecentRecaps();
+  const [recaps, { games }] = await Promise.all([getRecentRecaps(), getRecentGames()]);
   if (!recaps.length) return null;
-  return <StorylinesGrid recaps={recaps} />;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const completed = (games as any[]).filter((g: any) => ['FINAL', 'OFF'].includes(g.game_state));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const lastNight = completed.reduce((max: string, g: any) =>
+    (g.game_date as string) > max ? (g.game_date as string) : max, '');
+
+  // The hero card above already features last night's recap headline —
+  // don't repeat the identical headline here, show older stories instead.
+  const rest = recaps.filter(r => r.date !== lastNight);
+  if (!rest.length) return null;
+  return <StorylinesGrid recaps={rest} />;
 }
 
 // ── Section: Tonight (upcoming / live games) ──────────────────────────────────
@@ -439,7 +450,9 @@ async function BurningSection({ newLayout = false }: { newLayout?: boolean }) {
 
 // ── Section: Explore ──────────────────────────────────────────────────────────
 
-function ExploreSection() {
+async function ExploreSection() {
+  const rankings = await getRankings();
+  const totalSkaters = rankings?.totalSkaters ?? null;
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -460,7 +473,7 @@ function ExploreSection() {
           {
             href: '/rankings',
             category: 'HEAT MAP',
-            title: `All 32 skaters`,
+            title: totalSkaters ? `All ${totalSkaters} skaters` : 'Full rankings',
             desc: 'Live grid. Filter by team, position, streak.',
             color: 'var(--heat)',
           },

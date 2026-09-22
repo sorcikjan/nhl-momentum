@@ -297,6 +297,7 @@ export async function fetchRankings() {
 
   return {
     top100,
+    totalSkaters: skaters.length,
     breakoutWatch,
     coolingWatch,
     momentumLeaders: { skaters: momentumLeaderSkaters, goalies: momentumLeaderGoalies },
