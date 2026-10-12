@@ -114,3 +114,22 @@ export function currentSeason(): string {
   const startYear = month >= 10 ? year : year - 1;
   return `${startYear}${startYear + 1}`;
 }
+
+/** Season string for a "YYYY-MM-DD" date (same October cutover as currentSeason) */
+export function seasonForDate(date: string): string {
+  const year = Number(date.slice(0, 4));
+  const month = Number(date.slice(5, 7));
+  const startYear = month >= 10 ? year : year - 1;
+  return `${startYear}${startYear + 1}`;
+}
+
+/** Season string from an NHL game id — ids are YYYYTTNNNN (e.g. 2026020001 → "20262027") */
+export function seasonFromGameId(gameId: number): string {
+  const startYear = Math.floor(gameId / 1_000_000);
+  return `${startYear}${startYear + 1}`;
+}
+
+/** Lowest regular-season game id for a season — use with .gte('id', …) to exclude preseason (type 01) */
+export function firstRegularSeasonGameId(season: string): number {
+  return Number(season.slice(0, 4)) * 1_000_000 + 20_000;
+}

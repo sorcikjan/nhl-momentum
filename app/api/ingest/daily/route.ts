@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { getGamesByDate, getGameLanding, getGameRightRail } from '@/lib/nhl-api';
+import { getGamesByDate, getGameLanding, getGameRightRail, seasonForDate, seasonFromGameId, firstRegularSeasonGameId } from '@/lib/nhl-api';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 import { calculatePlayerEnergy, GOALIE_DRAIN_PER_MIN, type GameRecord } from '@/lib/energy';
 import { MODEL_REGISTRY } from '@/lib/prediction-models';
@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
           away_score: g.awayTeam.score ?? null,
           game_state: g.gameState,
           venue: g.venue?.default ?? null,
-          season: '20252026',
+          season: seasonFromGameId(g.id),
         }, { onConflict: 'id' });
     }
 
@@ -171,7 +171,7 @@ export async function GET(req: NextRequest) {
           away_score: null,
           game_state: g.gameState,
           venue: g.venue?.default ?? null,
-          season: '20252026',
+          season: seasonFromGameId(g.id),
         }, { onConflict: 'id' });
     }
 
@@ -310,7 +310,8 @@ export async function GET(req: NextRequest) {
           .from('games')
           .select('game_date, home_team_id, away_team_id, home_score, away_score')
           .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
-          .eq('season', '20252026')
+          .eq('season', seasonForDate(today))
+          .gte('id', firstRegularSeasonGameId(seasonForDate(today)))
           .not('home_score', 'is', null)
           .lt('game_date', today)
           .order('game_date', { ascending: true });

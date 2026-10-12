@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { requireIngestAuth } from '@/lib/ingest-auth';
+import { currentSeason, firstRegularSeasonGameId } from '@/lib/nhl-api';
 
 // ─── Backfill SOS + Recent Form ───────────────────────────────────────────────
 // Populates sos_multiplier and goalie_snapshot.teamRecentForm on all
@@ -31,7 +32,8 @@ export async function GET(req: NextRequest) {
     const { data: allGames, error: gamesErr } = await supabaseAdmin
       .from('games')
       .select('id, game_date, home_team_id, away_team_id, home_score, away_score')
-      .eq('season', '20252026')
+      .eq('season', currentSeason())
+      .gte('id', firstRegularSeasonGameId(currentSeason()))
       .not('home_score', 'is', null)
       .order('game_date', { ascending: true });
 

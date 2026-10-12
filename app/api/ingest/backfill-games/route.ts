@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { requireIngestAuth } from '@/lib/ingest-auth';
+import { seasonFromGameId } from '@/lib/nhl-api';
 
 // GET /api/ingest/backfill-games?start=YYYY-MM-DD&end=YYYY-MM-DD
 // Iterates every week in the range, fetches games from the NHL schedule API,
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
               away_score:     g.awayTeam.score ?? null,
               game_state:     g.gameState,
               venue:          g.venue?.default ?? null,
-              season:         '20252026',
+              season:         seasonFromGameId(g.id),
             });
           }
         }

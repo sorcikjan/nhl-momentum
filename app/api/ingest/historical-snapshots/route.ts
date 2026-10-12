@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { buildLayerMetrics, compositeLayer, calcBreakoutDelta } from '@/lib/metrics';
 import { requireIngestAuth } from '@/lib/ingest-auth';
+import { currentSeason } from '@/lib/nhl-api';
 
 // ─── Historical Metric Snapshot Backfill ──────────────────────────────────────
 // Creates player_metric_snapshots at fortnightly intervals from the season
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
     const { data: allGames } = await supabaseAdmin
       .from('games')
       .select('id, game_date')
-      .eq('season', '20252026')
+      .eq('season', currentSeason())
       .order('game_date', { ascending: true });
 
     const gameIdToDate = new Map<number, string>();

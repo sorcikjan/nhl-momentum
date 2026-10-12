@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { getGamesByDate } from '@/lib/nhl-api';
+import { getGamesByDate, seasonForDate, seasonFromGameId, firstRegularSeasonGameId } from '@/lib/nhl-api';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 import { MODEL_REGISTRY } from '@/lib/prediction-models';
 import type { NHLScheduledGame } from '@/types';
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
           } : {}),
           game_state: g.gameState,
           venue: g.venue?.default ?? null,
-          season: '20252026',
+          season: seasonFromGameId(g.id),
         }, { onConflict: 'id' });
       }
 
@@ -187,7 +187,8 @@ export async function GET(req: NextRequest) {
               .from('games')
               .select('game_date, home_team_id, away_team_id, home_score, away_score')
               .or(`home_team_id.eq.${teamId},away_team_id.eq.${teamId}`)
-              .eq('season', '20252026')
+              .eq('season', seasonForDate(date))
+              .gte('id', firstRegularSeasonGameId(seasonForDate(date)))
               .not('home_score', 'is', null)
               .lt('game_date', date)
               .order('game_date', { ascending: true });

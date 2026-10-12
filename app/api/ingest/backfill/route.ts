@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { getGamesByDate } from '@/lib/nhl-api';
+import { getGamesByDate, seasonFromGameId } from '@/lib/nhl-api';
 import type { NHLScheduledGame } from '@/types';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
         away_score: g.awayTeam.score ?? null,
         game_state: g.gameState,
         venue: g.venue?.default ?? null,
-        season: '20252026',
+        season: seasonFromGameId(g.id),
       }));
 
       const { error } = await supabaseAdmin

@@ -112,7 +112,8 @@ export default async function handler() {
       away_score: g.awayTeam?.score ?? null,
       game_state: g.gameState,
       venue: g.venue?.default ?? null,
-      season: '20252026',
+      // NHL game ids are YYYYTTNNNN — season start year is the first 4 digits
+      season: `${Math.floor(g.id / 1_000_000)}${Math.floor(g.id / 1_000_000) + 1}`,
     });
   }
 

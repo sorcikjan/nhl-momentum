@@ -61,6 +61,22 @@ export async function GET(req: NextRequest) {
   const since3d  = daysAgo(3);
   const since7d  = daysAgo(7);
 
+  // ── 0. DATABASE ───────────────────────────────────────────────────────────
+  // Every check below destructures only `data`, so a dead DB reads as "0 rows"
+  // and produces misleading per-phase issues. Probe once and bail loudly.
+  {
+    const { error: dbError } = await supabaseAdmin.from('games').select('id').limit(1);
+    if (dbError) {
+      return NextResponse.json({
+        ok: false,
+        timestamp: new Date().toISOString(),
+        issues: [`DATABASE: Supabase unreachable — ${dbError.message || dbError.code || 'unknown error'}. All other checks skipped.`],
+        checks: { database: { reachable: false, error: dbError.message, code: dbError.code } },
+      }, { status: 503 });
+    }
+    checks.database = { reachable: true };
+  }
+
   // ── 1. GAMES ──────────────────────────────────────────────────────────────
   // Check: FINAL games in last 3 days have non-null scores.
   // Check: today's schedule rows exist (may be 0 if no games today).
