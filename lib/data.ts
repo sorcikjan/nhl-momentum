@@ -691,7 +691,10 @@ export async function fetchPlayoffActiveTeams(): Promise<Set<number>> {
     return _playoffTeamsCache.teams;
   }
   const { data } = await supabaseAdmin
-    .from('games').select('id, home_team_id, away_team_id').eq('game_state', 'FUT').limit(300);
+    .from('games').select('id, home_team_id, away_team_id').eq('game_state', 'FUT')
+    // Unplayed "if necessary" playoff games stay FUT forever — only future dates count.
+    .gte('game_date', new Date().toISOString().slice(0, 10))
+    .limit(300);
   const active = new Set<number>();
   for (const g of data ?? []) {
     if (isPlayoffGameId(g.id)) { active.add(g.home_team_id); active.add(g.away_team_id); }
