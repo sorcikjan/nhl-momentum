@@ -39,12 +39,21 @@ const handler: BackgroundHandler = async (event) => {
   }
 
   const body = event.body ? JSON.parse(event.body) : {};
-  const phases: string[] = body.phases ?? ['backfill', 'outcomes', 'outcomes-backfill', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy', 'extras', 'assignments', 'recap'];
+  const phases: string[] = body.phases ?? ['rosters', 'backfill', 'outcomes', 'outcomes-backfill', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy', 'extras', 'assignments', 'recap'];
   const dateParam: string = body.date ?? '';
   const dateSuffix = dateParam ? `&date=${dateParam}` : '';
 
   const log: string[] = [];
   console.log('[daily-worker] start — phases:', phases.join(', '));
+
+  // 0a. Rosters — sync team membership from NHL rosters before anything reads
+  // players.team_id (trades/signings/call-ups; scratch detection depends on it)
+  if (phases.includes('rosters')) {
+    try {
+      const r = await call(`${base}/api/ingest/rosters`, h);
+      log.push(`rosters: ${r.data?.upserted ?? 0} upserted, ${r.data?.deactivated ?? 0} deactivated${r.error ? ` err: ${r.error}` : ''}`);
+    } catch (e) { log.push(`rosters: exception ${e}`); }
+  }
 
   // 0. Backfill — predictions for past 3 days (catches any cron failures)
   if (phases.includes('backfill')) {
