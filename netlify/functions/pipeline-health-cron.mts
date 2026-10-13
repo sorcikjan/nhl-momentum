@@ -1,32 +1,24 @@
 import type { Config } from '@netlify/functions';
 
-// Daily pipeline health check — fires at 10:30 UTC, after:
-//   08:00 UTC — daily-pipeline (main ingest)
-//   09:30 UTC — recap-cron (safety net)
+// Pipeline health check — fires at 10:30 UTC (after the overnight/morning runs)
+// and 20:30 UTC (before puck drop).
 //
-// Hits /api/pipeline-health and logs a structured pass/fail report.
-// Results are visible in Netlify function logs (Functions tab → pipeline-health-cron).
-//
-// If ok=false, the issues[] array names the exact broken phase so you know
-// which manual re-run curl to fire:
-//   gamelogs missing  → /api/ingest/gamelogs?since=YYYY-MM-DD
-//   snapshots stale   → /api/ingest/metrics
-//   predictions missing → /api/ingest/daily?phase=snapshots
-//   outcomes missing  → /api/ingest/outcomes-backfill
-//   recap missing     → /api/ingest/recap?date=YYYY-MM-DD&force=1
+// Hits /api/pipeline-health, maps failing checks to the worker phases that repair
+// them and triggers one background run, and posts the issues to ALERT_WEBHOOK_URL
+// (Slack/Discord) when set. Also visible in Netlify function logs.
+
+import { call, alert } from '../lib/pipeline';
 
 export default async function handler() {
   const base      = process.env.URL ?? 'https://nhl-momentum.netlify.app';
   const ingestKey = process.env.INGEST_API_KEY ?? '';
+  const h = { 'x-api-key': ingestKey };
 
-  let result: Record<string, unknown> = {};
-  try {
-    const res = await fetch(`${base}/api/pipeline-health?key=${ingestKey}`, {
-      headers: { 'Cache-Control': 'no-store' },
-    });
-    result = await res.json() as Record<string, unknown>;
-  } catch (err) {
-    console.error('[pipeline-health-cron] FAILED to reach health endpoint:', err);
+  // call() retries — a single cold-start timeout shouldn't read as "pipeline down".
+  const result = await call(`${base}/api/pipeline-health?key=${ingestKey}`, {}, { timeoutMs: 30_000 });
+  if (result.ok === undefined) {
+    console.error('[pipeline-health-cron] FAILED to reach health endpoint:', result.error);
+    await alert('health check', [`health endpoint unreachable: ${result.error}`]);
     return;
   }
 
@@ -57,24 +49,50 @@ export default async function handler() {
     recaps:      (checks.recaps     as Record<string, unknown>)?.newest,
   }));
 
-  // Self-heal: if recap is missing, kick off generation via background worker.
-  // This is a fourth safety net after the 08:00, 09:30, and 10:00 UTC attempts.
-  const recapMissing = issues.some(i => i.startsWith('RECAPS: no recap for yesterday'));
-  if (recapMissing) {
-    console.log('[pipeline-health-cron] auto-fix: triggering recap generation');
+  if (issues.some(i => i.startsWith('DATABASE'))) {
+    // Nothing to self-heal against a dead database — just alert.
+    await alert('health check', issues);
+    return;
+  }
+
+  // Self-heal: map failing checks to the worker phases that repair them, and run
+  // them in one background invocation (rosters first — everything keys off team_id).
+  const heal = new Set<string>();
+  if (issues.some(i => /^(ROSTERS|GAMELOGS|GOALIE DATA)/.test(i))) ['rosters', 'gamelogs', 'metrics', 'energy'].forEach(p => heal.add(p));
+  if (issues.some(i => i.startsWith('SNAPSHOTS'))) heal.add('metrics');
+  if (issues.some(i => i.startsWith('ENERGY'))) heal.add('energy');
+  if (issues.some(i => i.startsWith('PREDICTIONS'))) heal.add('snapshots');
+  if (issues.some(i => i.startsWith('OUTCOMES'))) heal.add('outcomes-backfill');
+  if (issues.some(i => i.startsWith('RECAPS: no recap for yesterday'))) heal.add('recap');
+
+  const order = ['rosters', 'outcomes-backfill', 'gamelogs', 'metrics', 'snapshots', 'energy', 'recap'];
+  const phases = order.filter(p => heal.has(p));
+  if (phases.length) {
+    console.log('[pipeline-health-cron] auto-fix: running phases', phases.join(','));
+    // Plain fetch: background functions answer 202 with an empty body, which
+    // call() would treat as a failure and retry (triggering the worker twice).
     try {
-      await fetch(`${base}/.netlify/functions/daily-worker-background`, {
+      const res = await fetch(`${base}/.netlify/functions/daily-worker-background`, {
         method: 'POST',
-        headers: { 'x-api-key': ingestKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phases: ['recap'] }),
+        headers: { ...h, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phases }),
       });
-      console.log('[pipeline-health-cron] auto-fix: recap background worker triggered');
+      console.log('[pipeline-health-cron] auto-fix: worker triggered, status', res.status);
     } catch (err) {
-      console.error('[pipeline-health-cron] auto-fix: failed to trigger recap:', err);
+      console.error('[pipeline-health-cron] auto-fix: failed to trigger worker:', err);
     }
+  }
+
+  if (!ok) {
+    await alert('health check', [
+      ...issues,
+      phases.length ? `auto-fix triggered: ${phases.join(', ')} — re-check in ~15 min` : 'no auto-fix available',
+    ]);
   }
 }
 
 export const config: Config = {
-  schedule: '30 10 * * *',
+  // 10:30 UTC: after the overnight/morning runs. 20:30 UTC: before puck drop, so
+  // missing predictions or stale player data get fixed before fans arrive.
+  schedule: '30 10,20 * * *',
 };

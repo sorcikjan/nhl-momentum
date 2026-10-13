@@ -110,16 +110,17 @@ export function currentSeason(): string {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
-  // NHL season starts in October
-  const startYear = month >= 10 ? year : year - 1;
+  // New season from September: training camp + preseason, and the regular season
+  // itself has opened in late September (2026-27 did). The prior season always ends by June.
+  const startYear = month >= 9 ? year : year - 1;
   return `${startYear}${startYear + 1}`;
 }
 
-/** Season string for a "YYYY-MM-DD" date (same October cutover as currentSeason) */
+/** Season string for a "YYYY-MM-DD" date (same September cutover as currentSeason) */
 export function seasonForDate(date: string): string {
   const year = Number(date.slice(0, 4));
   const month = Number(date.slice(5, 7));
-  const startYear = month >= 10 ? year : year - 1;
+  const startYear = month >= 9 ? year : year - 1;
   return `${startYear}${startYear + 1}`;
 }
 

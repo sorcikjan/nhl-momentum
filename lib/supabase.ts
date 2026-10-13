@@ -33,4 +33,5 @@ export const supabase = {
 // Uses service role key — bypasses RLS, only call from server-side ingest routes
 export const supabaseAdmin = {
   from: (...args: Parameters<SupabaseClient['from']>) => getAdminClient().from(...args),
+  rpc: (...args: Parameters<SupabaseClient['rpc']>) => getAdminClient().rpc(...args),
 };

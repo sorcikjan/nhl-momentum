@@ -65,7 +65,9 @@ export async function GET(req: NextRequest) {
   // Every check below destructures only `data`, so a dead DB reads as "0 rows"
   // and produces misleading per-phase issues. Probe once and bail loudly.
   {
+    const probeStart = Date.now();
     const { error: dbError } = await supabaseAdmin.from('games').select('id').limit(1);
+    const probeMs = Date.now() - probeStart;
     if (dbError) {
       return NextResponse.json({
         ok: false,
@@ -74,7 +76,27 @@ export async function GET(req: NextRequest) {
         checks: { database: { reachable: false, error: dbError.message, code: dbError.code } },
       }, { status: 503 });
     }
-    checks.database = { reachable: true };
+    checks.database = { reachable: true, probeMs };
+    // A trivial 1-row read normally takes <300ms. Seconds means the instance is
+    // saturated (this preceded both Oct 2026 outages) — warn before it falls over.
+    if (probeMs > 2_000) issues.push(`DATABASE: slow — 1-row probe took ${probeMs}ms (check Supabase CPU / disk IO)`);
+  }
+
+  // ── 0b. ROSTERS ───────────────────────────────────────────────────────────
+  // players.team_id drives scratch/injury detection and which players get stats.
+  // The roster sync runs daily; if it stops, trades and call-ups silently rot
+  // (it went unsynced from April to October 2026).
+  {
+    const { data: newest } = await supabaseAdmin
+      .from('players')
+      .select('updated_at')
+      .eq('is_active', true)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .single();
+    const ageH = newest?.updated_at ? (Date.now() - new Date(newest.updated_at).getTime()) / 3_600_000 : Infinity;
+    checks.rosters = { lastSynced: newest?.updated_at ?? 'never', ageHours: Math.round(ageH) };
+    if (ageH > 36) issues.push(`ROSTERS: last roster sync ${Number.isFinite(ageH) ? `${Math.round(ageH)}h` : 'never'} ago — trades/call-ups not reflected`);
   }
 
   // ── 1. GAMES ──────────────────────────────────────────────────────────────

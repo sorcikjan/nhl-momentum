@@ -17,25 +17,30 @@ function getClient() {
   return new GoogleGenerativeAI(key);
 }
 
-// Retry with exponential backoff for transient 503 / 429 errors.
-// gemini-2.5-flash occasionally returns 503 during high-demand periods.
+// Last failure from ask(), so callers (recap route, health checks) can report the
+// real cause instead of "check the logs".
+export let lastAiError: string | null = null;
+
+// Retry with exponential backoff for transient 503 / 429 errors, then fall through
+// the model chain. Google retires model ids without notice (gemini-2.0-flash went
+// 404 in 2026 and silently killed recaps), so the chain ends on an alias.
+const MODEL_CHAIN = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
+
 export async function ask(prompt: string, maxRetries = 3): Promise<string | null> {
   const client = getClient();
-  if (!client) { console.error('[ai] ask: GEMINI_API_KEY not set'); return null; }
+  if (!client) { lastAiError = 'GEMINI_API_KEY not set'; console.error('[ai] ask: GEMINI_API_KEY not set'); return null; }
 
-  // Primary model: 2.5 flash (thinking, higher quality)
-  // Fallback model: 2.0 flash (faster, used if 2.5 is unavailable)
-  const models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
-
-  for (const modelName of models) {
+  const failures: string[] = [];
+  for (const modelName of MODEL_CHAIN) {
     const model = client.getGenerativeModel({ model: modelName });
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         const result = await model.generateContent(prompt);
         const text = result.response.text()?.trim();
-        if (modelName !== 'gemini-2.5-flash' || attempt > 0) {
+        if (modelName !== MODEL_CHAIN[0] || attempt > 0) {
           console.log(`[ai] ask: succeeded on model=${modelName} attempt=${attempt + 1}`);
         }
+        lastAiError = null;
         return text ?? null;
       } catch (err: unknown) {
         const status = (err as { status?: number })?.status;
@@ -47,18 +52,16 @@ export async function ask(prompt: string, maxRetries = 3): Promise<string | null
           await new Promise(r => setTimeout(r, delayMs));
           continue;
         }
-        // Any error from the primary model falls through to the fallback model
-        if (modelName === 'gemini-2.5-flash') {
-          console.warn(`[ai] ask: ${modelName} failed (status=${status ?? 'unknown'}), falling back to gemini-2.0-flash`);
-          break;
-        }
-        console.error('[ai] ask error:', err);
-        return null;
+        const msg = `${modelName}: ${status ?? 'error'} ${String((err as Error)?.message ?? err).slice(0, 160)}`;
+        failures.push(msg);
+        console.warn(`[ai] ask: ${msg} — trying next model`);
+        break;
       }
     }
   }
 
-  console.error('[ai] ask: all models and retries exhausted');
+  lastAiError = failures.join(' | ') || 'all models and retries exhausted';
+  console.error('[ai] ask: all models failed:', lastAiError);
   return null;
 }
 

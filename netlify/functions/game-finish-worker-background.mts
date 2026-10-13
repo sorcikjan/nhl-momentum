@@ -10,46 +10,15 @@ import type { BackgroundHandler } from '@netlify/functions';
 //                 written to games table as step 0 so outcomes-backfill can find them
 //
 // Pipeline order:
-//   0. record-games     — write final scores to games table (enables outcomes-backfill)
-//   1. gamelogs         — ingest player stats for finished teams only (~40–50 players)
+//   0. stats            — box-score reconciliation: add unknown players, fetch game logs
+//                         only for players missing a stat row for these games
+//   1. record-games     — write final scores to games table (enables outcomes-backfill)
 //   2. outcomes-backfill — score predictions from DB scores (immune to NHL API cache)
 //   3. metrics          — full recalculation so global rankings stay correct
 //   4. energy           — update energy bars
 //   5. extras           — three stars + highlights for the just-finished games
 
-const CALL_TIMEOUT_MS = 25_000;
-const GAMELOGS_TIMEOUT_MS = 120_000;
-
-async function call(url: string, headers: Record<string, string>, timeoutMs = CALL_TIMEOUT_MS) {
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { headers, signal: ac.signal });
-    return await res.json();
-  } catch (err) {
-    return { error: String(err), data: null };
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-async function post(url: string, headers: Record<string, string>, body: unknown, timeoutMs = CALL_TIMEOUT_MS) {
-  const ac = new AbortController();
-  const timer = setTimeout(() => ac.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: ac.signal,
-    });
-    return await res.json();
-  } catch (err) {
-    return { error: String(err), data: null };
-  } finally {
-    clearTimeout(timer);
-  }
-}
+import { call, paginate, alert, syncMissingStats } from '../lib/pipeline';
 
 const handler: BackgroundHandler = async (event) => {
   const base = process.env.URL ?? 'https://nhl-momentum.netlify.app';
@@ -74,116 +43,102 @@ const handler: BackgroundHandler = async (event) => {
   }
 
   const log: string[] = [];
+  const problems: string[] = [];
   console.log('[game-finish-worker] start — games:', gameIds.join(','), 'teams:', teamIds.join(','));
 
-  // 0. Gamelogs FIRST — targeted to just the finished teams (40–50 players vs 200+).
-  //    Must run before record-games so the game is not yet FINAL in our DB.
-  //    The poller's "already processed" check reads game_state from the games table:
-  //    if we write FINAL first and gamelogs fails (NHL API delay — data often unavailable
-  //    for 15–30 min post-game), the poller will never retry gamelogs for this game.
-  //    By running gamelogs first, a 0-row result keeps the game out of our DB as FINAL,
-  //    so the poller retries on its next 15-min tick until stats are actually available.
-  let gamelogRowsFetched = 0;
-  if (teamIds.length > 0) {
-    try {
-      const r = await call(`${base}/api/ingest/gamelogs?teamIds=${teamIds.join(',')}`, h, GAMELOGS_TIMEOUT_MS);
-      gamelogRowsFetched = (r.data?.skaterRows ?? 0) + (r.data?.goalieRows ?? 0);
-      const warn = (r.data?.rateLimited ?? 0) > 0 ? ` (${r.data.rateLimited} rate-limited)` : '';
-      log.push(`gamelogs: ${gamelogRowsFetched} rows for teams [${teamIds.join(',')}]${warn}${r.error ? ` err: ${r.error}` : ''}`);
-    } catch (e) { log.push(`gamelogs: exception ${e}`); }
-  }
+  // 0. Stats FIRST, and only mark the game FINAL in our DB once its stats are in.
+  //    The poller's "already processed" check reads game_state from the games table,
+  //    so leaving the game un-FINAL makes the poller retry on its next 15-min tick.
+  //    Completeness is checked against the box score itself (every skater/goalie who
+  //    played has a row) — the old row-count heuristic was fooled by earlier games in
+  //    each player's season log, and the old two-team gamelogs call always hit the
+  //    26s route limit, so post-game stats never actually landed.
+  const stats = gameIds.length > 0
+    ? await syncMissingStats(base, h, `ids=${gameIds.join(',')}`)
+    : { rows: 0, needed: 0, stillMissing: null, added: [] as string[], errors: ['no gameIds'] };
+  log.push(`stats: ${stats.needed} players needed, ${stats.rows} rows, ${stats.stillMissing ?? 'unknown'} still missing${stats.added.length ? `, added: ${stats.added.join('; ')}` : ''}`);
+  problems.push(...stats.errors);
 
-  // NHL API delay guard: if gamelogs returned 0 rows and all games finished within the
-  // last 90 minutes, the API likely hasn't published the game log yet. Skip record-games
-  // so the poller retries on its next 15-min tick instead of permanently ignoring this game.
+  // NHL API delay guard: game logs usually publish 15–30 min after the final horn.
+  // While stats are incomplete and the game is young, exit and let the poller retry.
   const oldestGameStartMs = (gameRecords as Array<{ start_time_utc?: string | null; game_date?: string }>)
     .map(g => g.start_time_utc ? new Date(g.start_time_utc).getTime() : new Date(`${g.game_date}T20:00:00Z`).getTime())
     .reduce((min, t) => Math.min(min, t), Infinity);
   const gameAgeMs = Date.now() - oldestGameStartMs;
   const TYPICAL_GAME_DURATION_MS = 2.5 * 3_600_000; // 2h30m
-  const NHL_API_PUBLISH_DELAY_MS = 30 * 60_000;     // 30 min post-game
-  const tooSoonForApiData = gamelogRowsFetched === 0 && teamIds.length > 0
-    && gameAgeMs < TYPICAL_GAME_DURATION_MS + NHL_API_PUBLISH_DELAY_MS;
+  const NHL_API_PUBLISH_DELAY_MS = 60 * 60_000;     // allow up to 60 min post-game
+  const statsIncomplete = stats.stillMissing === null || stats.stillMissing > 0;
 
-  if (tooSoonForApiData) {
-    console.log('[game-finish-worker] gamelogs returned 0 rows — NHL API likely not ready yet, skipping record-games so poller retries');
-    log.push('record-games: skipped — waiting for NHL API to publish game log');
+  if (statsIncomplete && gameAgeMs < TYPICAL_GAME_DURATION_MS + NHL_API_PUBLISH_DELAY_MS) {
+    console.log('[game-finish-worker] stats incomplete — NHL API likely not ready yet, skipping record-games so poller retries');
     console.log('[game-finish-worker] complete (early exit):', log.join(' | '));
     return;
+  }
+  if (statsIncomplete) {
+    // Too old to keep waiting — record the game; the nightly reconciliation retries stats.
+    problems.push(`stats still incomplete for games ${gameIds.join(',')} ${Math.round(gameAgeMs / 3_600_000)}h after start`);
   }
 
   // 1. Write final game scores to games table.
   //    Critical: outcomes-backfill reads from games WHERE game_state IN ('FINAL','OFF').
-  //    Runs after gamelogs so a successful gamelogs ingestion is confirmed before the
-  //    poller considers this game "done".
   if (gameRecords.length > 0) {
-    try {
-      const r = await post(`${base}/api/ingest/record-games`, h, { games: gameRecords });
-      log.push(`record-games: ${r.data?.upserted ?? 0} upserted${r.error ? ` err: ${r.error}` : ''}`);
-    } catch (e) { log.push(`record-games: exception ${e}`); }
+    const r = await call(`${base}/api/ingest/record-games`, h, { method: 'POST', body: { games: gameRecords } });
+    log.push(`record-games: ${r.data?.upserted ?? 0} upserted${r.error ? ` err: ${r.error}` : ''}`);
   }
 
-  // 2. Outcomes backfill — DB-based, immune to NHL API cache. Now that games table
-  //    has the final scores (step 1), this will find and score the predictions.
-  try {
+  // 2. Outcomes backfill — DB-based, immune to NHL API cache.
+  {
     const r = await call(`${base}/api/ingest/outcomes-backfill?limit=100`, h);
     log.push(`outcomes-backfill: ${r.data?.outcomes_upserted ?? 0} upserted across ${r.data?.games_processed ?? 0} games${r.error ? ` err: ${r.error}` : ''}`);
-  } catch (e) { log.push(`outcomes-backfill: exception ${e}`); }
+  }
 
   // 3. Metrics — full recalculation so global rankings remain correct.
-  //    Must include all players — partial ranking would skew momentum_rank for everyone.
-  try {
-    let offset = 0, snaps = 0;
-    for (;;) {
-      const r = await call(`${base}/api/ingest/metrics?offset=${offset}&limit=100`, h);
-      if (r.error) { log.push(`metrics err: ${r.error}`); break; }
-      const inserted = r.data?.snapshotsInserted ?? 0;
-      snaps += inserted;
-      if (inserted === 0) break;
-      offset += 100;
-      if (offset > 2000) break;
-    }
-    log.push(`metrics: ${snaps} snapshots`);
-  } catch (e) { log.push(`metrics: exception ${e}`); }
+  {
+    const res = await paginate(
+      offset => call(`${base}/api/ingest/metrics?offset=${offset}&limit=100`, h),
+      { pageSize: 100, maxOffset: 2000, done: p => (p.data?.snapshotsInserted ?? 0) === 0 },
+    );
+    const snaps = res.pages.reduce((n, p) => n + (p.data?.snapshotsInserted ?? 0), 0);
+    log.push(`metrics: ${snaps} snapshots${res.failedOffsets.length ? ` err: failed offsets ${res.failedOffsets.join(',')}` : ''}`);
+  }
 
   // 4. Snapshots + predictions — regenerate for any upcoming games with fresh player data
-  try {
-    let offset = 0, snaps = 0, preds = 0;
-    for (;;) {
+  {
+    let snaps = 0, preds = 0;
+    for (let offset = 0; offset <= 50; offset += 2) {
       const r = await call(`${base}/api/ingest/daily?phase=snapshots&game_offset=${offset}&game_limit=2`, h);
-      if (r.error) break;
-      snaps += r.data?.snapshots_saved ?? 0;
-      preds += r.data?.predictions_stored ?? 0;
-      if (!r.data?.has_more) break;
-      offset += 2;
-      if (offset > 50) break;
+      if (!r.data) { log.push(`snapshots err: ${r.error}`); break; }
+      snaps += r.data.snapshots_saved ?? 0;
+      preds += r.data.predictions_stored ?? 0;
+      if (!r.data.has_more) break;
     }
     log.push(`snapshots: ${snaps} saved, ${preds} predictions`);
-  } catch (e) { log.push(`snapshots: exception ${e}`); }
+  }
 
   // 5. Energy — full sweep (fast — reads existing snapshots, no NHL API calls)
-  try {
+  {
     const r = await call(`${base}/api/ingest/daily?phase=energy`, h);
     log.push(`energy: ${r.data?.energy_updated ?? `err: ${r.error}`} updated`);
-  } catch (e) { log.push(`energy: exception ${e}`); }
+  }
 
   // 6. Extras — three stars + highlights for the just-finished games
-  try {
+  {
     const r = await call(`${base}/api/ingest/game-extras?days=2&limit=20`, h);
     log.push(`extras: ${r.data?.updated ?? 0} games updated, ${r.data?.youtubeFound ?? 0} YouTube highlights${r.error ? ` err: ${r.error}` : ''}`);
-  } catch (e) { log.push(`extras: exception ${e}`); }
+  }
 
-  // Bust the ISR cache so the homepage shows fresh data immediately,
-  // without waiting for the next visitor to accidentally trigger a revalidation.
-  try {
-    await fetch(`${base}/api/revalidate`, {
-      method: 'POST',
-      headers: { 'x-api-key': ingestKey },
-    });
-    log.push('revalidate: ok');
-  } catch (e) { log.push(`revalidate: exception ${e}`); }
+  // Bust the ISR cache so the homepage shows fresh data immediately.
+  {
+    const r = await call(`${base}/api/revalidate`, h, { method: 'POST', body: {} });
+    log.push(r.revalidated ? 'revalidate: ok' : `revalidate err: ${r.error}`);
+  }
 
   console.log('[game-finish-worker] complete:', log.join(' | '));
+  problems.push(...log.filter(l => /\berr\b|err:|exception/.test(l)));
+  if (problems.length) {
+    console.error('[game-finish-worker] problems:', problems.join(' | '));
+    await alert(`post-game worker (games ${gameIds.join(',')})`, problems);
+  }
 };
 
 export { handler };

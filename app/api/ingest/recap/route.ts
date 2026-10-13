@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { fetchRecapData, fetchRecentSoftSignals } from '@/lib/data';
-import { generateDailyRecap } from '@/lib/ai';
+import { generateDailyRecap, lastAiError } from '@/lib/ai';
 import type { RecapGame, RecapPerformer, RecapShutout } from '@/lib/ai';
 
 // Fetch a free hockey photo from Pixabay (Pixabay License — no attribution required).
@@ -223,7 +223,7 @@ export async function GET(req: NextRequest) {
   const result = await generateDailyRecap({ date, dateLabel, games, topPerformers, shutouts, newsContext });
 
   if (!result) {
-    return NextResponse.json({ data: null, error: 'AI generation failed — check Netlify function logs for [ai] ask error' }, { status: 500 });
+    return NextResponse.json({ data: null, error: `AI generation failed — ${lastAiError ?? 'empty or unparseable model response'}` }, { status: 500 });
   }
 
   const heroImageUrl: string | null = await pickHeroImage(date, raw.games, result.featured_game);

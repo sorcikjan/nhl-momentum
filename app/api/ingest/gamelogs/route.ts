@@ -25,19 +25,32 @@ export async function GET(req: NextRequest) {
 
   const teamIdsParam = req.nextUrl.searchParams.get('teamIds');
   const sinceParam = req.nextUrl.searchParams.get('since');
-  // teamIds= mode loads all players for those teams in one shot (no pagination needed)
-  // since= mode uses smaller pages (20) — fully sequential processing at 1 req/s
-  // takes ~22s for 20 players, safely within Netlify's 26s function limit.
-  const defaultLimit = sinceParam ? 20 : 50;
+  // Processing is fully sequential at ~1 player/s, and the route must finish inside
+  // Netlify's 26s limit — so every mode paginates. teamIds= used to load both teams
+  // (~50 players) in one call, which always 504'd and meant post-game stats never
+  // landed until the nightly sweep. Callers page with offset until playersProcessed < limit.
+  const defaultLimit = (sinceParam || teamIdsParam) ? 15 : 50;
   const limit  = Math.min(200, Math.max(1, Number(req.nextUrl.searchParams.get('limit')  ?? defaultLimit)));
   const offset = Math.max(0, Number(req.nextUrl.searchParams.get('offset') ?? '0'));
   const season = currentSeason();
 
   let players: { id: number; position_code: string; team_id: number | null }[] | null = null;
 
-  if (teamIdsParam) {
+  const playerIdsParam = req.nextUrl.searchParams.get('playerIds');
+
+  if (playerIdsParam) {
+    // Reconciliation mode: exactly the players /api/ingest/boxscore-players reported
+    // as missing stat rows. Callers chunk the list (≤15 ids per call).
+    const ids = playerIdsParam.split(',').map(s => Number(s.trim())).filter(n => n > 0).slice(0, 30);
+    const { data, error } = await supabaseAdmin
+      .from('players')
+      .select('id, position_code, team_id')
+      .in('id', ids.length ? ids : [-1]);
+    if (error) return NextResponse.json({ data: null, error: error.message }, { status: 500 });
+    players = data ?? [];
+  } else if (teamIdsParam) {
     // Event-driven mode: target exactly the teams from a just-finished game.
-    // Parses comma-separated team IDs (e.g. "1,17") — no DB date lookup, no pagination.
+    // Parses comma-separated team IDs (e.g. "1,17") — no DB date lookup; paginated.
     const targetIds = teamIdsParam.split(',').map(s => Number(s.trim())).filter(n => n > 0);
     if (targetIds.length === 0) {
       return NextResponse.json({ data: { skaterRows: 0, goalieRows: 0, playersProcessed: 0, rateLimited: 0, errors: [] }, error: null });
@@ -47,7 +60,8 @@ export async function GET(req: NextRequest) {
       .select('id, position_code, team_id')
       .eq('is_active', true)
       .in('team_id', targetIds)
-      .order('id');
+      .order('id')
+      .range(offset, offset + limit - 1);
     if (error) return NextResponse.json({ data: null, error: error.message }, { status: 500 });
     players = data ?? [];
   } else if (sinceParam) {
