@@ -288,8 +288,12 @@ export const generateNightlyStories = unstable_cache(
 export interface RecapGame {
   awayTeam: string;
   homeTeam: string;
+  awayName?: string;          // full name, e.g. "Buffalo Sabres"
+  homeName?: string;
   awayScore: number;
   homeScore: number;
+  finish?: 'REG' | 'OT' | 'SO'; // how the game ended (NHL score feed)
+  goals?: string[];           // "P1 05:58 BUF Josh Doan (P. Krebs) EV" — the only scoring facts the model may use
   predictedCorrectly: boolean | null;
   homeWinProbability: number | null;
   seriesContext?: string;
@@ -368,7 +372,10 @@ export async function generateDailyRecap(input: DailyRecapInput): Promise<DailyR
     const margin = Math.abs(g.awayScore - g.homeScore);
     const context = g.predictedCorrectly === false ? 'UPSET' : margin >= 4 ? 'BLOWOUT' : margin === 1 ? 'ONE-GOAL GAME' : '';
     const seriesPart = g.seriesContext ? ` [PLAYOFF: ${g.seriesContext}]` : '';
-    return `${g.awayTeam} ${g.awayScore} @ ${g.homeTeam} ${g.homeScore}${context ? ` [${context}]` : ''}${seriesPart}${g.predictedCorrectly !== null ? ` [model: ${g.predictedCorrectly ? '✓' : '✗'}]` : ''}${g.homeWinProbability != null ? ` [gave ${winner} ${awayWon ? ((1 - g.homeWinProbability) * 100).toFixed(0) : (g.homeWinProbability * 100).toFixed(0)}% win prob]` : ''}`;
+    const names = g.awayName && g.homeName ? ` (${g.awayName} at ${g.homeName})` : '';
+    const finish = g.finish === 'OT' ? ' [FINAL/OT]' : g.finish === 'SO' ? ' [FINAL/SHOOTOUT]' : g.finish === 'REG' ? ' [FINAL in regulation — no overtime]' : '';
+    const goals = g.goals?.length ? `\n    Goals: ${g.goals.join('; ')}` : '';
+    return `${g.awayTeam} ${g.awayScore} @ ${g.homeTeam} ${g.homeScore}${names}${finish}${context ? ` [${context}]` : ''}${seriesPart}${g.predictedCorrectly !== null ? ` [model: ${g.predictedCorrectly ? '✓' : '✗'}]` : ''}${g.homeWinProbability != null ? ` [gave ${winner} ${awayWon ? ((1 - g.homeWinProbability) * 100).toFixed(0) : (g.homeWinProbability * 100).toFixed(0)}% win prob]` : ''}${goals}`;
   }).join('\n');
 
   const prompt = `You are a senior sports writer at Momentum. Your voice is ESPN energy meets data credibility — you love the game, you trust the numbers, and you know how to make both come alive on the page. Write a daily recap article for ${input.dateLabel} that reads like real sports journalism. Not a data dump. Not a press release. A story.${newsSection}
@@ -406,6 +413,8 @@ TONE: ESPN excitement meets data credibility. Write like someone who watched eve
 
 FULL NAMES: Every time you mention a player, use their full first and last name. Never use last name only.
 
+FACTS — NON-NEGOTIABLE: Use only the facts in this prompt. Every goal, scorer, assist, period, time, and how each game ended is listed above; if a detail isn't listed, don't write it. Never invent goals, times, saves, comebacks, crowd reactions, or quotes. Never say a game went to overtime or a shootout unless it is marked [FINAL/OT] or [FINAL/SHOOTOUT]. Refer to teams only by the full names given (e.g. "Buffalo Sabres") or their city/nickname from those names — never any other nickname.
+
 Respond with valid JSON (no markdown, no code blocks):
 {
   "title": "[headline max 70 chars — lead with the biggest story, name a specific player or team, make it compelling enough to click]",
@@ -414,8 +423,52 @@ Respond with valid JSON (no markdown, no code blocks):
   "content": "[lede paragraph]\\n\\n[optional second lede paragraph]\\n\\n### {AWAY} {score} @ {HOME} {score}\\n\\n[paragraph 1 — game story]\\n\\n[paragraph 2 — analytics]\\n\\n[repeat for each game]\\n\\n### Momentum Watch\\n\\n[paragraph]\\n\\n### Looking Ahead\\n\\n[paragraph]"
 }`;
 
-  const raw = await ask(prompt);
-  if (!raw) return null;
+  // Generate, then reject outputs that contradict the facts we supplied (the old
+  // prompt had no scoring data, and recaps invented overtime winners and team
+  // nicknames). One retry, then give up — no recap beats a wrong one.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const raw = await ask(prompt);
+    if (!raw) return null;
+    const parsed = parseRecapOutput(raw, input);
+    if (!parsed) { lastAiError = 'unparseable model response'; continue; }
+    const problem = recapFactProblem(parsed, input.games);
+    if (!problem) return parsed;
+    lastAiError = `recap rejected: ${problem}`;
+    console.warn(`[ai] recap attempt ${attempt + 1} rejected: ${problem}`);
+  }
+  return null;
+}
+
+// Cheap consistency checks against the structured game data.
+export function recapFactProblem(out: DailyRecapOutput, games: RecapGame[]): string | null {
+  const text = `${out.title}\n${out.summary}\n${out.content}`;
+  const anyExtra = games.some(g => g.finish === 'OT' || g.finish === 'SO');
+  const allKnown = games.every(g => g.finish);
+  if (allKnown && !anyExtra && /overtime|\bOT\b|shootout|extra (frame|period|session)|sudden death/i.test(text)) {
+    return 'mentions overtime/shootout but every game ended in regulation';
+  }
+  for (const g of games) {
+    for (const full of [g.awayName, g.homeName]) {
+      if (!full) continue;
+      // Two-word nicknames: Maple Leafs, Red Wings, Blue Jackets, Golden Knights
+      const words = full.split(' ');
+      const nickLen = /^(Maple|Red|Blue|Golden)$/.test(words[words.length - 2] ?? '') ? 2 : 1;
+      const city = words.slice(0, -nickLen).join(' ');            // "Buffalo", "Vegas"
+      const nick = words[words.length - nickLen];                 // "Sabres", "Golden"
+      if (!city) continue;
+      // "<City> <Word>" where Word isn't the real nickname → invented name ("Buffalo Bills")
+      const re = new RegExp(`\\b${city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+([A-Z][a-z]+)`, 'g');
+      for (const m of text.matchAll(re)) {
+        if (m[1] !== nick) {
+          return `wrong team name "${city} ${m[1]}" (should be ${full})`;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function parseRecapOutput(raw: string, input: DailyRecapInput): DailyRecapOutput | null {
 
   // Repair literal control characters inside JSON string values.
   // Gemini occasionally outputs real \n/\r/\t inside string values instead of

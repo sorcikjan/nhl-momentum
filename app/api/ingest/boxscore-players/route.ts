@@ -43,6 +43,10 @@ export async function GET(req: NextRequest) {
 
   // player id → team id, from box scores; plus every (game, player) appearance
   const seen = new Map<number, number>();
+  const seenGame = new Map<number, number>(); // player → latest game id (traded players: newest team wins)
+  const note = (pid: number, teamId: number, gid: number) => {
+    if ((seenGame.get(pid) ?? 0) < gid) { seen.set(pid, teamId); seenGame.set(pid, gid); }
+  };
   const appearances: { gid: number; pid: number; goalie: boolean }[] = [];
   const errors: string[] = [];
   await Promise.all(gameIds.map(async gid => {
@@ -57,12 +61,12 @@ export async function GET(req: NextRequest) {
         const stats = box.playerByGameStats?.[side] ?? {};
         for (const p of [...(stats.forwards ?? []), ...(stats.defense ?? [])] as BoxPlayer[]) {
           if (!p?.playerId || !teamId) continue;
-          seen.set(p.playerId, teamId);
+          note(p.playerId, teamId, gid);
           appearances.push({ gid, pid: p.playerId, goalie: false });
         }
         for (const p of (stats.goalies ?? []) as BoxPlayer[]) {
           if (!p?.playerId || !teamId) continue;
-          seen.set(p.playerId, teamId);
+          note(p.playerId, teamId, gid);
           // Dressed backup goalies are listed with 00:00 TOI and get no game-log row
           if (p.toi && p.toi !== '00:00') appearances.push({ gid, pid: p.playerId, goalie: true });
         }
@@ -78,10 +82,24 @@ export async function GET(req: NextRequest) {
 
   const { data: known, error: kErr } = await supabaseAdmin
     .from('players')
-    .select('id')
+    .select('id, is_active, team_id')
     .in('id', [...seen.keys()]);
   if (kErr) return NextResponse.json({ data: null, error: kErr.message }, { status: 500 });
   const knownIds = new Set((known ?? []).map(p => p.id));
+
+  // Known players who just played but are inactive or on a stale team: fix them,
+  // otherwise gamelogs/metrics skip them (both only process active players).
+  const reactivated: number[] = [];
+  for (const p of known ?? []) {
+    const teamId = seen.get(p.id);
+    if (p.is_active && p.team_id === teamId) continue;
+    const { error } = await supabaseAdmin
+      .from('players')
+      .update({ is_active: true, team_id: teamId, updated_at: new Date().toISOString() })
+      .eq('id', p.id);
+    if (error) errors.push(`reactivate ${p.id}: ${error.message}`);
+    else reactivated.push(p.id);
+  }
   const unknown = [...seen.keys()].filter(id => !knownIds.has(id));
 
   // Box scores only carry abbreviated names ("H. Stanley") — use the landing page.
@@ -132,7 +150,7 @@ export async function GET(req: NextRequest) {
   const gamesMissingStats = [...new Set(missing.map(a => a.gid))];
 
   return NextResponse.json({
-    data: { games: gameIds.length, checked: seen.size, added, needStats, gamesMissingStats, errors },
+    data: { games: gameIds.length, checked: seen.size, added, reactivated, needStats, gamesMissingStats, errors },
     error: errors.length ? `${errors.length} errors` : null,
   });
 }

@@ -82,16 +82,30 @@ export async function GET(req: NextRequest) {
     }
   }));
 
-  // Deactivate players no longer on any NHL roster (traded out of the league,
-  // unsigned, retired). Only when every team loaded — a partial fetch would
-  // wrongly deactivate whole teams.
+  // Deactivate players no longer on any NHL roster (unsigned, retired, left the
+  // league). Only when every team loaded — a partial fetch would wrongly deactivate
+  // whole teams. The roster feed also omits injured-reserve players, so anyone who
+  // has played this regular season stays active (injury badges handle them);
+  // boxscore-players reactivates anyone who later appears in a game.
   let deactivated = 0;
   if (errors.length === 0 && seenIds.size > 0) {
     const { data: active } = await supabaseAdmin
       .from('players')
       .select('id')
       .eq('is_active', true);
-    const gone = (active ?? []).map(p => p.id).filter(id => !seenIds.has(id));
+    const offRoster = (active ?? []).map(p => p.id).filter(id => !seenIds.has(id));
+    const firstGameId = Number(season.slice(0, 4)) * 1_000_000 + 20_000;
+    const playedThisSeason = new Set<number>();
+    for (let i = 0; i < offRoster.length; i += 200) {
+      const chunk = offRoster.slice(i, i + 200);
+      const [sk, gk] = await Promise.all([
+        supabaseAdmin.from('game_player_stats').select('player_id').in('player_id', chunk).gte('game_id', firstGameId).limit(1000),
+        supabaseAdmin.from('game_goalie_stats').select('player_id').in('player_id', chunk).gte('game_id', firstGameId).limit(1000),
+      ]);
+      if (sk.error || gk.error) { errors.push(`season check: ${(sk.error ?? gk.error)!.message}`); break; }
+      for (const r of [...(sk.data ?? []), ...(gk.data ?? [])]) playedThisSeason.add(r.player_id);
+    }
+    const gone = errors.length ? [] : offRoster.filter(id => !playedThisSeason.has(id));
     for (let i = 0; i < gone.length; i += 200) {
       const { error } = await supabaseAdmin
         .from('players')

@@ -162,6 +162,31 @@ export async function GET(req: NextRequest) {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   });
 
+  // Scoring facts from the NHL score feed — the model may only describe these.
+  // Without them it invented overtime winners and team nicknames.
+  const scoreFeed = new Map<number, { finish: 'REG' | 'OT' | 'SO'; goals: string[] }>();
+  try {
+    const res = await fetch(`https://api-web.nhle.com/v1/score/${date}`, { cache: 'no-store', signal: AbortSignal.timeout(10_000) });
+    if (res.ok) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      for (const fg of ((await res.json()).games ?? []) as any[]) {
+        const type = fg.gameOutcome?.lastPeriodType;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const goals = ((fg.goals ?? []) as any[]).map(gl => {
+          const per = gl.periodDescriptor?.periodType === 'OT' ? 'OT' : gl.periodDescriptor?.periodType === 'SO' ? 'SO' : `P${gl.period}`;
+          const scorer = `${gl.firstName?.default ?? ''} ${gl.lastName?.default ?? gl.name?.default ?? ''}`.trim();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const assists = ((gl.assists ?? []) as any[]).map(a => a.name?.default).filter(Boolean).join(', ');
+          const tags = [gl.strength && gl.strength !== 'ev' ? gl.strength.toUpperCase() : '', gl.goalModifier === 'empty-net' ? 'EN' : ''].filter(Boolean).join(' ');
+          return `${per} ${gl.timeInPeriod} ${gl.teamAbbrev} ${scorer}${assists ? ` (${assists})` : ' (unassisted)'}${tags ? ` ${tags}` : ''}`;
+        });
+        if (type === 'REG' || type === 'OT' || type === 'SO') scoreFeed.set(fg.id, { finish: type, goals });
+      }
+    }
+  } catch (err) {
+    console.warn('[recap] score feed unavailable:', err);
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const games: RecapGame[] = (raw.games as any[]).map(g => {
     const pred = raw.predMap.get(g.id);
@@ -178,6 +203,10 @@ export async function GET(req: NextRequest) {
     return {
       awayTeam: g.away_team?.abbrev ?? '?',
       homeTeam: g.home_team?.abbrev ?? '?',
+      awayName: g.away_team?.name ?? undefined,
+      homeName: g.home_team?.name ?? undefined,
+      finish: scoreFeed.get(g.id)?.finish,
+      goals: scoreFeed.get(g.id)?.goals,
       awayScore: g.away_score ?? 0,
       homeScore: g.home_score ?? 0,
       predictedCorrectly,
