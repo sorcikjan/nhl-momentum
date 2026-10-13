@@ -41,6 +41,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: null, error: 'ids or since required' }, { status: 400 });
   }
 
+  // Regular season + playoffs only. Preseason games (type 01) are in `games` too,
+  // and their box scores are full of camp invitees and prospects.
+  gameIds = gameIds.filter(id => String(id).slice(4, 6) !== '01');
+
   // player id → team id, from box scores; plus every (game, player) appearance
   const seen = new Map<number, number>();
   const seenGame = new Map<number, number>(); // player → latest game id (traded players: newest team wins)
@@ -49,7 +53,10 @@ export async function GET(req: NextRequest) {
   };
   const appearances: { gid: number; pid: number; goalie: boolean }[] = [];
   const errors: string[] = [];
-  await Promise.all(gameIds.map(async gid => {
+  // At most 6 box scores in flight — 100+ parallel requests trip the NHL API's 429s.
+  const queue = [...gameIds];
+  const worker = async () => { for (let gid = queue.shift(); gid !== undefined; gid = queue.shift()) await readBox(gid); };
+  const readBox = async (gid: number) => {
     try {
       const res = await fetch(`https://api-web.nhle.com/v1/gamecenter/${gid}/boxscore`, {
         cache: 'no-store', signal: AbortSignal.timeout(10_000),
@@ -74,7 +81,8 @@ export async function GET(req: NextRequest) {
     } catch (err) {
       errors.push(`${gid}: ${(err as Error).message}`);
     }
-  }));
+  };
+  await Promise.all(Array.from({ length: 6 }, worker));
 
   if (seen.size === 0) {
     return NextResponse.json({ data: { games: gameIds.length, checked: 0, added: [], needStats: [], errors }, error: null });
@@ -104,7 +112,10 @@ export async function GET(req: NextRequest) {
 
   // Box scores only carry abbreviated names ("H. Stanley") — use the landing page.
   const added: string[] = [];
-  for (const id of unknown) {
+  // Sequential with a small gap; capped per call so a backlog can't blow the 26s limit
+  // (the rest are picked up on the next run).
+  for (const id of unknown.slice(0, 25)) {
+    if (added.length) await new Promise(r => setTimeout(r, 150));
     try {
       const res = await fetch(`https://api-web.nhle.com/v1/player/${id}/landing`, {
         cache: 'no-store', signal: AbortSignal.timeout(10_000),
