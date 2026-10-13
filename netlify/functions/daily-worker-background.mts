@@ -190,15 +190,8 @@ const handler: BackgroundHandler = async (event) => {
     } catch (e) { log.push(`assignments: exception ${e}`); }
   }
 
-  // 9. Soft signals — NHL RSS + Newsdata.io news ingestion
-  if (phases.includes('signals')) {
-    try {
-      const r = await call(`${base}/api/ingest/soft-signals?type=all`, h);
-      log.push(`signals: ${r.data?.inserted ?? 0} inserted, ${r.data?.skipped ?? 0} skipped${r.error ? ` err: ${r.error}` : ''}`);
-    } catch (e) { log.push(`signals: exception ${e}`); }
-  }
-
-  // 9. Daily recap article — generated after outcomes/gamelogs are fresh
+  // 9. Daily recap article — generated after outcomes/gamelogs are fresh, and before
+  //    signals so bulk AI calls can't use up the Gemini quota first
   if (phases.includes('recap')) {
     try {
       // Respect explicit date param (for manual backfills); fall back to yesterday.
@@ -206,6 +199,14 @@ const handler: BackgroundHandler = async (event) => {
       const r = await call(`${base}/api/ingest/recap?date=${recapDate}`, h, { timeoutMs: RECAP_TIMEOUT_MS, retries: 1 });
       log.push(`recap: ${r.data?.skipped ? `skipped (${r.data.reason})` : r.data?.title ?? `err: ${r.error}`}`);
     } catch (e) { log.push(`recap: exception ${e}`); }
+  }
+
+  // 9b. Soft signals — NHL RSS + Newsdata.io news ingestion
+  if (phases.includes('signals')) {
+    try {
+      const r = await call(`${base}/api/ingest/soft-signals?type=all`, h);
+      log.push(`signals: ${r.data?.inserted ?? 0} inserted, ${r.data?.skipped ?? 0} skipped${r.error ? ` err: ${r.error}` : ''}`);
+    } catch (e) { log.push(`signals: exception ${e}`); }
   }
 
   // 10. Snapshot retention — keeps player_metric_snapshots bounded (it reached ~755k

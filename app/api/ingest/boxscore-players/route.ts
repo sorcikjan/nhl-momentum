@@ -53,14 +53,21 @@ export async function GET(req: NextRequest) {
   };
   const appearances: { gid: number; pid: number; goalie: boolean }[] = [];
   const errors: string[] = [];
-  // At most 6 box scores in flight — 100+ parallel requests trip the NHL API's 429s.
+  // At most 3 box scores in flight (+ backoff on 429) — 100+ parallel requests trip
+  // the NHL API's rate limit.
   const queue = [...gameIds];
   const worker = async () => { for (let gid = queue.shift(); gid !== undefined; gid = queue.shift()) await readBox(gid); };
   const readBox = async (gid: number) => {
     try {
-      const res = await fetch(`https://api-web.nhle.com/v1/gamecenter/${gid}/boxscore`, {
+      let res = await fetch(`https://api-web.nhle.com/v1/gamecenter/${gid}/boxscore`, {
         cache: 'no-store', signal: AbortSignal.timeout(10_000),
       });
+      for (let backoff = 1; res.status === 429 && backoff <= 2; backoff++) {
+        await new Promise(r => setTimeout(r, 2_000 * backoff));
+        res = await fetch(`https://api-web.nhle.com/v1/gamecenter/${gid}/boxscore`, {
+          cache: 'no-store', signal: AbortSignal.timeout(10_000),
+        });
+      }
       if (!res.ok) { errors.push(`${gid}: HTTP ${res.status}`); return; }
       const box = await res.json();
       for (const side of ['homeTeam', 'awayTeam'] as const) {
@@ -82,7 +89,7 @@ export async function GET(req: NextRequest) {
       errors.push(`${gid}: ${(err as Error).message}`);
     }
   };
-  await Promise.all(Array.from({ length: 6 }, worker));
+  await Promise.all(Array.from({ length: 3 }, worker));
 
   if (seen.size === 0) {
     return NextResponse.json({ data: { games: gameIds.length, checked: 0, added: [], needStats: [], errors }, error: null });

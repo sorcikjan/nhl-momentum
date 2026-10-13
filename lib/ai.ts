@@ -26,26 +26,38 @@ export let lastAiError: string | null = null;
 // 404 in 2026 and silently killed recaps), so the chain ends on an alias.
 const MODEL_CHAIN = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest'];
 
-export async function ask(prompt: string, maxRetries = 3): Promise<string | null> {
+// Background/bulk generation (player bios, perf evals, news blurbs) runs on the
+// cheaper model with no retries, so it can't drain the daily quota the recap needs.
+// Before this, ~150–300 player-page generations a day — each retried up to 9×
+// once quota ran out — left nothing for the 08:00 recap.
+export const BULK = { models: ['gemini-2.5-flash-lite'], maxRetries: 1 } as const;
+
+export async function ask(
+  prompt: string,
+  opts: { models?: readonly string[]; maxRetries?: number } = {},
+): Promise<string | null> {
+  const { models = MODEL_CHAIN, maxRetries = 3 } = opts;
   const client = getClient();
   if (!client) { lastAiError = 'GEMINI_API_KEY not set'; console.error('[ai] ask: GEMINI_API_KEY not set'); return null; }
 
   const failures: string[] = [];
-  for (const modelName of MODEL_CHAIN) {
+  for (const modelName of models) {
     const model = client.getGenerativeModel({ model: modelName });
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         const result = await model.generateContent(prompt);
         const text = result.response.text()?.trim();
-        if (modelName !== MODEL_CHAIN[0] || attempt > 0) {
+        if (modelName !== models[0] || attempt > 0) {
           console.log(`[ai] ask: succeeded on model=${modelName} attempt=${attempt + 1}`);
         }
         lastAiError = null;
         return text ?? null;
       } catch (err: unknown) {
         const status = (err as { status?: number })?.status;
-        // 503, 429, and 500 are all transient Gemini errors worth retrying
-        const isTransient = status === 503 || status === 429 || status === 500;
+        // 503, 429, and 500 are transient — except a 429 for an exhausted daily
+        // quota, which won't recover by retrying; move to the next model instead.
+        const quotaExhausted = status === 429 && /quota/i.test(String((err as Error)?.message ?? ''));
+        const isTransient = !quotaExhausted && (status === 503 || status === 429 || status === 500);
         if (isTransient && attempt < maxRetries - 1) {
           const delayMs = 2000 * Math.pow(2, attempt); // 2s, 4s, 8s
           console.warn(`[ai] ask: ${status} on model=${modelName} attempt=${attempt + 1}, retrying in ${delayMs}ms`);
@@ -174,8 +186,8 @@ export async function getPlayerInsights(
   playerId: number,
   input: PlayerAIInput,
 ): Promise<{ bio: string | null; perfEval: string | null }> {
-  const BIO_TTL_H   = 48;
-  const PERF_TTL_H  = 6;
+  const BIO_TTL_H   = 7 * 24;  // bios barely change
+  const PERF_TTL_H  = 24;      // form changes at most once per game day
 
   // Load existing row
   const { data: row } = await supabaseAdmin
@@ -198,8 +210,8 @@ export async function getPlayerInsights(
 
   // Generate only what's stale — run in parallel if both needed
   const [newBio, newPerf] = await Promise.all([
-    needsBio  ? ask(buildBioPrompt(input))      : Promise.resolve(null),
-    needsPerf ? ask(buildPerfEvalPrompt(input)) : Promise.resolve(null),
+    needsBio  ? ask(buildBioPrompt(input), BULK)      : Promise.resolve(null),
+    needsPerf ? ask(buildPerfEvalPrompt(input), BULK) : Promise.resolve(null),
   ]);
 
   const upsertData = {
@@ -220,8 +232,8 @@ export async function getPlayerInsights(
 }
 
 // Keep old exports for backwards compat (used in page.tsx)
-export const generatePlayerBio = async (input: PlayerAIInput) => ask(buildBioPrompt(input));
-export const generatePlayerPerfEval = async (input: PlayerAIInput) => ask(buildPerfEvalPrompt(input));
+export const generatePlayerBio = async (input: PlayerAIInput) => ask(buildBioPrompt(input), BULK);
+export const generatePlayerPerfEval = async (input: PlayerAIInput) => ask(buildPerfEvalPrompt(input), BULK);
 
 // ─── Nightly stories ──────────────────────────────────────────────────────────
 

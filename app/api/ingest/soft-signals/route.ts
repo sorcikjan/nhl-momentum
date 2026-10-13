@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ask } from '@/lib/ai';
+import { ask, BULK } from '@/lib/ai';
 import Parser from 'rss-parser';
 
 // GET /api/ingest/soft-signals?type=rss|newsdata|all
@@ -85,7 +85,8 @@ export async function GET(req: NextRequest) {
   const expanded = await Promise.all(fresh.map(async s => {
     const snippet = s.content ? ` Context: ${s.content}` : '';
     const article = await ask(
-      `Write a 3-4 sentence NHL news article based on this headline.${snippet}\n\nHeadline: "${s.title}"\n\nBe factual and direct. No intro phrases like "In a recent development". Third person. Plain text only.`
+      `Write a 3-4 sentence NHL news article based on this headline.${snippet}\n\nHeadline: "${s.title}"\n\nBe factual and direct. No intro phrases like "In a recent development". Third person. Plain text only.`,
+      BULK,
     ).catch(() => null);
     return { ...s, content: article ?? s.content };
   }));
