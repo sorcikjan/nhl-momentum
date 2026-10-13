@@ -155,7 +155,7 @@ export async function fetchRankings() {
       sos_coefficient, calculated_at,
       players (
         id, first_name, last_name, position_code, team_id,
-        headshot_url, injury_status, sweater_number, in_minors, birth_country,
+        headshot_url, injury_status, sweater_number, in_minors, birth_country, is_active,
         teams ( id, abbrev, name )
       )
     `)
@@ -169,7 +169,8 @@ export async function fetchRankings() {
   const latest = (data as any[] ?? []).filter((row: any) => {
     if (seen.has(row.player_id)) return false;
     seen.add(row.player_id);
-    return true;
+    // Players dropped from every NHL roster keep their last snapshot — exclude them.
+    return row.players?.is_active !== false;
   });
 
   // During playoffs, only show players whose team is still active.
@@ -182,8 +183,11 @@ export async function fetchRankings() {
   // last season, i.e. the ones not playing). Scale the floor to ~60% of the
   // games teams have played so far, capped at 10.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const maxSeasonGames = Math.max(0, ...latest.map((r: any) => r.season_games ?? 0));
-  const seasonGamesFloor = Math.min(10, Math.max(1, Math.ceil(maxSeasonGames * 0.6)));
+  // 90th percentile rather than max, so one stale carried-over snapshot can't reset it.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gamesSorted = latest.map((r: any) => r.season_games ?? 0).sort((a: number, b: number) => a - b);
+  const typicalSeasonGames = gamesSorted[Math.floor(gamesSorted.length * 0.9)] ?? 0;
+  const seasonGamesFloor = Math.min(10, Math.max(1, Math.ceil(typicalSeasonGames * 0.6)));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const skaters = latest.filter((r: any) =>
     r.players?.position_code !== 'G' &&
