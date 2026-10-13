@@ -51,6 +51,17 @@ export async function GET(req: NextRequest) {
         : now.getUTCFullYear() - 1;
     }
 
+    // Has the current regular season produced any player stats yet? Until it has
+    // (offseason/preseason), season stats carry forward from last season. Once it
+    // has, a player with no current-season games must NOT fall back — otherwise
+    // injured/scratched players keep a full prior season and outrank everyone.
+    const { data: anyCurrentSeasonStat } = await supabaseAdmin
+      .from('game_player_stats')
+      .select('game_id')
+      .gte('game_id', seasonStartYear * 1_000_000 + 20_000)
+      .limit(1);
+    const seasonUnderway = (anyCurrentSeasonStat?.length ?? 0) > 0;
+
     // Fetch active players with pagination
     const { data: players, error: pErr } = await supabaseAdmin
       .from('players')
@@ -142,7 +153,7 @@ export async function GET(req: NextRequest) {
       // meaningful "season" baseline until real current-season games exist —
       // this is a deliberate carry-forward, not a blend: exactly one season's
       // games are used, never a mix of two.
-      if (fullSeason.length === 0) {
+      if (fullSeason.length === 0 && !seasonUnderway) {
         fullSeason = playerStats.filter(r => inSeason(r, seasonStartYear - 1));
       }
 

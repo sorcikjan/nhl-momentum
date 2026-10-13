@@ -176,12 +176,18 @@ export async function fetchRankings() {
   const playoffTeams = await fetchPlayoffActiveTeams();
   const isPlayoffs = playoffTeams.size > 0;
 
-  // Layer 1 stability: require at least 10 season games so all derived lists
-  // are built from players with a meaningful seasonal baseline.
+  // Layer 1 stability: require a meaningful seasonal baseline — 10 games once
+  // the season is established. Early in the season nobody has 10 games yet, so a
+  // fixed floor would empty the lists (or leave only players carried over from
+  // last season, i.e. the ones not playing). Scale the floor to ~60% of the
+  // games teams have played so far, capped at 10.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const maxSeasonGames = Math.max(0, ...latest.map((r: any) => r.season_games ?? 0));
+  const seasonGamesFloor = Math.min(10, Math.max(1, Math.ceil(maxSeasonGames * 0.6)));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const skaters = latest.filter((r: any) =>
     r.players?.position_code !== 'G' &&
-    (r.season_games ?? 0) >= 10 &&
+    (r.season_games ?? 0) >= seasonGamesFloor &&
     (!isPlayoffs || playoffTeams.has(r.players?.team_id))
   );
 
