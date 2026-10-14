@@ -109,12 +109,11 @@ const handler: BackgroundHandler = async (event) => {
   if (phases.includes('metrics')) {
     const res = await paginate(
       offset => call(`${base}/api/ingest/metrics?offset=${offset}&limit=100`, h),
-      { pageSize: 100, maxOffset: 2000, done: p => (p.data?.snapshotsInserted ?? 0) === 0 },
+      { pageSize: 100, maxOffset: 2000, done: p => (p.data?.playersProcessed ?? 0) < 100 },
     );
     const snaps = res.pages.reduce((n, p) => n + (p.data?.snapshotsInserted ?? 0), 0);
     log.push(`metrics: ${snaps} snapshots${res.failedOffsets.length ? `, failed offsets ${res.failedOffsets.join(',')}` : ''}`);
     if (res.failedOffsets.length) problems.push(`metrics failed at offsets ${res.failedOffsets.join(',')}`);
-    if (snaps === 0) problems.push('metrics: 0 snapshots written');
   }
 
   // 4. Snapshots + predictions — today (and tomorrow look-ahead)

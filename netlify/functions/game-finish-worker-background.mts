@@ -92,11 +92,12 @@ const handler: BackgroundHandler = async (event) => {
     log.push(`outcomes-backfill: ${r.data?.outcomes_upserted ?? 0} upserted across ${r.data?.games_processed ?? 0} games${r.error ? ` err: ${r.error}` : ''}`);
   }
 
-  // 3. Metrics — full recalculation so global rankings remain correct.
+  // 3. Metrics — only the teams that just played (rankings re-rank at query time).
   {
+    const teamFilter = teamIds.length ? `&teamIds=${teamIds.join(',')}` : '';
     const res = await paginate(
-      offset => call(`${base}/api/ingest/metrics?offset=${offset}&limit=100`, h),
-      { pageSize: 100, maxOffset: 2000, done: p => (p.data?.snapshotsInserted ?? 0) === 0 },
+      offset => call(`${base}/api/ingest/metrics?offset=${offset}&limit=100${teamFilter}`, h),
+      { pageSize: 100, maxOffset: 2000, done: p => (p.data?.playersProcessed ?? 0) < 100 },
     );
     const snaps = res.pages.reduce((n, p) => n + (p.data?.snapshotsInserted ?? 0), 0);
     log.push(`metrics: ${snaps} snapshots${res.failedOffsets.length ? ` err: failed offsets ${res.failedOffsets.join(',')}` : ''}`);

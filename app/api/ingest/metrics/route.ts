@@ -26,6 +26,12 @@ export async function GET(req: NextRequest) {
 
   const limit  = Math.min(500, Math.max(1, Number(req.nextUrl.searchParams.get('limit')  ?? '100')));
   const offset = Math.max(0, Number(req.nextUrl.searchParams.get('offset') ?? '0'));
+  // ?teamIds=1,17 — post-game: only the teams that just played. Rankings are
+  // re-ranked at query time, so a partial recalculation is safe.
+  const teamIds = (req.nextUrl.searchParams.get('teamIds') ?? '')
+    .split(',').map(Number).filter(n => n > 0);
+  // ?force=1 rewrites every snapshot — use after changing a metric formula.
+  const force = req.nextUrl.searchParams.get('force') === '1';
 
   try {
     // Determine the current season-start year so we can scope "season" stats to the
@@ -63,10 +69,12 @@ export async function GET(req: NextRequest) {
     const seasonUnderway = (anyCurrentSeasonStat?.length ?? 0) > 0;
 
     // Fetch active players with pagination
-    const { data: players, error: pErr } = await supabaseAdmin
+    let playersQuery = supabaseAdmin
       .from('players')
       .select('id, position_code, team_id, injury_status')
-      .eq('is_active', true)
+      .eq('is_active', true);
+    if (teamIds.length) playersQuery = playersQuery.in('team_id', teamIds);
+    const { data: players, error: pErr } = await playersQuery
       .order('id')
       .range(offset, offset + limit - 1);
 
@@ -113,15 +121,18 @@ export async function GET(req: NextRequest) {
     }
 
     // Carry forward existing energy_bar — energy phase writes this separately
+    // Also used to skip unchanged snapshots (see below).
     const { data: existingSnaps } = await supabaseAdmin
       .from('player_metric_snapshots')
-      .select('player_id, energy_bar')
+      .select('player_id, energy_bar, momentum_games, momentum_points, momentum_toi_sec, season_games, season_points, season_toi_sec')
       .in('player_id', skaterIds)
       .order('calculated_at', { ascending: false })
       .limit(skaterIds.length * 3);
     const existingEnergyByPlayer = new Map<number, number>();
+    const latestByPlayer = new Map<number, NonNullable<typeof existingSnaps>[number]>();
     for (const snap of existingSnaps ?? []) {
       if (!existingEnergyByPlayer.has(snap.player_id)) existingEnergyByPlayer.set(snap.player_id, snap.energy_bar ?? 100);
+      if (!latestByPlayer.has(snap.player_id)) latestByPlayer.set(snap.player_id, snap);
     }
 
     const snapshots = [];
@@ -212,9 +223,25 @@ export async function GET(req: NextRequest) {
     }
 
     // Rank by composite_ppm
-    const ranked = snapshots
+    const rankedAll = snapshots
       .sort((a, b) => b.composite_ppm - a.composite_ppm)
       .map((s, i) => ({ ...s, momentum_rank: i + 1 }));
+
+    // Only write players whose underlying numbers changed. Every run used to insert
+    // a row for every player (~800 rows × 10–15 runs/day) although only the ~40
+    // players in each finished game change — that write volume is what kept
+    // exhausting the database. All derived metrics are functions of these inputs.
+    const unchanged = (s: typeof rankedAll[number]) => {
+      const prev = latestByPlayer.get(s.player_id);
+      return !!prev
+        && prev.momentum_games  === s.momentum_games
+        && prev.momentum_points === s.momentum_points
+        && prev.momentum_toi_sec === s.momentum_toi_sec
+        && prev.season_games    === s.season_games
+        && prev.season_points   === s.season_points
+        && prev.season_toi_sec  === s.season_toi_sec;
+    };
+    const ranked = force ? rankedAll : rankedAll.filter(s => !unchanged(s));
 
     const BATCH = 50;
     let inserted = 0;
@@ -227,7 +254,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      data: { snapshotsInserted: inserted },
+      data: { snapshotsInserted: inserted, unchanged: rankedAll.length - ranked.length, playersProcessed: players?.length ?? 0 },
       error: null,
     });
   } catch (err) {
