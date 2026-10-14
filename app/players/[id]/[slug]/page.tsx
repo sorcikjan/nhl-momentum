@@ -15,7 +15,9 @@ import Link from 'next/link';
 // Deduplicate fetchPlayer between generateMetadata and the page component
 const cachedFetchPlayer = cache((id: string) => fetchPlayer(id).catch(() => null));
 
-export const revalidate = 120;
+// Player data changes at most a few times a night; the pipeline also calls
+// /api/revalidate after each run. 10 min keeps crawler traffic off the database.
+export const revalidate = 600;
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string; slug: string }> }): Promise<Metadata> {
   const { id } = await params;

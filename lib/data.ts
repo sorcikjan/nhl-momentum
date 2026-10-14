@@ -592,35 +592,48 @@ export async function fetchPlayer(id: string) {
 
 // Returns up to 6 same-position players ranked by composite_ppm, excluding the
 // current player. Used by the "Compare to" section on the player profile page.
-export async function fetchComparisonPeers(playerId: string, positionCode: string) {
-  if (!positionCode || positionCode === 'G') return [];
+//
+// The underlying "latest snapshot per player" set is identical for every profile,
+// so it's loaded once per 30 min per server instance. It used to be a 2000-row
+// joined query on every player-page render (895 pages, crawlers included) —
+// a large share of the read load behind the Oct 2026 database outages.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _peerPoolCache: { rows: any[]; floor: number; ts: number } | null = null;
 
+async function peerPool() {
+  if (_peerPoolCache && Date.now() - _peerPoolCache.ts < 30 * 60_000) return _peerPoolCache;
   const { data } = await supabaseAdmin
     .from('player_metric_snapshots')
     .select(`
       player_id, momentum_ppm, season_ppm, composite_ppm,
       momentum_goals, momentum_assists, momentum_games, season_games,
       calculated_at,
-      players(first_name, last_name, position_code, headshot_url,
+      players!inner(first_name, last_name, position_code, headshot_url, is_active,
         teams(abbrev))
     `)
+    .eq('players.is_active', true)
     .order('calculated_at', { ascending: false })
     .limit(2000);
-
-  if (!data) return [];
-
   const seen = new Set<number>();
-  const pid = Number(playerId);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data as any[])
-    .filter(r => {
-      if (r.player_id === pid) return false;
-      if (seen.has(r.player_id)) return false;
-      seen.add(r.player_id);
-      if (r.players?.position_code !== positionCode) return false;
-      if ((r.season_games ?? 0) < 10) return false;
-      return true;
-    })
+  const rows = ((data ?? []) as any[]).filter(r => !seen.has(r.player_id) && seen.add(r.player_id));
+  // Same season-aware floor as fetchRankings: 10 games once established, ~60% of
+  // games played so far early in the season.
+  const games = rows.map(r => r.season_games ?? 0).sort((x, y) => x - y);
+  const floor = Math.min(10, Math.max(1, Math.ceil((games[Math.floor(games.length * 0.9)] ?? 0) * 0.6)));
+  if (rows.length) _peerPoolCache = { rows, floor, ts: Date.now() };
+  return { rows, floor, ts: Date.now() };
+}
+
+export async function fetchComparisonPeers(playerId: string, positionCode: string) {
+  if (!positionCode || positionCode === 'G') return [];
+  const { rows, floor } = await peerPool();
+  const pid = Number(playerId);
+  return rows
+    .filter(r =>
+      r.player_id !== pid &&
+      r.players?.position_code === positionCode &&
+      (r.season_games ?? 0) >= floor)
     .sort((a, b) => (b.composite_ppm ?? 0) - (a.composite_ppm ?? 0))
     .slice(0, 6);
 }
