@@ -142,7 +142,23 @@ async function getLastPlayedDates(playerIds: number[]): Promise<Map<number, stri
 
 // ─── Rankings ─────────────────────────────────────────────────────────────────
 
+// Rankings are built from the same data for the homepage, /rankings, /hot,
+// /welcome and /api/rankings — share one build per server instance for 3 min
+// (and one in-flight build), instead of each page rebuilding it.
+let _rankingsCache: { value: Awaited<ReturnType<typeof buildRankings>>; ts: number } | null = null;
+let _rankingsInFlight: ReturnType<typeof buildRankings> | null = null;
+
 export async function fetchRankings() {
+  if (_rankingsCache && Date.now() - _rankingsCache.ts < 3 * 60_000) return _rankingsCache.value;
+  if (!_rankingsInFlight) {
+    _rankingsInFlight = buildRankings()
+      .then(value => { _rankingsCache = { value, ts: Date.now() }; return value; })
+      .finally(() => { _rankingsInFlight = null; });
+  }
+  return _rankingsInFlight;
+}
+
+async function buildRankings() {
   const { data, error } = await supabaseAdmin
     .from('player_metric_snapshots')
     .select(`
@@ -228,15 +244,30 @@ export async function fetchRankings() {
   // Top-100 player IDs for the sparkline history query (run in parallel below)
   const top100Ids = allSkaterIds.slice(0, 100);
 
-  // Step 1: last game_id per player.
-  // Chunked into groups of 50 × limit 250 = safely under Supabase's 1000-row cap.
-  // All chunks fire in parallel alongside the recentTeamGames query (step 2).
-  const lastGameIdByPlayer = new Map<number, number>();
-  const STAT_CHUNK = 25;
   const sinceDate = new Date(Date.now() - 45 * 86_400_000).toISOString().slice(0, 10);
 
+  // Step 1: recent completed games for all teams (the 45-day window the badges use).
+  // NOTE: the games table PK is `id`, not `game_id`.
+  const { data: recentTeamGames } = await supabaseAdmin
+    .from('games')
+    .select('id, game_date, home_team_id, away_team_id')
+    .in('game_state', ['FINAL', 'OFF'])
+    .gte('game_date', sinceDate)
+    .order('id', { ascending: false })
+    .limit(700);
+
+  // Step 2: last game_id per player — only within that window. A player whose last
+  // game is older counts every window game as missed either way, so nothing older
+  // is needed. Unbounded, this was the database's single most expensive query
+  // (~315ms × 22 chunks per rankings build — most of the free-tier CPU, Oct 2026);
+  // bounded, the (player_id, game_id) index returns a handful of rows per player.
+  // Step 2b: sparkline history for top-100 players (last ~6 snapshots each).
+  const windowStartGid = (recentTeamGames ?? []).reduce((min, g) => Math.min(min, g.id), Infinity);
+  const lastGameIdByPlayer = new Map<number, number>();
+  const STAT_CHUNK = 50;
+
   const chunkPromises = [];
-  for (let ci = 0; ci < allSkaterIds.length; ci += STAT_CHUNK) {
+  for (let ci = 0; Number.isFinite(windowStartGid) && ci < allSkaterIds.length; ci += STAT_CHUNK) {
     const chunk = allSkaterIds.slice(ci, ci + STAT_CHUNK);
     chunkPromises.push(
       (async () => {
@@ -244,25 +275,16 @@ export async function fetchRankings() {
           .from('game_player_stats')
           .select('player_id, game_id')
           .in('player_id', chunk)
+          .gte('game_id', windowStartGid)
           .order('game_id', { ascending: false })
-          .limit(chunk.length * 40);
+          .limit(1000);
         return data ?? [];
       })()
     );
   }
 
-  // Step 2: recent completed games for all teams — run in parallel with step 1 chunks.
-  // Step 2b: sparkline history for top-100 players (last ~6 snapshots each).
-  // NOTE: the games table PK is `id`, not `game_id`.
-  const [allChunkData, { data: recentTeamGames }, { data: rawSparklines }] = await Promise.all([
+  const [allChunkData, { data: rawSparklines }] = await Promise.all([
     Promise.all(chunkPromises),
-    supabaseAdmin
-      .from('games')
-      .select('id, game_date, home_team_id, away_team_id')
-      .in('game_state', ['FINAL', 'OFF'])
-      .gte('game_date', sinceDate)
-      .order('id', { ascending: false })
-      .limit(700),
     supabaseAdmin
       .from('player_metric_snapshots')
       .select('player_id, calculated_at, momentum_ppm')
