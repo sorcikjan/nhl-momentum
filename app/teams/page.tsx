@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { supabaseAdmin } from '@/lib/supabase';
+import { supabaseAdmin, assertDatabaseUp } from '@/lib/supabase';
 import { teamLogoUrl } from '@/lib/data';
 import { teamUrl } from '@/lib/urls';
 import { getStandings } from '@/lib/nhl-api';
@@ -36,6 +36,8 @@ const NHL_STRUCTURE = {
 const ACTIVE_ABBREVS = new Set(Object.values(NHL_STRUCTURE).flatMap(c => Object.values(c).flat()));
 
 export default async function TeamsPage() {
+  // Throw (→ keep serving the last good cached page) if the database is down.
+  await assertDatabaseUp();
   const { data: teams } = await supabaseAdmin
     .from('teams')
     .select('id, name, abbrev')

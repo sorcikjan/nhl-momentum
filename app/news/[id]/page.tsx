@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { fetchSignalById } from '@/lib/data';
+import { assertDatabaseUp } from '@/lib/supabase';
 
 export const revalidate = 86400;
 
@@ -19,6 +20,8 @@ export async function generateMetadata(
 }
 
 export default async function NewsArticlePage({ params }: { params: Promise<{ id: string }> }) {
+  // Throw (→ keep serving the last good cached page) if the database is down.
+  await assertDatabaseUp();
   const { id } = await params;
   const signal = await fetchSignalById(Number(id)).catch(() => null);
   if (!signal) notFound();

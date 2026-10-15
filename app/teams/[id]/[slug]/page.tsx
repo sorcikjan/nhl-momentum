@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { fetchTeam, teamLogoUrl, fetchSeasonPhase, deriveOutStatus } from '@/lib/data';
 import { playerUrl, gameUrl } from '@/lib/urls';
+import { assertDatabaseUp } from '@/lib/supabase';
 
 export const revalidate = 120;
 
@@ -30,6 +31,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 export default async function TeamPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
+  // Throw (→ keep serving the last good cached page) if the database is down.
+  await assertDatabaseUp();
   const { id } = await params;
   const [{ team, roster, recentGames, upcoming, standing }, seasonPhase] = await Promise.all([
     fetchTeam(id),

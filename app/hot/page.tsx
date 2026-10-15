@@ -7,6 +7,7 @@ import HeatCircle from '@/components/ui/HeatCircle';
 import { fetchRankings, fetchGoalieRankings, fetchNewcomerWatch, fetchSeasonPhase } from '@/lib/data';
 import { ppmToHeat, heatBg, heatBorderColor, heatColor } from '@/lib/heat';
 import { playerUrl } from '@/lib/urls';
+import { assertDatabaseUp } from '@/lib/supabase';
 
 export const revalidate = 120;
 
@@ -25,6 +26,8 @@ export const metadata: Metadata = {
 };
 
 export default async function HotPage() {
+  // Throw (→ keep serving the last good cached page) if the database is down.
+  await assertDatabaseUp();
   const [data, goalies, newcomers, seasonPhase] = await Promise.all([
     fetchRankings().catch(() => null),
     fetchGoalieRankings().catch(() => []),

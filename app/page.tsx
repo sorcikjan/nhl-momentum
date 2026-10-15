@@ -26,6 +26,7 @@ import { ppmToHeat } from '@/lib/heat';
 import { calcWatchability } from '@/lib/watchability';
 import { getSeasonPhase, SECTION_ORDER, type SeasonPhase, type SectionKey } from '@/lib/season';
 import type { WatchPlayer } from '@/components/dashboard/TonightSection';
+import { assertDatabaseUp } from '@/lib/supabase';
 
 export const revalidate = 60;
 
@@ -660,6 +661,8 @@ function SiteFooter() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
+  // Throw (→ keep serving the last good cached page) if the database is down.
+  await assertDatabaseUp();
   const today = new Date().toISOString().slice(0, 10);
 
   // Detect current season phase. Falls back to 'regular' on any error.

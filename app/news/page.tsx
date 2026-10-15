@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { fetchNewsFeed } from '@/lib/data';
+import { assertDatabaseUp } from '@/lib/supabase';
 
 export const revalidate = 1800; // 30 min
 
@@ -25,6 +26,8 @@ function timeAgo(dateStr: string | null): string {
 }
 
 export default async function NewsPage() {
+  // Throw (→ keep serving the last good cached page) if the database is down.
+  await assertDatabaseUp();
   const signals = await fetchNewsFeed(60).catch(() => []);
 
   return (

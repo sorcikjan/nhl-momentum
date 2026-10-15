@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import RankingsTable from '@/components/rankings/RankingsTable';
 import { fetchRankings, fetchSeasonPhase } from '@/lib/data';
+import { assertDatabaseUp } from '@/lib/supabase';
 
 export const revalidate = 120;
 
@@ -19,6 +20,8 @@ export const metadata: Metadata = {
 };
 
 export default async function RankingsPage() {
+  // Throw (→ keep serving the last good cached page) if the database is down.
+  await assertDatabaseUp();
   const [data, seasonPhase] = await Promise.all([
     fetchRankings().catch(() => null),
     fetchSeasonPhase().catch(() => ({ isPreseason: false, regularSeasonStartDate: null, daysUntilStart: null })),

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { fetchSeriesStandings, teamLogoUrl } from '@/lib/data';
 import type { SeriesInfo } from '@/lib/data';
 import { notFound } from 'next/navigation';
+import { assertDatabaseUp } from '@/lib/supabase';
 
 export const revalidate = 120;
 
@@ -97,6 +98,8 @@ function SeriesCard({ s }: { s: SeriesInfo }) {
 }
 
 export default async function PlayoffsPage() {
+  // Throw (→ keep serving the last good cached page) if the database is down.
+  await assertDatabaseUp();
   const seriesMap = await fetchSeriesStandings();
 
   if (seriesMap.size === 0) notFound();

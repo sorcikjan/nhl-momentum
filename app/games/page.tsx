@@ -7,6 +7,7 @@ import { calcWatchability } from '@/lib/watchability';
 import ScheduleFilters, { type ScheduleRange } from '@/components/games/ScheduleFilters';
 import ScheduleRow from '@/components/games/ScheduleRow';
 import DayPredictionSummary from '@/components/games/DayPredictionSummary';
+import { assertDatabaseUp } from '@/lib/supabase';
 
 export const revalidate = 30;
 
@@ -47,6 +48,8 @@ export default async function GamesPage({
 }: {
   searchParams: Promise<{ range?: string; date?: string }>;
 }) {
+  // Throw (→ keep serving the last good cached page) if the database is down.
+  await assertDatabaseUp();
   const { range: rawRange, date: customDate } = await searchParams;
   const range: ScheduleRange = (['all', 'today', 'tomorrow', 'week', 'custom'] as const).includes(rawRange as ScheduleRange)
     ? (rawRange as ScheduleRange)

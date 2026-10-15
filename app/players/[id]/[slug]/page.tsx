@@ -11,6 +11,7 @@ import type { PlayerAIInput } from '@/lib/ai';
 import { teamUrl, playerUrl } from '@/lib/urls';
 import { deriveArchetype } from '@/lib/archetype';
 import Link from 'next/link';
+import { assertDatabaseUp } from '@/lib/supabase';
 
 // Deduplicate fetchPlayer between generateMetadata and the page component
 const cachedFetchPlayer = cache((id: string) => fetchPlayer(id).catch(() => null));
@@ -192,6 +193,8 @@ function rankBadge(rank: number | undefined) {
 }
 
 export default async function PlayerPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
+  // Throw (→ keep serving the last good cached page) if the database is down.
+  await assertDatabaseUp();
   const { id } = await params;
   const [data, leagueAvg, seasonPhase] = await Promise.all([
     cachedFetchPlayer(id),

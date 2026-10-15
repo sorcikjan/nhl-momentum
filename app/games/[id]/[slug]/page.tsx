@@ -28,6 +28,7 @@ import PlayersToWatchCard from '@/components/games/PlayersToWatchCard';
 import SpecialTeamsCard from '@/components/games/SpecialTeamsCard';
 import HeadToHeadCard from '@/components/games/HeadToHeadCard';
 import LineupContextCard from '@/components/games/LineupContextCard';
+import { assertDatabaseUp } from '@/lib/supabase';
 
 export const revalidate = 30;
 
@@ -104,6 +105,8 @@ function normGoalie(goalies: any[], teamId: number): any | null {
 }
 
 export default async function MatchPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
+  // Throw (→ keep serving the last good cached page) if the database is down.
+  await assertDatabaseUp();
   const { id } = await params;
   const {
     game, liveData, predictions, snapshots, playerStats, goalieStats, externalOdds,

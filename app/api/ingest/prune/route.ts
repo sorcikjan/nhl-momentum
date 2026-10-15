@@ -10,9 +10,9 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabaseAdmin.rpc('prune_player_metric_snapshots', {
     keep_days: 7,
-    // Steady state is ~2k rows/day; small batches keep this inside the 26s route
-    // limit. The one-off backlog is cleared from the SQL editor (see migration 014).
-    max_rows: 20_000,
+    // Steady state is a few hundred rows/day now that unchanged snapshots aren't
+    // written; small batches stay inside the 12s DB timeout (lib/supabase.ts).
+    max_rows: 5_000,
   });
   if (error) return NextResponse.json({ data: null, error: error.message }, { status: 500 });
   return NextResponse.json({ data: { deleted: data ?? 0 }, error: null });

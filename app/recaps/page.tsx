@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { fetchRecentRecaps } from '@/lib/data';
 import { recapUrl } from '@/lib/urls';
+import { assertDatabaseUp } from '@/lib/supabase';
 
 export const revalidate = 3600;
 
@@ -20,6 +21,8 @@ export const metadata: Metadata = {
 };
 
 export default async function RecapsPage() {
+  // Throw (→ keep serving the last good cached page) if the database is down.
+  await assertDatabaseUp();
   const recaps = await fetchRecentRecaps(30).catch(() => []);
 
   return (

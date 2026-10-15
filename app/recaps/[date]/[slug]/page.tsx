@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { fetchRecap, fetchRecapData, teamLogoUrl } from '@/lib/data';
 import { recapUrl, gameUrl, playerUrl, teamUrl } from '@/lib/urls';
 import { SITE_URL } from '@/lib/site';
+import { assertDatabaseUp } from '@/lib/supabase';
 
 export const revalidate = 3600;
 
@@ -581,6 +582,8 @@ function ArticleSkeleton() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function RecapSlugPage({ params }: { params: Promise<{ date: string; slug: string }> }) {
+  // Throw (→ keep serving the last good cached page) if the database is down.
+  await assertDatabaseUp();
   const { date } = await params;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) notFound();

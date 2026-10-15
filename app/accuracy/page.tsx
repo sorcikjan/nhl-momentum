@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import ModelStatsCard from '@/components/accuracy/ModelStatsCard';
 import MatchComparisonTable from '@/components/accuracy/MatchComparisonTable';
 import { fetchAccuracy } from '@/lib/data';
+import { assertDatabaseUp } from '@/lib/supabase';
 
 export const revalidate = 3600;
 
@@ -15,6 +16,8 @@ export const metadata: Metadata = {
 };
 
 export default async function AccuracyPage() {
+  // Throw (→ keep serving the last good cached page) if the database is down.
+  await assertDatabaseUp();
   const data = await fetchAccuracy().catch(() => null);
   const { modelVersions, predictions, modelStats } = data ?? {};
 
