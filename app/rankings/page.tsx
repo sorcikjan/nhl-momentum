@@ -3,7 +3,9 @@ import RankingsTable from '@/components/rankings/RankingsTable';
 import { fetchRankings, fetchSeasonPhase } from '@/lib/data';
 import { assertDatabaseUp } from '@/lib/supabase';
 
-export const revalidate = 120;
+// Free-tier database: data changes only when the pipeline runs, and pipeline
+// runs call /api/revalidate — so a longer interval costs no freshness.
+export const revalidate = 600;
 
 export const metadata: Metadata = {
   title: 'NHL Player Rankings 2026–27',

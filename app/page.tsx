@@ -28,7 +28,8 @@ import { getSeasonPhase, SECTION_ORDER, type SeasonPhase, type SectionKey } from
 import type { WatchPlayer } from '@/components/dashboard/TonightSection';
 import { assertDatabaseUp } from '@/lib/supabase';
 
-export const revalidate = 60;
+// Free-tier database: each render is several queries; crawlers visit every page.
+export const revalidate = 120;
 
 export const metadata: Metadata = {
   title: 'momentum. — Hockey Intelligence, Daily',

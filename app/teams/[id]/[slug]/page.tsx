@@ -4,7 +4,9 @@ import { fetchTeam, teamLogoUrl, fetchSeasonPhase, deriveOutStatus } from '@/lib
 import { playerUrl, gameUrl } from '@/lib/urls';
 import { assertDatabaseUp } from '@/lib/supabase';
 
-export const revalidate = 120;
+// Free-tier database: data changes only when the pipeline runs, and pipeline
+// runs call /api/revalidate — so a longer interval costs no freshness.
+export const revalidate = 600;
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string; slug: string }> }): Promise<Metadata> {
   const { id } = await params;

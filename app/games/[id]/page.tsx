@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabase';
 import { gameUrl } from '@/lib/urls';
 
-export const revalidate = 30;
+// Free-tier database: each render is several queries; crawlers visit every page.
+export const revalidate = 60;
 
 export default async function GameRedirect({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

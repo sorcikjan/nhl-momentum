@@ -2,7 +2,9 @@ import { redirect } from 'next/navigation';
 import { supabaseAdmin } from '@/lib/supabase';
 import { playerUrl } from '@/lib/urls';
 
-export const revalidate = 120;
+// Free-tier database: data changes only when the pipeline runs, and pipeline
+// runs call /api/revalidate — so a longer interval costs no freshness.
+export const revalidate = 600;
 
 export default async function PlayerRedirect({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

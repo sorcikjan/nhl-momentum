@@ -4,7 +4,9 @@ import type { SeriesInfo } from '@/lib/data';
 import { notFound } from 'next/navigation';
 import { assertDatabaseUp } from '@/lib/supabase';
 
-export const revalidate = 120;
+// Free-tier database: data changes only when the pipeline runs, and pipeline
+// runs call /api/revalidate — so a longer interval costs no freshness.
+export const revalidate = 600;
 
 export const metadata: Metadata = {
   title: 'Stanley Cup Playoffs — momentum.',

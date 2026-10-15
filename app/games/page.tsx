@@ -9,7 +9,8 @@ import ScheduleRow from '@/components/games/ScheduleRow';
 import DayPredictionSummary from '@/components/games/DayPredictionSummary';
 import { assertDatabaseUp } from '@/lib/supabase';
 
-export const revalidate = 30;
+// Free-tier database: each render is several queries; crawlers visit every page.
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: 'NHL Schedule & Predictions',

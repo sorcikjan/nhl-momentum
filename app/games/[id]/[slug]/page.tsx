@@ -30,7 +30,8 @@ import HeadToHeadCard from '@/components/games/HeadToHeadCard';
 import LineupContextCard from '@/components/games/LineupContextCard';
 import { assertDatabaseUp } from '@/lib/supabase';
 
-export const revalidate = 30;
+// Free-tier database: each render is several queries; crawlers visit every page.
+export const revalidate = 60;
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string; slug: string }> }): Promise<Metadata> {
   const { id } = await params;
