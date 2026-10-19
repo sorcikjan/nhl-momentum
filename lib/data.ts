@@ -379,6 +379,23 @@ export async function fetchRecentCompletedGames(days = 3, limit = 20) {
   return { games, predMap };
 }
 
+// Number of games on today's schedule, for the header status pill. Cached per
+// server instance for 5 min (the header renders on every page).
+let _todayCountCache: { date: string; count: number; ts: number } | null = null;
+export async function fetchTodayGameCount(): Promise<number> {
+  const today = new Date().toISOString().slice(0, 10);
+  if (_todayCountCache && _todayCountCache.date === today && Date.now() - _todayCountCache.ts < 5 * 60_000) {
+    return _todayCountCache.count;
+  }
+  const { count, error } = await supabaseAdmin
+    .from('games')
+    .select('id', { count: 'exact', head: true })
+    .eq('game_date', today);
+  if (error) throw error;
+  _todayCountCache = { date: today, count: count ?? 0, ts: Date.now() };
+  return count ?? 0;
+}
+
 export async function fetchGames(date: string) {
   // NHL API and model version can run in parallel
   const [games, activeModel] = await Promise.all([

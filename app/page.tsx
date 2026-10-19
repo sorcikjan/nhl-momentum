@@ -641,23 +641,6 @@ async function TopBanner() {
 
 // ── Footer ────────────────────────────────────────────────────────────────────
 
-function SiteFooter() {
-  return (
-    <footer className="pt-8 pb-4 flex items-center justify-between gap-4 flex-wrap text-xs" style={{ borderTop: '1px solid var(--border)', color: 'var(--text)', opacity: 0.4 }}>
-      <div className="flex gap-2 flex-wrap">
-        <span>DATA</span>
-        {['NHL Stats API', 'MoneyPuck', 'Natural Stat Trick'].map(s => (
-          <span key={s}>· {s}</span>
-        ))}
-      </div>
-      <div className="flex gap-4 flex-wrap">
-        {[['Twitter', 'https://twitter.com']].map(([label, href]) => (
-          <a key={label} href={href} className="hover:opacity-70">{label}</a>
-        ))}
-      </div>
-    </footer>
-  );
-}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -744,7 +727,6 @@ export default async function DashboardPage() {
   return (
     <div className="max-w-7xl mx-auto pb-20 md:pb-0 flex flex-col gap-12">
       {SECTION_ORDER[phase].map(key => renderSection(key))}
-      <SiteFooter />
     </div>
   );
 }

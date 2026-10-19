@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono, Fraunces } from 'next/font/google';
 import Script from 'next/script';
 import './globals.css';
-import Sidebar from '@/components/layout/Sidebar';
+import BrandHeader from '@/components/layout/BrandHeader';
+import { SiteFooter } from '@/components/layout/SiteFooter';
 import { TopLoader } from '@/components/top-loader';
 import { SITE_URL } from '@/lib/site';
 
@@ -42,11 +43,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} antialiased min-h-screen`}>
         <TopLoader />
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 pt-12 md:pt-16 p-4 md:p-6 overflow-x-hidden">
+        <BrandHeader />
+        <div className="flex min-h-screen flex-col">
+          {/* Offsets: fixed header 48px mobile / 72px desktop; design gutters 16 / 48px. */}
+          <main className="flex-1 overflow-x-hidden px-4 pb-6 pt-16 lg:px-12 lg:pb-10 lg:pt-[104px]">
             {children}
           </main>
+          <SiteFooter />
         </div>
       </body>
     </html>

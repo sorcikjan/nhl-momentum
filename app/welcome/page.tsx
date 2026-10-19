@@ -160,13 +160,6 @@ export default async function WelcomePage() {
           </Link>
         </div>
       </section>
-
-      <footer className="pt-6 pb-4 flex items-center justify-center gap-2 flex-wrap text-xs" style={{ borderTop: '1px solid var(--border)', color: 'var(--text)', opacity: 0.4 }}>
-        <span>DATA</span>
-        {['NHL Stats API', 'MoneyPuck', 'Natural Stat Trick'].map(s => (
-          <span key={s}>&middot; {s}</span>
-        ))}
-      </footer>
     </div>
   );
 }
