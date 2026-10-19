@@ -3,6 +3,7 @@ import ModelStatsCard from '@/components/accuracy/ModelStatsCard';
 import MatchComparisonTable from '@/components/accuracy/MatchComparisonTable';
 import { fetchAccuracy } from '@/lib/data';
 import { assertDatabaseUp } from '@/lib/supabase';
+import { SectionHeading } from '@/components/ds';
 
 export const revalidate = 3600;
 
@@ -37,13 +38,8 @@ export default async function AccuracyPage() {
     )[0];
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 md:pb-0">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-bright)' }}>Prediction Accuracy</h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>
-          Model performance across all versions — winner accuracy, score error, and per-game comparison.
-        </p>
-      </div>
+    <div className="pb-20 lg:pb-0">
+      <SectionHeading as="h1" size="page" kicker="METHODOLOGY · TRACK RECORD" title="How we're doing." sub="Model performance across all versions — winner accuracy, score error, and per-game comparison." />
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -56,7 +52,7 @@ export default async function AccuracyPage() {
         ].map(kpi => (
           <div key={kpi.label} className="rounded-xl border p-3 md:p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
             <p className="text-xs leading-tight mb-1" style={{ color: 'var(--text)' }}>{kpi.label}</p>
-            <p className="text-xl font-bold font-mono" style={{ color: 'var(--neon)' }}>{kpi.value}</p>
+            <p className="text-xl font-bold font-mono" style={{ color: 'var(--heat)' }}>{kpi.value}</p>
             {kpi.sub && <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--text)' }}>{kpi.sub}</p>}
           </div>
         ))}

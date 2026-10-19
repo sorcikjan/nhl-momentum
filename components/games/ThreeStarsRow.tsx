@@ -9,11 +9,7 @@ export default function ThreeStarsRow({ stars, heatByPlayerId }: { stars: any[];
   if (!stars.length) return null;
   return (
     <div>
-      <div className="text-[11px] font-mono font-bold uppercase mb-1.5" style={{ color: 'var(--heat)', letterSpacing: '0.12em' }}>Three Stars · Official</div>
-      <div className="font-sans font-extrabold mb-3" style={{ fontSize: 'clamp(18px, 2.5vw, 24px)', color: 'var(--text-bright)', letterSpacing: '-0.03em' }}>
-        Tonight&apos;s best.
-      </div>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         {stars.map((star) => {
           const medal = (star.star as 1 | 2 | 3) ?? 3;
           const heat = heatByPlayerId?.get(star.playerId) ?? null;

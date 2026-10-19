@@ -2,7 +2,9 @@
 // Pages should call these directly — never fetch their own API over HTTP.
 
 import { supabaseAdmin } from '@/lib/supabase';
-import { getGamesByDate, getGameBoxscore, getGamePlayByPlay, getStandings, getTeamSeasonStats, getSeasonDates } from '@/lib/nhl-api';
+import { ppmToHeat } from '@/lib/heat';
+import { currentSeasonRows } from '@/lib/player-profile';
+import { currentSeason, getGamesByDate, getGameBoxscore, getGamePlayByPlay, getStandings, getTeamSeasonStats, getSeasonDates } from '@/lib/nhl-api';
 export { deriveOutStatus, daysAgo } from '@/lib/player-status';
 import { daysAgo } from '@/lib/player-status';
 import { processPlayByPlay } from '@/lib/play-by-play';
@@ -348,7 +350,7 @@ export async function fetchRecentCompletedGames(days = 3, limit = 20) {
   const { data: games } = await supabaseAdmin
     .from('games')
     .select(`
-      id, game_date, home_score, away_score, game_state, youtube_highlight_id,
+      id, game_date, home_score, away_score, game_state, youtube_highlight_id, three_stars,
       home_team:teams!games_home_team_id_fkey(id, abbrev, name),
       away_team:teams!games_away_team_id_fkey(id, abbrev, name)
     `)
@@ -377,6 +379,21 @@ export async function fetchRecentCompletedGames(days = 3, limit = 20) {
   }
 
   return { games, predMap };
+}
+
+// Number of games on today's schedule, for the header status pill — from the same
+// NHL schedule the homepage slate uses, so the two always agree. Cached per server
+// instance for 5 min (the header renders on every page).
+let _todayCountCache: { date: string; count: number; ts: number } | null = null;
+export async function fetchTodayGameCount(): Promise<number> {
+  // Eastern date, like the schedule (a UTC date rolls over during evening games).
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+  if (_todayCountCache && _todayCountCache.date === today && Date.now() - _todayCountCache.ts < 5 * 60_000) {
+    return _todayCountCache.count;
+  }
+  const games = await getGamesByDate(today);
+  _todayCountCache = { date: today, count: games.length, ts: Date.now() };
+  return games.length;
 }
 
 export async function fetchGames(date: string) {
@@ -413,6 +430,12 @@ export async function fetchGames(date: string) {
   return { games, predictions, odds };
 }
 
+// The /schedule response carries the date on the day, not on each game, so a
+// 9 PM ET game (01:00 UTC next day) would otherwise look like tomorrow's.
+export function withScheduleDates<T extends { id: number; gameDate?: string }>(dates: string[], gamesByDate: T[][]): (T & { gameDate: string })[] {
+  return gamesByDate.flatMap((games, i) => games.map(g => ({ ...g, gameDate: g.gameDate ?? dates[i] })));
+}
+
 // Same shape as fetchGames but across several dates in one round of calls —
 // used by the schedule page's Today / Tomorrow / This week views. The NHL
 // schedule endpoint is per-date, so we still fan out one call per date, but
@@ -421,7 +444,7 @@ export async function fetchGamesRange(dates: string[]) {
   const activeModel = await latestModelVersion();
   const gamesByDate = await Promise.all(dates.map(d => getGamesByDate(d)));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const games = gamesByDate.flat() as any[];
+  const games = withScheduleDates(dates, gamesByDate as any[][]) as any[];
   const gameIds = games.map(g => g.id);
 
   if (gameIds.length === 0) {
@@ -601,8 +624,10 @@ export async function fetchPlayer(id: string) {
       const gaa = toiSeconds > 0 ? goalsAgainst / (toiSeconds / 3600) : 0;
       return { gp, wins, losses, otl, shotsAgainst, goalsAgainst, savePct, toiSeconds, gaa };
     };
+    // "Season" = this season only — the fetch spans up to 82 games across seasons.
+    const startYear = Number(currentSeason().slice(0, 4));
     goalieStats = {
-      season: agg(rawGameStats),
+      season: agg(currentSeasonRows(rawGameStats, startYear)),
       recent: agg(rawGameStats.slice(0, 5)),
     };
   }
@@ -988,6 +1013,48 @@ export async function fetchRecap(date: string) {
 
 // ─── Accuracy ─────────────────────────────────────────────────────────────────
 
+// Active model's winner accuracy for the current regular season (homepage strip).
+// Small, bounded query, cached 30 min per instance — fetchAccuracy() is far heavier.
+// [first, end) game ids of the current regular season (Y02NNNN; playoffs are Y03NNNN).
+export function regularSeasonGameIdRange(now: Date): [number, number] {
+  const y = now.getUTCMonth() + 1 >= 9 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+  return [y * 1_000_000 + 20_000, y * 1_000_000 + 30_000];
+}
+
+let _pickAccCache: { value: number | null; ts: number } | null = null;
+export async function fetchSeasonPickAccuracy(): Promise<number | null> {
+  if (_pickAccCache && Date.now() - _pickAccCache.ts < 30 * 60_000) return _pickAccCache.value;
+  const model = await latestModelVersion();
+  const [lo, hi] = regularSeasonGameIdRange(new Date());
+  // Count-only queries: no rows transferred, so PostgREST's 1,000-row cap can't truncate.
+  const base = () => supabaseAdmin
+    .from('prediction_outcomes')
+    .select('correct_winner, predictions!inner(model_version, game_id)', { count: 'exact', head: true })
+    .eq('predictions.model_version', model)
+    .gte('predictions.game_id', lo)
+    .lt('predictions.game_id', hi);
+  const [all, hit] = await Promise.all([base().not('correct_winner', 'is', null), base().eq('correct_winner', true)]);
+  if (all.error) throw all.error;
+  if (hit.error) throw hit.error;
+  const value = all.count ? ((hit.count ?? 0) / all.count) * 100 : null;
+  _pickAccCache = { value, ts: Date.now() };
+  return value;
+}
+
+// Latest Heat (momentum PPM → 0–100) for a handful of players, e.g. game stars.
+export async function fetchSnapshotHeat(playerIds: number[]): Promise<Map<number, number>> {
+  const out = new Map<number, number>();
+  if (!playerIds.length) return out;
+  const { data } = await supabaseAdmin
+    .from('player_metric_snapshots')
+    .select('player_id, momentum_ppm, calculated_at')
+    .in('player_id', playerIds)
+    .order('calculated_at', { ascending: false })
+    .limit(playerIds.length * 4);
+  for (const r of data ?? []) if (!out.has(r.player_id)) out.set(r.player_id, ppmToHeat(r.momentum_ppm));
+  return out;
+}
+
 export async function fetchAccuracy() {
   const VERSIONS = ['v1.0', 'v1.1', 'v1.2', 'v1.3', 'v1.4', 'v1.5', 'v1.6', 'v1.7', 'v1.8'];
 
@@ -1135,6 +1202,8 @@ export async function fetchTeam(id: string) {
       `)
       .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
       .in('game_state', ['FUT', 'PRE', 'LIVE', 'CRIT'])
+      // Unplayed "if necessary" playoff games stay FUT forever — upcoming means today or later (ET).
+      .gte('game_date', new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }))
       .order('game_date', { ascending: true })
       .limit(5),
     getTeamSeasonStats(team.abbrev).catch(() => null),
@@ -1528,7 +1597,7 @@ export async function fetchNewcomerWatch() {
       players!inner(
         first_name, last_name, headshot_url, position_code,
         career_games, draft_year, draft_round, draft_pick,
-        in_minors, injury_status, birth_country,
+        in_minors, injury_status, birth_country, birth_date,
         teams(id, abbrev)
       )
     `)
@@ -1582,6 +1651,7 @@ export async function fetchNewcomerWatch() {
       draft_round:    r.players.draft_round   as number | null,
       draft_pick:     r.players.draft_pick    as number | null,
       birth_country:  r.players.birth_country as string | null,
+      age:            r.players.birth_date ? Math.floor((Date.now() - Date.parse(r.players.birth_date)) / 31_557_600_000) : null,
       teams:          r.players.teams         as { id: number; abbrev: string } | null,
     },
   }));

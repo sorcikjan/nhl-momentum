@@ -13,8 +13,10 @@
   --text-bright:  #f4f5f8;  /* headlines, key numbers */
   --text:         #8a94a6;  /* body */
   --text-muted:   #5a6378;  /* labels, meta */
+  --text-dim:     #6b7388;
 
-  /* ── Semantic — heat-orange is PRIMARY, blue means cold ── */
+  /* ── Semantic — heat-orange is PRIMARY, blue means cold ──
+     Values mirror docs/design/redesign-2026/tokens.js (NM). */
   --heat:         #ff5a24;
   --heat-dim:     rgba(255, 90, 36, 0.14);
   --heat-glow:    rgba(255, 90, 36, 0.15);
@@ -23,13 +25,15 @@
   --rise:         #00e5a0;
   --rise-dim:     rgba(0, 229, 160, 0.12);
   --story:        #e5508b;
+  --story-dim:    rgba(229, 80, 139, 0.14);
+  --heat-bg:      rgba(255, 90, 36, 0.08);
+  --blue:         #4d7cff;
+  --blue-dim:     rgba(77, 124, 255, 0.12);
   --gold:         #ffb547;  /* rivalry, watchability, caution */
   --red:          #ef4444;
 
   /* ── Aliases kept for backward compat with existing components ── */
-  --neon:         #3a88ff;
-  --neon-glow:    rgba(58, 136, 255, 0.15);
-  --green:        #00e5a0;
+  --green:        #22c55e;  /* tokens.js green (was an alias of --rise) */
   --silver:       #8a94a6;
   --amber:        #ffb547;
 }
@@ -51,12 +55,12 @@ body {
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
 .recap-inline-link {
-  color: var(--neon);
+  color: var(--heat);
   text-decoration: none;
   border-bottom: 1px solid rgba(99,202,183,0.3);
 }
 .recap-inline-link:hover {
-  border-bottom-color: var(--neon);
+  border-bottom-color: var(--heat);
 }
 
 /* Inline player mention chip — appears in article body text */
@@ -101,7 +105,7 @@ body {
 .player-mention-stats {
   font-size: 11px;
   font-weight: 600;
-  color: var(--neon);
+  color: var(--heat);
   white-space: nowrap;
 }
 .player-mention-surge {

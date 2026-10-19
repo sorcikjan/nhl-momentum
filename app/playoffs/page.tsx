@@ -80,7 +80,7 @@ function SeriesCard({ s }: { s: SeriesInfo }) {
       {/* Status + next game */}
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold"
-          style={{ color: s.isComplete ? 'var(--neon)' : 'var(--text)', opacity: s.isComplete ? 1 : 0.6 }}>
+          style={{ color: s.isComplete ? 'var(--heat)' : 'var(--text)', opacity: s.isComplete ? 1 : 0.6 }}>
           {statusLabel}
         </span>
         {nextGameLabel && !s.isComplete && (
@@ -90,7 +90,7 @@ function SeriesCard({ s }: { s: SeriesInfo }) {
         )}
         {s.isComplete && (
           <span className="text-xs px-2 py-0.5 rounded-full font-bold"
-            style={{ background: 'var(--neon)', color: '#000' }}>
+            style={{ background: 'var(--heat)', color: '#000' }}>
             SERIES FINAL
           </span>
         )}
