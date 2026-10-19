@@ -1,7 +1,22 @@
 import Link from 'next/link';
 import { HeatPill, SectionHeading, TeamChip } from '@/components/ds';
+import { gameView } from '@/lib/game-state';
 import type { SlateGame } from '@/lib/home';
 import { dayLabel, MONO, timeET } from './format';
+
+// Start time before the game; live / final state with the score once it starts.
+function Status({ g }: { g: SlateGame }) {
+  const view = gameView(g.state);
+  const scored = view !== 'upcoming' && g.awayScore != null && g.homeScore != null;
+  if (view === 'upcoming' || !scored) {
+    return <span className="text-[10px] font-semibold lg:text-[13px]" style={{ ...MONO, color: view === 'live' ? 'var(--heat)' : 'var(--text-bright)' }}>{view === 'live' ? '● LIVE' : view === 'final' ? 'FINAL' : timeET(g.startTimeUTC)}</span>;
+  }
+  return (
+    <span className="text-[10px] font-bold lg:text-[13px]" style={{ ...MONO, color: view === 'live' ? 'var(--heat)' : 'var(--text)' }}>
+      {view === 'live' ? '● LIVE' : 'FINAL'} · <span style={{ color: 'var(--text-bright)' }}>{g.awayScore}–{g.homeScore}</span>
+    </span>
+  );
+}
 
 function PickBar({ g }: { g: SlateGame }) {
   if (g.pickSide == null || g.pickPct == null) {
@@ -46,7 +61,7 @@ export function TonightSlate({ games, nextGameDate }: { games: SlateGame[]; next
               className="grid grid-cols-1 items-center gap-x-4 gap-y-2 px-3 py-3 transition-colors hover:bg-[var(--bg-hover)] lg:grid-cols-[96px_1fr_240px_200px_24px] lg:px-6 lg:py-[18px]"
               style={{ borderTop: i ? '1px solid var(--border-soft)' : undefined }}
             >
-              <span className="text-[10px] font-semibold lg:text-[13px]" style={{ ...MONO, color: 'var(--text-bright)' }}>{timeET(g.startTimeUTC)}</span>
+              <Status g={g} />
               <div className="flex min-w-0 items-center gap-2.5">
                 <TeamChip abbrev={g.away.abbrev} size={32} ringed={g.pickSide === 'away'} />
                 <span className="truncate text-[13px] font-bold lg:text-[15px]" style={{ color: 'var(--text-bright)' }}>{g.away.name}</span>

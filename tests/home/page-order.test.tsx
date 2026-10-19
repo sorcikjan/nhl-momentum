@@ -6,7 +6,7 @@ import type { HomeData } from '@/lib/home';
 const base: HomeData = {
   today: '2026-10-19',
   tonight: [{
-    id: 1, href: '/games/1/ana-at-nyr-1019', startTimeUTC: '2026-10-19T23:00:00Z', state: 'FUT',
+    id: 1, href: '/games/1/ana-at-nyr-1019', startTimeUTC: '2026-10-19T23:00:00Z', state: 'FUT', awayScore: null, homeScore: null,
     away: { abbrev: 'ANA', name: 'Anaheim' }, home: { abbrev: 'NYR', name: 'NY Rangers' },
     pickSide: 'away', pickPct: 55, watch: { name: 'Mikael Granlund', heat: 57 },
   }],

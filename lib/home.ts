@@ -11,6 +11,7 @@ import { gameUrl, playerUrl, recapUrl } from '@/lib/urls';
 export type TeamSide = { abbrev: string; name: string };
 export type SlateGame = {
   id: number; href: string; startTimeUTC: string | null; state: string;
+  awayScore: number | null; homeScore: number | null;
   away: TeamSide; home: TeamSide;
   pickSide: 'home' | 'away' | null; pickPct: number | null;
   watch: { name: string; heat: number } | null;
@@ -108,9 +109,9 @@ export function todayET(now = new Date()): string {
 }
 
 export async function fetchHomeData(today: string): Promise<HomeData> {
-  const week = Array.from({ length: 8 }, (_, i) => addDays(today, i));
+  const emptyRange = { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map() };
   const [range, recent, rankings, goalies, rookies, recaps, accuracy] = await Promise.all([
-    safe(fetchGamesRange(week), { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map() }),
+    safe(fetchGamesRange([today]), emptyRange),
     safe(fetchRecentCompletedGames(4, 20), { games: [], predMap: new Map() }),
     safe(fetchRankings(), null),
     safe(fetchGoalieRankings(), []),
@@ -132,13 +133,20 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
       href: gameUrl(g.id, g.awayTeam.abbrev, g.homeTeam.abbrev, today),
       startTimeUTC: g.startTimeUTC ?? null,
       state: g.gameState ?? 'FUT',
+      awayScore: g.awayTeam.score ?? null, homeScore: g.homeTeam.score ?? null,
       away: side(g.awayTeam.abbrev), home: side(g.homeTeam.abbrev),
       pickSide: p == null ? null : p >= 0.5 ? 'home' : 'away',
       pickPct: p == null ? null : Math.round((p >= 0.5 ? p : 1 - p) * 100),
       watch: top ? { name: top.name, heat: ppmToHeat(top.compositePpm) } : null,
     };
   });
-  const nextGameDate = tonight.length ? null : (games.map(dateOf).filter(d => d > today).sort()[0] ?? null);
+  // Off-day only: look a week ahead for the next game date (each extra day costs an NHL call + DB reads).
+  let nextGameDate: string | null = null;
+  if (!tonight.length) {
+    const ahead = await safe(fetchGamesRange(Array.from({ length: 7 }, (_, i) => addDays(today, i + 1))), emptyRange);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nextGameDate = (ahead.games as any[]).map(dateOf).filter(d => d > today).sort()[0] ?? null;
+  }
 
   // Results: the most recent completed game day only.
   const resultsDate = recent.games[0]?.game_date ?? null;
