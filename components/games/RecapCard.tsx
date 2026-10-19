@@ -17,7 +17,7 @@ export default function RecapCard({
         boxShadow: '0 0 16px rgba(255,90,36,0.10)',
       }}
     >
-      <div className="text-[10px] font-mono font-bold uppercase mb-2.5" style={{ color: 'var(--heat)', letterSpacing: '0.12em' }}>Recap</div>
+      <div className="text-[10px] font-mono font-bold uppercase mb-2.5" style={{ color: 'var(--heat)', letterSpacing: '0.12em' }}>AI Recap</div>
       <h3
         className="font-sans font-extrabold leading-snug mb-2.5"
         style={{ fontSize: 'clamp(15px, 1.6vw, 22px)', color: 'var(--text-bright)', letterSpacing: '-0.025em', lineHeight: 1.2 }}

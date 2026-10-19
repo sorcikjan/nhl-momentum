@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import type React from 'react';
 import Link from 'next/link';
 import {
-  fetchMatch, fetchAccuracy, fetchRecap, fetchSeriesStandings, fetchTeamSpecialTeams,
-  fetchPostGameHeat, isPlayoffGameId, parsePlayoffGameId, teamLogoUrl,
+  fetchMatch, fetchRecap, fetchSeasonPickAccuracy, fetchTeamSpecialTeams,
+  fetchPostGameHeat, teamLogoUrl,
 } from '@/lib/data';
 import { teamUrl, playerUrl, recapUrl } from '@/lib/urls';
 import { decimalToNormProb, formatBookmaker } from '@/lib/odds-api';
@@ -11,7 +11,10 @@ import { ppmToHeat, heatColor } from '@/lib/heat';
 import { periodScoresFromMomentum } from '@/lib/play-by-play';
 
 import ShareButton from '@/components/ui/ShareButton';
-import GameHero from '@/components/games/GameHero';
+import { SectionHeading } from '@/components/ds';
+import { SECTION_META, gameView, pickHeadline, sectionPlan, type SectionKey } from '@/lib/game-state';
+import { teamColor } from '@/lib/team-colors';
+import { GameHero } from '@/components/game/GameHero';
 import MomentumTracker from '@/components/games/MomentumTracker';
 import RecentActionFeed from '@/components/games/RecentActionFeed';
 import WinProbabilityCard from '@/components/games/WinProbabilityCard';
@@ -22,7 +25,6 @@ import PredictionCard from '@/components/games/PredictionCard';
 import HeatImpactCard, { type Mover } from '@/components/games/HeatImpactCard';
 import RecapCard from '@/components/games/RecapCard';
 import HighlightsCard from '@/components/games/HighlightsCard';
-import SeriesTrackerCard from '@/components/games/SeriesTrackerCard';
 import GoalieMatchupCard from '@/components/games/GoalieMatchupCard';
 import PlayersToWatchCard from '@/components/games/PlayersToWatchCard';
 import SpecialTeamsCard from '@/components/games/SpecialTeamsCard';
@@ -232,13 +234,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   type PredictionFactor = { label: string; away: { name?: string; value: number | null }; home: { name?: string; value: number | null } };
 
   // ── Accuracy for the "Our Pick" card ──────────────────────────────────────
-  let accuracyYtd: number | null = null;
-  if (prediction) {
-    const accuracy = await fetchAccuracy().catch(() => null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const active = (accuracy?.modelStats as any[])?.find((m: any) => m.version === prediction.model_version);
-    accuracyYtd = active?.winnerAccuracyPct ?? null;
-  }
+  // Active model, current season — small cached query (fetchAccuracy is far heavier).
+  const accuracyRaw = prediction ? await fetchSeasonPickAccuracy().catch(() => null) : null;
+  const accuracyYtd: number | null = accuracyRaw == null ? null : Math.round(accuracyRaw);
 
   // ── Heat Impact (FINAL only): pre-game snapshot Heat vs. most recent Heat ──
   let heatImpactUp: Mover[] = [];
@@ -284,15 +282,6 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     if (dailyRecap) recapHref = recapUrl(gameDate, dailyRecap.title);
   }
 
-  // ── Series tracker (playoff games only) ────────────────────────────────────
-  let seriesInfo = null;
-  if (isPlayoffGameId(Number(id))) {
-    const gameSeasonYear = Math.floor(Number(id) / 1000000);
-    const allSeries = await fetchSeriesStandings(gameSeasonYear).catch(() => new Map());
-    const { round, series } = parsePlayoffGameId(Number(id));
-    seriesInfo = allSeries.get(`${round}-${series}`) ?? null;
-  }
-  const seriesLabel = seriesInfo ? `R${seriesInfo.round} G${(seriesInfo.seriesGames.length || 0) + (seriesInfo.isComplete ? 0 : 1)}` : null;
 
   // ── Pregame-only context: goalie matchup, players to watch, special teams ──
   const isUpcoming = !isLive && !isFinal;
@@ -399,152 +388,106 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     }
   }
 
+  // ── Sections by state (design order lives in lib/game-state.ts) ──────────
+  const view = gameView(gameState);
+  const favoredAbbrev = favoredIsHome ? homeAbbrev : awayAbbrev;
+  const favoredPct = prediction ? Math.round(Math.max(prediction.home_win_probability, prediction.away_win_probability) * 100) : 0;
+  const box = (child: React.ReactNode, padded = true) => (
+    <div className={`rounded-xl border ${padded ? 'p-4' : ''}`} style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>{child}</div>
+  );
+  const nodes: Partial<Record<SectionKey, React.ReactNode>> = {};
+  if (view === 'upcoming') {
+    if (prediction) nodes.prediction = (
+      <PredictionCard mode="pregame" favoredAbbrev={favoredAbbrev} favoredPct={favoredPct} accuracyYtd={accuracyYtd}
+        chips={predictionChips} factors={predictionFactors} awayAbbrev={awayAbbrev} homeAbbrev={homeAbbrev} />
+    );
+    if (homeGoalieSnap || awayGoalieSnap) nodes.goalies = (
+      <GoalieMatchupCard
+        away={{ name: awayGoalieSnap?.playerName ?? 'TBD', abbrev: awayAbbrev,
+          savePct: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.savePct ?? awayGoalieSnap?.seasonSavePct ?? null,
+          gaa: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.gaa ?? null,
+          gamesPlayed: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.gamesPlayed ?? 0 }}
+        home={{ name: homeGoalieSnap?.playerName ?? 'TBD', abbrev: homeAbbrev,
+          savePct: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.savePct ?? homeGoalieSnap?.seasonSavePct ?? null,
+          gaa: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.gaa ?? null,
+          gamesPlayed: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.gamesPlayed ?? 0 }}
+      />
+    );
+    if (heatRoster.length) nodes.watch = (
+      <PlayersToWatchCard players={heatRoster.map(p => ({ playerId: p.playerId, href: p.href, name: p.name, teamAbbrev: p.teamAbbrev, position: p.line.split(' · ')[0] || null, heat: p.heat, line: p.line }))} />
+    );
+    if (specialTeams) nodes.specialTeams = <SpecialTeamsCard away={specialTeams.away} home={specialTeams.home} />;
+    if (headToHead.length) nodes.h2h = <HeadToHeadCard meetings={headToHead} homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev} />;
+    nodes.lineup = <LineupContextCard homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev} homeOutCount={homeOutCount} awayOutCount={awayOutCount} restDays={restDays} />;
+  } else if (view === 'live') {
+    if (playByPlay.momentum.length) nodes.momentum = box(<MomentumTracker momentum={playByPlay.momentum} homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev} />);
+    nodes.playByPlay = playByPlay.recentPlays.length
+      ? box(<RecentActionFeed plays={playByPlay.recentPlays} />, false)
+      : box(<p className="text-sm" style={{ color: 'var(--text-muted)' }}>Play-by-play appears once the puck drops.</p>);
+    if (prediction) nodes.winProb = (
+      <WinProbabilityCard title={SECTION_META.winProb.kicker} homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev}
+        homeWinPct={Math.round(prediction.home_win_probability * 100)} awayWinPct={Math.round(prediction.away_win_probability * 100)} />
+    );
+    if (liveStatsRows.length) nodes.liveStats = <LiveStatsGrid rows={liveStatsRows} awayAbbrev={awayAbbrev} homeAbbrev={homeAbbrev} />;
+    if (heatRoster.length) nodes.topPerformers = <HeatingUpCard players={heatRoster} />;
+  } else {
+    if (threeStars?.length) nodes.threeStars = (
+      <ThreeStarsRow stars={threeStars} heatByPlayerId={new Map([...awaySkaters, ...homeSkaters].map(s => [s.playerId as number, ppmToHeat(s.momentumPpm ?? s.compositePpm)]))} />
+    );
+    if (prediction) nodes.pick = (
+      <PredictionCard mode="final" favoredAbbrev={favoredAbbrev} favoredPct={favoredPct} correct={outcome?.correct_winner ?? null}
+        accuracyYtd={accuracyYtd} chips={predictionChips} factors={predictionFactors} awayAbbrev={awayAbbrev} homeAbbrev={homeAbbrev} />
+    );
+    if (heatImpactUp.length || heatImpactDown.length) nodes.heatImpact = <HeatImpactCard up={heatImpactUp} down={heatImpactDown} />;
+    if (recapHeadline || recapBody) nodes.recap = <RecapCard headline={recapHeadline} body={recapBody} recapHref={recapHref} />;
+    nodes.highlights = <HighlightsCard youtubeId={youtubeId} nhlUrl={nhlUrl} awayAbbrev={awayAbbrev} homeAbbrev={homeAbbrev} />;
+  }
+  const plan = sectionPlan(view, new Set(Object.keys(nodes)));
+  const startUtc: string | null = game?.start_time_utc ?? live?.startTimeUTC ?? null;
+  const dayET = (gameDate ? new Date(`${gameDate}T12:00:00Z`) : new Date()).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }).toUpperCase();
+  const timeET = startUtc ? new Date(startUtc).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET' : null;
+  const heroEyebrow = view === 'final' ? `FINAL · ${dayET}` : view === 'live' ? `LIVE · ${clockLabel ?? dayET}` : [dayET, timeET].filter(Boolean).join(' · ');
+  // One real line: last night's recap headline, or who leads the Heat coming in.
+  const heroStory = view === 'final'
+    ? recapHeadline ?? null
+    : heatRoster[0] ? `${heatRoster[0].name} comes in at ${heatRoster[0].heat} Heat — the hottest player on the ice.` : null;
+  const titleFor = (k: SectionKey) =>
+    k === 'prediction' ? `${teamColor(favoredAbbrev).name} win.` : k === 'pick' ? pickHeadline(outcome?.correct_winner ?? null) : SECTION_META[k].title;
+
   return (
-    <div className="max-w-6xl mx-auto pb-20 md:pb-0">
+    <div className="pb-20 lg:pb-0">
 
       <GameHero
-        state={isLive ? 'LIVE' : isFinal ? 'FINAL' : 'UPCOMING'}
-        away={{ id: awayId, abbrev: awayAbbrev, name: awayName, logo: awayLogo, score: awayScore }}
-        home={{ id: homeId, abbrev: homeAbbrev, name: homeName, logo: homeLogo, score: homeScore }}
-        periodScores={periodScores}
-        clock={clockLabel}
-        dateLabel={dateLabel}
-        seriesLabel={seriesLabel}
-        pickResult={isFinal && outcome ? (outcome.correct_winner ? 'hit' : 'miss') : null}
-        storyline={isFinal && recapHeadline ? recapHeadline : null}
-        favoredIsHome={favoredIsHome}
+        view={view}
+        away={{ abbrev: awayAbbrev, name: awayName, score: awayScore }}
+        home={{ abbrev: homeAbbrev, name: homeName, score: homeScore }}
+        eyebrow={heroEyebrow}
+        venue={game?.venue ?? null}
+        storyline={heroStory}
+        pickSide={favoredIsHome == null ? null : favoredIsHome ? 'home' : 'away'}
+        liveLabel={clockLabel}
       />
 
-      <div className="flex justify-end mb-4">
+      <div className="mb-4 flex justify-end">
         <ShareButton title={`${awayName} vs ${homeName} — momentum.`} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 mb-4">
-        {/* ── Main column ── */}
-        <div className="lg:col-span-2 space-y-8">
-          {isLive && (
-            <GameSectionBlock kicker="Momentum Tracker · Live" title="Who's pushing right now.">
-              <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-                <MomentumTracker momentum={playByPlay.momentum} homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev} />
-              </div>
-            </GameSectionBlock>
-          )}
-
-          {isLive && (
-            <GameSectionBlock kicker="Play-by-Play" title="Recent action.">
-              <div className="rounded-xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-                <RecentActionFeed plays={playByPlay.recentPlays} />
-              </div>
-            </GameSectionBlock>
-          )}
-
-          {isFinal && (
-            <>
-              <ThreeStarsRow stars={threeStars} heatByPlayerId={new Map([...awaySkaters, ...homeSkaters].map(s => [s.playerId as number, ppmToHeat(s.momentumPpm ?? s.compositePpm)]))} />
-              {prediction && (
-                <GameSectionBlock kicker="Our Pick · How It Played" title="The model nailed this one.">
-                  <PredictionCard
-                    mode="final"
-                    favoredAbbrev={favoredIsHome ? homeAbbrev : awayAbbrev}
-                    favoredPct={Math.round(Math.max(prediction.home_win_probability, prediction.away_win_probability) * 100)}
-                    correct={outcome?.correct_winner ?? null}
-                    accuracyYtd={accuracyYtd}
-                    chips={predictionChips}
-                    factors={predictionFactors}
-                    awayAbbrev={awayAbbrev}
-                    homeAbbrev={homeAbbrev}
-                  />
-                </GameSectionBlock>
-              )}
-              <GameSectionBlock kicker="Heat Impact" title="Who moved up. Who moved down.">
-                <HeatImpactCard up={heatImpactUp} down={heatImpactDown} />
-              </GameSectionBlock>
-            </>
-          )}
-
-          {isUpcoming && prediction && (
-            <GameSectionBlock kicker="Our Prediction" title={`${favoredIsHome ? homeAbbrev : awayAbbrev} win.`}>
-              <PredictionCard
-                mode="pregame"
-                favoredAbbrev={favoredIsHome ? homeAbbrev : awayAbbrev}
-                favoredPct={Math.round(Math.max(prediction.home_win_probability, prediction.away_win_probability) * 100)}
-                accuracyYtd={accuracyYtd}
-                chips={predictionChips}
-                factors={predictionFactors}
-                awayAbbrev={awayAbbrev}
-                homeAbbrev={homeAbbrev}
-              />
-            </GameSectionBlock>
-          )}
-
-          {isUpcoming && (homeGoalieSnap || awayGoalieSnap) && (
-            <GameSectionBlock kicker="Starting Goalies" title="The matchup in net.">
-              <GoalieMatchupCard
-                away={{
-                  name: awayGoalieSnap?.playerName ?? 'TBD',
-                  abbrev: awayAbbrev,
-                  savePct: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.savePct ?? awayGoalieSnap?.seasonSavePct ?? null,
-                  gaa: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.gaa ?? null,
-                  gamesPlayed: goalieSeasonStats.get(awayGoalieSnap?.playerId)?.gamesPlayed ?? 0,
-                }}
-                home={{
-                  name: homeGoalieSnap?.playerName ?? 'TBD',
-                  abbrev: homeAbbrev,
-                  savePct: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.savePct ?? homeGoalieSnap?.seasonSavePct ?? null,
-                  gaa: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.gaa ?? null,
-                  gamesPlayed: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.gamesPlayed ?? 0,
-                }}
-              />
-            </GameSectionBlock>
-          )}
-
-          {isUpcoming && (
-            <GameSectionBlock kicker="Players to Watch" title="Watch these tonight.">
-              <PlayersToWatchCard
-                players={heatRoster.map(p => ({ playerId: p.playerId, href: p.href, name: p.name, teamAbbrev: p.teamAbbrev, position: p.line.split(' · ')[0] || null, heat: p.heat, line: p.line }))}
-              />
-            </GameSectionBlock>
-          )}
-
-          {isUpcoming && specialTeams && (
-            <GameSectionBlock kicker="Special Teams" title="Where games are won.">
-              <SpecialTeamsCard away={specialTeams.away} home={specialTeams.home} />
-            </GameSectionBlock>
-          )}
-
-          {isUpcoming && headToHead.length > 0 && (
-            <GameSectionBlock kicker="Head-to-Head" title="Recent meetings.">
-              <HeadToHeadCard meetings={headToHead} homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev} />
-            </GameSectionBlock>
-          )}
-
-          {isUpcoming && (
-            <GameSectionBlock kicker="Lineup & Context" title="Tonight's roster picture.">
-              <LineupContextCard
-                homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev}
-                homeOutCount={homeOutCount} awayOutCount={awayOutCount}
-                restDays={restDays}
-              />
-            </GameSectionBlock>
-          )}
+      <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0 space-y-8" data-column="main">
+          {plan.main.map(k => (
+            <section key={k} data-section={k}>
+              <SectionHeading kicker={SECTION_META[k].kicker} title={titleFor(k)} />
+              {nodes[k]}
+            </section>
+          ))}
         </div>
-
-        {/* ── Side column ── */}
-        <div className="space-y-4">
-          {heatRoster.length > 0 && (isLive || isFinal) && <HeatingUpCard players={heatRoster} />}
-          {prediction && (isLive || isFinal) && (
-            <WinProbabilityCard
-              title={isLive ? 'Live Win Probability' : 'Win Probability'}
-              homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev}
-              homeWinPct={Math.round(prediction.home_win_probability * 100)}
-              awayWinPct={Math.round(prediction.away_win_probability * 100)}
-            />
-          )}
-          {liveStatsRows.length > 0 && <LiveStatsGrid rows={liveStatsRows} awayAbbrev={awayAbbrev} homeAbbrev={homeAbbrev} />}
-          {isFinal && <RecapCard headline={recapHeadline} body={recapBody} recapHref={recapHref} />}
-          {isFinal && <HighlightsCard youtubeId={youtubeId} nhlUrl={nhlUrl} awayAbbrev={awayAbbrev} homeAbbrev={homeAbbrev} />}
-          {isFinal && seriesInfo && <SeriesTrackerCard series={seriesInfo} />}
-          {isUpcoming && seriesInfo && <SeriesTrackerCard series={seriesInfo} />}
+        <div className="min-w-0 space-y-4" data-column="side">
+          {plan.side.map(k => (
+            <section key={k} data-section={k}>
+              {SECTION_META[k].title && <SectionHeading kicker={SECTION_META[k].kicker} title={SECTION_META[k].title} />}
+              {nodes[k]}
+            </section>
+          ))}
         </div>
       </div>
 
@@ -574,13 +517,13 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         );
 
         return (
-          <div className="rounded-xl border p-4 mb-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h2 className="text-xs font-mono font-bold uppercase tracking-widest" style={{ color: 'var(--heat)', letterSpacing: '0.1em' }}>Betting Markets</h2>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text)', opacity: 0.6 }}>For reference — {rows.length} bookmaker{rows.length !== 1 ? 's' : ''}</p>
-              </div>
-            </div>
+          <section className="mb-8" data-section="market">
+            <SectionHeading
+              kicker={`MARKET ODDS · ${rows.length} BOOKMAKER${rows.length !== 1 ? 'S' : ''}`}
+              title="What the books say."
+              sub={prediction ? `Our model: ${favoredIsHome ? homeAbbrev : awayAbbrev} ${Math.round(Math.max(prediction.home_win_probability, prediction.away_win_probability) * 100)}% · Market (${formatBookmaker(pinnacle.bookmaker)}): ${favoredIsHome ? homeAbbrev : awayAbbrev} ${favoredIsHome ? pinH : pinA}%` : undefined}
+            />
+          <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
             <div className="rounded-lg p-3 mb-3" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs flex items-center gap-1.5" style={{ color: 'var(--text)' }}>
@@ -590,7 +533,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                     <span className="font-mono px-1 rounded" style={{ background: 'var(--border)', color: 'var(--text)', fontSize: '10px' }}>sharpest</span>
                   )}
                 </span>
-                <span className="text-xs font-mono" style={{ color: 'var(--text)', opacity: 0.5 }}>hover for odds</span>
+                <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>
+                  {awayAbbrev} {pinnacle.away_odds.toFixed(2)} · {homeAbbrev} {pinnacle.home_odds.toFixed(2)}
+                </span>
               </div>
               <div className="flex items-center gap-2 mb-1.5">
                 <img src={awayLogo} alt={awayAbbrev} className="w-5 h-5 object-contain flex-shrink-0" />
@@ -605,7 +550,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
               </div>
             </div>
             {otherBooks.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <details className="group">
+              <summary className="cursor-pointer select-none text-xs font-semibold" style={{ color: 'var(--text)' }}>All bookmakers ({otherBooks.length})</summary>
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {otherBooks.map((o: any) => {
                   const op = decimalToNormProb(o.home_odds, o.away_odds, o.draw_odds);
@@ -624,9 +571,11 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
                   );
                 })}
               </div>
+              </details>
             )}
-            <p className="text-xs mt-3" style={{ color: 'var(--text)', opacity: 0.4 }}>Win % removes bookmaker margin · hover for decimal odds</p>
+            <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>Win % removes the bookmaker margin · decimal odds shown beside each book.</p>
           </div>
+          </section>
         );
       })()}
 
@@ -742,24 +691,3 @@ function LineupCard({
   );
 }
 
-function GameSectionBlock({ kicker, title, children }: { kicker: string; title: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <div className="mb-4">
-        <div
-          className="font-mono font-bold uppercase"
-          style={{ fontSize: 11, color: 'var(--heat)', letterSpacing: '0.12em', marginBottom: 6 }}
-        >
-          {kicker}
-        </div>
-        <div
-          className="font-sans font-extrabold"
-          style={{ fontSize: 'clamp(18px, 2.2vw, 24px)', color: 'var(--text-bright)', letterSpacing: '-0.03em' }}
-        >
-          {title}
-        </div>
-      </div>
-      {children}
-    </section>
-  );
-}

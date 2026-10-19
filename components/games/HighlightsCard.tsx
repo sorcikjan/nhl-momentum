@@ -9,8 +9,8 @@ export default function HighlightsCard({
   if (!youtubeId && !nhlUrl) return null;
   return (
     <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="px-4 pt-4 text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>
-        Highlights
+      <div className="px-4 pt-4 text-[10px] font-bold uppercase" style={{ fontFamily: 'var(--font-geist-mono), monospace', color: 'var(--heat)', letterSpacing: '0.12em' }}>
+        If you missed it
       </div>
       {youtubeId ? (
         <div className="mt-3" style={{ aspectRatio: '16/9' }}>
