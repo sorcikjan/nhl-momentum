@@ -96,7 +96,8 @@ and `lib/heat.ts`.
 
 ### Shell
 `BrandedHeaderDesktop/Mobile` replaces `components/layout/Sidebar.tsx`: HeatPulse mark
-+ wordmark, nav *Tonight `/` · Heat map `/hot` · Players `/search` · Rankings
++ the wordmark **"momentum."** exactly as in the design — no "Hockey" (decided
+2026-10-19), nav *Tonight `/` · Heat map `/hot` · Players `/search` · Rankings
 `/rankings` · Stories `/recaps`*, live/tonight status pill. Footer per design with
 "How Heat works" / "Methodology" links and the honest data-source line.
 
