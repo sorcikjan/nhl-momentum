@@ -1015,21 +1015,28 @@ export async function fetchRecap(date: string) {
 
 // Active model's winner accuracy for the current regular season (homepage strip).
 // Small, bounded query, cached 30 min per instance — fetchAccuracy() is far heavier.
+// [first, end) game ids of the current regular season (Y02NNNN; playoffs are Y03NNNN).
+export function regularSeasonGameIdRange(now: Date): [number, number] {
+  const y = now.getUTCMonth() + 1 >= 9 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+  return [y * 1_000_000 + 20_000, y * 1_000_000 + 30_000];
+}
+
 let _pickAccCache: { value: number | null; ts: number } | null = null;
 export async function fetchSeasonPickAccuracy(): Promise<number | null> {
   if (_pickAccCache && Date.now() - _pickAccCache.ts < 30 * 60_000) return _pickAccCache.value;
   const model = await latestModelVersion();
-  const now = new Date();
-  const startYear = now.getUTCMonth() + 1 >= 9 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
-  const { data, error } = await supabaseAdmin
+  const [lo, hi] = regularSeasonGameIdRange(new Date());
+  // Count-only queries: no rows transferred, so PostgREST's 1,000-row cap can't truncate.
+  const base = () => supabaseAdmin
     .from('prediction_outcomes')
-    .select('correct_winner, predictions!inner(model_version, game_id)')
+    .select('correct_winner, predictions!inner(model_version, game_id)', { count: 'exact', head: true })
     .eq('predictions.model_version', model)
-    .gte('predictions.game_id', startYear * 1_000_000 + 20_000)
-    .limit(2000);
-  if (error) throw error;
-  const rows = (data ?? []).filter(r => r.correct_winner != null);
-  const value = rows.length ? (rows.filter(r => r.correct_winner).length / rows.length) * 100 : null;
+    .gte('predictions.game_id', lo)
+    .lt('predictions.game_id', hi);
+  const [all, hit] = await Promise.all([base().not('correct_winner', 'is', null), base().eq('correct_winner', true)]);
+  if (all.error) throw all.error;
+  if (hit.error) throw hit.error;
+  const value = all.count ? ((hit.count ?? 0) / all.count) * 100 : null;
   _pickAccCache = { value, ts: Date.now() };
   return value;
 }

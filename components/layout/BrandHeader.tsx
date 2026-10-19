@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { HeatPulseMark } from '@/components/ds';
-import { fetchTodayGameCount } from '@/lib/data';
 import { DesktopNav, MobileTabBar } from './NavLinks';
+import { TonightStatus } from './TonightStatus';
 
 // Design BrandedHeaderDesktop / BrandedHeaderMobile.
 export const NAV_ITEMS = [
@@ -38,29 +38,6 @@ export function Wordmark({ size = 22 }: { size?: number }) {
   );
 }
 
-function TonightStatus({ count, compact }: { count: number | null; compact?: boolean }) {
-  if (count == null) return null;
-  const live = count > 0;
-  return (
-    <Link
-      href="/games"
-      className="inline-flex items-center gap-1.5 rounded-full font-bold"
-      style={{
-        padding: compact ? '4px 8px' : '6px 10px',
-        background: live ? 'var(--heat-dim)' : 'var(--bg-card)',
-        border: `1px solid ${live ? 'rgba(255, 90, 36, 0.33)' : 'var(--border)'}`,
-        color: live ? 'var(--heat)' : 'var(--text)',
-        fontFamily: 'var(--font-geist-mono), monospace',
-        fontSize: compact ? 9 : 10,
-        letterSpacing: compact ? 0.8 : 1,
-      }}
-    >
-      {live && <span className="rounded-full" style={{ width: 6, height: 6, background: 'var(--heat)', boxShadow: '0 0 8px var(--heat)' }} />}
-      {live ? `TONIGHT · ${count}` : 'NO GAMES TODAY'}
-    </Link>
-  );
-}
-
 const SearchButton = ({ size }: { size: number }) => (
   <Link
     href="/search"
@@ -75,9 +52,8 @@ const SearchButton = ({ size }: { size: number }) => (
   </Link>
 );
 
-export default async function BrandHeader() {
-  // Server-rendered and cached — replaces the old per-visitor client polling.
-  const count = await fetchTodayGameCount().catch(() => null);
+// No server fetch here: the root layout renders into every ISR page.
+export default function BrandHeader() {
   return (
     <>
       <header
@@ -89,7 +65,7 @@ export default async function BrandHeader() {
         </Link>
         <DesktopNav items={NAV_ITEMS} />
         <div className="flex items-center gap-3">
-          <TonightStatus count={count} />
+          <TonightStatus />
           <SearchButton size={30} />
         </div>
       </header>
@@ -101,7 +77,7 @@ export default async function BrandHeader() {
           <Wordmark size={18} />
         </Link>
         <div className="flex items-center gap-2">
-          <TonightStatus count={count} compact />
+          <TonightStatus compact />
           <SearchButton size={24} />
         </div>
       </header>

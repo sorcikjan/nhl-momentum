@@ -41,3 +41,12 @@ export function rankingRows(skaters: any[], f: { pos: Pos; sort: Sort }, sparks:
     .map((r, i) => ({ ...r, rank: i + 1 }));
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
+
+// Client-side view of the static rankings: filter + re-sort the server-built rows.
+export function viewRows(rows: RankRow[], f: { pos: Pos; sort: Sort }): RankRow[] {
+  const key: Record<Sort, (r: RankRow) => number> = { heat: r => r.heat, points: r => r.pts, goals: r => r.g, assists: r => r.a };
+  return rows
+    .filter(r => f.pos === 'ALL' || r.pos === f.pos)
+    .sort((x, y) => key[f.sort](y) - key[f.sort](x) || y.heat - x.heat)
+    .map((r, i) => ({ ...r, rank: i + 1 }));
+}
