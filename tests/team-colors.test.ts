@@ -5,6 +5,8 @@ describe('teamColor', () => {
   it('returns the design colors for a known team', () => {
     expect(teamColor('EDM')).toEqual({ bg: '#041E42', fg: '#FF4C00', name: 'Edmonton' });
     expect(teamColor('UTA').bg).toBe('#71AFE5');
+    expect(teamColor('NYR').name).toBe('NY Rangers');
+    expect(teamColor('NYI').name).toBe('NY Islanders');
   });
 
   it('falls back to neutral tokens for an unknown code', () => {

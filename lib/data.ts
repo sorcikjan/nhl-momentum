@@ -2,6 +2,7 @@
 // Pages should call these directly — never fetch their own API over HTTP.
 
 import { supabaseAdmin } from '@/lib/supabase';
+import { ppmToHeat } from '@/lib/heat';
 import { getGamesByDate, getGameBoxscore, getGamePlayByPlay, getStandings, getTeamSeasonStats, getSeasonDates } from '@/lib/nhl-api';
 export { deriveOutStatus, daysAgo } from '@/lib/player-status';
 import { daysAgo } from '@/lib/player-status';
@@ -348,7 +349,7 @@ export async function fetchRecentCompletedGames(days = 3, limit = 20) {
   const { data: games } = await supabaseAdmin
     .from('games')
     .select(`
-      id, game_date, home_score, away_score, game_state, youtube_highlight_id,
+      id, game_date, home_score, away_score, game_state, youtube_highlight_id, three_stars,
       home_team:teams!games_home_team_id_fkey(id, abbrev, name),
       away_team:teams!games_away_team_id_fkey(id, abbrev, name)
     `)
@@ -1005,6 +1006,41 @@ export async function fetchRecap(date: string) {
 
 // ─── Accuracy ─────────────────────────────────────────────────────────────────
 
+// Active model's winner accuracy for the current regular season (homepage strip).
+// Small, bounded query, cached 30 min per instance — fetchAccuracy() is far heavier.
+let _pickAccCache: { value: number | null; ts: number } | null = null;
+export async function fetchSeasonPickAccuracy(): Promise<number | null> {
+  if (_pickAccCache && Date.now() - _pickAccCache.ts < 30 * 60_000) return _pickAccCache.value;
+  const model = await latestModelVersion();
+  const now = new Date();
+  const startYear = now.getUTCMonth() + 1 >= 9 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+  const { data, error } = await supabaseAdmin
+    .from('prediction_outcomes')
+    .select('correct_winner, predictions!inner(model_version, game_id)')
+    .eq('predictions.model_version', model)
+    .gte('predictions.game_id', startYear * 1_000_000 + 20_000)
+    .limit(2000);
+  if (error) throw error;
+  const rows = (data ?? []).filter(r => r.correct_winner != null);
+  const value = rows.length ? (rows.filter(r => r.correct_winner).length / rows.length) * 100 : null;
+  _pickAccCache = { value, ts: Date.now() };
+  return value;
+}
+
+// Latest Heat (momentum PPM → 0–100) for a handful of players, e.g. game stars.
+export async function fetchSnapshotHeat(playerIds: number[]): Promise<Map<number, number>> {
+  const out = new Map<number, number>();
+  if (!playerIds.length) return out;
+  const { data } = await supabaseAdmin
+    .from('player_metric_snapshots')
+    .select('player_id, momentum_ppm, calculated_at')
+    .in('player_id', playerIds)
+    .order('calculated_at', { ascending: false })
+    .limit(playerIds.length * 4);
+  for (const r of data ?? []) if (!out.has(r.player_id)) out.set(r.player_id, ppmToHeat(r.momentum_ppm));
+  return out;
+}
+
 export async function fetchAccuracy() {
   const VERSIONS = ['v1.0', 'v1.1', 'v1.2', 'v1.3', 'v1.4', 'v1.5', 'v1.6', 'v1.7', 'v1.8'];
 
@@ -1545,7 +1581,7 @@ export async function fetchNewcomerWatch() {
       players!inner(
         first_name, last_name, headshot_url, position_code,
         career_games, draft_year, draft_round, draft_pick,
-        in_minors, injury_status, birth_country,
+        in_minors, injury_status, birth_country, birth_date,
         teams(id, abbrev)
       )
     `)
@@ -1599,6 +1635,7 @@ export async function fetchNewcomerWatch() {
       draft_round:    r.players.draft_round   as number | null,
       draft_pick:     r.players.draft_pick    as number | null,
       birth_country:  r.players.birth_country as string | null,
+      age:            r.players.birth_date ? Math.floor((Date.now() - Date.parse(r.players.birth_date)) / 31_557_600_000) : null,
       teams:          r.players.teams         as { id: number; abbrev: string } | null,
     },
   }));
