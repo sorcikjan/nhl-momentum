@@ -229,15 +229,19 @@ export async function GET(req: NextRequest) {
 
     const recentPlayerIds = [...new Set((recentStats ?? []).map(r => r.player_id))];
 
-    // Latest snapshot per player (single query, ordered newest first)
-    const { data: snapshots } = recentPlayerIds.length
-      ? await supabaseAdmin
-          .from('player_metric_snapshots')
-          .select('player_id, calculated_at, momentum_ppm, energy_bar')
-          .in('player_id', recentPlayerIds)
-          .order('calculated_at', { ascending: false })
-          .limit(recentPlayerIds.length * 3) // headroom for duplicates
-      : { data: [] };
+    // Latest snapshot per player, in chunks: one query for ~500 players asked for
+    // 1,500 rows and PostgREST caps responses at 1,000, so players past the cap were
+    // reported as having NO snapshot (false alarm, Oct 2026).
+    const snapshots: { player_id: number; calculated_at: string; momentum_ppm: number | null; energy_bar: number | null }[] = [];
+    for (let i = 0; i < recentPlayerIds.length; i += 150) {
+      const { data } = await supabaseAdmin
+        .from('player_metric_snapshots')
+        .select('player_id, calculated_at, momentum_ppm, energy_bar')
+        .in('player_id', recentPlayerIds.slice(i, i + 150))
+        .order('calculated_at', { ascending: false })
+        .limit(450); // 3 per player of headroom, under the 1,000-row cap
+      snapshots.push(...(data ?? []));
+    }
 
     // Deduplicate to latest per player
     const latestSnap = new Map<number, { calculated_at: string; momentum_ppm: number | null; energy_bar: number | null }>();
