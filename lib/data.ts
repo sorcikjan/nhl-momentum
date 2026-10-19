@@ -1041,6 +1041,15 @@ export async function fetchSeasonPickAccuracy(): Promise<number | null> {
   return value;
 }
 
+// Headshot URLs for a handful of players (e.g. homepage "watch for").
+export async function fetchPlayerPhotos(playerIds: number[]): Promise<Map<number, string>> {
+  const out = new Map<number, string>();
+  if (!playerIds.length) return out;
+  const { data } = await supabaseAdmin.from('players').select('id, headshot_url').in('id', playerIds);
+  for (const r of data ?? []) if (r.headshot_url) out.set(r.id, r.headshot_url);
+  return out;
+}
+
 // Latest Heat (momentum PPM → 0–100) for a handful of players, e.g. game stars.
 export async function fetchSnapshotHeat(playerIds: number[]): Promise<Map<number, number>> {
   const out = new Map<number, number>();

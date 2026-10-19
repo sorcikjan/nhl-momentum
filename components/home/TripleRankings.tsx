@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { HeatPill, SectionHeading, TeamChip } from '@/components/ds';
+import { Headshot, HeatPill, SectionHeading } from '@/components/ds';
 import type { RankRow } from '@/lib/home';
 import { MONO } from './format';
 import { RankingsTabs } from './RankingsTabs';
@@ -13,7 +13,7 @@ export function RankList({ rows }: { rows: RankRow[] }) {
       {rows.map((p, i) => (
         <Link key={p.playerId} href={p.href} className="flex items-center gap-2.5 py-2.5" style={{ borderTop: i ? '1px solid var(--border-soft)' : undefined }}>
           <span className="w-4 text-[10px] font-bold" style={{ ...MONO, color: 'var(--text-muted)' }}>{i + 1}</span>
-          <TeamChip abbrev={p.team} size={24} />
+          <Headshot src={p.photo} name={p.name} team={p.team} size={28} />
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-bold" style={{ color: 'var(--text-bright)' }}>{p.name}</div>
             <div className="mt-px text-[9px] lg:text-[10px]" style={{ ...MONO, color: 'var(--text-muted)' }}>{p.sub}</div>

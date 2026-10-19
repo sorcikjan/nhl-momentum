@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { HeatPill, Sparkline, TeamChip } from '@/components/ds';
+import { Headshot, HeatPill, Sparkline, TeamChip } from '@/components/ds';
 import { heatColor } from '@/lib/heat';
 import type { RankRow } from '@/lib/rankings-view';
 
@@ -23,7 +23,7 @@ export function RankingsTable({ rows }: { rows: RankRow[] }) {
           <Link key={r.playerId} href={r.href} className={`${COLS} border-t px-4 py-3.5 transition-colors hover:bg-[var(--bg-hover)] lg:px-6`} style={{ borderColor: 'var(--border-soft)', borderLeft: `3px solid ${heatColor(r.heat)}` }}>
             <span className="text-sm font-bold" style={{ ...MONO, color: 'var(--text-bright)' }}>{r.rank}</span>
             <span className="flex min-w-0 items-center gap-2.5">
-              <span className="lg:hidden"><TeamChip abbrev={r.team} size={22} /></span>
+              <Headshot src={r.photo} name={r.name} team={r.team} size={28} />
               <span className="truncate text-sm font-bold" style={{ color: 'var(--text-bright)' }}>{r.name}</span>
             </span>
             <span className="hidden items-center gap-1.5 lg:flex">

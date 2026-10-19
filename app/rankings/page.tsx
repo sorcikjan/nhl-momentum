@@ -35,7 +35,7 @@ export default async function RankingsPage() {
   const rows = rankingRows(data?.top100 ?? [], { pos: 'ALL', sort: 'heat' }, data?.sparklineSnapshots ?? []);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const goalies: GoalieRow[] = (goaliesRaw as any[]).map(g => ({
-    id: g.id, href: playerUrl(g.id, g.first_name, g.last_name), name: `${g.first_name} ${g.last_name}`,
+    id: g.id, href: playerUrl(g.id, g.first_name, g.last_name), name: `${g.first_name} ${g.last_name}`, photo: g.headshot_url ?? null,
     team: g.teams?.abbrev ?? '', savePct: g.avgSavePct, gaa: g.avgGAA, games: g.gamesPlayed,
   }));
   const props = { rows, goalies, total: data?.totalSkaters ?? 0 };

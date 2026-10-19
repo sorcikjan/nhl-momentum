@@ -3,7 +3,7 @@ import { ppmToHeat } from '@/lib/heat';
 import { playerUrl } from '@/lib/urls';
 
 export type HotPlayer = {
-  playerId: number; href: string; first: string; last: string; team: string; pos: string;
+  playerId: number; href: string; first: string; last: string; photo: string | null; team: string; pos: string;
   heat: number; prev: number; sub: string; story: string;
 };
 
@@ -23,6 +23,7 @@ function toHot(s: any): HotPlayer {
     href: playerUrl(s.player_id, s.players?.first_name ?? '', s.players?.last_name ?? ''),
     first: s.players?.first_name ?? '',
     last: s.players?.last_name ?? '',
+    photo: s.players?.headshot_url ?? null,
     team: s.players?.teams?.abbrev ?? '',
     pos: s.players?.position_code ?? '',
     heat: ppmToHeat(s.momentum_ppm),

@@ -5,7 +5,7 @@ import { playerUrl } from '@/lib/urls';
 export type Pos = 'ALL' | 'C' | 'L' | 'R' | 'D' | 'G';
 export type Sort = 'heat' | 'points' | 'goals' | 'assists';
 export type RankRow = {
-  rank: number; playerId: number; href: string; name: string; team: string; pos: string;
+  rank: number; playerId: number; href: string; name: string; photo: string | null; team: string; pos: string;
   g: number; a: number; pts: number; heat: number; spark: number[]; delta: string | null;
 };
 
@@ -29,6 +29,7 @@ export function rankingRows(skaters: any[], f: { pos: Pos; sort: Sort }, sparks:
         playerId: s.player_id,
         href: playerUrl(s.player_id, s.players?.first_name ?? '', s.players?.last_name ?? ''),
         name: `${s.players?.first_name ?? ''} ${s.players?.last_name ?? ''}`.trim(),
+        photo: s.players?.headshot_url ?? null,
         team: s.players?.teams?.abbrev ?? '',
         pos: s.players?.position_code ?? '',
         g, a, pts: Number(s.season_points ?? g + a),

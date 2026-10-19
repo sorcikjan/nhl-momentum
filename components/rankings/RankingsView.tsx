@@ -1,11 +1,11 @@
 'use client';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { FilterChips, SectionHeading, TeamChip } from '@/components/ds';
+import { FilterChips, Headshot, SectionHeading, TeamChip } from '@/components/ds';
 import { RankingsTable } from '@/components/rankings/RankingsTable';
 import { viewRows, type Pos, type RankRow, type Sort } from '@/lib/rankings-view';
 
-export type GoalieRow = { id: number; href: string; name: string; team: string; savePct: number; gaa: number; games: number };
+export type GoalieRow = { id: number; href: string; name: string; photo: string | null; team: string; savePct: number; gaa: number; games: number };
 
 const POSITIONS: Pos[] = ['ALL', 'C', 'L', 'R', 'D', 'G'];
 const SORTS: { key: Sort; label: string }[] = [
@@ -56,7 +56,8 @@ export function RankingsView({ rows: all, goalies, total, pos, sort }: Props & {
             <Link key={g.id} href={g.href} className="grid grid-cols-[32px_minmax(0,1fr)_72px_56px] items-center gap-3 border-t px-4 py-3.5 hover:bg-[var(--bg-hover)] lg:grid-cols-[60px_minmax(0,1fr)_100px_100px_80px] lg:px-6" style={{ borderColor: 'var(--border-soft)', borderLeft: '3px solid var(--cold)' }}>
               <span className="text-sm font-bold" style={{ ...MONO, color: 'var(--text-bright)' }}>{i + 1}</span>
               <span className="flex min-w-0 items-center gap-2.5">
-                <TeamChip abbrev={g.team} size={22} />
+                <Headshot src={g.photo} name={g.name} team={g.team} size={28} />
+                <TeamChip abbrev={g.team} size={20} />
                 <span className="truncate text-sm font-bold" style={{ color: 'var(--text-bright)' }}>{g.name}</span>
               </span>
               <span className="text-right text-[13px] font-bold" style={{ ...MONO, color: 'var(--cold)' }}>{g.savePct.toFixed(3).replace(/^0/, '')}</span>

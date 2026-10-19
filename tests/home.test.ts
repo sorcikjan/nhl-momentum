@@ -29,7 +29,11 @@ describe('toResultCard', () => {
   });
   it('takes the first star from three_stars', () => {
     const stars = [{ star: 1, playerId: 8482445, name: { default: 'D. Cooley' }, teamAbbrev: 'CGY', position: 'G' }];
-    expect(toResultCard(game(3, 2, stars), null).star).toEqual({ playerId: 8482445, name: 'D. Cooley', team: 'CGY', goalie: true });
+    expect(toResultCard(game(3, 2, stars), null).star).toEqual({ playerId: 8482445, name: 'D. Cooley', team: 'CGY', goalie: true, photo: null });
+  });
+  it('carries the first star headshot from the NHL three stars', () => {
+    const stars = [{ star: 1, playerId: 1, name: { default: 'K. Kaprizov' }, teamAbbrev: 'MIN', position: 'L', headshot: 'https://assets.nhle.com/mugs/x.png' }];
+    expect(toResultCard(game(3, 2, stars), null).star?.photo).toBe('https://assets.nhle.com/mugs/x.png');
   });
 });
 

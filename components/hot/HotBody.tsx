@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { HeatDial, HeatPill, SectionHeading, TeamChip } from '@/components/ds';
+import { Headshot, HeatDial, HeatPill, SectionHeading, TeamChip } from '@/components/ds';
 import { heatColor } from '@/lib/heat';
 import type { HotView } from '@/lib/hot-view';
 import { teamColor } from '@/lib/team-colors';
@@ -22,7 +22,7 @@ export function HotBody({ view }: { view: HotView }) {
         <div className="mb-9 grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
           <Link href={top.href} className="relative overflow-hidden rounded-2xl border p-6 lg:p-8" style={{ background: `linear-gradient(155deg, ${teamColor(top.team).bg}88 0%, var(--bg-card) 50%)`, borderColor: 'rgba(255, 90, 36, 0.33)', boxShadow: '0 0 40px rgba(255, 90, 36, 0.13)' }}>
             <span className="absolute right-4 top-4 rounded-full border px-2.5 py-1 text-[10px] font-bold lg:right-6 lg:top-6" style={{ ...MONO, color: 'var(--heat)', background: 'var(--bg)', borderColor: 'rgba(255, 90, 36, 0.4)', letterSpacing: 1.4 }}>#1 · HOTTEST RIGHT NOW</span>
-            <TeamChip abbrev={top.team} size={42} />
+            <span className="flex items-center gap-3"><Headshot src={top.photo} name={`${top.first} ${top.last}`} team={top.team} size={72} /><TeamChip abbrev={top.team} size={36} /></span>
             <div className="mb-2 mt-[18px] font-extrabold leading-none" style={{ fontSize: 'clamp(36px, 5vw, 56px)', letterSpacing: '-0.036em', color: 'var(--text-bright)', textWrap: 'pretty' }}>
               {top.first} <span style={{ color: 'var(--heat)' }}>{top.last}</span>
             </div>
@@ -37,7 +37,7 @@ export function HotBody({ view }: { view: HotView }) {
             {rest.map((p, i) => (
               <Link key={p.playerId} href={p.href} className="flex items-center gap-3 rounded-[10px] border px-3.5 py-[11px]" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)', borderLeft: `3px solid ${heatColor(p.heat)}` }}>
                 <span className="w-[18px] text-[11px] font-bold" style={{ ...MONO, color: 'var(--text-muted)' }}>{i + 2}</span>
-                <TeamChip abbrev={p.team} size={26} />
+                <Headshot src={p.photo} name={`${p.first} ${p.last}`} team={p.team} size={32} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[13px] font-bold" style={{ color: 'var(--text-bright)' }}>{p.first} {p.last}</div>
                   <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{p.sub}</div>
@@ -56,7 +56,7 @@ export function HotBody({ view }: { view: HotView }) {
             {breakouts.map(b => (
               <Link key={b.playerId} href={b.href} className="rounded-xl border p-[18px]" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}>
                 <div className="mb-3 flex items-center gap-2">
-                  <TeamChip abbrev={b.team} size={28} />
+                  <Headshot src={b.photo} name={`${b.first} ${b.last}`} team={b.team} size={36} />
                   <span className="ml-auto text-[10px] font-bold" style={{ ...MONO, color: 'var(--rise)', letterSpacing: 1 }}>↑ RISING</span>
                 </div>
                 <div className="mb-1 truncate text-base font-bold" style={{ color: 'var(--text-bright)' }}>{b.first} {b.last}</div>
@@ -77,7 +77,7 @@ export function HotBody({ view }: { view: HotView }) {
           <div className="rounded-xl border px-[18px] py-1" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}>
             {cooling.map((p, i) => (
               <Link key={p.playerId} href={p.href} className="flex items-center gap-3 py-3.5" style={{ borderTop: i ? '1px solid var(--border-soft)' : undefined }}>
-                <TeamChip abbrev={p.team} size={32} />
+                <Headshot src={p.photo} name={`${p.first} ${p.last}`} team={p.team} size={36} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-bold" style={{ color: 'var(--text-bright)' }}>{p.first} {p.last}</div>
                   <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{p.sub}</div>

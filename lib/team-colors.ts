@@ -44,3 +44,8 @@ export function teamColor(abbrev: string): TeamColor {
 
 // Tint for cards with no team (hex, so callers can append an alpha suffix).
 export const NEUTRAL_TINT = '#ff5a24';
+
+// Official NHL logo, dark-background variant (the site is dark).
+export function teamLogo(abbrev: string): string {
+  return `https://assets.nhle.com/logos/nhl/svg/${abbrev}_dark.svg`;
+}

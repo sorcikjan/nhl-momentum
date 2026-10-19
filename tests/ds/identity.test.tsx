@@ -5,10 +5,8 @@ import { FilterChips, Headshot, Kicker, SectionHeading, Stat, TeamChip } from '@
 const html = (el: React.ReactElement) => renderToStaticMarkup(el);
 
 describe('TeamChip', () => {
-  it('renders the abbreviation in team colors', () => {
-    const out = html(<TeamChip abbrev="EDM" />);
-    expect(out).toContain('EDM');
-    expect(out).toContain('#041E42');
+  it('renders the team logo', () => {
+    expect(html(<TeamChip abbrev="EDM" />)).toContain('EDM_dark.svg');
   });
   it('adds the heat ring when ringed', () => {
     expect(html(<TeamChip abbrev="EDM" ringed />)).toContain('var(--heat)');

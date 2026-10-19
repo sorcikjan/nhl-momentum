@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { HeatPill, SectionHeading, TeamChip } from '@/components/ds';
+import { Headshot, HeatPill, SectionHeading, TeamChip } from '@/components/ds';
 import type { ResultCard } from '@/lib/home';
 import { dayLabel, MONO } from './format';
 
@@ -62,6 +62,7 @@ export function ResultsSection({ date, results }: { date: string | null; results
             {r.star && (
               <div className="flex items-center gap-2 border-t px-3.5 py-2.5" style={{ borderColor: 'var(--border-soft)' }}>
                 <span className="text-[9px] font-bold" style={{ ...MONO, color: 'var(--heat)' }}>★</span>
+                <Headshot src={r.star.photo} name={r.star.name} team={r.star.team} size={24} />
                 <span className="flex-1 truncate text-xs font-semibold" style={{ color: 'var(--text-bright)' }}>{r.star.name}</span>
                 {r.starHeat != null && <HeatPill heat={r.starHeat} size="sm" />}
               </div>

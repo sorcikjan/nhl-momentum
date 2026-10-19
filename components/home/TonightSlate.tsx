@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { HeatPill, SectionHeading, TeamChip } from '@/components/ds';
+import { Headshot, HeatPill, SectionHeading, TeamChip } from '@/components/ds';
 import { gameView } from '@/lib/game-state';
 import type { SlateGame } from '@/lib/home';
 import { dayLabel, MONO, timeET } from './format';
@@ -75,6 +75,7 @@ export function TonightSlate({ games, nextGameDate }: { games: SlateGame[]; next
                   <>
                     <div className="mb-0.5 text-[10px] font-semibold" style={{ ...MONO, color: 'var(--text-muted)', letterSpacing: 0.5 }}>WATCH FOR</div>
                     <div className="flex items-center gap-2 text-[13px] font-semibold" style={{ color: 'var(--text-bright)' }}>
+                      <Headshot src={g.watch.photo} name={g.watch.name} team={g.watch.team} size={24} />
                       <span className="truncate">{g.watch.name}</span>
                       <HeatPill heat={g.watch.heat} size="sm" />
                     </div>

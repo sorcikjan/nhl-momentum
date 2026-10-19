@@ -2,7 +2,7 @@
 // design's sections show (docs/design/redesign-2026/homepage-final.js).
 import {
   fetchGamesRange, fetchGoalieRankings, fetchNewcomerWatch, fetchRankings, fetchRecap,
-  fetchRecentCompletedGames, fetchRecentRecaps, fetchSeasonPickAccuracy, fetchSnapshotHeat,
+  fetchPlayerPhotos, fetchRecentCompletedGames, fetchRecentRecaps, fetchSeasonPickAccuracy, fetchSnapshotHeat,
 } from '@/lib/data';
 import { ppmToHeat } from '@/lib/heat';
 import { teamColor } from '@/lib/team-colors';
@@ -14,17 +14,17 @@ export type SlateGame = {
   awayScore: number | null; homeScore: number | null;
   away: TeamSide; home: TeamSide;
   pickSide: 'home' | 'away' | null; pickPct: number | null;
-  watch: { name: string; heat: number } | null;
+  watch: { playerId?: number; name: string; heat: number; photo: string | null; team: string } | null;
 };
 export type ResultCard = {
   id: number; href: string;
   away: TeamSide & { score: number }; home: TeamSide & { score: number };
   pick: 'hit' | 'miss' | null; pickTeam: string | null; pickPct: number | null;
-  star: { playerId: number; name: string; team: string; goalie: boolean } | null;
+  star: { playerId: number; name: string; team: string; goalie: boolean; photo: string | null } | null;
   starHeat?: number | null;
 };
 export type StoryCard = { href: string; kicker: string; title: string; dek: string; team: string | null; lead: boolean };
-export type RankRow = { playerId: number; href: string; name: string; team: string; heat: number | null; sub: string };
+export type RankRow = { playerId: number; href: string; name: string; photo: string | null; team: string; heat: number | null; sub: string };
 export type HomeData = {
   today: string;
   tonight: SlateGame[]; nextGameDate: string | null;
@@ -68,7 +68,7 @@ export function toResultCard(g: FinishedGame, pred: Pred): ResultCard {
     away: { ...side(away), score: as },
     home: { ...side(home), score: hs },
     pick, pickTeam, pickPct,
-    star: first ? { playerId: first.playerId, name: first.name?.default ?? '', team: first.teamAbbrev ?? '', goalie: first.position === 'G' } : null,
+    star: first ? { playerId: first.playerId, name: first.name?.default ?? '', team: first.teamAbbrev ?? '', goalie: first.position === 'G', photo: first.headshot ?? null } : null,
   };
 }
 
@@ -137,9 +137,15 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
       away: side(g.awayTeam.abbrev), home: side(g.homeTeam.abbrev),
       pickSide: p == null ? null : p >= 0.5 ? 'home' : 'away',
       pickPct: p == null ? null : Math.round((p >= 0.5 ? p : 1 - p) * 100),
-      watch: top ? { name: top.name, heat: ppmToHeat(top.compositePpm) } : null,
+      watch: top ? { name: top.name, heat: ppmToHeat(top.compositePpm), photo: null, team: top.teamAbbrev, playerId: top.playerId } : null,
     };
   });
+  // Photos for the "watch for" players (snapshots carry no headshot).
+  const watchIds = tonight.flatMap(t => (t.watch?.playerId ? [t.watch.playerId] : []));
+  if (watchIds.length) {
+    const photos = await safe(fetchPlayerPhotos(watchIds), new Map<number, string>());
+    for (const t of tonight) if (t.watch?.playerId) t.watch.photo = photos.get(t.watch.playerId) ?? null;
+  }
   // Off-day only: look a week ahead for the next game date (each extra day costs an NHL call + DB reads).
   let nextGameDate: string | null = null;
   if (!tonight.length) {
@@ -166,6 +172,7 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
     playerId: r.player_id,
     href: playerUrl(r.player_id, r.players?.first_name ?? '', r.players?.last_name ?? ''),
     name: `${r.players?.first_name ?? ''} ${r.players?.last_name ?? ''}`.trim(),
+    photo: r.players?.headshot_url ?? null,
     team: r.players?.teams?.abbrev ?? '',
     heat: ppmToHeat(r.momentum_ppm),
     sub: r.players?.position_code === 'D' ? 'Defense' : 'Forward',
@@ -175,6 +182,7 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
     playerId: g.id,
     href: playerUrl(g.id, g.first_name, g.last_name),
     name: `${g.first_name} ${g.last_name}`,
+    photo: g.headshot_url ?? null,
     team: g.teams?.abbrev ?? '',
     heat: null,
     sub: `SV% ${g.avgSavePct.toFixed(3).replace(/^0/, '')} · last ${g.gamesPlayed}`,
@@ -184,6 +192,7 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
     playerId: r.player_id,
     href: playerUrl(r.player_id, r.players.first_name, r.players.last_name),
     name: `${r.players.first_name} ${r.players.last_name}`,
+    photo: r.players.headshot_url ?? null,
     team: r.players.teams?.abbrev ?? '',
     heat: ppmToHeat(r.momentum_ppm),
     sub: r.players.age != null ? `Age ${r.players.age}` : `${r.players.career_games} NHL games`,
