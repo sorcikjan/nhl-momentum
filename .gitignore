@@ -43,3 +43,4 @@ next-env.d.ts
 
 # Claude Code worktrees (never commit these — embedded git repos break CI)
 .claude/worktrees/
+.superpowers/
