@@ -1195,6 +1195,8 @@ export async function fetchTeam(id: string) {
       `)
       .or(`home_team_id.eq.${team.id},away_team_id.eq.${team.id}`)
       .in('game_state', ['FUT', 'PRE', 'LIVE', 'CRIT'])
+      // Unplayed "if necessary" playoff games stay FUT forever — upcoming means today or later (ET).
+      .gte('game_date', new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }))
       .order('game_date', { ascending: true })
       .limit(5),
     getTeamSeasonStats(team.abbrev).catch(() => null),

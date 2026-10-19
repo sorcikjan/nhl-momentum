@@ -6,6 +6,7 @@ import { fetchRecap, fetchRecapData, teamLogoUrl } from '@/lib/data';
 import { recapUrl, gameUrl, playerUrl, teamUrl } from '@/lib/urls';
 import { SITE_URL } from '@/lib/site';
 import { assertDatabaseUp } from '@/lib/supabase';
+import { SectionHeading } from '@/components/ds';
 
 export const revalidate = 3600;
 
@@ -251,7 +252,7 @@ function GameCard({ game, pred, gUrl, seriesContext }: { game: any; pred: any; g
         {/* Playoff series context */}
         {seriesContext && (
           <div className="text-center text-xs font-semibold mt-1 mb-1 py-1 px-3 rounded-full inline-block mx-auto"
-            style={{ background: 'var(--neon)', color: '#000', display: 'table', margin: '4px auto 0' }}>
+            style={{ background: 'var(--heat)', color: '#000', display: 'table', margin: '4px auto 0' }}>
             {seriesContext}
           </div>
         )}
@@ -460,7 +461,7 @@ async function ArticleBody({ date, content }: { date: string; content: string })
       {/* Top performers of the day */}
       {topPerformers.length > 0 && (
         <div className="rounded-xl border p-4 mb-8" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--neon)' }}>
+          <h2 className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--heat)' }}>
             Top performers of the day
           </h2>
           <div className="flex flex-col gap-2">
@@ -476,7 +477,7 @@ async function ArticleBody({ date, content }: { date: string; content: string })
                   style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
                   {/* Rank */}
                   <span className="text-xs font-mono font-bold w-4 text-center flex-shrink-0"
-                    style={{ color: 'var(--neon)' }}>{i + 1}</span>
+                    style={{ color: 'var(--heat)' }}>{i + 1}</span>
 
                   {/* Headshot */}
                   {p.players?.headshot_url ? (
@@ -514,7 +515,7 @@ async function ArticleBody({ date, content }: { date: string; content: string })
                         <Link
                           href={teamUrl(p.teams.id, p.teams.name ?? p.teams.abbrev)}
                           className="text-xs hover:underline"
-                          style={{ color: 'var(--neon)' }}>
+                          style={{ color: 'var(--heat)' }}>
                           {p.teams?.abbrev}
                         </Link>
                       ) : (
@@ -525,7 +526,7 @@ async function ArticleBody({ date, content }: { date: string; content: string })
 
                   {/* Stats */}
                   <div className="text-right flex-shrink-0">
-                    <div className="text-sm font-mono font-semibold" style={{ color: 'var(--neon)' }}>
+                    <div className="text-sm font-mono font-semibold" style={{ color: 'var(--heat)' }}>
                       {p.goals}G {p.assists}A
                     </div>
                     <div className="text-xs" style={{ color: 'var(--text)' }}>
@@ -547,7 +548,7 @@ async function ArticleBody({ date, content }: { date: string; content: string })
 
       {/* Footer nav */}
       <div className="flex items-center justify-between pt-4" style={{ borderTop: '1px solid var(--border)' }}>
-        <Link href="/recaps" className="text-xs hover:underline" style={{ color: 'var(--neon)' }}>
+        <Link href="/recaps" className="text-xs hover:underline" style={{ color: 'var(--heat)' }}>
           ← All recaps
         </Link>
         <Link href="/" className="text-xs hover:underline" style={{ color: 'var(--text)' }}>
@@ -620,11 +621,11 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <div className="max-w-3xl mx-auto pb-20 md:pb-0">
+      <div className="max-w-[760px] pb-20 lg:pb-0">
 
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-xs mb-6" style={{ color: 'var(--text)' }}>
-          <Link href="/recaps" className="hover:underline" style={{ color: 'var(--neon)' }}>
+          <Link href="/recaps" className="hover:underline" style={{ color: 'var(--heat)' }}>
             Recaps
           </Link>
           <span style={{ opacity: 0.4 }}>›</span>
@@ -633,12 +634,7 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
 
         {/* Article header */}
         <div className="mb-6">
-          <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--neon)' }}>
-            NHL Recap · {dateLabel}
-          </p>
-          <h1 className="text-2xl md:text-3xl font-black leading-tight mb-3" style={{ color: 'var(--text-bright)' }}>
-            {cleanTitle}
-          </h1>
+          <SectionHeading as="h1" size="feature" kicker={`NHL RECAP · ${dateLabel.toUpperCase()}`} title={cleanTitle} />
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--text)' }}>
             {recap.games_count != null && <span>{recap.games_count} games</span>}
             <span style={{ opacity: 0.4 }}>·</span>

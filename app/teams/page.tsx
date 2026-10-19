@@ -4,6 +4,7 @@ import { supabaseAdmin, assertDatabaseUp } from '@/lib/supabase';
 import { teamLogoUrl } from '@/lib/data';
 import { teamUrl } from '@/lib/urls';
 import { getStandings } from '@/lib/nhl-api';
+import { SectionHeading } from '@/components/ds';
 
 export const metadata: Metadata = {
   title: 'NHL Teams 2025–26',
@@ -61,15 +62,12 @@ export default async function TeamsPage() {
   } catch { /* standings optional */ }
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 md:pb-0">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold" style={{ color: 'var(--text-bright)' }}>Teams</h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>All 32 NHL teams · click for full roster & momentum profile</p>
-      </div>
+    <div className="pb-20 lg:pb-0">
+      <SectionHeading as="h1" size="page" kicker="ALL 32 TEAMS" title="Teams" sub="Every NHL team — open one for its roster, standings and Heat." />
 
       {Object.entries(NHL_STRUCTURE).map(([conf, divisions]) => (
         <div key={conf} className="mb-8">
-          <h2 className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--neon)' }}>
+          <h2 className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: 'var(--heat)' }}>
             {conf} Conference
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -127,7 +125,7 @@ function TeamRow({ team, wins, losses, otLosses, points }: {
             {wins}–{losses}{otLosses != null ? `–${otLosses}` : ''}
           </div>
           {points !== null && (
-            <div className="text-xs font-mono" style={{ color: 'var(--neon)' }}>{points} pts</div>
+            <div className="text-xs font-mono" style={{ color: 'var(--heat)' }}>{points} pts</div>
           )}
         </div>
       )}

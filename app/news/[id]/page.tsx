@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { fetchSignalById } from '@/lib/data';
 import { assertDatabaseUp } from '@/lib/supabase';
+import { SectionHeading } from '@/components/ds';
 
 export const revalidate = 86400;
 
@@ -41,11 +42,11 @@ export default async function NewsArticlePage({ params }: { params: Promise<{ id
     .filter(Boolean);
 
   return (
-    <div className="max-w-2xl mx-auto pb-20 md:pb-0">
+    <div className="max-w-[760px] pb-20 lg:pb-0">
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs mb-6" style={{ color: 'var(--text)' }}>
-        <Link href="/news" className="hover:underline" style={{ color: 'var(--neon)' }}>
+        <Link href="/news" className="hover:underline" style={{ color: 'var(--heat)' }}>
           News
         </Link>
         <span style={{ opacity: 0.4 }}>›</span>
@@ -54,14 +55,7 @@ export default async function NewsArticlePage({ params }: { params: Promise<{ id
 
       {/* Article header */}
       <div className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-wider mb-2"
-          style={{ color: 'var(--neon)' }}>
-          NHL News · {s.source}
-        </p>
-        <h1 className="text-2xl md:text-3xl font-black leading-tight mb-3"
-          style={{ color: 'var(--text-bright)' }}>
-          {s.title}
-        </h1>
+        <SectionHeading as="h1" size="feature" kicker={`NHL NEWS · ${String(s.source ?? '').toUpperCase()}`} title={s.title} />
         {dateLabel && (
           <p className="text-xs" style={{ color: 'var(--text)' }}>{dateLabel}</p>
         )}
@@ -89,7 +83,7 @@ export default async function NewsArticlePage({ params }: { params: Promise<{ id
           <p className="text-xs mb-2" style={{ color: 'var(--text)' }}>Original source</p>
           <a href={s.url} target="_blank" rel="noopener noreferrer"
             className="text-sm font-medium hover:underline"
-            style={{ color: 'var(--neon)' }}>
+            style={{ color: 'var(--heat)' }}>
             Read on {s.source} →
           </a>
         </div>
@@ -98,7 +92,7 @@ export default async function NewsArticlePage({ params }: { params: Promise<{ id
       {/* Footer nav */}
       <div className="flex items-center justify-between pt-4"
         style={{ borderTop: '1px solid var(--border)' }}>
-        <Link href="/news" className="text-xs hover:underline" style={{ color: 'var(--neon)' }}>
+        <Link href="/news" className="text-xs hover:underline" style={{ color: 'var(--heat)' }}>
           ← All news
         </Link>
         <Link href="/" className="text-xs hover:underline" style={{ color: 'var(--text)' }}>

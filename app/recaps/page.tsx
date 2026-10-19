@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { fetchRecentRecaps } from '@/lib/data';
 import { recapUrl } from '@/lib/urls';
 import { assertDatabaseUp } from '@/lib/supabase';
+import { SectionHeading } from '@/components/ds';
 
 export const revalidate = 3600;
 
@@ -26,15 +27,8 @@ export default async function RecapsPage() {
   const recaps = await fetchRecentRecaps(30).catch(() => []);
 
   return (
-    <div className="max-w-3xl mx-auto pb-20 md:pb-0">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-bright)' }}>
-          Last Night.
-        </h1>
-        <p className="text-sm" style={{ color: 'var(--text)' }}>
-          Data-driven stories from every NHL game night — top performers, momentum analytics, and how our model did.
-        </p>
-      </div>
+    <div className="max-w-[760px] pb-20 lg:pb-0">
+      <SectionHeading as="h1" size="page" kicker="STORIES · EVERY GAME NIGHT" title="Last Night." sub="Data-driven stories from every NHL game night — top performers, Heat, and how our model did." />
 
       {recaps.length === 0 ? (
         <div className="rounded-xl border p-8 text-center"

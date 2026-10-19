@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { fetchNewsFeed } from '@/lib/data';
 import { assertDatabaseUp } from '@/lib/supabase';
+import { SectionHeading } from '@/components/ds';
 
 export const revalidate = 1800; // 30 min
 
@@ -31,15 +32,8 @@ export default async function NewsPage() {
   const signals = await fetchNewsFeed(60).catch(() => []);
 
   return (
-    <div className="max-w-3xl mx-auto pb-20 md:pb-0">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-bright)' }}>
-          NHL News
-        </h1>
-        <p className="text-sm" style={{ color: 'var(--text)' }}>
-          Latest headlines from NHL.com and sports media, updated daily.
-        </p>
-      </div>
+    <div className="max-w-[760px] pb-20 lg:pb-0">
+      <SectionHeading as="h1" size="page" kicker="HEADLINES" title="NHL News" sub="Latest headlines from NHL.com and sports media, updated daily." />
 
       {signals.length === 0 ? (
         <div className="rounded-xl border p-8 text-center"

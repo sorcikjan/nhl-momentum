@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { fetchTeam, teamLogoUrl, fetchSeasonPhase, deriveOutStatus } from '@/lib/data';
 import { playerUrl, gameUrl } from '@/lib/urls';
 import { assertDatabaseUp } from '@/lib/supabase';
+import { HeatPill, SectionHeading } from '@/components/ds';
+import { ppmToHeat } from '@/lib/heat';
 
 // Free-tier database: data changes only when the pipeline runs, and pipeline
 // runs call /api/revalidate — so a longer interval costs no freshness.
@@ -57,20 +59,17 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
   const energyColor = avgEnergy >= 70 ? 'var(--green)' : avgEnergy >= 40 ? 'var(--amber)' : 'var(--red)';
 
   return (
-    <div className="max-w-5xl mx-auto pb-20 md:pb-0">
+    <div className="pb-20 lg:pb-0">
 
       {/* Team header */}
       <div className="flex items-center gap-5 mb-6">
         <img src={logo} alt={team.abbrev} className="w-20 h-20 object-contain" />
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text-bright)' }}>{team.name}</h1>
+          <SectionHeading as="h1" size="page" kicker={[team.conference, team.division && `${team.division} Division`].filter(Boolean).join(' · ').toUpperCase() || 'TEAM'} title={team.name} />
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm" style={{ color: 'var(--text)' }}>
-            {team.conference && <span>{team.conference}</span>}
-            {team.division && <><span>·</span><span>{team.division} Division</span></>}
             {standing && (
               <>
-                <span>·</span>
-                <span style={{ color: 'var(--neon)' }}>
+                <span style={{ color: 'var(--heat)' }}>
                   {standing.wins}–{standing.losses}–{standing.otLosses}
                 </span>
                 <span>·</span>
@@ -126,7 +125,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                         : deriveOutStatus(p.consecutive_games_missed ?? null, null, p.players.in_minors ?? false, !seasonPhase.isPreseason);
                       if (!status) return null;
                       const label = status === 'minors' ? 'MINORS' : status === 'injured' ? 'INJURED' : status === 'scratch' ? 'SCRATCHED' : 'OUT';
-                      const color = status === 'minors' ? 'var(--neon)' : status === 'injured' ? 'var(--red)' : 'var(--amber)';
+                      const color = status === 'minors' ? 'var(--cold)' : status === 'injured' ? 'var(--red)' : 'var(--amber)';
                       const bg    = status === 'minors' ? 'rgba(99,179,237,0.15)' : status === 'injured' ? 'rgba(239,68,68,0.18)' : 'rgba(245,158,11,0.18)';
                       return (
                         <span className="text-xs px-1.5 py-0.5 rounded font-bold" style={{ background: bg, color }}>
@@ -139,13 +138,12 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                     #{i + 1} on team &middot; {p.players.position_code}
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-bold font-mono" style={{ color: 'var(--neon)' }}>
-                    {Number(p.momentum_ppm).toFixed(4)}
-                  </div>
-                  <div className="text-xs font-mono" style={{ color: Number(p.breakout_delta) > 0 ? 'var(--green)' : 'var(--red)' }}>
-                    {Number(p.breakout_delta) > 0 ? '+' : ''}{Number(p.breakout_delta).toFixed(4)}
-                  </div>
+                <div className="flex flex-col items-end gap-1">
+                  <HeatPill heat={ppmToHeat(p.momentum_ppm)} />
+                  {Number(p.season_ppm) > 0 && (() => {
+                    const pace = Math.round(((Number(p.momentum_ppm) - Number(p.season_ppm)) / Number(p.season_ppm)) * 100);
+                    return <div className="text-[10px] font-mono" style={{ color: pace >= 0 ? 'var(--rise)' : 'var(--red)' }}>{pace >= 0 ? '+' : ''}{pace}% vs pace</div>;
+                  })()}
                 </div>
               </Link>
             ))}
