@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
-import { Suspense } from 'react';
-import { fetchGamesRange, fetchAccuracy, fetchRecap, isPlayoffGameId } from '@/lib/data';
-import { recapUrl } from '@/lib/urls';
+import { FilterChips, SectionHeading } from '@/components/ds';
+import { ScheduleEmpty } from '@/components/schedule/ScheduleEmpty';
+import { ScheduleRow, type ScheduleRowData } from '@/components/schedule/ScheduleRow';
+import { fetchGamesRange, fetchRecap, fetchSeasonPickAccuracy } from '@/lib/data';
+import { gameView } from '@/lib/game-state';
 import { ppmToHeat } from '@/lib/heat';
-import { calcWatchability } from '@/lib/watchability';
-import ScheduleFilters, { type ScheduleRange } from '@/components/games/ScheduleFilters';
-import ScheduleRow from '@/components/games/ScheduleRow';
-import DayPredictionSummary from '@/components/games/DayPredictionSummary';
+import { todayET } from '@/lib/home';
 import { assertDatabaseUp } from '@/lib/supabase';
+import { gameUrl, recapUrl } from '@/lib/urls';
+import { calcWatchability } from '@/lib/watchability';
 
 // Free-tier database: each render is several queries; crawlers visit every page.
 export const revalidate = 60;
@@ -21,144 +22,131 @@ export const metadata: Metadata = {
   },
 };
 
-function datesForRange(range: ScheduleRange, customDate?: string): string[] {
-  const today = new Date();
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
-  if (range === 'all') {
-    return Array.from({ length: 14 }, (_, i) => {
-      const d = new Date(today); d.setDate(d.getDate() + i);
-      return iso(d);
-    });
-  }
-  if (range === 'tomorrow') {
-    const d = new Date(today); d.setDate(d.getDate() + 1);
-    return [iso(d)];
-  }
-  if (range === 'week') {
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(today); d.setDate(d.getDate() + i);
-      return iso(d);
-    });
-  }
-  if (range === 'custom' && customDate) return [customDate];
-  return [iso(today)];
+type Range = 'today' | 'tomorrow' | 'week' | 'all' | 'custom';
+const RANGES: { key: Exclude<Range, 'custom'>; label: string }[] = [
+  { key: 'today', label: 'Today' },
+  { key: 'tomorrow', label: 'Tomorrow' },
+  { key: 'week', label: 'This week' },
+  { key: 'all', label: 'Next 2 weeks' },
+];
+
+const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
+function datesFor(range: Range, today: string, custom?: string): string[] {
+  if (range === 'custom' && custom && /^\d{4}-\d{2}-\d{2}$/.test(custom)) return [custom];
+  const n = range === 'tomorrow' ? 1 : range === 'week' ? 7 : range === 'all' ? 14 : 1;
+  const start = range === 'tomorrow' ? 1 : 0;
+  return Array.from({ length: n }, (_, i) => addDays(today, start + i));
 }
 
-export default async function GamesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ range?: string; date?: string }>;
-}) {
+function dayHeader(d: string, today: string) {
+  const base = new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }).toUpperCase();
+  return d === today ? `TONIGHT · ${base}` : d === addDays(today, 1) ? `TOMORROW · ${base}` : d === addDays(today, -1) ? `YESTERDAY · ${base}` : new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' }).toUpperCase() + ` · ${base}`;
+}
+
+// Schedule per docs/design/redesign-2026 DesktopScheduleEnhanced / MobileGamesList.
+export default async function GamesPage({ searchParams }: { searchParams: Promise<{ range?: string; date?: string }> }) {
   // Throw (→ keep serving the last good cached page) if the database is down.
   await assertDatabaseUp();
-  const { range: rawRange, date: customDate } = await searchParams;
-  const range: ScheduleRange = (['all', 'today', 'tomorrow', 'week', 'custom'] as const).includes(rawRange as ScheduleRange)
-    ? (rawRange as ScheduleRange)
-    : 'today';
-  const dates = datesForRange(range, customDate);
+  const { range: raw, date: custom } = await searchParams;
+  const range: Range = (['today', 'tomorrow', 'week', 'all', 'custom'] as const).includes(raw as Range) ? (raw as Range) : 'today';
+  const today = todayET();
+  const dates = datesFor(range, today, custom);
 
+  const empty = { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map() };
   const [{ games, predictions, topPlayerByGame, topHeatByGameTeam }, accuracy] = await Promise.all([
-    fetchGamesRange(dates).catch(() => ({ games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map() })),
-    fetchAccuracy().catch(() => null),
+    fetchGamesRange(dates).catch(() => empty),
+    fetchSeasonPickAccuracy().catch(() => null),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const activeVersion = (accuracy?.modelVersions as any[])?.find((v: any) => v.is_active)?.version;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const activeModelStats = (accuracy?.modelStats as any[])?.find((m: any) => m.version === activeVersion);
-  const ytdAccuracy = activeModelStats?.winnerAccuracyPct ?? null;
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const predMap = new Map<number, any>((predictions ?? []).map((p: { game_id: number }) => [p.game_id, p]));
-
-  // Group by date, in order
+  const predBy = new Map<number, any>((predictions ?? []).map((p: { game_id: number }) => [p.game_id, p]));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const byDate = new Map<string, any[]>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const g of (games as any[])) {
-    const d = g.gameDate ?? g.startTimeUTC?.slice(0, 10);
+  for (const g of games as any[]) {
+    const d = g.gameDate;
     if (!byDate.has(d)) byDate.set(d, []);
     byDate.get(d)!.push(g);
   }
 
-  // Recap lookup — one fetch per distinct date that has a final game
-  const finalDates = [...byDate.entries()]
-    .filter(([, dayGames]) => dayGames.some(g => ['FINAL', 'OFF'].includes(g.gameState)))
-    .map(([d]) => d);
-  const recapEntries = await Promise.all(finalDates.map(async d => [d, await fetchRecap(d).catch(() => null)] as const));
-  const recapByDate = new Map(recapEntries);
+  const finalDates = [...byDate.entries()].filter(([, gs]) => gs.some(g => gameView(g.gameState) === 'final')).map(([d]) => d);
+  const recapBy = new Map(await Promise.all(finalDates.map(async d => [d, await fetchRecap(d).catch(() => null)] as const)));
 
-  const today = new Date().toISOString().slice(0, 10);
-  const tomorrowDate = new Date(today + 'T12:00:00Z');
-  tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
-  const tomorrow = tomorrowDate.toISOString().slice(0, 10);
-  const dayLabel = (d: string) => {
-    if (d === today) return 'Today';
-    if (d === tomorrow) return 'Tomorrow';
-    return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  };
+  let nextGameDate: string | null = null;
+  if (games.length === 0) {
+    const ahead = await fetchGamesRange(Array.from({ length: 7 }, (_, i) => addDays(dates[dates.length - 1], i + 1))).catch(() => empty);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    nextGameDate = (ahead.games as any[]).map(g => g.gameDate).sort()[0] ?? null;
+  }
 
-  const totalGames = games.length;
+  const days = [...byDate.entries()].map(([date, gs]) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows: ScheduleRowData[] = gs.map((g: any) => {
+      const p = predBy.get(g.id);
+      const view = gameView(g.gameState);
+      const homeProb: number | null = p?.home_win_probability ?? null;
+      const top = topPlayerByGame.get(g.id);
+      const outcome = p?.prediction_outcomes?.[0]?.correct_winner;
+      const recap = recapBy.get(date);
+      return {
+        href: gameUrl(g.id, g.awayTeam.abbrev, g.homeTeam.abbrev, date),
+        state: g.gameState,
+        startTimeUTC: g.startTimeUTC ?? null,
+        away: g.awayTeam.abbrev,
+        home: g.homeTeam.abbrev,
+        awayScore: g.awayTeam.score ?? null,
+        homeScore: g.homeTeam.score ?? null,
+        pick: homeProb == null ? null : homeProb >= 0.5
+          ? { abbrev: g.homeTeam.abbrev, pct: Math.round(homeProb * 100) }
+          : { abbrev: g.awayTeam.abbrev, pct: Math.round((1 - homeProb) * 100) },
+        pickResult: view !== 'final' || outcome == null ? null : outcome ? 'hit' : 'miss',
+        watch: top ? { name: top.name, heat: ppmToHeat(top.compositePpm) } : null,
+        watchability: view === 'final' ? null : calcWatchability({
+          topHomeHeat: ppmToHeat(topHeatByGameTeam.get(`${g.id}-true`) ?? 0),
+          topAwayHeat: ppmToHeat(topHeatByGameTeam.get(`${g.id}-false`) ?? 0),
+          homeWinProbability: homeProb,
+          isPlayoff: false,
+        }),
+        recapHref: view === 'final' && recap ? recapUrl(date, recap.title) : null,
+        marquee: false,
+      };
+    });
+    // ★ the single most watchable upcoming game of the day
+    const best = rows.reduce<ScheduleRowData | null>((b, r) => (r.watchability != null && (!b || r.watchability > (b.watchability ?? -1)) ? r : b), null);
+    if (best && rows.length > 1) best.marquee = true;
+    return { date, rows };
+  });
 
   return (
-    <div className="max-w-6xl mx-auto pb-20 md:pb-0">
-      <div className="mb-6">
-        <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--heat)' }}>Schedule · {range === 'today' ? 'Live' : 'Upcoming'}</div>
-        <h1 className="text-3xl sm:text-4xl font-bold font-editorial" style={{ color: 'var(--text-bright)' }}>All games. Every prediction.</h1>
-        {ytdAccuracy != null && (
-          <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>
-            YTD pick accuracy <span className="font-semibold" style={{ color: 'var(--rise)' }}>{ytdAccuracy}%</span>
-          </p>
-        )}
-      </div>
+    <div className="pb-20 lg:pb-0">
+      <SectionHeading
+        as="h1"
+        size="page"
+        kicker={range === 'today' ? 'SCHEDULE · TONIGHT' : 'SCHEDULE'}
+        title="All games. Every prediction."
+        sub={accuracy != null ? <>Season pick accuracy <b style={{ color: 'var(--rise)' }}>{Math.round(accuracy)}%</b> · our pick is ringed on every game.</> : 'Our pick is ringed on every game.'}
+        right={<FilterChips options={RANGES.map(r => ({ label: r.label, href: r.key === 'today' ? '/games' : `/games?range=${r.key}`, active: r.key === range }))} />}
+      />
 
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <Suspense>
-          <ScheduleFilters active={range} customDate={customDate} />
-        </Suspense>
-        <span className="text-sm" style={{ color: 'var(--text)' }}>{totalGames} game{totalGames !== 1 ? 's' : ''}</span>
-      </div>
-
-      {range === 'today' && <DayPredictionSummary predictions={predictions ?? []} />}
-
-      {totalGames === 0 ? (
-        <div className="rounded-xl border p-12 text-center" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <p style={{ color: 'var(--text)' }}>No games scheduled</p>
-        </div>
+      {days.length === 0 ? (
+        <ScheduleEmpty nextGameDate={nextGameDate} />
       ) : (
-        [...byDate.entries()].map(([date, dayGames]) => (
-          <div key={date} className="mb-6">
-            <div className="flex items-center justify-between mb-2 px-1">
-              <h2 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text)' }}>{dayLabel(date)}</h2>
-              <span className="text-xs" style={{ color: 'var(--text)', opacity: 0.6 }}>{dayGames.length} game{dayGames.length !== 1 ? 's' : ''}</span>
+        days.map(({ date, rows }) => (
+          <section key={date} className="mb-8">
+            <div className="mb-3.5 flex items-center gap-3">
+              <h2 className="text-[11px] font-bold" style={{ fontFamily: 'var(--font-geist-mono), monospace', color: 'var(--text-muted)', letterSpacing: 1.4 }}>{dayHeader(date, today)}</h2>
+              <span className="h-px flex-1" style={{ background: 'var(--border-soft)' }} />
+              <span className="text-[11px]" style={{ fontFamily: 'var(--font-geist-mono), monospace', color: 'var(--text-muted)' }}>{rows.length} game{rows.length === 1 ? '' : 's'}</span>
             </div>
-            <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-              {dayGames.map(g => {
-                const prediction = predMap.get(g.id);
-                const top = topPlayerByGame.get(g.id);
-                const isFinal = ['FINAL', 'OFF'].includes(g.gameState);
-                const recap = recapByDate.get(date);
-                const watchability = !isFinal
-                  ? calcWatchability({
-                      topHomeHeat: ppmToHeat(topHeatByGameTeam.get(`${g.id}-true`) ?? 0),
-                      topAwayHeat: ppmToHeat(topHeatByGameTeam.get(`${g.id}-false`) ?? 0),
-                      homeWinProbability: prediction?.home_win_probability ?? null,
-                      isPlayoff: isPlayoffGameId(g.id),
-                    })
-                  : null;
-                return (
-                  <ScheduleRow
-                    key={g.id}
-                    game={g}
-                    prediction={prediction}
-                    watchPlayer={top ? { name: top.name, teamAbbrev: top.teamAbbrev, heat: ppmToHeat(top.compositePpm) } : null}
-                    watchability={watchability}
-                    recapHref={isFinal && recap ? recapUrl(date, recap.title) : null}
-                  />
-                );
-              })}
+            <div className="overflow-hidden rounded-[14px] border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+              {rows.map((r, i) => (
+                <div key={r.href} style={{ borderTop: i ? '1px solid var(--border-soft)' : undefined }}>
+                  <ScheduleRow g={r} />
+                </div>
+              ))}
             </div>
-          </div>
+          </section>
         ))
       )}
     </div>
