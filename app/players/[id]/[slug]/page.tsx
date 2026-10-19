@@ -12,6 +12,7 @@ import { teamUrl, playerUrl } from '@/lib/urls';
 import { deriveArchetype } from '@/lib/archetype';
 import Link from 'next/link';
 import { assertDatabaseUp } from '@/lib/supabase';
+import { teamColor } from '@/lib/team-colors';
 
 // Deduplicate fetchPlayer between generateMetadata and the page component
 const cachedFetchPlayer = cache((id: string) => fetchPlayer(id).catch(() => null));
@@ -57,19 +58,6 @@ const COUNTRY_FLAG: Record<string, string> = {
   AUS: '🇦🇺', NLD: '🇳🇱', GBR: '🇬🇧', HUN: '🇭🇺',
 };
 
-const TEAM_BG_COLORS: Record<string, string> = {
-  ANA: '#945a2a', ARI: '#8c2633', UTA: '#1a5276',
-  BOS: '#8b6914', BUF: '#003087', CGY: '#8c1c1c',
-  CAR: '#7a0000', CHI: '#7a0618', COL: '#4a1726',
-  CBJ: '#002654', DAL: '#004a30', DET: '#7a0a14',
-  EDM: '#1a3060', FLA: '#041e42', LAK: '#333333',
-  MIN: '#0f3022', MTL: '#6e1220', NSH: '#1a2a5c',
-  NJD: '#7a0a14', NYI: '#003a6b', NYR: '#00277a',
-  OTT: '#7a5c1a', PHI: '#8b2e00', PIT: '#1a1a1a',
-  SEA: '#001628', SJS: '#004a50', STL: '#001e6b',
-  TBL: '#001a5c', TOR: '#001845', VAN: '#00421e',
-  VGK: '#252f34', WSH: '#041e42', WPG: '#041e42',
-};
 
 function SectionTitle({ main, accent, kicker }: { main: string; accent: string; kicker?: string }) {
   return (
@@ -355,7 +343,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
 
   // ── Team hero color ────────────────────────────────────────────────────────
   const playerTeamAbbrev = player.teams?.abbrev ?? '';
-  const teamHeroColor = TEAM_BG_COLORS[playerTeamAbbrev] ?? null;
+  const teamHeroColor = playerTeamAbbrev ? teamColor(playerTeamAbbrev).bg : null;
   const age = player.birth_date
     ? Math.floor((Date.now() - new Date(player.birth_date).getTime()) / (365.25 * 86400000))
     : null;
