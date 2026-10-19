@@ -31,6 +31,8 @@ export type HomeData = {
   stories: StoryCard[];
   hottest: RankRow[]; goalies: RankRow[]; rookies: RankRow[];
   pickAccuracyPct: number | null;
+  rankedCount: number | null;
+  heroImageUrl: string | null;
 };
 
 const side = (abbrev: string): TeamSide => ({ abbrev, name: teamColor(abbrev).name });
@@ -99,6 +101,11 @@ async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
 }
 
 const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+
+// NHL game dates are Eastern; a UTC date would roll to tomorrow during evening games.
+export function todayET(now = new Date()): string {
+  return now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
+}
 
 export async function fetchHomeData(today: string): Promise<HomeData> {
   const week = Array.from({ length: 8 }, (_, i) => addDays(today, i));
@@ -174,5 +181,5 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
     sub: r.players.age != null ? `Age ${r.players.age}` : `${r.players.career_games} NHL games`,
   }));
 
-  return { today, tonight, nextGameDate, resultsDate, results, stories, hottest, goalies: goalieRows, rookies: rookieRows, pickAccuracyPct: accuracy };
+  return { today, tonight, nextGameDate, resultsDate, results, stories, hottest, goalies: goalieRows, rookies: rookieRows, pickAccuracyPct: accuracy, rankedCount: rankings?.totalSkaters ?? null, heroImageUrl: latest?.hero_image_url ?? null };
 }

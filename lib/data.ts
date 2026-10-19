@@ -380,21 +380,19 @@ export async function fetchRecentCompletedGames(days = 3, limit = 20) {
   return { games, predMap };
 }
 
-// Number of games on today's schedule, for the header status pill. Cached per
-// server instance for 5 min (the header renders on every page).
+// Number of games on today's schedule, for the header status pill — from the same
+// NHL schedule the homepage slate uses, so the two always agree. Cached per server
+// instance for 5 min (the header renders on every page).
 let _todayCountCache: { date: string; count: number; ts: number } | null = null;
 export async function fetchTodayGameCount(): Promise<number> {
-  const today = new Date().toISOString().slice(0, 10);
+  // Eastern date, like the schedule (a UTC date rolls over during evening games).
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
   if (_todayCountCache && _todayCountCache.date === today && Date.now() - _todayCountCache.ts < 5 * 60_000) {
     return _todayCountCache.count;
   }
-  const { count, error } = await supabaseAdmin
-    .from('games')
-    .select('id', { count: 'exact', head: true })
-    .eq('game_date', today);
-  if (error) throw error;
-  _todayCountCache = { date: today, count: count ?? 0, ts: Date.now() };
-  return count ?? 0;
+  const games = await getGamesByDate(today);
+  _todayCountCache = { date: today, count: games.length, ts: Date.now() };
+  return games.length;
 }
 
 export async function fetchGames(date: string) {
@@ -431,6 +429,12 @@ export async function fetchGames(date: string) {
   return { games, predictions, odds };
 }
 
+// The /schedule response carries the date on the day, not on each game, so a
+// 9 PM ET game (01:00 UTC next day) would otherwise look like tomorrow's.
+export function withScheduleDates<T extends { id: number; gameDate?: string }>(dates: string[], gamesByDate: T[][]): (T & { gameDate: string })[] {
+  return gamesByDate.flatMap((games, i) => games.map(g => ({ ...g, gameDate: g.gameDate ?? dates[i] })));
+}
+
 // Same shape as fetchGames but across several dates in one round of calls —
 // used by the schedule page's Today / Tomorrow / This week views. The NHL
 // schedule endpoint is per-date, so we still fan out one call per date, but
@@ -439,7 +443,7 @@ export async function fetchGamesRange(dates: string[]) {
   const activeModel = await latestModelVersion();
   const gamesByDate = await Promise.all(dates.map(d => getGamesByDate(d)));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const games = gamesByDate.flat() as any[];
+  const games = withScheduleDates(dates, gamesByDate as any[][]) as any[];
   const gameIds = games.map(g => g.id);
 
   if (gameIds.length === 0) {

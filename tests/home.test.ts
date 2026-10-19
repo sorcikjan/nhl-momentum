@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatAccuracy, recapToStories, toResultCard } from '@/lib/home';
+import { formatAccuracy, recapToStories, toResultCard, todayET } from '@/lib/home';
 
 const game = (homeScore: number, awayScore: number, threeStars: unknown = null) => ({
   id: 2026020136,
@@ -58,5 +58,11 @@ describe('recapToStories', () => {
   });
   it('returns nothing without a recap', () => {
     expect(recapToStories(null, '')).toEqual([]);
+  });
+});
+
+describe('todayET', () => {
+  it('uses the Eastern date during late games (02:30 UTC is still the previous day in ET)', () => {
+    expect(todayET(new Date('2026-10-20T02:30:00Z'))).toBe('2026-10-19');
   });
 });
