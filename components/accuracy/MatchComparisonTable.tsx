@@ -109,7 +109,7 @@ export default function MatchComparisonTable({ predictions }: { predictions: Pre
             <button key={key} onClick={() => setTab(key)}
               className="text-xs px-3 py-1 rounded font-semibold transition-all"
               style={{
-                background: tab === key ? 'var(--neon)' : 'var(--border)',
+                background: tab === key ? 'var(--heat)' : 'var(--border)',
                 color: tab === key ? 'var(--bg)' : 'var(--text)',
                 cursor: 'pointer',
               }}>
@@ -139,7 +139,7 @@ export default function MatchComparisonTable({ predictions }: { predictions: Pre
                 {versions.map((v, vi) => (
                   <th key={v}
                     className={`px-2 md:px-4 py-2.5 text-left text-xs font-semibold uppercase font-mono${vi < versions.length - 1 ? ' hidden md:table-cell' : ''}`}
-                    style={{ color: 'var(--neon)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
+                    style={{ color: 'var(--heat)', borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>
                     {v}
                   </th>
                 ))}
@@ -201,7 +201,7 @@ export default function MatchComparisonTable({ predictions }: { predictions: Pre
                             {pred.predictedHome.toFixed(1)} – {pred.predictedAway.toFixed(1)}
                           </div>
                           <div className="flex items-center gap-1 mt-0.5">
-                            <span className="font-mono" style={{ color: pickedHome ? 'var(--neon)' : 'var(--silver)' }}>
+                            <span className="font-mono" style={{ color: pickedHome ? 'var(--heat)' : 'var(--silver)' }}>
                               {pickedHome ? `${pred.homeWinPct}%H` : `${100 - pred.homeWinPct}%A`}
                             </span>
                             {pred.correct !== null && (

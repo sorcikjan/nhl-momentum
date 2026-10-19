@@ -13,7 +13,7 @@ export default function ModelStatsCard({ stat }: { stat: ModelStat }) {
   return (
     <div className="rounded-xl border p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-bold font-mono" style={{ color: 'var(--neon)' }}>
+        <h3 className="text-sm font-bold font-mono" style={{ color: 'var(--heat)' }}>
           {stat.version}
         </h3>
         <span className="text-xs px-2 py-0.5 rounded font-mono"
@@ -57,7 +57,7 @@ export default function ModelStatsCard({ stat }: { stat: ModelStat }) {
             <div className="h-1.5 rounded-full"
               style={{
                 width: `${(stat.withOutcome / stat.totalPredictions) * 100}%`,
-                background: 'var(--neon)',
+                background: 'var(--heat)',
               }} />
           </div>
         </div>

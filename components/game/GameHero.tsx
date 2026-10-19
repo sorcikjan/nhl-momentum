@@ -13,6 +13,22 @@ const nickname = (full: string) => {
   return /^(Maple|Red|Blue|Golden)$/.test(w[w.length - 2] ?? '') ? w.slice(-2).join(' ') : w[w.length - 1] ?? full;
 };
 
+function Team({ s, align, won, picked, showScore }: { s: Side; align: 'left' | 'right'; won: boolean; picked: boolean; showScore: boolean }) {
+  const color = showScore ? (won ? 'var(--text-bright)' : 'var(--text)') : picked ? 'var(--text-bright)' : 'var(--text)';
+  return (
+    <div className={`flex min-w-0 flex-1 items-center gap-3 lg:gap-[18px] ${align === 'right' ? 'flex-row-reverse text-right' : ''}`}>
+      <span className="lg:hidden"><TeamChip abbrev={s.abbrev} size={48} ringed={!showScore && picked} /></span>
+      <span className="hidden lg:inline-flex"><TeamChip abbrev={s.abbrev} size={96} ringed={!showScore && picked} /></span>
+      <div className="min-w-0">
+        <div className="truncate font-extrabold leading-none" style={{ fontSize: 'clamp(22px, 4vw, 56px)', letterSpacing: '-0.032em', color }}>
+          {nickname(s.name)}
+        </div>
+        <div className="mt-1.5 truncate text-[11px] lg:mt-2 lg:text-[13px]" style={{ color: 'var(--text)' }}>{teamColor(s.abbrev).name}</div>
+      </div>
+    </div>
+  );
+}
+
 // Game hero (design DesktopGameUpcoming / Live / Final hero), regular season:
 // split team gradients, eyebrow, big matchup, one-line story. Full-bleed.
 export function GameHero({
@@ -30,20 +46,6 @@ export function GameHero({
   const showScore = view !== 'upcoming' && away.score != null && home.score != null;
   const awayWon = showScore && away.score! > home.score!;
   const homeWon = showScore && home.score! > away.score!;
-  const dim = (won: boolean, picked: boolean) => (showScore ? (won ? 'var(--text-bright)' : 'var(--text)') : picked ? 'var(--text-bright)' : 'var(--text)');
-  const Team = ({ s, align, won, picked }: { s: Side; align: 'left' | 'right'; won: boolean; picked: boolean }) => (
-    <div className={`flex min-w-0 flex-1 items-center gap-3 lg:gap-[18px] ${align === 'right' ? 'flex-row-reverse text-right' : ''}`}>
-      <span className="lg:hidden"><TeamChip abbrev={s.abbrev} size={48} ringed={!showScore && picked} /></span>
-      <span className="hidden lg:inline-flex"><TeamChip abbrev={s.abbrev} size={96} ringed={!showScore && picked} /></span>
-      <div className="min-w-0">
-        <div className="truncate font-extrabold leading-none" style={{ fontSize: 'clamp(22px, 4vw, 56px)', letterSpacing: '-0.032em', color: dim(won, picked) }}>
-          {nickname(s.name)}
-        </div>
-        <div className="mt-1.5 truncate text-[11px] lg:mt-2 lg:text-[13px]" style={{ color: 'var(--text)' }}>{teamColor(s.abbrev).name}</div>
-      </div>
-    </div>
-  );
-
   return (
     <section className="relative -mx-4 -mt-4 mb-8 overflow-hidden border-b lg:-mx-12 lg:-mt-8" style={{ borderColor: 'var(--border-soft)' }}>
       <div className="absolute inset-0 flex">
@@ -61,7 +63,7 @@ export function GameHero({
         </div>
 
         <h1 className="mb-4 flex items-center gap-4 lg:mb-[18px] lg:gap-8">
-          <Team s={away} align="left" won={awayWon} picked={pickSide === 'away'} />
+          <Team s={away} align="left" won={awayWon} picked={pickSide === 'away'} showScore={showScore} />
           <span className="flex shrink-0 flex-col items-center gap-1.5">
             {showScore ? (
               <span className="flex items-baseline gap-2 font-extrabold lg:gap-4" style={{ ...MONO, fontSize: 'clamp(28px, 5vw, 64px)', letterSpacing: -1.5 }}>
@@ -76,7 +78,7 @@ export function GameHero({
               {view === 'final' ? 'FINAL' : view === 'live' ? liveLabel ?? 'LIVE' : ''}
             </span>
           </span>
-          <Team s={home} align="right" won={homeWon} picked={pickSide === 'home'} />
+          <Team s={home} align="right" won={homeWon} picked={pickSide === 'home'} showScore={showScore} />
         </h1>
 
         {storyline && (

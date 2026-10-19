@@ -41,3 +41,6 @@ export const TEAMS: Record<string, TeamColor> = {
 export function teamColor(abbrev: string): TeamColor {
   return TEAMS[abbrev] ?? { bg: 'var(--bg-raised)', fg: 'var(--text-bright)', name: abbrev };
 }
+
+// Tint for cards with no team (hex, so callers can append an alpha suffix).
+export const NEUTRAL_TINT = '#ff5a24';

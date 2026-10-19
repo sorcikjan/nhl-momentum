@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import { SectionHeading, TeamChip } from '@/components/ds';
-import { teamColor } from '@/lib/team-colors';
+import { NEUTRAL_TINT, teamColor } from '@/lib/team-colors';
 import type { StoryCard } from '@/lib/home';
 import { MONO } from './format';
 
 const tint = (team: string | null, alpha: string) =>
-  `linear-gradient(155deg, ${team ? teamColor(team).bg : '#ff5a24'}${alpha} 0%, var(--bg) 100%)`;
+  `linear-gradient(155deg, ${team ? teamColor(team).bg : NEUTRAL_TINT}${alpha} 0%, var(--bg) 100%)`;
 
 // Last night's recap as a lead story + its game stories (design ArticleGrid).
 export function ArticleGrid({ stories, heroImageUrl }: { stories: StoryCard[]; heroImageUrl?: string | null }) {

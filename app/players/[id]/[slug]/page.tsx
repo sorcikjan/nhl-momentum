@@ -62,6 +62,10 @@ const COUNTRY_FLAG: Record<string, string> = {
 };
 
 
+function ageOf(birthDate: string | null | undefined): number | null {
+  return birthDate ? Math.floor((Date.now() - Date.parse(birthDate)) / (365.25 * 86_400_000)) : null;
+}
+
 const OUT_LABEL = { injured: 'INJURED', out: 'OUT', scratch: 'SCRATCHED', minors: 'MINORS' } as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -121,7 +125,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     seasonPim: Number(snap.season_pim ?? 0),
   }) : null;
 
-  const age = player.birth_date ? Math.floor((Date.now() - Date.parse(player.birth_date)) / (365.25 * 86_400_000)) : null;
+  const age = ageOf(player.birth_date);
   const name = `${player.first_name} ${player.last_name}`;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const games = (recentGames ?? []) as any[];

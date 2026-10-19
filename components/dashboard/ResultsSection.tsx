@@ -220,7 +220,7 @@ export default function ResultsSection({
           {pct !== null && (
             <div className="flex items-center gap-3 px-4 py-2.5 rounded-[10px] flex-shrink-0" style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}>
               <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.625rem', color: 'var(--text)', opacity: 0.6, fontWeight: 700, letterSpacing: '0.06em' }}>WE GOT</span>
-              <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '1.375rem', color: 'var(--neon)', fontWeight: 800, letterSpacing: '-0.03em' }}>{hits}/{total}</span>
+              <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '1.375rem', color: 'var(--heat)', fontWeight: 800, letterSpacing: '-0.03em' }}>{hits}/{total}</span>
               <span style={{ fontFamily: 'var(--font-geist-mono), monospace', fontSize: '0.625rem', color: 'var(--text)', opacity: 0.6, fontWeight: 600 }}>right · {pct}%</span>
             </div>
           )}
