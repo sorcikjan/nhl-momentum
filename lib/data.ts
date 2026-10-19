@@ -3,7 +3,8 @@
 
 import { supabaseAdmin } from '@/lib/supabase';
 import { ppmToHeat } from '@/lib/heat';
-import { getGamesByDate, getGameBoxscore, getGamePlayByPlay, getStandings, getTeamSeasonStats, getSeasonDates } from '@/lib/nhl-api';
+import { currentSeasonRows } from '@/lib/player-profile';
+import { currentSeason, getGamesByDate, getGameBoxscore, getGamePlayByPlay, getStandings, getTeamSeasonStats, getSeasonDates } from '@/lib/nhl-api';
 export { deriveOutStatus, daysAgo } from '@/lib/player-status';
 import { daysAgo } from '@/lib/player-status';
 import { processPlayByPlay } from '@/lib/play-by-play';
@@ -623,8 +624,10 @@ export async function fetchPlayer(id: string) {
       const gaa = toiSeconds > 0 ? goalsAgainst / (toiSeconds / 3600) : 0;
       return { gp, wins, losses, otl, shotsAgainst, goalsAgainst, savePct, toiSeconds, gaa };
     };
+    // "Season" = this season only — the fetch spans up to 82 games across seasons.
+    const startYear = Number(currentSeason().slice(0, 4));
     goalieStats = {
-      season: agg(rawGameStats),
+      season: agg(currentSeasonRows(rawGameStats, startYear)),
       recent: agg(rawGameStats.slice(0, 5)),
     };
   }
