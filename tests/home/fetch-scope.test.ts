@@ -11,7 +11,8 @@ vi.mock('@/lib/data', () => ({
   fetchRecentRecaps: async () => [],
   fetchSeasonPickAccuracy: async () => null,
   fetchPlayerPhotos: async () => new Map(),
-  fetchGameKeyPlayers: async () => new Map(),
+  fetchPregameKeyPlayers: async () => new Map(),
+  fetchStatLines: async () => new Map(),
 }));
 
 const game = (id: number, gameDate: string) => ({ id, gameDate, startTimeUTC: `${gameDate}T23:00:00Z`, gameState: 'FUT', awayTeam: { abbrev: 'EDM' }, homeTeam: { abbrev: 'COL' } });

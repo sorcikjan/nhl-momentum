@@ -6,16 +6,16 @@ import type { HomeData } from '@/lib/home';
 const base: HomeData = {
   today: '2026-10-19',
   tonight: [{
-    id: 1, href: '/games/1/ana-at-nyr-1019', startTimeUTC: '2026-10-19T23:00:00Z', state: 'FUT', awayScore: null, homeScore: null,
-    away: { abbrev: 'ANA', name: 'Anaheim' }, home: { abbrev: 'NYR', name: 'NY Rangers' },
-    pickSide: 'away', pickPct: 55, keyAway: [], keyHome: [],
+    id: 1, href: '/games/1/ana-at-nyr-1019', startTimeUTC: '2026-10-19T23:00:00Z', state: 'FUT',
+    away: { abbrev: 'ANA', name: 'Anaheim', score: null, pct: 55, players: [] }, home: { abbrev: 'NYR', name: 'NY Rangers', score: null, pct: 45, players: [] },
+    pick: { abbrev: 'ANA', pct: 55 }, pickResult: null,
   }],
   nextGameDate: null,
   resultsDate: '2026-10-18',
   results: [{
-    id: 2, href: '/games/2/car-at-cgy-1018',
-    away: { abbrev: 'CAR', name: 'Carolina', score: 2 }, home: { abbrev: 'CGY', name: 'Calgary', score: 3 },
-    pick: 'miss', pickTeam: 'CAR', pickPct: 63, keyAway: [], keyHome: [],
+    id: 2, href: '/games/2/car-at-cgy-1018', state: 'OFF', startTimeUTC: null,
+    away: { abbrev: 'CAR', name: 'Carolina', score: 2, pct: null, players: [] }, home: { abbrev: 'CGY', name: 'Calgary', score: 3, pct: null, players: [] },
+    pick: { abbrev: 'CAR', pct: 63 }, pickResult: 'miss',
   }],
   stories: [{ href: '/recaps/x', kicker: 'LAST NIGHT · BIG STORY', title: 'Flames Extinguish Reigning Champs', dek: 'd', team: null, lead: true }],
   hottest: [{ playerId: 4, href: '/players/4/x', name: 'Connor McDavid', team: 'EDM', heat: 100, sub: 'Forward', photo: null }],

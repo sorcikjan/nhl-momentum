@@ -35,7 +35,7 @@ describe('sectionPlan', () => {
     expect(text).not.toMatch(/SERIES|PLAYOFF/);
     expect(SECTION_META.lineup.kicker).toBe('LINEUP · PROJECTED');
     expect(SECTION_META.watch.kicker).toBe('KEY PLAYERS · WHY WATCH');
-    expect(SECTION_META.keyPlayers.kicker).toBe('KEY PLAYERS · WHO DECIDED IT');
+    expect(SECTION_META.keyPlayers.kicker).toBe('KEY PLAYERS · HOW THEY DID');
   });
 });
 

@@ -2,34 +2,22 @@
 // design's sections show (docs/design/redesign-2026/homepage-final.js).
 import {
   fetchGamesRange, fetchGoalieRankings, fetchNewcomerWatch, fetchRankings, fetchRecap,
-  fetchGameKeyPlayers, fetchPlayerPhotos, fetchRecentCompletedGames, fetchRecentRecaps, fetchSeasonPickAccuracy,
+  fetchPlayerPhotos, fetchPregameKeyPlayers, fetchRecentCompletedGames, fetchRecentRecaps, fetchSeasonPickAccuracy, fetchStatLines,
 } from '@/lib/data';
+import { cardPlayers, type GameCardData } from '@/lib/game-card';
+import { gameView } from '@/lib/game-state';
 import { ppmToHeat } from '@/lib/heat';
 import type { KeyPlayer } from '@/lib/key-players';
 import { teamColor } from '@/lib/team-colors';
 import { gameUrl, playerUrl, recapUrl } from '@/lib/urls';
 
 export type TeamSide = { abbrev: string; name: string };
-export type KeyFace = { playerId?: number; name: string; photo: string | null; team: string };
-export type SlateGame = {
-  id: number; href: string; startTimeUTC: string | null; state: string;
-  awayScore: number | null; homeScore: number | null;
-  away: TeamSide; home: TeamSide;
-  pickSide: 'home' | 'away' | null; pickPct: number | null;
-  keyAway: KeyFace[]; keyHome: KeyFace[];
-};
-export type ResultCard = {
-  id: number; href: string;
-  away: TeamSide & { score: number }; home: TeamSide & { score: number };
-  pick: 'hit' | 'miss' | null; pickTeam: string | null; pickPct: number | null;
-  keyAway: KeyFace[]; keyHome: KeyFace[];
-};
 export type StoryCard = { href: string; kicker: string; title: string; dek: string; team: string | null; lead: boolean };
 export type RankRow = { playerId: number; href: string; name: string; photo: string | null; team: string; heat: number | null; sub: string };
 export type HomeData = {
   today: string;
-  tonight: SlateGame[]; nextGameDate: string | null;
-  resultsDate: string | null; results: ResultCard[];
+  tonight: GameCardData[]; nextGameDate: string | null;
+  resultsDate: string | null; results: GameCardData[];
   stories: StoryCard[];
   hottest: RankRow[]; goalies: RankRow[]; rookies: RankRow[];
   pickAccuracyPct: number | null;
@@ -45,29 +33,25 @@ type FinishedGame = {
   home_team: { abbrev: string; name?: string } | null; away_team: { abbrev: string; name?: string } | null;
 };
 
-export function toResultCard(g: FinishedGame, pred: Pred): ResultCard {
+// Our pick from the home win probability: the favored side and its %.
+function pickFrom(p: number | null | undefined, home: string, away: string): GameCardData['pick'] {
+  if (p == null) return null;
+  return p >= 0.5 ? { abbrev: home, pct: Math.round(p * 100) } : { abbrev: away, pct: Math.round((1 - p) * 100) };
+}
+
+export function toResultCard(g: FinishedGame, pred: Pred): GameCardData {
   const home = g.home_team?.abbrev ?? '?';
   const away = g.away_team?.abbrev ?? '?';
   const hs = g.home_score ?? 0;
   const as = g.away_score ?? 0;
-  let pick: ResultCard['pick'] = null;
-  let pickTeam: string | null = null;
-  let pickPct: number | null = null;
-  const p = pred?.home_win_probability;
-  if (p != null) {
-    const homePick = p >= 0.5;
-    pickTeam = homePick ? home : away;
-    pickPct = Math.round((homePick ? p : 1 - p) * 100);
-    const recorded = pred?.prediction_outcomes?.[0]?.correct_winner;
-    pick = (recorded ?? homePick === hs > as) ? 'hit' : 'miss';
-  }
+  const pick = pickFrom(pred?.home_win_probability, home, away);
+  const recorded = pred?.prediction_outcomes?.[0]?.correct_winner;
+  const pickResult: GameCardData['pickResult'] = !pick ? null : (recorded ?? (pick.abbrev === home) === hs > as) ? 'hit' : 'miss';
   return {
-    id: g.id,
-    href: gameUrl(g.id, away, home, g.game_date),
-    away: { ...side(away), score: as },
-    home: { ...side(home), score: hs },
-    pick, pickTeam, pickPct,
-    keyAway: [], keyHome: [], // filled from the box score by fetchHomeData
+    id: g.id, href: gameUrl(g.id, away, home, g.game_date), state: 'OFF', startTimeUTC: null,
+    away: { ...side(away), score: as, pct: null, players: [] },
+    home: { ...side(home), score: hs, pct: null, players: [] },
+    pick, pickResult,
   };
 }
 
@@ -103,9 +87,6 @@ async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
 const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 // NHL game dates are Eastern; a UTC date would roll to tomorrow during evening games.
-const faces = (ks: { playerId: number; name: string; team: string }[] | undefined): KeyFace[] =>
-  (ks ?? []).map(k => ({ playerId: k.playerId, name: k.name, photo: null, team: k.team }));
-
 export function todayET(now = new Date()): string {
   return now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 }
@@ -127,28 +108,20 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const predBy = new Map<number, any>(range.predictions.map((p: any) => [p.game_id, p]));
   const dateOf = (g: { gameDate?: string; startTimeUTC?: string }) => g.gameDate ?? g.startTimeUTC?.slice(0, 10) ?? '';
-  const tonight: SlateGame[] = games.filter(g => dateOf(g) === today).map(g => {
-    const p = predBy.get(g.id)?.home_win_probability ?? null;
+  const tonight: GameCardData[] = games.filter(g => dateOf(g) === today).map(g => {
+    const pred = predBy.get(g.id);
+    const p: number | null = pred?.home_win_probability ?? null;
+    const pick = pickFrom(p, g.homeTeam.abbrev, g.awayTeam.abbrev);
+    const outcome = pred?.prediction_outcomes?.[0]?.correct_winner;
+    const homePct = p == null ? null : Math.round(p * 100);
     return {
-      id: g.id,
-      href: gameUrl(g.id, g.awayTeam.abbrev, g.homeTeam.abbrev, today),
-      startTimeUTC: g.startTimeUTC ?? null,
-      state: g.gameState ?? 'FUT',
-      awayScore: g.awayTeam.score ?? null, homeScore: g.homeTeam.score ?? null,
-      away: side(g.awayTeam.abbrev), home: side(g.homeTeam.abbrev),
-      pickSide: p == null ? null : p >= 0.5 ? 'home' : 'away',
-      pickPct: p == null ? null : Math.round((p >= 0.5 ? p : 1 - p) * 100),
-      keyAway: faces(range.keyPlayersByGameTeam.get(`${g.id}-false`)), keyHome: faces(range.keyPlayersByGameTeam.get(`${g.id}-true`)),
+      id: g.id, href: gameUrl(g.id, g.awayTeam.abbrev, g.homeTeam.abbrev, today),
+      state: g.gameState ?? 'FUT', startTimeUTC: g.startTimeUTC ?? null,
+      away: { ...side(g.awayTeam.abbrev), score: g.awayTeam.score ?? null, pct: homePct == null ? null : 100 - homePct, players: [] },
+      home: { ...side(g.homeTeam.abbrev), score: g.homeTeam.score ?? null, pct: homePct, players: [] },
+      pick, pickResult: gameView(g.gameState) === 'final' && outcome != null && pick ? (outcome ? 'hit' : 'miss') : null,
     };
   });
-  // Photos for tonight's key players (snapshots carry no headshot) — one query.
-  const faceIds = tonight.flatMap(t => [...t.keyAway, ...t.keyHome].flatMap(f => (f.playerId ? [f.playerId] : [])));
-  if (faceIds.length) {
-    const photos = await safe(fetchPlayerPhotos([...new Set(faceIds)]), new Map<number, string>());
-    for (const t of tonight) {
-      for (const f of [...t.keyAway, ...t.keyHome]) if (f.playerId) f.photo = photos.get(f.playerId) ?? null;
-    }
-  }
   // Off-day only: look a week ahead for the next game date (each extra day costs an NHL call + DB reads).
   let nextGameDate: string | null = null;
   if (!tonight.length) {
@@ -161,15 +134,20 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
   const resultsDate = recent.games[0]?.game_date ?? null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const results = (recent.games as any[]).filter(g => g.game_date === resultsDate).map(g => toResultCard(g, recent.predMap.get(g.id) ?? null));
-  // Each team's key players from the box score (same ranking as the game page).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const resultGames = (recent.games as any[]).filter(g => g.game_date === resultsDate && g.home_team && g.away_team)
-    .map(g => ({ id: g.id, homeTeamId: g.home_team.id, awayTeamId: g.away_team.id, home: g.home_team.abbrev, away: g.away_team.abbrev }));
-  const keys = await safe(fetchGameKeyPlayers(resultGames), new Map<number, { away: KeyPlayer[]; home: KeyPlayer[] }>());
-  for (const r of results) {
-    const k = keys.get(r.id);
-    r.keyAway = (k?.away ?? []).map(p => ({ playerId: p.playerId, name: p.name, photo: p.photo, team: p.team }));
-    r.keyHome = (k?.home ?? []).map(p => ({ playerId: p.playerId, name: p.name, photo: p.photo, team: p.team }));
+  // Key players on every card: top pre-game Heat per team, plus goals/assists
+  // once a game has started — then photos for all of them in one query.
+  const resultKeys = await safe(fetchPregameKeyPlayers(results.map(r => ({ id: r.id, home: r.home.abbrev, away: r.away.abbrev }))), new Map<string, KeyPlayer[]>());
+  const keyOf = (id: number, isHome: boolean) => range.keyPlayersByGameTeam.get(`${id}-${isHome}`) ?? resultKeys.get(`${id}-${isHome}`) ?? [];
+  const cards = [...tonight, ...results];
+  const started = cards.filter(c => gameView(c.state) !== 'upcoming').map(c => c.id);
+  const statsBy = await safe(fetchStatLines(started), new Map<number, Map<number, { goals: number; assists: number }>>());
+  const ids = [...new Set(cards.flatMap(c => [...keyOf(c.id, false), ...keyOf(c.id, true)].map(k => k.playerId)))];
+  const photos = ids.length ? await safe(fetchPlayerPhotos(ids), new Map<number, string>()) : new Map<number, string>();
+  for (const c of cards) {
+    // A started game without box-score rows yet shows Heat only (not "DNP" for everyone).
+    const stats = statsBy.get(c.id)?.size ? statsBy.get(c.id)! : null;
+    c.away.players = cardPlayers(keyOf(c.id, false), photos, stats);
+    c.home.players = cardPlayers(keyOf(c.id, true), photos, stats);
   }
 
   const latest = recaps[0] ?? null;

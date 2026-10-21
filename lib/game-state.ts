@@ -24,7 +24,7 @@ export const SECTION_META = {
   liveStats: { kicker: 'LIVE STATS', title: '' },
   topPerformers: { kicker: 'TOP PERFORMERS', title: '' },
   threeStars: { kicker: 'THREE STARS · OFFICIAL', title: "Tonight's best." },
-  keyPlayers: { kicker: 'KEY PLAYERS · WHO DECIDED IT', title: 'Top three on each side.' },
+  keyPlayers: { kicker: 'KEY PLAYERS · HOW THEY DID', title: 'The three hottest on each side.' },
   pick: { kicker: 'OUR PICK · HOW IT PLAYED', title: '' }, // title from pickHeadline()
   heatImpact: { kicker: 'HEAT IMPACT', title: 'Who moved up. Who moved down.' },
   recap: { kicker: 'AI RECAP', title: '' },

@@ -27,7 +27,8 @@ import RecapCard from '@/components/games/RecapCard';
 import HighlightsCard from '@/components/games/HighlightsCard';
 import GoalieMatchupCard from '@/components/games/GoalieMatchupCard';
 import { KeyPlayers } from '@/components/game/KeyPlayers';
-import { postgameKeyPlayers, pregameKeyPlayers, type SnapSkater } from '@/lib/key-players';
+import { pregameKeyPlayers, type SnapSkater } from '@/lib/key-players';
+import { cardPlayers } from '@/lib/game-card';
 import SpecialTeamsCard from '@/components/games/SpecialTeamsCard';
 import HeadToHeadCard from '@/components/games/HeadToHeadCard';
 import LineupContextCard from '@/components/games/LineupContextCard';
@@ -243,7 +244,6 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   // ── Heat Impact (FINAL only): pre-game snapshot Heat vs. most recent Heat ──
   let heatImpactUp: Mover[] = [];
   let heatImpactDown: Mover[] = [];
-  const heatDelta = new Map<number, number>();
   if (isFinal) {
     const allSkaters = [...awaySkaters.map(s => ({ ...s, teamAbbrev: awayAbbrev })), ...homeSkaters.map(s => ({ ...s, teamAbbrev: homeAbbrev }))];
     const postHeat = await fetchPostGameHeat(allSkaters.map(s => s.playerId)).catch(() => new Map<number, number>());
@@ -255,24 +255,29 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         return { playerId: s.playerId, href: playerUrl(s.playerId, ...splitName(s.playerName)), name: s.playerName, teamAbbrev: s.teamAbbrev, before, after, delta: after - before };
       })
       .filter(m => m.delta !== 0);
-    for (const m of movers) heatDelta.set(m.playerId, m.delta);
     heatImpactUp = movers.filter(m => m.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3);
     heatImpactDown = movers.filter(m => m.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 3);
   }
 
-  // ── Key players: three per team (before: Heat + form; after: box score) ────
-  const keyCandidates = (sk: SnapSkater[]) => pregameKeyPlayers(sk, new Map(), '').map(p => p.playerId);
-  const keyForm = !isFinal
-    ? await fetchKeyPlayerForm([...keyCandidates(awaySkaters), ...keyCandidates(homeSkaters)]).catch(() => new Map())
-    : new Map();
-  const awayKey = isFinal
-    ? postgameKeyPlayers(awayStats.length ? awayStats : awayBoxPlayers ?? [], awayGoalie ?? awayBoxGoalie, awayAbbrev, heatDelta)
-    : pregameKeyPlayers(awaySkaters, keyForm, awayAbbrev);
-  const homeKey = isFinal
-    ? postgameKeyPlayers(homeStats.length ? homeStats : homeBoxPlayers ?? [], homeGoalie ?? homeBoxGoalie, homeAbbrev, heatDelta)
-    : pregameKeyPlayers(homeSkaters, keyForm, homeAbbrev);
-  const keyPlayersNode = (awayKey.length || homeKey.length)
-    ? <KeyPlayers away={{ abbrev: awayAbbrev, name: awayName, players: awayKey }} home={{ abbrev: homeAbbrev, name: homeName, players: homeKey }} />
+  // ── Key players: three per team by pre-game Heat (same as the game cards).
+  // Before: why to watch; after: what they did in this game.
+  // Finished games pick from a deeper pool (skipping late scratches); upcoming show the top 3.
+  const pool = isFinal ? 8 : 3;
+  const keyCandidates = (sk: SnapSkater[]) => pregameKeyPlayers(sk, new Map(), '', pool).map(p => p.playerId);
+  const keyForm = await fetchKeyPlayerForm([...keyCandidates(awaySkaters), ...keyCandidates(homeSkaters)]).catch(() => new Map());
+  const awayKeys = pregameKeyPlayers(awaySkaters, keyForm, awayAbbrev, pool);
+  const homeKeys = pregameKeyPlayers(homeSkaters, keyForm, homeAbbrev, pool);
+  const gameStats = new Map<number, { goals: number; assists: number }>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of ([...(playerStats ?? []), ...(homeBoxPlayers ?? []), ...(awayBoxPlayers ?? [])] as any[])) {
+    if (!gameStats.has(r.player_id)) gameStats.set(r.player_id, { goals: r.goals ?? 0, assists: r.assists ?? 0 });
+  }
+  const statsOrNull = isFinal && gameStats.size ? gameStats : null;
+  const toRows = (keys: typeof awayKeys) => isFinal
+    ? cardPlayers(keys, new Map(), statsOrNull)
+    : keys.map(k => ({ playerId: k.playerId, name: k.name, href: k.href, photo: k.photo, heat: k.heat, stat: k.line }));
+  const keyPlayersNode = (awayKeys.length || homeKeys.length)
+    ? <KeyPlayers away={{ abbrev: awayAbbrev, name: awayName, players: toRows(awayKeys) }} home={{ abbrev: homeAbbrev, name: homeName, players: toRows(homeKeys) }} />
     : null;
 
   // ── Recap (FINAL only): factual, templated from real box-score data ────────

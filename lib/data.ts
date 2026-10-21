@@ -4,7 +4,7 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { ppmToHeat } from '@/lib/heat';
 import { buildSearchIndex } from '@/lib/search';
-import { postgameKeyPlayers, pregameKeyPlayers, type KeyPlayer } from '@/lib/key-players';
+import { pregameKeyPlayers, type KeyPlayer } from '@/lib/key-players';
 import { currentSeasonRows } from '@/lib/player-profile';
 import { currentSeason, getGamesByDate, getGameBoxscore, getGamePlayByPlay, getStandings, getTeamSeasonStats, getSeasonDates } from '@/lib/nhl-api';
 export { deriveOutStatus, daysAgo } from '@/lib/player-status';
@@ -424,7 +424,7 @@ export async function fetchGamesRange(dates: string[]) {
     if (!skaters.length) continue;
     const game = games.find(g => g.id === snap.game_id);
     const teamAbbrev = snap.is_home ? game?.homeTeam?.abbrev : game?.awayTeam?.abbrev;
-    keyPlayersByGameTeam.set(`${snap.game_id}-${snap.is_home}`, pregameKeyPlayers(skaters, new Map(), teamAbbrev ?? ''));
+    keyPlayersByGameTeam.set(`${snap.game_id}-${snap.is_home}`, pregameKeyPlayers(skaters, new Map(), teamAbbrev ?? '', 8));
     const top = [...skaters].sort((a, b) => (b.compositePpm ?? 0) - (a.compositePpm ?? 0))[0];
     if (top) {
       topHeatByGameTeam.set(`${snap.game_id}-${snap.is_home}`, top.compositePpm ?? 0);
@@ -904,36 +904,38 @@ export async function fetchSearchIndex() {
   return buildSearchIndex(players as any[], [...latest.values()], (teams ?? []).filter(t => live.has(t.abbrev)));
 }
 
-// Box-score key players (three per team, as on the game page) for finished games.
-// Two queries for all games together, paged under the 1,000-row cap.
-export async function fetchGameKeyPlayers(
-  games: { id: number; homeTeamId: number; awayTeamId: number; home: string; away: string }[],
-): Promise<Map<number, { away: KeyPlayer[]; home: KeyPlayer[] }>> {
-  const out = new Map<number, { away: KeyPlayer[]; home: KeyPlayer[] }>();
+// Pre-game key players (top Heat, three per team) for games already in the DB,
+// e.g. finished games on the homepage — from the stored pre-game snapshots.
+export async function fetchPregameKeyPlayers(games: { id: number; home: string; away: string }[]): Promise<Map<string, KeyPlayer[]>> {
+  const out = new Map<string, KeyPlayer[]>();
   if (!games.length) return out;
-  const ids = games.map(g => g.id);
-  const stats: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const { data } = await supabaseAdmin
+    .from('game_team_snapshots')
+    .select('game_id, is_home, skater_snapshots')
+    .in('game_id', games.map(g => g.id));
+  for (const snap of data ?? []) {
+    const g = games.find(x => x.id === snap.game_id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    out.set(`${snap.game_id}-${snap.is_home}`, pregameKeyPlayers((snap.skater_snapshots as any[]) ?? [], new Map(), (snap.is_home ? g?.home : g?.away) ?? '', 8));
+  }
+  return out;
+}
+
+// Goals/assists per player for finished games: gameId → playerId → line.
+export async function fetchStatLines(gameIds: number[]): Promise<Map<number, Map<number, { goals: number; assists: number }>>> {
+  const out = new Map<number, Map<number, { goals: number; assists: number }>>();
+  if (!gameIds.length) return out;
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabaseAdmin
       .from('game_player_stats')
-      .select('game_id, team_id, player_id, goals, assists, shots_on_goal, plus_minus, players(first_name, last_name, position_code, headshot_url)')
-      .in('game_id', ids).order('id').range(from, from + 999);
+      .select('game_id, player_id, goals, assists')
+      .in('game_id', gameIds).order('id').range(from, from + 999);
     if (error) throw error;
-    stats.push(...(data ?? []));
+    for (const r of data ?? []) {
+      if (!out.has(r.game_id)) out.set(r.game_id, new Map());
+      out.get(r.game_id)!.set(r.player_id, { goals: r.goals ?? 0, assists: r.assists ?? 0 });
+    }
     if ((data ?? []).length < 1000) break;
-  }
-  const { data: goalies } = await supabaseAdmin
-    .from('game_goalie_stats')
-    .select('game_id, team_id, player_id, shots_against, goals_against, save_pct, players(first_name, last_name, headshot_url)')
-    .in('game_id', ids);
-  for (const g of games) {
-    const side = (teamId: number, abbrev: string) => postgameKeyPlayers(
-      stats.filter(s => s.game_id === g.id && s.team_id === teamId),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ((goalies ?? []) as any[]).filter(x => x.game_id === g.id && x.team_id === teamId).sort((a, b) => b.shots_against - a.shots_against)[0] ?? null,
-      abbrev, new Map(),
-    );
-    out.set(g.id, { away: side(g.awayTeamId, g.away), home: side(g.homeTeamId, g.home) });
   }
   return out;
 }

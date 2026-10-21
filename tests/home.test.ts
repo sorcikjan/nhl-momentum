@@ -13,19 +13,19 @@ const game = (homeScore: number, awayScore: number, threeStars: unknown = null) 
 
 describe('toResultCard', () => {
   it('marks a hit when the favored side won', () => {
-    expect(toResultCard(game(3, 2), { home_win_probability: 0.6 }).pick).toBe('hit');
+    expect(toResultCard(game(3, 2), { home_win_probability: 0.6 }).pickResult).toBe('hit');
   });
   it('marks a miss when the favored side lost', () => {
     const r = toResultCard(game(3, 2), { home_win_probability: 0.4 });
-    expect(r.pick).toBe('miss');
-    expect(r.pickTeam).toBe('CAR');
-    expect(r.pickPct).toBe(60);
+    expect(r.pickResult).toBe('miss');
+    expect(r.pick).toEqual({ abbrev: 'CAR', pct: 60 });
   });
   it('has no pick without a prediction', () => {
     expect(toResultCard(game(3, 2), null).pick).toBeNull();
+    expect(toResultCard(game(3, 2), null).pickResult).toBeNull();
   });
   it('prefers the recorded outcome when present', () => {
-    expect(toResultCard(game(3, 2), { home_win_probability: 0.6, prediction_outcomes: [{ correct_winner: false }] }).pick).toBe('miss');
+    expect(toResultCard(game(3, 2), { home_win_probability: 0.6, prediction_outcomes: [{ correct_winner: false }] }).pickResult).toBe('miss');
   });
 });
 
