@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Headshot, HeatPill, SectionHeading, TeamChip } from '@/components/ds';
+import { KeyLine, SectionHeading, TeamChip } from '@/components/ds';
 import type { ResultCard } from '@/lib/home';
 import { dayLabel, MONO } from './format';
 
@@ -26,7 +26,7 @@ function TeamLine({ t, won }: { t: ResultCard['home']; won: boolean }) {
   );
 }
 
-// Last game day: our pick vs the result + first star (design ResultsSection).
+// Last game day: our pick vs the result + each team's key players.
 export function ResultsSection({ date, results }: { date: string | null; results: ResultCard[] }) {
   if (!date || !results.length) return null;
   const hit = (r: ResultCard) => r.pick === 'hit';
@@ -59,12 +59,10 @@ export function ResultsSection({ date, results }: { date: string | null; results
               <TeamLine t={r.away} won={r.away.score > r.home.score} />
               <TeamLine t={r.home} won={r.home.score > r.away.score} />
             </div>
-            {r.star && (
-              <div className="flex items-center gap-2 border-t px-3.5 py-2.5" style={{ borderColor: 'var(--border-soft)' }}>
-                <span className="text-[9px] font-bold" style={{ ...MONO, color: 'var(--heat)' }}>★</span>
-                <Headshot src={r.star.photo} name={r.star.name} team={r.star.team} size={24} />
-                <span className="flex-1 truncate text-xs font-semibold" style={{ color: 'var(--text-bright)' }}>{r.star.name}</span>
-                {r.starHeat != null && <HeatPill heat={r.starHeat} size="sm" />}
+            {(r.keyAway.length > 0 || r.keyHome.length > 0) && (
+              <div className="flex flex-col gap-1.5 border-t px-3.5 py-2.5" style={{ borderColor: 'var(--border-soft)' }}>
+                <KeyLine team={r.away.abbrev} players={r.keyAway} />
+                <KeyLine team={r.home.abbrev} players={r.keyHome} />
               </div>
             )}
           </Link>

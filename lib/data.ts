@@ -4,7 +4,7 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { ppmToHeat } from '@/lib/heat';
 import { buildSearchIndex } from '@/lib/search';
-import { pregameKeyPlayers, type KeyPlayer } from '@/lib/key-players';
+import { postgameKeyPlayers, pregameKeyPlayers, type KeyPlayer } from '@/lib/key-players';
 import { currentSeasonRows } from '@/lib/player-profile';
 import { currentSeason, getGamesByDate, getGameBoxscore, getGamePlayByPlay, getStandings, getTeamSeasonStats, getSeasonDates } from '@/lib/nhl-api';
 export { deriveOutStatus, daysAgo } from '@/lib/player-status';
@@ -382,7 +382,7 @@ export async function fetchGamesRange(dates: string[]) {
   const gameIds = games.map(g => g.id);
 
   if (gameIds.length === 0) {
-    return { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map(), keyPlayersByGameTeam: new Map<string, KeyPlayer[]>() };
+    return { games: [], predictions: [], odds: [], topHeatByGameTeam: new Map(), keyPlayersByGameTeam: new Map<string, KeyPlayer[]>() };
   }
 
   const [{ data: allPredictions }, { data: odds }] = await Promise.all([
@@ -408,14 +408,13 @@ export async function fetchGamesRange(dates: string[]) {
   }
   const predictions = Array.from(predByGame.values());
 
-  // Per-game top Heat player (for "watch for") — sourced from the same
-  // pre-game skater snapshots the prediction model itself uses as input.
+  // Per-team key players and top Heat — from the same pre-game skater
+  // snapshots the prediction model itself uses as input.
   const { data: snapshots } = await supabaseAdmin
     .from('game_team_snapshots')
     .select('game_id, is_home, skater_snapshots')
     .in('game_id', gameIds);
 
-  const topPlayerByGame = new Map<number, { playerId: number; name: string; compositePpm: number; teamAbbrev: string }>();
   const topHeatByGameTeam = new Map<string, number>(); // `${gameId}-${isHome}` → highest compositePpm
   // `${gameId}-${isHome}` → the game page's three key players (photos filled by callers).
   const keyPlayersByGameTeam = new Map<string, KeyPlayer[]>();
@@ -429,14 +428,10 @@ export async function fetchGamesRange(dates: string[]) {
     const top = [...skaters].sort((a, b) => (b.compositePpm ?? 0) - (a.compositePpm ?? 0))[0];
     if (top) {
       topHeatByGameTeam.set(`${snap.game_id}-${snap.is_home}`, top.compositePpm ?? 0);
-      const existing = topPlayerByGame.get(snap.game_id);
-      if (!existing || (top.compositePpm ?? 0) > existing.compositePpm) {
-        topPlayerByGame.set(snap.game_id, { playerId: top.playerId, name: top.playerName, compositePpm: top.compositePpm ?? 0, teamAbbrev: teamAbbrev ?? '' });
-      }
     }
   }
 
-  return { games, predictions, odds, topPlayerByGame, topHeatByGameTeam, keyPlayersByGameTeam };
+  return { games, predictions, odds, topHeatByGameTeam, keyPlayersByGameTeam };
 }
 
 // ─── Player ───────────────────────────────────────────────────────────────────
@@ -909,6 +904,40 @@ export async function fetchSearchIndex() {
   return buildSearchIndex(players as any[], [...latest.values()], (teams ?? []).filter(t => live.has(t.abbrev)));
 }
 
+// Box-score key players (three per team, as on the game page) for finished games.
+// Two queries for all games together, paged under the 1,000-row cap.
+export async function fetchGameKeyPlayers(
+  games: { id: number; homeTeamId: number; awayTeamId: number; home: string; away: string }[],
+): Promise<Map<number, { away: KeyPlayer[]; home: KeyPlayer[] }>> {
+  const out = new Map<number, { away: KeyPlayer[]; home: KeyPlayer[] }>();
+  if (!games.length) return out;
+  const ids = games.map(g => g.id);
+  const stats: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabaseAdmin
+      .from('game_player_stats')
+      .select('game_id, team_id, player_id, goals, assists, shots_on_goal, plus_minus, players(first_name, last_name, position_code, headshot_url)')
+      .in('game_id', ids).order('id').range(from, from + 999);
+    if (error) throw error;
+    stats.push(...(data ?? []));
+    if ((data ?? []).length < 1000) break;
+  }
+  const { data: goalies } = await supabaseAdmin
+    .from('game_goalie_stats')
+    .select('game_id, team_id, player_id, shots_against, goals_against, save_pct, players(first_name, last_name, headshot_url)')
+    .in('game_id', ids);
+  for (const g of games) {
+    const side = (teamId: number, abbrev: string) => postgameKeyPlayers(
+      stats.filter(s => s.game_id === g.id && s.team_id === teamId),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ((goalies ?? []) as any[]).filter(x => x.game_id === g.id && x.team_id === teamId).sort((a, b) => b.shots_against - a.shots_against)[0] ?? null,
+      abbrev, new Map(),
+    );
+    out.set(g.id, { away: side(g.awayTeamId, g.away), home: side(g.homeTeamId, g.home) });
+  }
+  return out;
+}
+
 // Recent form + photo for a game's key players (a handful of ids).
 export async function fetchKeyPlayerForm(playerIds: number[]): Promise<Map<number, { goals: number; assists: number; games: number; photo: string | null }>> {
   const out = new Map<number, { goals: number; assists: number; games: number; photo: string | null }>();
@@ -933,20 +962,6 @@ export async function fetchPlayerPhotos(playerIds: number[]): Promise<Map<number
   if (!playerIds.length) return out;
   const { data } = await supabaseAdmin.from('players').select('id, headshot_url').in('id', playerIds);
   for (const r of data ?? []) if (r.headshot_url) out.set(r.id, r.headshot_url);
-  return out;
-}
-
-// Latest Heat (momentum PPM → 0–100) for a handful of players, e.g. game stars.
-export async function fetchSnapshotHeat(playerIds: number[]): Promise<Map<number, number>> {
-  const out = new Map<number, number>();
-  if (!playerIds.length) return out;
-  const { data } = await supabaseAdmin
-    .from('player_metric_snapshots')
-    .select('player_id, momentum_ppm, calculated_at')
-    .in('player_id', playerIds)
-    .order('calculated_at', { ascending: false })
-    .limit(playerIds.length * 4);
-  for (const r of data ?? []) if (!out.has(r.player_id)) out.set(r.player_id, ppmToHeat(r.momentum_ppm));
   return out;
 }
 

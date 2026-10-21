@@ -6,7 +6,7 @@ import type { SlateGame } from '@/lib/home';
 const g = (state: string, awayScore: number | null, homeScore: number | null): SlateGame => ({
   id: 1, href: '/games/1/x', startTimeUTC: '2026-10-19T23:00:00Z', state, awayScore, homeScore,
   away: { abbrev: 'EDM', name: 'Oilers' }, home: { abbrev: 'COL', name: 'Avalanche' },
-  pickSide: 'home', pickPct: 60, watch: null,
+  pickSide: 'home', pickPct: 60, keyAway: [], keyHome: [],
 } as SlateGame);
 
 describe('TonightSlate game state', () => {

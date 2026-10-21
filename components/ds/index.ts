@@ -15,3 +15,4 @@ export { ScoreRow } from './ScoreRow';
 export { ArchetypeBadge } from './ArchetypeBadge';
 export { HeatPulseMark } from './HeatPulseMark';
 export { AvatarStack } from './AvatarStack';
+export { KeyLine } from './KeyLine';

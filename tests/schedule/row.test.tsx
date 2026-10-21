@@ -6,7 +6,7 @@ import { ScheduleEmpty } from '@/components/schedule/ScheduleEmpty';
 const up: ScheduleRowData = {
   href: '/games/1/ana-at-nyr-1019', state: 'FUT', startTimeUTC: '2026-10-19T23:00:00Z',
   away: 'ANA', home: 'NYR', awayScore: null, homeScore: null,
-  pick: { abbrev: 'ANA', pct: 55 }, pickResult: null, watch: { name: 'Mikael Granlund', heat: 58 },
+  pick: { abbrev: 'ANA', pct: 55 }, pickResult: null, keyAway: [], keyHome: [],
   watchability: 74, recapHref: null, marquee: true,
 };
 

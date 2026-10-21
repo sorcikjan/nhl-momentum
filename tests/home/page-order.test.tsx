@@ -8,14 +8,14 @@ const base: HomeData = {
   tonight: [{
     id: 1, href: '/games/1/ana-at-nyr-1019', startTimeUTC: '2026-10-19T23:00:00Z', state: 'FUT', awayScore: null, homeScore: null,
     away: { abbrev: 'ANA', name: 'Anaheim' }, home: { abbrev: 'NYR', name: 'NY Rangers' },
-    pickSide: 'away', pickPct: 55, watch: { name: 'Mikael Granlund', heat: 57, photo: null, team: 'ANA' },
+    pickSide: 'away', pickPct: 55, keyAway: [], keyHome: [],
   }],
   nextGameDate: null,
   resultsDate: '2026-10-18',
   results: [{
     id: 2, href: '/games/2/car-at-cgy-1018',
     away: { abbrev: 'CAR', name: 'Carolina', score: 2 }, home: { abbrev: 'CGY', name: 'Calgary', score: 3 },
-    pick: 'miss', pickTeam: 'CAR', pickPct: 63, star: { playerId: 3, name: 'D. Cooley', team: 'CGY', goalie: true, photo: null }, starHeat: null,
+    pick: 'miss', pickTeam: 'CAR', pickPct: 63, keyAway: [], keyHome: [],
   }],
   stories: [{ href: '/recaps/x', kicker: 'LAST NIGHT · BIG STORY', title: 'Flames Extinguish Reigning Champs', dek: 'd', team: null, lead: true }],
   hottest: [{ playerId: 4, href: '/players/4/x', name: 'Connor McDavid', team: 'EDM', heat: 100, sub: 'Forward', photo: null }],

@@ -55,11 +55,21 @@ export const supabaseAdmin = {
 let _dbOkUntil = 0;
 export async function assertDatabaseUp(): Promise<void> {
   if (Date.now() < _dbOkUntil) return;
-  const { error } = await getAdminClient()
-    .from('games')
-    .select('id')
-    .limit(1)
-    .abortSignal(AbortSignal.timeout(4_000));
-  if (error) throw new Error(`Database unavailable: ${error.message || error.code || 'timeout'}`);
-  _dbOkUntil = Date.now() + 30_000;
+  // Up to 3 probes: a single slow response (common on the free tier, and during
+  // builds that prerender many pages at once) must not fail a page or a deploy.
+  let lastError: { message?: string; code?: string } | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt) await new Promise(r => setTimeout(r, attempt * 500));
+    const { error } = await getAdminClient()
+      .from('games')
+      .select('id')
+      .limit(1)
+      .abortSignal(AbortSignal.timeout(4_000));
+    if (!error) {
+      _dbOkUntil = Date.now() + 30_000;
+      return;
+    }
+    lastError = error;
+  }
+  throw new Error(`Database unavailable: ${lastError?.message || lastError?.code || 'timeout'}`);
 }

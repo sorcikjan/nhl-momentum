@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { AvatarStack, Headshot, HeatPill, SectionHeading, TeamChip } from '@/components/ds';
+import { KeyLine, SectionHeading, TeamChip } from '@/components/ds';
 import { gameView } from '@/lib/game-state';
 import type { SlateGame } from '@/lib/home';
 import { dayLabel, MONO, timeET } from './format';
@@ -58,7 +58,7 @@ export function TonightSlate({ games, nextGameDate }: { games: SlateGame[]; next
             <Link
               key={g.id}
               href={g.href}
-              className="grid grid-cols-1 items-center gap-x-4 gap-y-2 px-3 py-3 transition-colors hover:bg-[var(--bg-hover)] lg:grid-cols-[96px_1fr_240px_200px_24px] lg:px-6 lg:py-[18px]"
+              className="grid grid-cols-1 items-center gap-x-4 gap-y-2 px-3 py-3 transition-colors hover:bg-[var(--bg-hover)] lg:grid-cols-[96px_1fr_200px_280px_24px] lg:px-6 lg:py-[18px]"
               style={{ borderTop: i ? '1px solid var(--border-soft)' : undefined }}
             >
               <Status g={g} />
@@ -70,23 +70,9 @@ export function TonightSlate({ games, nextGameDate }: { games: SlateGame[]; next
                 <span className="truncate text-[13px] font-bold lg:text-[15px]" style={{ color: 'var(--text-bright)' }}>{g.home.name}</span>
               </div>
               <PickBar g={g} />
-              <div className="hidden lg:block">
-                {(g.keyAway?.length || g.keyHome?.length) ? (
-                  <div className="mb-1.5 flex items-center gap-3">
-                    <AvatarStack team={g.away.abbrev} players={g.keyAway ?? []} />
-                    <AvatarStack team={g.home.abbrev} players={g.keyHome ?? []} />
-                  </div>
-                ) : null}
-                {g.watch && (
-                  <>
-                    <div className="mb-0.5 text-[10px] font-semibold" style={{ ...MONO, color: 'var(--text-muted)', letterSpacing: 0.5 }}>WATCH FOR</div>
-                    <div className="flex items-center gap-2 text-[13px] font-semibold" style={{ color: 'var(--text-bright)' }}>
-                      <Headshot src={g.watch.photo} name={g.watch.name} team={g.watch.team} size={24} />
-                      <span className="truncate">{g.watch.name}</span>
-                      <HeatPill heat={g.watch.heat} size="sm" />
-                    </div>
-                  </>
-                )}
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <KeyLine team={g.away.abbrev} players={g.keyAway} />
+                <KeyLine team={g.home.abbrev} players={g.keyHome} />
               </div>
               <span className="hidden text-lg lg:block" style={{ color: 'var(--text-muted)' }}>›</span>
             </Link>

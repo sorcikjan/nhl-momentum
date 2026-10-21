@@ -2,7 +2,7 @@
 // design's sections show (docs/design/redesign-2026/homepage-final.js).
 import {
   fetchGamesRange, fetchGoalieRankings, fetchNewcomerWatch, fetchRankings, fetchRecap,
-  fetchPlayerPhotos, fetchRecentCompletedGames, fetchRecentRecaps, fetchSeasonPickAccuracy, fetchSnapshotHeat,
+  fetchGameKeyPlayers, fetchPlayerPhotos, fetchRecentCompletedGames, fetchRecentRecaps, fetchSeasonPickAccuracy,
 } from '@/lib/data';
 import { ppmToHeat } from '@/lib/heat';
 import type { KeyPlayer } from '@/lib/key-players';
@@ -16,15 +16,13 @@ export type SlateGame = {
   awayScore: number | null; homeScore: number | null;
   away: TeamSide; home: TeamSide;
   pickSide: 'home' | 'away' | null; pickPct: number | null;
-  watch: { playerId?: number; name: string; heat: number; photo: string | null; team: string } | null;
-  keyAway?: KeyFace[]; keyHome?: KeyFace[];
+  keyAway: KeyFace[]; keyHome: KeyFace[];
 };
 export type ResultCard = {
   id: number; href: string;
   away: TeamSide & { score: number }; home: TeamSide & { score: number };
   pick: 'hit' | 'miss' | null; pickTeam: string | null; pickPct: number | null;
-  star: { playerId: number; name: string; team: string; goalie: boolean; photo: string | null } | null;
-  starHeat?: number | null;
+  keyAway: KeyFace[]; keyHome: KeyFace[];
 };
 export type StoryCard = { href: string; kicker: string; title: string; dek: string; team: string | null; lead: boolean };
 export type RankRow = { playerId: number; href: string; name: string; photo: string | null; team: string; heat: number | null; sub: string };
@@ -63,15 +61,13 @@ export function toResultCard(g: FinishedGame, pred: Pred): ResultCard {
     const recorded = pred?.prediction_outcomes?.[0]?.correct_winner;
     pick = (recorded ?? homePick === hs > as) ? 'hit' : 'miss';
   }
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const first = Array.isArray(g.three_stars) ? (g.three_stars as any[]).find(s => s?.star === 1) : null;
   return {
     id: g.id,
     href: gameUrl(g.id, away, home, g.game_date),
     away: { ...side(away), score: as },
     home: { ...side(home), score: hs },
     pick, pickTeam, pickPct,
-    star: first ? { playerId: first.playerId, name: first.name?.default ?? '', team: first.teamAbbrev ?? '', goalie: first.position === 'G', photo: first.headshot ?? null } : null,
+    keyAway: [], keyHome: [], // filled from the box score by fetchHomeData
   };
 }
 
@@ -115,7 +111,7 @@ export function todayET(now = new Date()): string {
 }
 
 export async function fetchHomeData(today: string): Promise<HomeData> {
-  const emptyRange = { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map(), keyPlayersByGameTeam: new Map<string, KeyPlayer[]>() };
+  const emptyRange = { games: [], predictions: [], odds: [], topHeatByGameTeam: new Map(), keyPlayersByGameTeam: new Map<string, KeyPlayer[]>() };
   const [range, recent, rankings, goalies, rookies, recaps, accuracy] = await Promise.all([
     safe(fetchGamesRange([today]), emptyRange),
     safe(fetchRecentCompletedGames(4, 20), { games: [], predMap: new Map() }),
@@ -133,7 +129,6 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
   const dateOf = (g: { gameDate?: string; startTimeUTC?: string }) => g.gameDate ?? g.startTimeUTC?.slice(0, 10) ?? '';
   const tonight: SlateGame[] = games.filter(g => dateOf(g) === today).map(g => {
     const p = predBy.get(g.id)?.home_win_probability ?? null;
-    const top = range.topPlayerByGame.get(g.id);
     return {
       id: g.id,
       href: gameUrl(g.id, g.awayTeam.abbrev, g.homeTeam.abbrev, today),
@@ -143,16 +138,15 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
       away: side(g.awayTeam.abbrev), home: side(g.homeTeam.abbrev),
       pickSide: p == null ? null : p >= 0.5 ? 'home' : 'away',
       pickPct: p == null ? null : Math.round((p >= 0.5 ? p : 1 - p) * 100),
-      watch: top ? { name: top.name, heat: ppmToHeat(top.compositePpm), photo: null, team: top.teamAbbrev, playerId: top.playerId } : null,
       keyAway: faces(range.keyPlayersByGameTeam.get(`${g.id}-false`)), keyHome: faces(range.keyPlayersByGameTeam.get(`${g.id}-true`)),
     };
   });
-  // Photos for "watch for" and key players (snapshots carry no headshot) — one query.
-  const faceIds = tonight.flatMap(t => [t.watch, ...(t.keyAway ?? []), ...(t.keyHome ?? [])].flatMap(f => (f?.playerId ? [f.playerId] : [])));
+  // Photos for tonight's key players (snapshots carry no headshot) — one query.
+  const faceIds = tonight.flatMap(t => [...t.keyAway, ...t.keyHome].flatMap(f => (f.playerId ? [f.playerId] : [])));
   if (faceIds.length) {
     const photos = await safe(fetchPlayerPhotos([...new Set(faceIds)]), new Map<number, string>());
     for (const t of tonight) {
-      for (const f of [t.watch, ...(t.keyAway ?? []), ...(t.keyHome ?? [])]) if (f?.playerId) f.photo = photos.get(f.playerId) ?? null;
+      for (const f of [...t.keyAway, ...t.keyHome]) if (f.playerId) f.photo = photos.get(f.playerId) ?? null;
     }
   }
   // Off-day only: look a week ahead for the next game date (each extra day costs an NHL call + DB reads).
@@ -167,10 +161,16 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
   const resultsDate = recent.games[0]?.game_date ?? null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const results = (recent.games as any[]).filter(g => g.game_date === resultsDate).map(g => toResultCard(g, recent.predMap.get(g.id) ?? null));
-  // Goalies have no points-based Heat, so only skater stars get one.
-  const starIds = results.filter(r => r.star && !r.star.goalie).map(r => r.star!.playerId);
-  const starHeat = await safe(fetchSnapshotHeat(starIds), new Map<number, number>());
-  for (const r of results) r.starHeat = r.star && !r.star.goalie ? starHeat.get(r.star.playerId) ?? null : null;
+  // Each team's key players from the box score (same ranking as the game page).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const resultGames = (recent.games as any[]).filter(g => g.game_date === resultsDate && g.home_team && g.away_team)
+    .map(g => ({ id: g.id, homeTeamId: g.home_team.id, awayTeamId: g.away_team.id, home: g.home_team.abbrev, away: g.away_team.abbrev }));
+  const keys = await safe(fetchGameKeyPlayers(resultGames), new Map<number, { away: KeyPlayer[]; home: KeyPlayer[] }>());
+  for (const r of results) {
+    const k = keys.get(r.id);
+    r.keyAway = (k?.away ?? []).map(p => ({ playerId: p.playerId, name: p.name, photo: p.photo, team: p.team }));
+    r.keyHome = (k?.home ?? []).map(p => ({ playerId: p.playerId, name: p.name, photo: p.photo, team: p.team }));
+  }
 
   const latest = recaps[0] ?? null;
   const recap = latest ? await safe(fetchRecap(latest.date), null) : null;

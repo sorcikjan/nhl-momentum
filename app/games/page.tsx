@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { FilterChips, SectionHeading } from '@/components/ds';
 import { ScheduleEmpty } from '@/components/schedule/ScheduleEmpty';
 import { ScheduleRow, type ScheduleRowData } from '@/components/schedule/ScheduleRow';
-import { fetchGamesRange, fetchPlayerPhotos, fetchRecap, fetchSeasonPickAccuracy } from '@/lib/data';
+import { fetchGameKeyPlayers, fetchGamesRange, fetchPlayerPhotos, fetchRecap, fetchSeasonPickAccuracy } from '@/lib/data';
 import { gameView } from '@/lib/game-state';
 import { ppmToHeat } from '@/lib/heat';
 import { todayET } from '@/lib/home';
@@ -54,8 +54,8 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
   const today = todayET();
   const dates = datesFor(range, today, custom);
 
-  const empty = { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map(), keyPlayersByGameTeam: new Map<string, KeyPlayer[]>() };
-  const [{ games, predictions, topPlayerByGame, topHeatByGameTeam, keyPlayersByGameTeam }, accuracy] = await Promise.all([
+  const empty = { games: [], predictions: [], odds: [], topHeatByGameTeam: new Map(), keyPlayersByGameTeam: new Map<string, KeyPlayer[]>() };
+  const [{ games, predictions, topHeatByGameTeam, keyPlayersByGameTeam }, accuracy] = await Promise.all([
     fetchGamesRange(dates).catch(() => empty),
     fetchSeasonPickAccuracy().catch(() => null),
   ]);
@@ -65,8 +65,17 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
   const upcomingIds = new Set((games as any[]).filter(g => gameView(g.gameState) === 'upcoming').map(g => g.id as number));
   const keyIds = [...keyPlayersByGameTeam.entries()].filter(([k]) => upcomingIds.has(Number(k.split('-')[0]))).flatMap(([, ps]) => ps.map(p => p.playerId));
   const photos = keyIds.length ? await fetchPlayerPhotos([...new Set(keyIds)]).catch(() => new Map<number, string>()) : new Map<number, string>();
-  const faces = (gameId: number, isHome: boolean) =>
-    upcomingIds.has(gameId) ? (keyPlayersByGameTeam.get(`${gameId}-${isHome}`) ?? []).map(p => ({ name: p.name, photo: photos.get(p.playerId) ?? null, team: p.team })) : [];
+  // Finished games: key players from the box score, as on the game page.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const finals = (games as any[]).filter(g => gameView(g.gameState) === 'final')
+    .map(g => ({ id: g.id as number, homeTeamId: g.homeTeam.id, awayTeamId: g.awayTeam.id, home: g.homeTeam.abbrev, away: g.awayTeam.abbrev }));
+  const finalKeys = finals.length ? await fetchGameKeyPlayers(finals).catch(() => new Map<number, { away: KeyPlayer[]; home: KeyPlayer[] }>()) : new Map<number, { away: KeyPlayer[]; home: KeyPlayer[] }>();
+  const face = (p: KeyPlayer) => ({ name: p.name, photo: p.photo ?? photos.get(p.playerId) ?? null, team: p.team });
+  const faces = (gameId: number, isHome: boolean) => {
+    if (upcomingIds.has(gameId)) return (keyPlayersByGameTeam.get(`${gameId}-${isHome}`) ?? []).map(face);
+    const k = finalKeys.get(gameId);
+    return ((isHome ? k?.home : k?.away) ?? []).map(face);
+  };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const predBy = new Map<number, any>((predictions ?? []).map((p: { game_id: number }) => [p.game_id, p]));
@@ -95,7 +104,6 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
       const p = predBy.get(g.id);
       const view = gameView(g.gameState);
       const homeProb: number | null = p?.home_win_probability ?? null;
-      const top = topPlayerByGame.get(g.id);
       const outcome = p?.prediction_outcomes?.[0]?.correct_winner;
       const recap = recapBy.get(date);
       return {
@@ -110,7 +118,6 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
           ? { abbrev: g.homeTeam.abbrev, pct: Math.round(homeProb * 100) }
           : { abbrev: g.awayTeam.abbrev, pct: Math.round((1 - homeProb) * 100) },
         pickResult: view !== 'final' || outcome == null ? null : outcome ? 'hit' : 'miss',
-        watch: top ? { name: top.name, heat: ppmToHeat(top.compositePpm) } : null,
         watchability: view === 'final' ? null : calcWatchability({
           topHomeHeat: ppmToHeat(topHeatByGameTeam.get(`${g.id}-true`) ?? 0),
           topAwayHeat: ppmToHeat(topHeatByGameTeam.get(`${g.id}-false`) ?? 0),

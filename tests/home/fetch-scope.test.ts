@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const empty = { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map(), keyPlayersByGameTeam: new Map() };
+const empty = { games: [], predictions: [], odds: [], topHeatByGameTeam: new Map(), keyPlayersByGameTeam: new Map() };
 const fetchGamesRange = vi.fn();
 vi.mock('@/lib/data', () => ({
   fetchGamesRange: (d: string[]) => fetchGamesRange(d),
@@ -10,8 +10,8 @@ vi.mock('@/lib/data', () => ({
   fetchNewcomerWatch: async () => [],
   fetchRecentRecaps: async () => [],
   fetchSeasonPickAccuracy: async () => null,
-  fetchSnapshotHeat: async () => new Map(),
   fetchPlayerPhotos: async () => new Map(),
+  fetchGameKeyPlayers: async () => new Map(),
 }));
 
 const game = (id: number, gameDate: string) => ({ id, gameDate, startTimeUTC: `${gameDate}T23:00:00Z`, gameState: 'FUT', awayTeam: { abbrev: 'EDM' }, homeTeam: { abbrev: 'COL' } });

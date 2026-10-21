@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { AvatarStack, HeatPill, TeamChip } from '@/components/ds';
+import { KeyLine, TeamChip } from '@/components/ds';
 import { gameView } from '@/lib/game-state';
 
 const MONO = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' } as const;
@@ -9,9 +9,8 @@ export type ScheduleRowData = {
   away: string; home: string; awayScore: number | null; homeScore: number | null;
   pick: { abbrev: string; pct: number } | null;
   pickResult: 'hit' | 'miss' | null;
-  watch: { name: string; heat: number } | null;
-  keyAway?: { name: string; photo: string | null; team: string }[];
-  keyHome?: { name: string; photo: string | null; team: string }[];
+  keyAway: { name: string; photo: string | null; team: string }[];
+  keyHome: { name: string; photo: string | null; team: string }[];
   watchability: number | null;
   recapHref: string | null;
   marquee: boolean;
@@ -34,7 +33,7 @@ export function ScheduleRow({ g }: { g: ScheduleRowData }) {
   return (
     <Link
       href={g.href}
-      className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-x-3.5 gap-y-3 px-4 py-4 transition-colors hover:bg-[var(--bg-hover)] lg:grid-cols-[90px_minmax(0,1fr)_170px_220px_150px_24px] lg:px-[22px]"
+      className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-x-3.5 gap-y-3 px-4 py-4 transition-colors hover:bg-[var(--bg-hover)] lg:grid-cols-[90px_minmax(0,1fr)_130px_280px_130px_24px] lg:px-[22px]"
       style={{ background: g.marquee ? 'linear-gradient(90deg, var(--heat-dim) 0%, transparent 60%)' : undefined }}
     >
       <div>
@@ -77,22 +76,9 @@ export function ScheduleRow({ g }: { g: ScheduleRowData }) {
         )}
       </div>
 
-      <div className="col-start-2 min-w-0 lg:col-start-auto">
-        {view === 'upcoming' && (g.keyAway?.length || g.keyHome?.length) ? (
-          <div className="mb-1.5 hidden items-center gap-3 lg:flex">
-            <AvatarStack team={g.away} players={g.keyAway ?? []} />
-            <AvatarStack team={g.home} players={g.keyHome ?? []} />
-          </div>
-        ) : null}
-        {g.watch && (
-          <>
-            <Label>WATCH FOR</Label>
-            <div className="flex min-w-0 items-center gap-1.5">
-              <span className="truncate text-xs font-semibold" style={{ color: 'var(--text-bright)' }}>{g.watch.name}</span>
-              <HeatPill heat={g.watch.heat} size="sm" />
-            </div>
-          </>
-        )}
+      <div className="col-start-2 flex min-w-0 flex-col gap-1.5 lg:col-start-auto">
+        <KeyLine team={g.away} players={g.keyAway} />
+        <KeyLine team={g.home} players={g.keyHome} />
       </div>
 
       <div className="col-start-2 lg:col-start-auto">
