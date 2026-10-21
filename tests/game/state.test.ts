@@ -23,7 +23,7 @@ describe('sectionPlan', () => {
   });
   it('orders live and final sections like the design', () => {
     expect(sectionPlan('live', all)).toEqual({ main: ['momentum', 'playByPlay'], side: ['winProb', 'liveStats', 'topPerformers'] });
-    expect(sectionPlan('final', all)).toEqual({ main: ['threeStars', 'pick', 'heatImpact'], side: ['recap', 'highlights'] });
+    expect(sectionPlan('final', all)).toEqual({ main: ['threeStars', 'keyPlayers', 'pick', 'heatImpact'], side: ['recap', 'highlights'] });
   });
   it('drops sections without data but keeps the rest', () => {
     const plan = sectionPlan('upcoming', new Set(['goalies', 'watch']));
@@ -34,6 +34,8 @@ describe('sectionPlan', () => {
     const text = JSON.stringify(SECTION_META);
     expect(text).not.toMatch(/SERIES|PLAYOFF/);
     expect(SECTION_META.lineup.kicker).toBe('LINEUP · PROJECTED');
+    expect(SECTION_META.watch.kicker).toBe('KEY PLAYERS · WHY WATCH');
+    expect(SECTION_META.keyPlayers.kicker).toBe('KEY PLAYERS · WHO DECIDED IT');
   });
 });
 

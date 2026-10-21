@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { HeatPill, TeamChip } from '@/components/ds';
+import { AvatarStack, HeatPill, TeamChip } from '@/components/ds';
 import { gameView } from '@/lib/game-state';
 
 const MONO = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' } as const;
@@ -10,6 +10,8 @@ export type ScheduleRowData = {
   pick: { abbrev: string; pct: number } | null;
   pickResult: 'hit' | 'miss' | null;
   watch: { name: string; heat: number } | null;
+  keyAway?: { name: string; photo: string | null; team: string }[];
+  keyHome?: { name: string; photo: string | null; team: string }[];
   watchability: number | null;
   recapHref: string | null;
   marquee: boolean;
@@ -76,6 +78,12 @@ export function ScheduleRow({ g }: { g: ScheduleRowData }) {
       </div>
 
       <div className="col-start-2 min-w-0 lg:col-start-auto">
+        {view === 'upcoming' && (g.keyAway?.length || g.keyHome?.length) ? (
+          <div className="mb-1.5 hidden items-center gap-3 lg:flex">
+            <AvatarStack team={g.away} players={g.keyAway ?? []} />
+            <AvatarStack team={g.home} players={g.keyHome ?? []} />
+          </div>
+        ) : null}
         {g.watch && (
           <>
             <Label>WATCH FOR</Label>

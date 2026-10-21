@@ -3,7 +3,7 @@ import type React from 'react';
 import Link from 'next/link';
 import {
   fetchMatch, fetchRecap, fetchSeasonPickAccuracy, fetchTeamSpecialTeams,
-  fetchPostGameHeat, teamLogoUrl,
+  fetchKeyPlayerForm, fetchPostGameHeat, teamLogoUrl,
 } from '@/lib/data';
 import { teamUrl, playerUrl, recapUrl } from '@/lib/urls';
 import { decimalToNormProb, formatBookmaker } from '@/lib/odds-api';
@@ -26,7 +26,8 @@ import HeatImpactCard, { type Mover } from '@/components/games/HeatImpactCard';
 import RecapCard from '@/components/games/RecapCard';
 import HighlightsCard from '@/components/games/HighlightsCard';
 import GoalieMatchupCard from '@/components/games/GoalieMatchupCard';
-import PlayersToWatchCard from '@/components/games/PlayersToWatchCard';
+import { KeyPlayers } from '@/components/game/KeyPlayers';
+import { postgameKeyPlayers, pregameKeyPlayers, type SnapSkater } from '@/lib/key-players';
 import SpecialTeamsCard from '@/components/games/SpecialTeamsCard';
 import HeadToHeadCard from '@/components/games/HeadToHeadCard';
 import LineupContextCard from '@/components/games/LineupContextCard';
@@ -81,6 +82,7 @@ function normPlayers(teamPlayers: any, teamId: number): any[] {
       goals: p.goals ?? 0,
       assists: p.assists ?? 0,
       plus_minus: p.plusMinus ?? 0,
+      shots_on_goal: p.sog ?? 0,
       players: {
         first_name: sp > 0 ? full.slice(0, sp) : '',
         last_name: sp > 0 ? full.slice(sp + 1) : full,
@@ -241,6 +243,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   // ── Heat Impact (FINAL only): pre-game snapshot Heat vs. most recent Heat ──
   let heatImpactUp: Mover[] = [];
   let heatImpactDown: Mover[] = [];
+  const heatDelta = new Map<number, number>();
   if (isFinal) {
     const allSkaters = [...awaySkaters.map(s => ({ ...s, teamAbbrev: awayAbbrev })), ...homeSkaters.map(s => ({ ...s, teamAbbrev: homeAbbrev }))];
     const postHeat = await fetchPostGameHeat(allSkaters.map(s => s.playerId)).catch(() => new Map<number, number>());
@@ -252,9 +255,25 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         return { playerId: s.playerId, href: playerUrl(s.playerId, ...splitName(s.playerName)), name: s.playerName, teamAbbrev: s.teamAbbrev, before, after, delta: after - before };
       })
       .filter(m => m.delta !== 0);
+    for (const m of movers) heatDelta.set(m.playerId, m.delta);
     heatImpactUp = movers.filter(m => m.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3);
     heatImpactDown = movers.filter(m => m.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 3);
   }
+
+  // ── Key players: three per team (before: Heat + form; after: box score) ────
+  const keyCandidates = (sk: SnapSkater[]) => pregameKeyPlayers(sk, new Map(), '').map(p => p.playerId);
+  const keyForm = !isFinal
+    ? await fetchKeyPlayerForm([...keyCandidates(awaySkaters), ...keyCandidates(homeSkaters)]).catch(() => new Map())
+    : new Map();
+  const awayKey = isFinal
+    ? postgameKeyPlayers(awayStats.length ? awayStats : awayBoxPlayers ?? [], awayGoalie ?? awayBoxGoalie, awayAbbrev, heatDelta)
+    : pregameKeyPlayers(awaySkaters, keyForm, awayAbbrev);
+  const homeKey = isFinal
+    ? postgameKeyPlayers(homeStats.length ? homeStats : homeBoxPlayers ?? [], homeGoalie ?? homeBoxGoalie, homeAbbrev, heatDelta)
+    : pregameKeyPlayers(homeSkaters, keyForm, homeAbbrev);
+  const keyPlayersNode = (awayKey.length || homeKey.length)
+    ? <KeyPlayers away={{ abbrev: awayAbbrev, name: awayName, players: awayKey }} home={{ abbrev: homeAbbrev, name: homeName, players: homeKey }} />
+    : null;
 
   // ── Recap (FINAL only): factual, templated from real box-score data ────────
   let recapHeadline = '';
@@ -413,9 +432,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
           gamesPlayed: goalieSeasonStats.get(homeGoalieSnap?.playerId)?.gamesPlayed ?? 0 }}
       />
     );
-    if (heatRoster.length) nodes.watch = (
-      <PlayersToWatchCard players={heatRoster.map(p => ({ playerId: p.playerId, href: p.href, name: p.name, teamAbbrev: p.teamAbbrev, position: p.line.split(' · ')[0] || null, heat: p.heat, line: p.line }))} />
-    );
+    if (keyPlayersNode) nodes.watch = keyPlayersNode;
     if (specialTeams) nodes.specialTeams = <SpecialTeamsCard away={specialTeams.away} home={specialTeams.home} />;
     if (headToHead.length) nodes.h2h = <HeadToHeadCard meetings={headToHead} homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev} />;
     nodes.lineup = <LineupContextCard homeAbbrev={homeAbbrev} awayAbbrev={awayAbbrev} homeOutCount={homeOutCount} awayOutCount={awayOutCount} restDays={restDays} />;
@@ -434,6 +451,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     if (threeStars?.length) nodes.threeStars = (
       <ThreeStarsRow stars={threeStars} heatByPlayerId={new Map([...awaySkaters, ...homeSkaters].map(s => [s.playerId as number, ppmToHeat(s.momentumPpm ?? s.compositePpm)]))} />
     );
+    if (keyPlayersNode) nodes.keyPlayers = keyPlayersNode;
     if (prediction) nodes.pick = (
       <PredictionCard mode="final" favoredAbbrev={favoredAbbrev} favoredPct={favoredPct} correct={outcome?.correct_winner ?? null}
         accuracyYtd={accuracyYtd} chips={predictionChips} factors={predictionFactors} awayAbbrev={awayAbbrev} homeAbbrev={homeAbbrev} />

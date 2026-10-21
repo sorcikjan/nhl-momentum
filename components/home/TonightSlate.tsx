@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Headshot, HeatPill, SectionHeading, TeamChip } from '@/components/ds';
+import { AvatarStack, Headshot, HeatPill, SectionHeading, TeamChip } from '@/components/ds';
 import { gameView } from '@/lib/game-state';
 import type { SlateGame } from '@/lib/home';
 import { dayLabel, MONO, timeET } from './format';
@@ -71,6 +71,12 @@ export function TonightSlate({ games, nextGameDate }: { games: SlateGame[]; next
               </div>
               <PickBar g={g} />
               <div className="hidden lg:block">
+                {(g.keyAway?.length || g.keyHome?.length) ? (
+                  <div className="mb-1.5 flex items-center gap-3">
+                    <AvatarStack team={g.away.abbrev} players={g.keyAway ?? []} />
+                    <AvatarStack team={g.home.abbrev} players={g.keyHome ?? []} />
+                  </div>
+                ) : null}
                 {g.watch && (
                   <>
                     <div className="mb-0.5 text-[10px] font-semibold" style={{ ...MONO, color: 'var(--text-muted)', letterSpacing: 0.5 }}>WATCH FOR</div>

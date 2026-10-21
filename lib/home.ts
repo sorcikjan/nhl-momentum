@@ -5,16 +5,19 @@ import {
   fetchPlayerPhotos, fetchRecentCompletedGames, fetchRecentRecaps, fetchSeasonPickAccuracy, fetchSnapshotHeat,
 } from '@/lib/data';
 import { ppmToHeat } from '@/lib/heat';
+import type { KeyPlayer } from '@/lib/key-players';
 import { teamColor } from '@/lib/team-colors';
 import { gameUrl, playerUrl, recapUrl } from '@/lib/urls';
 
 export type TeamSide = { abbrev: string; name: string };
+export type KeyFace = { playerId?: number; name: string; photo: string | null; team: string };
 export type SlateGame = {
   id: number; href: string; startTimeUTC: string | null; state: string;
   awayScore: number | null; homeScore: number | null;
   away: TeamSide; home: TeamSide;
   pickSide: 'home' | 'away' | null; pickPct: number | null;
   watch: { playerId?: number; name: string; heat: number; photo: string | null; team: string } | null;
+  keyAway?: KeyFace[]; keyHome?: KeyFace[];
 };
 export type ResultCard = {
   id: number; href: string;
@@ -104,12 +107,15 @@ async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
 const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
 // NHL game dates are Eastern; a UTC date would roll to tomorrow during evening games.
+const faces = (ks: { playerId: number; name: string; team: string }[] | undefined): KeyFace[] =>
+  (ks ?? []).map(k => ({ playerId: k.playerId, name: k.name, photo: null, team: k.team }));
+
 export function todayET(now = new Date()): string {
   return now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 }
 
 export async function fetchHomeData(today: string): Promise<HomeData> {
-  const emptyRange = { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map() };
+  const emptyRange = { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map(), keyPlayersByGameTeam: new Map<string, KeyPlayer[]>() };
   const [range, recent, rankings, goalies, rookies, recaps, accuracy] = await Promise.all([
     safe(fetchGamesRange([today]), emptyRange),
     safe(fetchRecentCompletedGames(4, 20), { games: [], predMap: new Map() }),
@@ -138,13 +144,16 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
       pickSide: p == null ? null : p >= 0.5 ? 'home' : 'away',
       pickPct: p == null ? null : Math.round((p >= 0.5 ? p : 1 - p) * 100),
       watch: top ? { name: top.name, heat: ppmToHeat(top.compositePpm), photo: null, team: top.teamAbbrev, playerId: top.playerId } : null,
+      keyAway: faces(range.keyPlayersByGameTeam.get(`${g.id}-false`)), keyHome: faces(range.keyPlayersByGameTeam.get(`${g.id}-true`)),
     };
   });
-  // Photos for the "watch for" players (snapshots carry no headshot).
-  const watchIds = tonight.flatMap(t => (t.watch?.playerId ? [t.watch.playerId] : []));
-  if (watchIds.length) {
-    const photos = await safe(fetchPlayerPhotos(watchIds), new Map<number, string>());
-    for (const t of tonight) if (t.watch?.playerId) t.watch.photo = photos.get(t.watch.playerId) ?? null;
+  // Photos for "watch for" and key players (snapshots carry no headshot) — one query.
+  const faceIds = tonight.flatMap(t => [t.watch, ...(t.keyAway ?? []), ...(t.keyHome ?? [])].flatMap(f => (f?.playerId ? [f.playerId] : [])));
+  if (faceIds.length) {
+    const photos = await safe(fetchPlayerPhotos([...new Set(faceIds)]), new Map<number, string>());
+    for (const t of tonight) {
+      for (const f of [t.watch, ...(t.keyAway ?? []), ...(t.keyHome ?? [])]) if (f?.playerId) f.photo = photos.get(f.playerId) ?? null;
+    }
   }
   // Off-day only: look a week ahead for the next game date (each extra day costs an NHL call + DB reads).
   let nextGameDate: string | null = null;

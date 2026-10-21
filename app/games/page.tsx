@@ -2,13 +2,14 @@ import type { Metadata } from 'next';
 import { FilterChips, SectionHeading } from '@/components/ds';
 import { ScheduleEmpty } from '@/components/schedule/ScheduleEmpty';
 import { ScheduleRow, type ScheduleRowData } from '@/components/schedule/ScheduleRow';
-import { fetchGamesRange, fetchRecap, fetchSeasonPickAccuracy } from '@/lib/data';
+import { fetchGamesRange, fetchPlayerPhotos, fetchRecap, fetchSeasonPickAccuracy } from '@/lib/data';
 import { gameView } from '@/lib/game-state';
 import { ppmToHeat } from '@/lib/heat';
 import { todayET } from '@/lib/home';
 import { assertDatabaseUp } from '@/lib/supabase';
 import { gameUrl, recapUrl } from '@/lib/urls';
 import { calcWatchability } from '@/lib/watchability';
+import type { KeyPlayer } from '@/lib/key-players';
 
 // Free-tier database: each render is several queries; crawlers visit every page.
 export const revalidate = 60;
@@ -53,11 +54,19 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
   const today = todayET();
   const dates = datesFor(range, today, custom);
 
-  const empty = { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map() };
-  const [{ games, predictions, topPlayerByGame, topHeatByGameTeam }, accuracy] = await Promise.all([
+  const empty = { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map(), keyPlayersByGameTeam: new Map<string, KeyPlayer[]>() };
+  const [{ games, predictions, topPlayerByGame, topHeatByGameTeam, keyPlayersByGameTeam }, accuracy] = await Promise.all([
     fetchGamesRange(dates).catch(() => empty),
     fetchSeasonPickAccuracy().catch(() => null),
   ]);
+
+  // Key players' photos for upcoming games (desktop avatar stacks) — one query.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const upcomingIds = new Set((games as any[]).filter(g => gameView(g.gameState) === 'upcoming').map(g => g.id as number));
+  const keyIds = [...keyPlayersByGameTeam.entries()].filter(([k]) => upcomingIds.has(Number(k.split('-')[0]))).flatMap(([, ps]) => ps.map(p => p.playerId));
+  const photos = keyIds.length ? await fetchPlayerPhotos([...new Set(keyIds)]).catch(() => new Map<number, string>()) : new Map<number, string>();
+  const faces = (gameId: number, isHome: boolean) =>
+    upcomingIds.has(gameId) ? (keyPlayersByGameTeam.get(`${gameId}-${isHome}`) ?? []).map(p => ({ name: p.name, photo: photos.get(p.playerId) ?? null, team: p.team })) : [];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const predBy = new Map<number, any>((predictions ?? []).map((p: { game_id: number }) => [p.game_id, p]));
@@ -110,6 +119,8 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
         }),
         recapHref: view === 'final' && recap ? recapUrl(date, recap.title) : null,
         marquee: false,
+        keyAway: faces(g.id, false),
+        keyHome: faces(g.id, true),
       };
     });
     // ★ the single most watchable upcoming game of the day

@@ -14,7 +14,7 @@ export function gameView(state: string | null | undefined): GameView {
 export const SECTION_META = {
   prediction: { kicker: 'OUR PREDICTION', title: '' }, // title is "<TEAM> win." at render
   goalies: { kicker: 'STARTING GOALIES', title: 'The matchup in net.' },
-  watch: { kicker: 'PLAYERS TO WATCH', title: 'Watch these tonight.' },
+  watch: { kicker: 'KEY PLAYERS · WHY WATCH', title: 'Three to watch on each side.' },
   specialTeams: { kicker: 'SPECIAL TEAMS', title: 'Where games are won.' },
   h2h: { kicker: 'HEAD-TO-HEAD', title: 'Recent meetings.' },
   lineup: { kicker: 'LINEUP · PROJECTED', title: "Tonight's roster picture." },
@@ -24,6 +24,7 @@ export const SECTION_META = {
   liveStats: { kicker: 'LIVE STATS', title: '' },
   topPerformers: { kicker: 'TOP PERFORMERS', title: '' },
   threeStars: { kicker: 'THREE STARS · OFFICIAL', title: "Tonight's best." },
+  keyPlayers: { kicker: 'KEY PLAYERS · WHO DECIDED IT', title: 'Top three on each side.' },
   pick: { kicker: 'OUR PICK · HOW IT PLAYED', title: '' }, // title from pickHeadline()
   heatImpact: { kicker: 'HEAT IMPACT', title: 'Who moved up. Who moved down.' },
   recap: { kicker: 'AI RECAP', title: '' },
@@ -35,7 +36,7 @@ export type SectionKey = keyof typeof SECTION_META;
 const PLAN: Record<GameView, { main: SectionKey[]; side: SectionKey[] }> = {
   upcoming: { main: ['prediction', 'goalies', 'watch', 'specialTeams'], side: ['h2h', 'lineup'] },
   live: { main: ['momentum', 'playByPlay'], side: ['winProb', 'liveStats', 'topPerformers'] },
-  final: { main: ['threeStars', 'pick', 'heatImpact'], side: ['recap', 'highlights'] },
+  final: { main: ['threeStars', 'keyPlayers', 'pick', 'heatImpact'], side: ['recap', 'highlights'] },
 };
 
 // Design order for the view, keeping only sections that have data.

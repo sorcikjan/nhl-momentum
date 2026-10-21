@@ -4,6 +4,7 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { ppmToHeat } from '@/lib/heat';
 import { buildSearchIndex } from '@/lib/search';
+import { pregameKeyPlayers, type KeyPlayer } from '@/lib/key-players';
 import { currentSeasonRows } from '@/lib/player-profile';
 import { currentSeason, getGamesByDate, getGameBoxscore, getGamePlayByPlay, getStandings, getTeamSeasonStats, getSeasonDates } from '@/lib/nhl-api';
 export { deriveOutStatus, daysAgo } from '@/lib/player-status';
@@ -381,7 +382,7 @@ export async function fetchGamesRange(dates: string[]) {
   const gameIds = games.map(g => g.id);
 
   if (gameIds.length === 0) {
-    return { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map() };
+    return { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map(), keyPlayersByGameTeam: new Map<string, KeyPlayer[]>() };
   }
 
   const [{ data: allPredictions }, { data: odds }] = await Promise.all([
@@ -416,12 +417,15 @@ export async function fetchGamesRange(dates: string[]) {
 
   const topPlayerByGame = new Map<number, { playerId: number; name: string; compositePpm: number; teamAbbrev: string }>();
   const topHeatByGameTeam = new Map<string, number>(); // `${gameId}-${isHome}` → highest compositePpm
+  // `${gameId}-${isHome}` → the game page's three key players (photos filled by callers).
+  const keyPlayersByGameTeam = new Map<string, KeyPlayer[]>();
   for (const snap of snapshots ?? []) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const skaters = (snap.skater_snapshots as any[]) ?? [];
     if (!skaters.length) continue;
     const game = games.find(g => g.id === snap.game_id);
     const teamAbbrev = snap.is_home ? game?.homeTeam?.abbrev : game?.awayTeam?.abbrev;
+    keyPlayersByGameTeam.set(`${snap.game_id}-${snap.is_home}`, pregameKeyPlayers(skaters, new Map(), teamAbbrev ?? ''));
     const top = [...skaters].sort((a, b) => (b.compositePpm ?? 0) - (a.compositePpm ?? 0))[0];
     if (top) {
       topHeatByGameTeam.set(`${snap.game_id}-${snap.is_home}`, top.compositePpm ?? 0);
@@ -432,7 +436,7 @@ export async function fetchGamesRange(dates: string[]) {
     }
   }
 
-  return { games, predictions, odds, topPlayerByGame, topHeatByGameTeam };
+  return { games, predictions, odds, topPlayerByGame, topHeatByGameTeam, keyPlayersByGameTeam };
 }
 
 // ─── Player ───────────────────────────────────────────────────────────────────
@@ -905,6 +909,24 @@ export async function fetchSearchIndex() {
   return buildSearchIndex(players as any[], [...latest.values()], (teams ?? []).filter(t => live.has(t.abbrev)));
 }
 
+// Recent form + photo for a game's key players (a handful of ids).
+export async function fetchKeyPlayerForm(playerIds: number[]): Promise<Map<number, { goals: number; assists: number; games: number; photo: string | null }>> {
+  const out = new Map<number, { goals: number; assists: number; games: number; photo: string | null }>();
+  if (!playerIds.length) return out;
+  const { data } = await supabaseAdmin
+    .from('player_metric_snapshots')
+    .select('player_id, momentum_goals, momentum_assists, momentum_games, calculated_at, players(headshot_url)')
+    .in('player_id', playerIds)
+    .order('calculated_at', { ascending: false })
+    .limit(playerIds.length * 4);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (data ?? []) as any[]) {
+    if (out.has(r.player_id)) continue;
+    out.set(r.player_id, { goals: r.momentum_goals ?? 0, assists: r.momentum_assists ?? 0, games: r.momentum_games ?? 0, photo: r.players?.headshot_url ?? null });
+  }
+  return out;
+}
+
 // Headshot URLs for a handful of players (e.g. homepage "watch for").
 export async function fetchPlayerPhotos(playerIds: number[]): Promise<Map<number, string>> {
   const out = new Map<number, string>();
@@ -1180,7 +1202,7 @@ export async function fetchMatch(id: string) {
       .order('goals', { ascending: false }),
     supabaseAdmin
       .from('game_goalie_stats')
-      .select('*, players(first_name, last_name)')
+      .select('*, players(first_name, last_name, headshot_url)')
       .eq('game_id', id),
     supabaseAdmin
       .from('external_odds')

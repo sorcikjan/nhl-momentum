@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const empty = { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map() };
+const empty = { games: [], predictions: [], odds: [], topPlayerByGame: new Map(), topHeatByGameTeam: new Map(), keyPlayersByGameTeam: new Map() };
 const fetchGamesRange = vi.fn();
 vi.mock('@/lib/data', () => ({
   fetchGamesRange: (d: string[]) => fetchGamesRange(d),
