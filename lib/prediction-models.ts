@@ -519,6 +519,22 @@ function runModelV1_8(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
   };
 }
 
+// v1.9 — v1.8 plus home-ice edge. v1.7/v1.8 dropped home advantage entirely
+// (HOME_EDGE=1.0) and picked the home team only ~50% of the time, while home
+// teams win ~54% long-run. +4 points matches that long-run NHL rate; tuned on
+// 2025-26, validated on 2026-27 (216 games: 51.9% → 57.4% winners, lower log loss).
+// Score projection is unchanged from v1.8.
+function runModelV1_9(homeSnap: TeamSnap, awaySnap: TeamSnap): ModelResult {
+  const HOME_SHIFT = 0.04;
+  const r = runModelV1_8(homeSnap, awaySnap);
+  const homeWin = Math.min(0.95, Math.max(0.05, r.homeWin + HOME_SHIFT));
+  return {
+    ...r,
+    homeWin: Math.round(homeWin * 1000) / 1000,
+    awayWin: Math.round((1 - homeWin) * 1000) / 1000,
+  };
+}
+
 // Registry of all model versions — add new versions here
 export const MODEL_REGISTRY: Record<string, (home: TeamSnap, away: TeamSnap) => ModelResult> = {
   'v1.0': runModelV1,
@@ -530,4 +546,5 @@ export const MODEL_REGISTRY: Record<string, (home: TeamSnap, away: TeamSnap) => 
   'v1.6': runModelV1_6,
   'v1.7': runModelV1_7,
   'v1.8': runModelV1_8,
+  'v1.9': runModelV1_9,
 };
