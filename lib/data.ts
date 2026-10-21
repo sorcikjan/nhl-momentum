@@ -6,7 +6,6 @@ import { ppmToHeat } from '@/lib/heat';
 import { currentSeasonRows } from '@/lib/player-profile';
 import { currentSeason, getGamesByDate, getGameBoxscore, getGamePlayByPlay, getStandings, getTeamSeasonStats, getSeasonDates } from '@/lib/nhl-api';
 export { deriveOutStatus, daysAgo } from '@/lib/player-status';
-import { daysAgo } from '@/lib/player-status';
 import { processPlayByPlay } from '@/lib/play-by-play';
 
 // NHL CDN logo URL — works for all 32 teams
@@ -107,39 +106,6 @@ export async function fetchLeagueAverages() {
 }
 
 // ─── Out Status ───────────────────────────────────────────────────────────────
-
-/** Returns Map<playerId, lastGameDate> for the given player IDs. */
-async function getLastPlayedDates(playerIds: number[]): Promise<Map<number, string>> {
-  if (!playerIds.length) return new Map();
-  // Fetch recent stats sorted by game_id desc — newest first, dedup per player in JS
-  const { data: stats } = await supabaseAdmin
-    .from('game_player_stats')
-    .select('player_id, game_id')
-    .in('player_id', playerIds)
-    .order('game_id', { ascending: false })
-    .limit(playerIds.length * 4);
-
-  const lastGameId = new Map<number, number>();
-  for (const row of stats ?? []) {
-    if (!lastGameId.has(row.player_id)) lastGameId.set(row.player_id, row.game_id);
-  }
-
-  const gameIds = [...new Set(lastGameId.values())];
-  if (!gameIds.length) return new Map();
-
-  const { data: games } = await supabaseAdmin
-    .from('games')
-    .select('id, game_date')
-    .in('id', gameIds);
-
-  const dateById = new Map((games ?? []).map(g => [g.id, g.game_date as string]));
-  const result = new Map<number, string>();
-  for (const [pid, gid] of lastGameId) {
-    const date = dateById.get(gid);
-    if (date) result.set(pid, date);
-  }
-  return result;
-}
 
 
 // ─── Rankings ─────────────────────────────────────────────────────────────────
@@ -396,40 +362,6 @@ export async function fetchTodayGameCount(): Promise<number> {
   return games.length;
 }
 
-export async function fetchGames(date: string) {
-  // NHL API and model version can run in parallel
-  const [games, activeModel] = await Promise.all([
-    getGamesByDate(date),
-    latestModelVersion(),
-  ]);
-  const gameIds = (games as { id: number }[]).map(g => g.id);
-  const [{ data: allPredictions }, { data: odds }] = await Promise.all([
-    supabaseAdmin
-      .from('predictions')
-      .select('*, prediction_outcomes(*)')
-      .in('game_id', gameIds)
-      .order('created_at', { ascending: false }),
-    supabaseAdmin
-      .from('external_odds')
-      .select('*')
-      .in('game_id', gameIds)
-      .order('fetched_at', { ascending: false }),
-  ]);
-
-  // Deduplicate: one prediction per game, prefer active model over older versions
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const predByGame = new Map<number, any>();
-  for (const p of (allPredictions ?? [])) {
-    const existing = predByGame.get(p.game_id);
-    if (!existing || p.model_version === activeModel) {
-      predByGame.set(p.game_id, p);
-    }
-  }
-  const predictions = Array.from(predByGame.values());
-
-  return { games, predictions, odds };
-}
-
 // The /schedule response carries the date on the day, not on each game, so a
 // 9 PM ET game (01:00 UTC next day) would otherwise look like tomorrow's.
 export function withScheduleDates<T extends { id: number; gameDate?: string }>(dates: string[], gamesByDate: T[][]): (T & { gameDate: string })[] {
@@ -633,92 +565,6 @@ export async function fetchPlayer(id: string) {
   }
 
   return { player, metricTimeline, recentGames, consecutiveGamesMissed, lastPlayedDate, goalieStats };
-}
-
-// ─── Comparison Peers ─────────────────────────────────────────────────────────
-
-// Returns up to 6 same-position players ranked by composite_ppm, excluding the
-// current player. Used by the "Compare to" section on the player profile page.
-//
-// The underlying "latest snapshot per player" set is identical for every profile,
-// so it's loaded once per 30 min per server instance. It used to be a 2000-row
-// joined query on every player-page render (895 pages, crawlers included) —
-// a large share of the read load behind the Oct 2026 database outages.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _peerPoolCache: { rows: any[]; floor: number; ts: number } | null = null;
-
-async function peerPool() {
-  if (_peerPoolCache && Date.now() - _peerPoolCache.ts < 30 * 60_000) return _peerPoolCache;
-  const { data } = await supabaseAdmin
-    .from('player_metric_snapshots')
-    .select(`
-      player_id, momentum_ppm, season_ppm, composite_ppm,
-      momentum_goals, momentum_assists, momentum_games, season_games,
-      calculated_at,
-      players!inner(first_name, last_name, position_code, headshot_url, is_active,
-        teams(abbrev))
-    `)
-    .eq('players.is_active', true)
-    .order('calculated_at', { ascending: false })
-    .limit(2000);
-  const seen = new Set<number>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rows = ((data ?? []) as any[]).filter(r => !seen.has(r.player_id) && seen.add(r.player_id));
-  // Same season-aware floor as fetchRankings: 10 games once established, ~60% of
-  // games played so far early in the season.
-  const games = rows.map(r => r.season_games ?? 0).sort((x, y) => x - y);
-  const floor = Math.min(10, Math.max(1, Math.ceil((games[Math.floor(games.length * 0.9)] ?? 0) * 0.6)));
-  if (rows.length) _peerPoolCache = { rows, floor, ts: Date.now() };
-  return { rows, floor, ts: Date.now() };
-}
-
-export async function fetchComparisonPeers(playerId: string, positionCode: string) {
-  if (!positionCode || positionCode === 'G') return [];
-  const { rows, floor } = await peerPool();
-  const pid = Number(playerId);
-  return rows
-    .filter(r =>
-      r.player_id !== pid &&
-      r.players?.position_code === positionCode &&
-      (r.season_games ?? 0) >= floor)
-    .sort((a, b) => (b.composite_ppm ?? 0) - (a.composite_ppm ?? 0))
-    .slice(0, 6);
-}
-
-// ─── Nightly Story Data ───────────────────────────────────────────────────────
-
-export async function fetchNightlyStoryData(date: string) {
-  const { data: games } = await supabaseAdmin
-    .from('games')
-    .select(`
-      id, game_date, home_score, away_score,
-      home_team:teams!games_home_team_id_fkey(abbrev),
-      away_team:teams!games_away_team_id_fkey(abbrev)
-    `)
-    .eq('game_date', date)
-    .in('game_state', ['FINAL', 'OFF']);
-
-  if (!games?.length) return null;
-
-  const gameIds = games.map((g: { id: number }) => g.id);
-
-  const { data: stats } = await supabaseAdmin
-    .from('game_player_stats')
-    .select(`
-      player_id, game_id, goals, assists, plus_minus, toi_seconds,
-      players(first_name, last_name, position_code),
-      teams(abbrev)
-    `)
-    .in('game_id', gameIds)
-    .neq('players.position_code', 'G');
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sorted = (stats as any[] ?? [])
-    .filter(s => s.players)
-    .sort((a, b) => (b.goals + b.assists) - (a.goals + a.assists))
-    .slice(0, 10);
-
-  return { games, topPerformers: sorted };
 }
 
 // ─── Playoff utilities ────────────────────────────────────────────────────────
@@ -973,24 +819,6 @@ export async function fetchRecentSoftSignals(withinHours = 48, limit = 15) {
     .order('published_at', { ascending: false })
     .limit(limit);
   return data ?? [];
-}
-
-export async function fetchNewsFeed(limit = 50) {
-  const { data } = await supabaseAdmin
-    .from('soft_signals')
-    .select('id, type, title, content, url, source, published_at, fetched_at')
-    .order('published_at', { ascending: false })
-    .limit(limit);
-  return data ?? [];
-}
-
-export async function fetchSignalById(id: number) {
-  const { data } = await supabaseAdmin
-    .from('soft_signals')
-    .select('id, type, title, content, url, source, published_at, fetched_at')
-    .eq('id', id)
-    .single();
-  return data ?? null;
 }
 
 export async function fetchRecentRecaps(limit = 30) {
@@ -1483,29 +1311,6 @@ export async function fetchPostGameHeat(playerIds: number[]) {
 // Returns the most-recent timestamp for each pipeline stage — used on the
 // homepage to let you quickly spot stale or broken sync jobs.
 
-export async function fetchPipelineStatus() {
-  const [gamelogs, metrics, predictions, outcomes, snapshots] = await Promise.all([
-    supabaseAdmin.from('game_player_stats').select('recorded_at').order('recorded_at', { ascending: false }).limit(1).single(),
-    supabaseAdmin.from('player_metric_snapshots').select('calculated_at').order('calculated_at', { ascending: false }).limit(1).single(),
-    // Use input_snapshot->>'captured_at' — this is written on every upsert, unlike
-    // created_at which Postgres never updates on a conflict-update.
-    supabaseAdmin.from('predictions').select('input_snapshot').order('created_at', { ascending: false }).limit(1).single(),
-    supabaseAdmin.from('prediction_outcomes').select('recorded_at').order('recorded_at', { ascending: false }).limit(1).single(),
-    supabaseAdmin.from('game_team_snapshots').select('captured_at').order('captured_at', { ascending: false }).limit(1).single(),
-  ]);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const predTimestamp = (predictions.data?.input_snapshot as any)?.captured_at ?? null;
-
-  return {
-    gamelogs:    gamelogs.data?.recorded_at  ?? null,
-    metrics:     metrics.data?.calculated_at ?? null,
-    predictions: predTimestamp,
-    outcomes:    outcomes.data?.recorded_at  ?? null,
-    snapshots:   snapshots.data?.captured_at ?? null,
-  };
-}
-
 // ─── Goalie Rankings ─────────────────────────────────────────────────────────
 
 export async function fetchGoalieRankings() {
@@ -1572,26 +1377,6 @@ export async function fetchGoalieRankings() {
 }
 
 // ─── Series Probability ──────────────────────────────────────────────────────
-
-export function computeSeriesProb(p: number, aWins: number, bWins: number): number {
-  // Negative binomial: P(team A wins series given a wins, b wins, per-game prob p)
-  const r = 4 - aWins;
-  const s = 4 - bWins;
-  if (r <= 0) return 1;
-  if (s <= 0) return 0;
-  function comb(n: number, k: number): number {
-    if (k < 0 || k > n) return 0;
-    if (k === 0 || k === n) return 1;
-    let result = 1;
-    for (let i = 0; i < k; i++) result = result * (n - i) / (i + 1);
-    return result;
-  }
-  let prob = 0;
-  for (let k = 0; k < s; k++) {
-    prob += comb(r + k - 1, k) * Math.pow(p, r) * Math.pow(1 - p, k);
-  }
-  return Math.min(1, Math.max(0, prob));
-}
 
 // ─── Newcomer Watch ───────────────────────────────────────────────────────────
 

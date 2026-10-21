@@ -13,7 +13,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: base,                   lastModified: now, changeFrequency: 'hourly',  priority: 1.0 },
     { url: `${base}/rankings`,     lastModified: now, changeFrequency: 'hourly',  priority: 0.9 },
     { url: `${base}/games`,        lastModified: now, changeFrequency: 'hourly',  priority: 0.9 },
-    { url: `${base}/teams`,        lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
     { url: `${base}/accuracy`,     lastModified: now, changeFrequency: 'daily',   priority: 0.6 },
   ];
 

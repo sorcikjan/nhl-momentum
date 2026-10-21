@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 // Every page's main heading comes from the shared SectionHeading (one <h1>, with a
 // kicker) — no hand-styled headings, so all pages read as one product.
 const pages = [
-  'app/teams/page.tsx', 'app/teams/[id]/[slug]/page.tsx', 'app/recaps/page.tsx', 'app/recaps/[date]/[slug]/page.tsx',
-  'app/news/page.tsx', 'app/news/[id]/page.tsx', 'app/accuracy/page.tsx', 'app/search/page.tsx',
+  'app/teams/[id]/[slug]/page.tsx', 'app/recaps/page.tsx', 'app/recaps/[date]/[slug]/page.tsx',
+  'app/accuracy/page.tsx', 'app/search/page.tsx',
 ];
 
 describe.each(pages)('%s', file => {
