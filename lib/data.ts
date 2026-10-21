@@ -3,6 +3,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase';
 import { ppmToHeat } from '@/lib/heat';
+import { buildSearchIndex } from '@/lib/search';
 import { currentSeasonRows } from '@/lib/player-profile';
 import { currentSeason, getGamesByDate, getGameBoxscore, getGamePlayByPlay, getStandings, getTeamSeasonStats, getSeasonDates } from '@/lib/nhl-api';
 export { deriveOutStatus, daysAgo } from '@/lib/player-status';
@@ -867,6 +868,41 @@ export async function fetchSeasonPickAccuracy(): Promise<number | null> {
   const value = all.count ? ((hit.count ?? 0) / all.count) * 100 : null;
   _pickAccCache = { value, ts: Date.now() };
   return value;
+}
+
+// Search index: every active player + team, with latest Heat. Paged under the
+// 1,000-row PostgREST cap. Served via the CDN-cached /api/search-index.
+export async function fetchSearchIndex() {
+  const page = async <T,>(build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) => {
+    const out: T[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await build(from, from + 999);
+      if (error) throw error;
+      out.push(...(data ?? []));
+      if ((data ?? []).length < 1000) return out;
+    }
+  };
+  const since = new Date(Date.now() - 3 * 86_400_000).toISOString();
+  const [players, snaps, { data: teams, error: tErr }] = await Promise.all([
+    page(async (f, t) => supabaseAdmin.from('players')
+      .select('id, first_name, last_name, position_code, headshot_url, teams(abbrev)')
+      .eq('is_active', true).order('id').range(f, t)),
+    page(async (f, t) => supabaseAdmin.from('player_metric_snapshots')
+      .select('player_id, momentum_ppm, calculated_at')
+      .gte('calculated_at', since).order('calculated_at', { ascending: false }).range(f, t)),
+    supabaseAdmin.from('teams').select('id, name, abbrev').order('name'),
+  ]);
+  if (tErr) throw tErr;
+  // Newest snapshot per player wins (rows are newest-first).
+  const latest = new Map<number, { player_id: number; momentum_ppm: number | null }>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const s of snaps as any[]) if (!latest.has(s.player_id)) latest.set(s.player_id, s);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // Only teams with active players (drops relocated/defunct franchises).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const live = new Set((players as any[]).map(p => p.teams?.abbrev).filter(Boolean));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return buildSearchIndex(players as any[], [...latest.values()], (teams ?? []).filter(t => live.has(t.abbrev)));
 }
 
 // Headshot URLs for a handful of players (e.g. homepage "watch for").

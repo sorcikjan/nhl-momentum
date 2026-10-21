@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 // kicker) — no hand-styled headings, so all pages read as one product.
 const pages = [
   'app/teams/[id]/[slug]/page.tsx', 'app/recaps/page.tsx', 'app/recaps/[date]/[slug]/page.tsx',
-  'app/accuracy/page.tsx', 'app/search/page.tsx',
+  'app/accuracy/page.tsx',
 ];
 
 describe.each(pages)('%s', file => {

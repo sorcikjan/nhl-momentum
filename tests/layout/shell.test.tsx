@@ -1,15 +1,23 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+vi.mock('next/navigation', () => ({ usePathname: () => '/', useRouter: () => ({ push: () => {} }) }));
 import { renderToStaticMarkup } from 'react-dom/server';
-import { NAV_ITEMS, MOBILE_NAV_ITEMS, Wordmark } from '@/components/layout/BrandHeader';
+import BrandHeader, { NAV_ITEMS, MOBILE_NAV_ITEMS, Wordmark } from '@/components/layout/BrandHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 
 describe('header', () => {
   it('has the design nav, in order', () => {
-    expect(NAV_ITEMS.map(i => i.href)).toEqual(['/', '/hot', '/search', '/rankings', '/recaps']);
-    expect(NAV_ITEMS.map(i => i.label)).toEqual(['Tonight', 'Heat map', 'Players', 'Rankings', 'Stories']);
+    expect(NAV_ITEMS.map(i => i.href)).toEqual(['/', '/games', '/hot', '/rankings', '/recaps']);
+    expect(NAV_ITEMS.map(i => i.label)).toEqual(['Tonight', 'Games', 'Heat map', 'Rankings', 'Stories']);
   });
-  it('keeps a mobile tab bar that includes the schedule', () => {
-    expect(MOBILE_NAV_ITEMS.map(i => i.href)).toContain('/games');
+  it('keeps a mobile tab bar with the schedule and a Search action (no /search page)', () => {
+    expect(MOBILE_NAV_ITEMS.map(i => i.label)).toEqual(['Tonight', 'Games', 'Heat', 'Rankings', 'Search']);
+    expect(MOBILE_NAV_ITEMS.find(i => i.label === 'Search')?.href).toBeNull();
+    expect(JSON.stringify(NAV_ITEMS)).not.toContain('/search');
+  });
+  it('header offers search as a button, not a link to a page', () => {
+    const out = renderToStaticMarkup(<BrandHeader />);
+    expect(out).not.toContain('href="/search"');
+    expect(out).toContain('Search players &amp; teams');
   });
   it('wordmark reads "momentum." with no "Hockey"', () => {
     const out = renderToStaticMarkup(<Wordmark />);
