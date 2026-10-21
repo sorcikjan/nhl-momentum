@@ -90,6 +90,19 @@ describe('GameCard', () => {
     expect(fin).toContain('href="/recaps/x/y"');
     expect(fin).not.toMatch(/<a\s[^>]*>(?:(?!<\/a>)[\s\S])*<a\s/);
   });
+  it('reads in order: teams/result first, then the prediction, then the players', () => {
+    const out = renderToStaticMarkup(<GameCard g={upcoming} />);
+    const team = out.indexOf('Buffalo'), pick = out.indexOf('BUF 65%'), player = out.indexOf('data-card-player');
+    expect(team).toBeGreaterThan(-1);
+    expect(pick).toBeGreaterThan(team);
+    expect(player).toBeGreaterThan(pick);
+    expect(out.match(/BUF 65%/g)).toHaveLength(1); // the pick is stated once
+  });
+  it('final: score before the pick result', () => {
+    const fin: GameCardData = { ...upcoming, state: 'OFF', pickResult: 'hit', away: side('PHI', 'Philadelphia', { score: 2 }), home: side('BUF', 'Buffalo', { score: 4 }) };
+    const out = renderToStaticMarkup(<GameCard g={fin} />);
+    expect(out.indexOf('PICK HIT')).toBeGreaterThan(out.indexOf('>4<'));
+  });
   it('a side without players says so instead of leaving a hole', () => {
     const out = renderToStaticMarkup(<GameCard g={{ ...upcoming, away: { ...upcoming.away, players: [] } }} />);
     expect(out).toContain('Lineup pending');

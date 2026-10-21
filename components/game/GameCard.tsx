@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { Headshot, HeatPill, TeamChip } from '@/components/ds';
+import { Headshot, TeamChip } from '@/components/ds';
+import { heatColor } from '@/lib/heat';
 import { gameView } from '@/lib/game-state';
 import { lastName, type CardPlayer, type CardSide, type GameCardData } from '@/lib/game-card';
 
@@ -8,33 +9,59 @@ const MONO = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' } a
 const timeET = (iso: string | null) =>
   iso ? new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET' : 'TBD';
 
-function Header({ g }: { g: GameCardData }) {
+// 1. Status: time before the game, LIVE / FINAL after — small, it frames the card.
+function Status({ g }: { g: GameCardData }) {
   const view = gameView(g.state);
-  const status = view === 'live' ? '● LIVE' : view === 'final' ? 'FINAL' : timeET(g.startTimeUTC);
-  const pick = view === 'final' && g.pickResult
-    ? { text: `${g.pickResult === 'hit' ? '✓ PICK HIT' : '✗ PICK MISS'}${g.pick ? ` · ${g.pick.abbrev} ${g.pick.pct}%` : ''}`, color: g.pickResult === 'hit' ? 'var(--rise)' : 'var(--cold)' }
-    : g.pick ? { text: `OUR PICK · ${g.pick.abbrev} ${g.pick.pct}%`, color: 'var(--heat)' } : null;
   return (
-    <div className="mb-3 flex items-center justify-between gap-2 text-[10px] font-bold" style={{ ...MONO, letterSpacing: 0.8 }}>
-      <span style={{ color: view === 'live' ? 'var(--heat)' : 'var(--text-bright)' }}>{status}</span>
-      {pick && <span className="truncate" style={{ color: pick.color }}>{pick.text}</span>}
+    <div className="mb-2.5 text-[10px] font-bold" style={{ ...MONO, letterSpacing: 0.8, color: view === 'live' ? 'var(--heat)' : 'var(--text-muted)' }}>
+      {view === 'live' ? '● LIVE' : view === 'final' ? 'FINAL' : timeET(g.startTimeUTC)}
     </div>
   );
 }
 
+// 2. The result and the teams — the biggest thing on the card.
 function TeamHead({ s, g, other }: { s: CardSide; g: GameCardData; other: CardSide }) {
   const view = gameView(g.state);
   const scored = view !== 'upcoming' && s.score != null && other.score != null;
   const won = scored && s.score! > other.score!;
+  const lit = !scored || won;
   return (
-    <div className="flex min-w-0 items-center gap-2">
-      <TeamChip abbrev={s.abbrev} size={26} ringed={view === 'upcoming' && g.pick?.abbrev === s.abbrev} />
-      <span className="min-w-0 flex-1 truncate text-[13px] lg:text-sm" style={{ fontWeight: !scored || won ? 700 : 500, color: !scored || won ? 'var(--text-bright)' : 'var(--text)' }}>{s.name}</span>
-      {scored ? (
-        <span className="text-xl font-extrabold" style={{ ...MONO, color: won ? 'var(--text-bright)' : 'var(--text-muted)' }}>{s.score}</span>
-      ) : s.pct != null ? (
-        <span className="text-[11px] font-bold" style={{ ...MONO, color: g.pick?.abbrev === s.abbrev ? 'var(--heat)' : 'var(--text-muted)' }}>{s.pct}%</span>
-      ) : null}
+    <div className="flex min-w-0 items-center gap-2.5">
+      <TeamChip abbrev={s.abbrev} size={34} />
+      <span className="min-w-0 flex-1 truncate text-[15px] lg:text-base" style={{ fontWeight: lit ? 800 : 600, color: lit ? 'var(--text-bright)' : 'var(--text-muted)' }}>{s.name}</span>
+      {scored && <span className="text-[28px] font-extrabold leading-none" style={{ ...MONO, color: lit ? 'var(--text-bright)' : 'var(--text-muted)' }}>{s.score}</span>}
+    </div>
+  );
+}
+
+// 3. Our prediction — one quiet line. Before/during: the split bar; after: hit or miss.
+function Prediction({ g }: { g: GameCardData }) {
+  const view = gameView(g.state);
+  if (!g.pick) return null;
+  if (view === 'final') {
+    if (!g.pickResult) return null;
+    const hit = g.pickResult === 'hit';
+    return (
+      <div className="mt-3 text-[10px] font-bold" style={{ ...MONO, letterSpacing: 0.8, color: hit ? 'var(--rise)' : 'var(--cold)' }}>
+        {hit ? '✓ PICK HIT' : '✗ PICK MISS'} <span style={{ color: 'var(--text-muted)' }}>· {g.pick.abbrev} {g.pick.pct}%</span>
+      </div>
+    );
+  }
+  const a = g.away, h = g.home;
+  if (a.pct == null || h.pct == null) return null;
+  const pickAway = g.pick.abbrev === a.abbrev;
+  const label = (side: CardSide, picked: boolean) => (
+    <span className="shrink-0 text-[10px] font-bold" style={{ ...MONO, color: picked ? 'var(--heat)' : 'var(--text-muted)' }}>{side.abbrev} {side.pct}%</span>
+  );
+  return (
+    <div className="mt-3 flex items-center gap-2">
+      <span className="shrink-0 text-[9px] font-bold" style={{ ...MONO, color: 'var(--text-muted)', letterSpacing: 0.8 }}>PICK</span>
+      {label(a, pickAway)}
+      <span className="flex h-[3px] flex-1 overflow-hidden rounded-sm">
+        <span style={{ flex: a.pct, background: pickAway ? 'var(--heat)' : 'var(--border-soft)' }} />
+        <span style={{ flex: h.pct, background: pickAway ? 'var(--border-soft)' : 'var(--heat)' }} />
+      </span>
+      {label(h, !pickAway)}
     </div>
   );
 }
@@ -45,16 +72,16 @@ function TeamHead({ s, g, other }: { s: CardSide; g: GameCardData; other: CardSi
 export function PlayerRows({ team, players, link = false }: { team: string; players: CardPlayer[]; link?: boolean }) {
   if (!players.length) return <p className="py-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>Lineup pending</p>;
   return (
-    <ul className="flex flex-col gap-1.5">
+    <ul className="flex flex-col gap-1">
       {players.map(p => {
         const row = (
           <>
-            <Headshot src={p.photo} name={p.name} team={team} size={24} />
-            <span className="min-w-0 flex-1 lg:flex lg:items-baseline lg:gap-1.5">
-              <span className="block truncate text-[12px] font-semibold lg:text-[13px]" style={{ color: 'var(--text-bright)' }}>{lastName(p.name)}</span>
-              {p.stat && <span className="block truncate text-[10px]" style={{ ...MONO, color: p.stat === 'DNP' || p.stat === '–' ? 'var(--text-muted)' : 'var(--text)' }}>{p.stat}</span>}
+            <Headshot src={p.photo} name={p.name} team={team} size={20} />
+            <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
+              <span className="truncate text-[12px] font-medium" style={{ color: 'var(--text)' }}>{lastName(p.name)}</span>
+              {p.stat && <span className="shrink-0 text-[10px]" style={{ ...MONO, color: 'var(--text-muted)' }}>{p.stat}</span>}
             </span>
-            {p.heat != null && <HeatPill heat={p.heat} size="sm" />}
+            {p.heat != null && <span className="text-[11px] font-bold" style={{ ...MONO, color: heatColor(p.heat) }}>{p.heat}</span>}
           </>
         );
         return (
@@ -72,7 +99,6 @@ export function PlayerRows({ team, players, link = false }: { team: string; play
 // One game, any state: status + pick, both teams, then each team's three
 // highest-Heat players directly under it. Same layout everywhere.
 export function GameCard({ g }: { g: GameCardData }) {
-  const view = gameView(g.state);
   const footer = g.watchability != null || g.recapHref || g.marquee;
   return (
     <article
@@ -80,18 +106,13 @@ export function GameCard({ g }: { g: GameCardData }) {
       style={{ background: 'var(--bg-card)', borderColor: g.marquee ? 'rgba(255, 90, 36, 0.45)' : 'var(--border)' }}
     >
       <Link href={g.href} className="block px-4 pb-3.5 pt-3 transition-colors hover:bg-[var(--bg-hover)]">
-        <Header g={g} />
+        <Status g={g} />
         <div className="grid grid-cols-2 gap-x-4">
           <TeamHead s={g.away} g={g} other={g.home} />
           <TeamHead s={g.home} g={g} other={g.away} />
         </div>
-        {view === 'upcoming' && g.away.pct != null && g.home.pct != null && (
-          <div className="mt-2.5 flex h-1 overflow-hidden rounded-sm">
-            <div style={{ flex: g.away.pct, background: g.pick?.abbrev === g.away.abbrev ? 'var(--heat)' : 'var(--border-soft)' }} />
-            <div style={{ flex: g.home.pct, background: g.pick?.abbrev === g.home.abbrev ? 'var(--heat)' : 'var(--border-soft)' }} />
-          </div>
-        )}
-        <div className="mt-3 grid grid-cols-2 gap-x-4 border-t pt-3" style={{ borderColor: 'var(--border-soft)' }}>
+        <Prediction g={g} />
+        <div className="mt-3 grid grid-cols-2 gap-x-4 border-t pt-2.5" style={{ borderColor: 'var(--border-soft)' }}>
           <PlayerRows team={g.away.abbrev} players={g.away.players} />
           <PlayerRows team={g.home.abbrev} players={g.home.players} />
         </div>
