@@ -1,5 +1,5 @@
 -- Add v1.9 model: v1.8 plus a +4-point home-ice edge on win probability.
--- Inserted inactive; activate once v1.9 predictions exist for upcoming games:
+-- Inserted inactive, then activated once v1.9 predictions existed for upcoming games:
 --   update model_versions set is_active = (version = 'v1.9');
 insert into model_versions (version, description, is_active)
 values (
