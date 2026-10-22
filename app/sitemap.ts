@@ -2,6 +2,8 @@ import type { MetadataRoute } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { playerUrl, teamUrl, gameUrl } from '@/lib/urls';
 import { SITE_URL } from '@/lib/site';
+import { todayET } from '@/lib/home';
+import { predictionSitemapDates } from '@/lib/seo';
 
 const base = SITE_URL;
 
@@ -14,6 +16,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/rankings`,     lastModified: now, changeFrequency: 'hourly',  priority: 0.9 },
     { url: `${base}/games`,        lastModified: now, changeFrequency: 'hourly',  priority: 0.9 },
     { url: `${base}/accuracy`,     lastModified: now, changeFrequency: 'daily',   priority: 0.6 },
+    { url: `${base}/predictions`,  lastModified: now, changeFrequency: 'hourly',  priority: 0.9 },
+    ...predictionSitemapDates(todayET()).map(d => ({ url: `${base}/predictions/${d}`, lastModified: now, changeFrequency: 'daily' as const, priority: 0.8 })),
   ];
 
   // Teams

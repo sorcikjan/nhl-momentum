@@ -10,6 +10,12 @@ import { ppmToHeat } from '@/lib/heat';
 // runs call /api/revalidate — so a longer interval costs no freshness.
 export const revalidate = 600;
 
+// Render on first visit, then serve from the ISR cache for `revalidate` seconds.
+// Without this, a dynamic-segment page is rendered on every request.
+export function generateStaticParams() {
+  return [];
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string; slug: string }> }): Promise<Metadata> {
   const { id } = await params;
   const { team, standing } = await fetchTeam(id).catch(() => ({ team: null, roster: [], recentGames: null, upcoming: null, seasonStats: null, standing: null }));

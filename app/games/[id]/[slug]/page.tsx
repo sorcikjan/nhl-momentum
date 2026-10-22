@@ -1,16 +1,20 @@
 import type { Metadata } from 'next';
 import type React from 'react';
+import { cache } from 'react';
 import Link from 'next/link';
 import {
   fetchMatch, fetchRecap, fetchSeasonPickAccuracy, fetchTeamSpecialTeams,
   fetchKeyPlayerForm, fetchPostGameHeat, teamLogoUrl,
 } from '@/lib/data';
-import { teamUrl, playerUrl, recapUrl } from '@/lib/urls';
+import { gameUrl, teamUrl, playerUrl, recapUrl } from '@/lib/urls';
 import { decimalToNormProb, formatBookmaker } from '@/lib/odds-api';
 import { ppmToHeat, heatColor } from '@/lib/heat';
 import { periodScoresFromMomentum } from '@/lib/play-by-play';
 
 import ShareButton from '@/components/ui/ShareButton';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { gameTitle, sportsEventLd } from '@/lib/seo';
+import { SITE_URL } from '@/lib/site';
 import { SectionHeading } from '@/components/ds';
 import { SECTION_META, gameView, pickHeadline, sectionPlan, type SectionKey } from '@/lib/game-state';
 import { teamColor } from '@/lib/team-colors';
@@ -37,9 +41,18 @@ import { assertDatabaseUp } from '@/lib/supabase';
 // Free-tier database: each render is several queries; crawlers visit every page.
 export const revalidate = 60;
 
+// Render on first visit, then serve from the ISR cache for `revalidate` seconds.
+// Without this, a dynamic-segment page is rendered on every request.
+export function generateStaticParams() {
+  return [];
+}
+
+// Metadata and the page share one fetch per render (it's a few dozen queries).
+const cachedFetchMatch = cache((id: string) => fetchMatch(id));
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string; slug: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const { game } = await fetchMatch(id).catch(() => ({ game: null }));
+  const { game } = await cachedFetchMatch(id).catch(() => ({ game: null }));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const away = (game?.away_team as any)?.abbrev ?? 'Away';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -52,10 +65,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     ? new Date(game.game_date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : '';
   const isFinalGame = ['FINAL', 'OFF'].includes(game?.game_state ?? '');
-  const title = `${awayName} vs ${homeName}${dateLabel ? ' — ' + dateLabel : ''}`;
+  const title = gameTitle({ awayName, homeName, date: game?.game_date ?? null, state: game?.game_state ?? null, awayScore: game?.away_score ?? null, homeScore: game?.home_score ?? null });
   const desc = isFinalGame
-    ? `${awayName} vs ${homeName} recap${dateLabel ? ' — ' + dateLabel : ''}: final score, top performers, expected goals, and AI prediction result.`
-    : `${awayName} vs ${homeName} prediction${dateLabel ? ' — ' + dateLabel : ''}: AI win probability, expected goals, lineup momentum, and betting odds comparison.`;
+    ? `${awayName} vs ${homeName} recap${dateLabel ? ' — ' + dateLabel : ''}: final score, whether our pick held, and how each team's three hottest players did.`
+    : `${awayName} vs ${homeName} prediction${dateLabel ? ' — ' + dateLabel : ''}: our pick and win probability, plus each team's three hottest players by Heat.`;
   return {
     title,
     description: desc,
@@ -117,7 +130,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const {
     game, liveData, predictions, snapshots, playerStats, goalieStats, externalOdds,
     playByPlay, headToHead, restDays, goalieSeasonStats,
-  } = await fetchMatch(id);
+  } = await cachedFetchMatch(id);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const live = liveData as any;
@@ -479,6 +492,14 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="pb-20 lg:pb-0">
+      <JsonLd data={sportsEventLd({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        name: `${(game?.away_team as any)?.name ?? awayName} vs ${(game?.home_team as any)?.name ?? homeName}`,
+        url: `${SITE_URL}${gameUrl(Number(id), awayAbbrev, homeAbbrev, gameDate)}`,
+        startDate: startUtc, venue: game?.venue ?? null,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        home: (game?.home_team as any)?.name ?? homeName, away: (game?.away_team as any)?.name ?? awayName, state: gameState,
+      })} />
 
       <GameHero
         view={view}

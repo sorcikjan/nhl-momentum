@@ -34,5 +34,6 @@ describe('footer', () => {
     for (const s of ['MoneyPuck', 'Natural Stat Trick', 'Evolving Hockey']) expect(out).not.toContain(s);
     expect(out).toContain('How Heat works');
     expect(out).toContain('Methodology');
+    expect(out).toContain('href="/predictions"');
   });
 });

@@ -1,17 +1,12 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { FilterChips, SectionHeading } from '@/components/ds';
 import { ScheduleEmpty } from '@/components/schedule/ScheduleEmpty';
 import { GameCard } from '@/components/game/GameCard';
-import { cardPlayers, type GameCardData } from '@/lib/game-card';
-import { teamColor } from '@/lib/team-colors';
-import { fetchGamesRange, fetchPlayerPhotos, fetchRecap, fetchSeasonPickAccuracy, fetchStatLines } from '@/lib/data';
-import { gameView } from '@/lib/game-state';
-import { ppmToHeat } from '@/lib/heat';
+import { fetchGamesRange, fetchSeasonPickAccuracy } from '@/lib/data';
+import { fetchDayCards } from '@/lib/game-cards';
 import { todayET } from '@/lib/home';
 import { assertDatabaseUp } from '@/lib/supabase';
-import { gameUrl, recapUrl } from '@/lib/urls';
-import { calcWatchability } from '@/lib/watchability';
-import type { KeyPlayer } from '@/lib/key-players';
 
 // Free-tier database: each render is several queries; crawlers visit every page.
 export const revalidate = 60;
@@ -56,82 +51,17 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
   const today = todayET();
   const dates = datesFor(range, today, custom);
 
-  const empty = { games: [], predictions: [], odds: [], topHeatByGameTeam: new Map(), keyPlayersByGameTeam: new Map<string, KeyPlayer[]>() };
-  const [{ games, predictions, topHeatByGameTeam, keyPlayersByGameTeam }, accuracy] = await Promise.all([
-    fetchGamesRange(dates).catch(() => empty),
+  const [days, accuracy] = await Promise.all([
+    fetchDayCards(dates),
     fetchSeasonPickAccuracy().catch(() => null),
   ]);
 
-  // Key players (top pre-game Heat per team) on every card; goals/assists once
-  // a game has started; photos for all of them in one query.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const startedIds = (games as any[]).filter(g => gameView(g.gameState) !== 'upcoming').map(g => g.id as number);
-  const keyIds = [...new Set([...keyPlayersByGameTeam.values()].flat().map(p => p.playerId))];
-  const [statsBy, photos] = await Promise.all([
-    fetchStatLines(startedIds).catch(() => new Map<number, Map<number, { goals: number; assists: number }>>()),
-    keyIds.length ? fetchPlayerPhotos(keyIds).catch(() => new Map<number, string>()) : Promise.resolve(new Map<number, string>()),
-  ]);
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const predBy = new Map<number, any>((predictions ?? []).map((p: { game_id: number }) => [p.game_id, p]));
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const byDate = new Map<string, any[]>();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const g of games as any[]) {
-    const d = g.gameDate;
-    if (!byDate.has(d)) byDate.set(d, []);
-    byDate.get(d)!.push(g);
-  }
-
-  const finalDates = [...byDate.entries()].filter(([, gs]) => gs.some(g => gameView(g.gameState) === 'final')).map(([d]) => d);
-  const recapBy = new Map(await Promise.all(finalDates.map(async d => [d, await fetchRecap(d).catch(() => null)] as const)));
-
   let nextGameDate: string | null = null;
-  if (games.length === 0) {
-    const ahead = await fetchGamesRange(Array.from({ length: 7 }, (_, i) => addDays(dates[dates.length - 1], i + 1))).catch(() => empty);
+  if (days.length === 0) {
+    const ahead = await fetchGamesRange(Array.from({ length: 7 }, (_, i) => addDays(dates[dates.length - 1], i + 1))).catch(() => ({ games: [] }));
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     nextGameDate = (ahead.games as any[]).map(g => g.gameDate).sort()[0] ?? null;
   }
-
-  const days = [...byDate.entries()].map(([date, gs]) => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const rows: GameCardData[] = gs.map((g: any) => {
-      const p = predBy.get(g.id);
-      const view = gameView(g.gameState);
-      const homeProb: number | null = p?.home_win_probability ?? null;
-      const homePct = homeProb == null ? null : Math.round(homeProb * 100);
-      const outcome = p?.prediction_outcomes?.[0]?.correct_winner;
-      const recap = recapBy.get(date);
-      // A started game without box-score rows yet shows Heat only (not "DNP" for everyone).
-      const stats = statsBy.get(g.id)?.size ? statsBy.get(g.id)! : null;
-      return {
-        id: g.id,
-        href: gameUrl(g.id, g.awayTeam.abbrev, g.homeTeam.abbrev, date),
-        state: g.gameState,
-        startTimeUTC: g.startTimeUTC ?? null,
-        away: { abbrev: g.awayTeam.abbrev, name: teamColor(g.awayTeam.abbrev).name, score: g.awayTeam.score ?? null, pct: homePct == null ? null : 100 - homePct,
-          players: cardPlayers(keyPlayersByGameTeam.get(`${g.id}-false`), photos, stats) },
-        home: { abbrev: g.homeTeam.abbrev, name: teamColor(g.homeTeam.abbrev).name, score: g.homeTeam.score ?? null, pct: homePct,
-          players: cardPlayers(keyPlayersByGameTeam.get(`${g.id}-true`), photos, stats) },
-        pick: homeProb == null ? null : homeProb >= 0.5
-          ? { abbrev: g.homeTeam.abbrev, pct: homePct! }
-          : { abbrev: g.awayTeam.abbrev, pct: 100 - homePct! },
-        pickResult: view !== 'final' || outcome == null ? null : outcome ? 'hit' : 'miss',
-        watchability: view === 'final' ? null : calcWatchability({
-          topHomeHeat: ppmToHeat(topHeatByGameTeam.get(`${g.id}-true`) ?? 0),
-          topAwayHeat: ppmToHeat(topHeatByGameTeam.get(`${g.id}-false`) ?? 0),
-          homeWinProbability: homeProb,
-          isPlayoff: false,
-        }),
-        recapHref: view === 'final' && recap ? recapUrl(date, recap.title) : null,
-        marquee: false,
-      };
-    });
-    // ★ the single most watchable upcoming game of the day
-    const best = rows.reduce<GameCardData | null>((b, r) => (r.watchability != null && (!b || r.watchability > (b.watchability ?? -1)) ? r : b), null);
-    if (best && rows.length > 1) best.marquee = true;
-    return { date, rows };
-  });
 
   return (
     <div className="pb-20 lg:pb-0">
@@ -140,14 +70,14 @@ export default async function GamesPage({ searchParams }: { searchParams: Promis
         size="page"
         kicker={range === 'today' ? 'SCHEDULE · TONIGHT' : 'SCHEDULE'}
         title="All games. Every prediction."
-        sub={accuracy != null ? <>Season pick accuracy <b style={{ color: 'var(--rise)' }}>{Math.round(accuracy)}%</b> · our pick on every game.</> : 'Our pick on every game, with each team’s three hottest players.'}
+        sub={<>{accuracy != null ? <>Season pick accuracy <b style={{ color: 'var(--rise)' }}>{Math.round(accuracy)}%</b> · our pick on every game. </> : 'Our pick on every game, with each team’s three hottest players. '}<Link href="/predictions" style={{ color: 'var(--heat)' }}>Tonight&apos;s predictions →</Link></>}
         right={<FilterChips options={RANGES.map(r => ({ label: r.label, href: r.key === 'today' ? '/games' : `/games?range=${r.key}`, active: r.key === range }))} />}
       />
 
       {days.length === 0 ? (
         <ScheduleEmpty nextGameDate={nextGameDate} />
       ) : (
-        days.map(({ date, rows }) => (
+        days.map(({ date, cards: rows }) => (
           <section key={date} className="mb-8">
             <div className="mb-3.5 flex items-center gap-3">
               <h2 className="text-[11px] font-bold" style={{ fontFamily: 'var(--font-geist-mono), monospace', color: 'var(--text-muted)', letterSpacing: 1.4 }}>{dayHeader(date, today)}</h2>

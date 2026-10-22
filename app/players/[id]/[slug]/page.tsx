@@ -10,6 +10,10 @@ import { ppmToHeat } from '@/lib/heat';
 import { currentSeason } from '@/lib/nhl-api';
 import { formChips, gameLogRows, heatSeries, last5Tiles, radarStats, seasonTiles, vsLeagueRows, type Tile } from '@/lib/player-profile';
 import { assertDatabaseUp } from '@/lib/supabase';
+import { JsonLd } from '@/components/seo/JsonLd';
+import { personLd, playerTitle } from '@/lib/seo';
+import { SITE_URL } from '@/lib/site';
+import { playerUrl } from '@/lib/urls';
 
 // Deduplicate fetchPlayer between generateMetadata and the page component
 const cachedFetchPlayer = cache((id: string) => fetchPlayer(id).catch(() => null));
@@ -17,6 +21,12 @@ const cachedFetchPlayer = cache((id: string) => fetchPlayer(id).catch(() => null
 // Player data changes at most a few times a night; the pipeline also calls
 // /api/revalidate after each run. 10 min keeps crawler traffic off the database.
 export const revalidate = 600;
+
+// Render on first visit, then serve from the ISR cache for `revalidate` seconds.
+// Without this, a dynamic-segment page is rendered on every request.
+export function generateStaticParams() {
+  return [];
+}
 
 // "2026–27" from the current NHL season id.
 function seasonLabel() {
@@ -34,8 +44,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const teamName = player.teams?.name ?? team;
   const pos  = player.position_code ?? '';
   const season = seasonLabel();
-  const title = `${name} Stats ${season}`;
-  const desc = `${name} ${season} NHL stats — momentum score, recent form, game log and advanced analytics for the ${teamName} ${pos}.`;
+  const title = playerTitle(name, season);
+  const desc = `${name} ${season} NHL stats — Heat score, recent form, game log and season numbers for the ${teamName} ${pos}.`;
   return {
     title,
     description: desc,
@@ -201,7 +211,17 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     vsRows: isGoalie || !hasSeason ? [] : vsLeagueRows(snap, leagueAvg),
   };
 
-  return <ProfileBody view={view} />;
+  return (
+    <>
+      <JsonLd data={personLd({
+        name: `${player.first_name} ${player.last_name}`,
+        url: `${SITE_URL}${playerUrl(player.id, player.first_name, player.last_name)}`,
+        image: player.headshot_url ?? null,
+        team: player.teams?.name ?? null,
+      })} />
+      <ProfileBody view={view} />
+    </>
+  );
 }
 
 async function AIBio({ playerId, aiInput }: { playerId: number; aiInput: PlayerAIInput }) {

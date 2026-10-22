@@ -10,6 +10,12 @@ import { SectionHeading } from '@/components/ds';
 
 export const revalidate = 3600;
 
+// Render on first visit, then serve from the ISR cache for `revalidate` seconds.
+// Without this, a dynamic-segment page is rendered on every request.
+export function generateStaticParams() {
+  return [];
+}
+
 // Deduplicate fetchRecap between generateMetadata and the page component.
 const cachedFetchRecap = cache((date: string) => fetchRecap(date).catch(() => null));
 
