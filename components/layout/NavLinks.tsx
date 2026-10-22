@@ -38,6 +38,7 @@ export function MobileTabBar({ items }: { items: Item[] }) {
   const path = usePathname();
   return (
     <nav
+      data-section="tabbar"
       className="fixed inset-x-0 bottom-0 z-50 flex border-t lg:hidden"
       style={{ background: 'rgba(10, 11, 15, 0.92)', borderColor: 'var(--border-soft)', backdropFilter: 'blur(10px)' }}
     >

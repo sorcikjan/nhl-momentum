@@ -45,6 +45,7 @@ export default function BrandHeader() {
   return (
     <>
       <header
+        data-section="header"
         className="fixed inset-x-0 top-0 z-50 hidden h-[72px] items-center justify-between border-b px-12 lg:flex"
         style={{ background: 'rgba(10, 11, 15, 0.85)', borderColor: 'var(--border-soft)', backdropFilter: 'blur(10px)' }}
       >
@@ -58,6 +59,7 @@ export default function BrandHeader() {
         </div>
       </header>
       <header
+        data-section="header"
         className="fixed inset-x-0 top-0 z-50 flex h-12 items-center justify-between border-b px-4 lg:hidden"
         style={{ background: 'rgba(10, 11, 15, 0.92)', borderColor: 'var(--border-soft)', backdropFilter: 'blur(10px)' }}
       >

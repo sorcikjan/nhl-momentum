@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+import { track } from '@/lib/analytics';
 
 // Shown only when a page has no cached copy to fall back on and its data can't
 // be loaded (e.g. right after a deploy while the database is unavailable).
@@ -9,6 +10,7 @@ import Link from 'next/link';
 export default function Error({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error('[page error]', error.message, error.digest ?? '');
+    track('exception', { description: (error.digest ?? error.message).slice(0, 100), fatal: false, page_path: window.location.pathname });
   }, [error]);
 
   return (

@@ -3,6 +3,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { hotPlayers, searchIndex, type SearchIndex } from '@/lib/search';
 import { SearchList, flattenRows, type SearchRow, type SearchSection } from './SearchList';
+import { track } from '@/lib/analytics';
 
 export const OPEN_SEARCH_EVENT = 'momentum:open-search';
 export const openSearch = () => window.dispatchEvent(new Event(OPEN_SEARCH_EVENT));
@@ -42,13 +43,31 @@ export function SearchPalette() {
   const listRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  const show = useCallback(() => {
+  // What the visitor typed and picked, reported once when the palette closes.
+  const session = useRef<{ query: string; picked?: { row: SearchRow; position: number }; results: number }>({ query: '', results: 0 });
+
+  const show = useCallback((method: string) => {
+    session.current = { query: '', results: 0 };
+    track('search_open', { method });
     setOpen(true);
     setRecent(readRecent());
     setFailed(false);
     loadIndex().then(setIndex, () => setFailed(true));
   }, []);
-  const close = useCallback(() => { setOpen(false); setQuery(''); setActive(0); }, []);
+  const close = useCallback(() => {
+    const s = session.current;
+    if (s.query || s.picked) {
+      track('search', {
+        search_term: s.query.slice(0, 100) || undefined,
+        result_count: s.results,
+        result_type: s.picked?.row.kind ?? 'none',
+        result_position: s.picked ? s.picked.position + 1 : undefined,
+        result_url: s.picked?.row.item.href,
+      });
+    }
+    session.current = { query: '', results: 0 };
+    setOpen(false); setQuery(''); setActive(0);
+  }, []);
 
   // Triggers: custom event, ⌘K / Ctrl+K, "/" outside text fields.
   useEffect(() => {
@@ -56,12 +75,13 @@ export function SearchPalette() {
       const typing = e.target instanceof HTMLElement && (e.target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName));
       if ((e.key === 'k' && (e.metaKey || e.ctrlKey)) || (e.key === '/' && !typing)) {
         e.preventDefault();
-        show();
+        show('keyboard');
       }
     };
-    window.addEventListener(OPEN_SEARCH_EVENT, show);
+    const onOpen = () => show('button');
+    window.addEventListener(OPEN_SEARCH_EVENT, onOpen);
     window.addEventListener('keydown', onKey);
-    return () => { window.removeEventListener(OPEN_SEARCH_EVENT, show); window.removeEventListener('keydown', onKey); };
+    return () => { window.removeEventListener(OPEN_SEARCH_EVENT, onOpen); window.removeEventListener('keydown', onKey); };
   }, [show]);
 
   // Focus the field and lock page scroll while open. (Picking a result closes it.)
@@ -89,7 +109,13 @@ export function SearchPalette() {
   }, [query, index, recent]);
   const rows = useMemo(() => sections.flatMap(s => s.rows), [sections]);
 
-  const pick = useCallback((row: SearchRow) => { saveRecent(row); close(); }, [close]);
+  useEffect(() => { session.current.query = query.trim(); session.current.results = query.trim() ? rows.length : 0; }, [query, rows]);
+
+  const pick = useCallback((row: SearchRow) => {
+    session.current.picked = { row, position: Math.max(0, rows.indexOf(row)) };
+    saveRecent(row);
+    close();
+  }, [close, rows]);
 
   const onInputKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') { e.preventDefault(); close(); }

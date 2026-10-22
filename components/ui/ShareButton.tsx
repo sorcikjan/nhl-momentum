@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { shareLinks } from '@/lib/share';
+import { pageType, track } from '@/lib/analytics';
 
 const MONO = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' } as const;
 
 const itemStyle = { color: 'var(--text-bright)' } as const;
 const itemCls = 'flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-[13px] font-semibold hover:bg-[var(--bg-hover)]';
 
-export function ShareMenu({ url, text, copied, onCopy }: { url: string; text: string; copied: boolean; onCopy: () => void }) {
+export function ShareMenu({ url, text, copied, onCopy, onShare }: { url: string; text: string; copied: boolean; onCopy: () => void; onShare?: (method: 'x' | 'reddit') => void }) {
   const l = shareLinks(url, text);
   return (
     <div
@@ -19,8 +20,8 @@ export function ShareMenu({ url, text, copied, onCopy }: { url: string; text: st
       <button role="menuitem" type="button" onClick={onCopy} className={itemCls} style={{ ...itemStyle, color: copied ? 'var(--rise)' : itemStyle.color }}>
         {copied ? '✓ Link copied' : 'Copy link'}
       </button>
-      <a role="menuitem" href={l.x} target="_blank" rel="noopener noreferrer" className={itemCls} style={itemStyle}>Post on X</a>
-      <a role="menuitem" href={l.reddit} target="_blank" rel="noopener noreferrer" className={itemCls} style={itemStyle}>Post to Reddit</a>
+      <a role="menuitem" href={l.x} onClick={() => onShare?.('x')} target="_blank" rel="noopener noreferrer" className={itemCls} style={itemStyle}>Post on X</a>
+      <a role="menuitem" href={l.reddit} onClick={() => onShare?.('reddit')} target="_blank" rel="noopener noreferrer" className={itemCls} style={itemStyle}>Post to Reddit</a>
       <p className="truncate px-3 pb-1 pt-1.5 text-[10px]" style={{ ...MONO, color: 'var(--text-muted)' }} title={text}>{text}</p>
     </div>
   );
@@ -43,11 +44,13 @@ export default function ShareButton({ path, text, className }: { path?: string; 
   }, [open]);
 
   const url = () => (typeof window === 'undefined' ? '' : `${window.location.origin}${path ?? window.location.pathname}`);
+  const sharePath = () => path ?? window.location.pathname;
+  const tracked = (method: string) => track('share', { method, content_type: pageType(sharePath()), item_id: sharePath() });
 
   async function onClick() {
     const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
     if (touch && typeof navigator !== 'undefined' && navigator.share) {
-      try { await navigator.share({ title: text, text, url: url() }); } catch { /* cancelled */ }
+      try { await navigator.share({ title: text, text, url: url() }); tracked('native'); } catch { /* cancelled */ }
       return;
     }
     setOpen(o => !o);
@@ -56,6 +59,7 @@ export default function ShareButton({ path, text, className }: { path?: string; 
   async function copy() {
     try {
       await navigator.clipboard.writeText(url());
+      tracked('copy_link');
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch { /* clipboard blocked: the menu still offers X / Reddit */ }
@@ -77,7 +81,7 @@ export default function ShareButton({ path, text, className }: { path?: string; 
         </svg>
         Share
       </button>
-      {open && <ShareMenu url={url()} text={text} copied={copied} onCopy={copy} />}
+      {open && <ShareMenu url={url()} text={text} copied={copied} onCopy={copy} onShare={tracked} />}
     </div>
   );
 }

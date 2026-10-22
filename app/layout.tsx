@@ -6,12 +6,17 @@ import BrandHeader from '@/components/layout/BrandHeader';
 import { SiteFooter } from '@/components/layout/SiteFooter';
 import { TopLoader } from '@/components/top-loader';
 import { SITE_URL } from '@/lib/site';
+import { Suspense } from 'react';
+import { Analytics } from '@/components/analytics/Analytics';
+import { GA_ID, gtagBootstrap } from '@/lib/analytics';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 const fraunces = Fraunces({ variable: '--font-fraunces', subsets: ['latin'], style: ['normal', 'italic'], weight: ['700', '900'] });
 
 const siteUrl = SITE_URL;
+// Production builds only, so local dev doesn't pollute the GA property.
+const analyticsOn = process.env.NODE_ENV === 'production';
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -39,10 +44,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <head>
-        <Script defer data-domain="hockeymomentum.com" src="https://plausible.io/js/script.js" strategy="afterInteractive" />
+        {analyticsOn && (
+          <>
+            <script id="gtag-init" dangerouslySetInnerHTML={{ __html: gtagBootstrap() }} />
+            <Script src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`} strategy="afterInteractive" />
+          </>
+        )}
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} antialiased min-h-screen`}>
         <TopLoader />
+        {analyticsOn && (
+          <Suspense fallback={null}>
+            <Analytics />
+          </Suspense>
+        )}
         <BrandHeader />
         <div className="flex min-h-screen flex-col">
           {/* Offsets: fixed header 48px mobile / 72px desktop; design gutters 16 / 48px. */}
