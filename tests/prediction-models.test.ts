@@ -29,3 +29,9 @@ describe('v1.9 — v1.8 plus home-ice edge', () => {
     expect(MODEL_REGISTRY['v1.9'](h, a).homeWin).toBeGreaterThan(0.5);
   });
 });
+
+describe('registry', () => {
+  it('no longer generates duplicate versions (v1.2 = v1.1 and v1.7 = v1.8 on win probability)', () => {
+    expect(Object.keys(MODEL_REGISTRY).sort()).toEqual(['v1.0', 'v1.1', 'v1.3', 'v1.4', 'v1.5', 'v1.6', 'v1.8', 'v1.9']);
+  });
+});

@@ -2,7 +2,6 @@
 // Pages should call these directly — never fetch their own API over HTTP.
 
 import { supabaseAdmin } from '@/lib/supabase';
-import { ppmToHeat } from '@/lib/heat';
 import { buildSearchIndex } from '@/lib/search';
 import { pregameKeyPlayers, type KeyPlayer } from '@/lib/key-players';
 import { currentSeasonRows } from '@/lib/player-profile';
@@ -34,7 +33,7 @@ async function latestModelVersion(): Promise<string> {
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
-  const version = data?.version ?? 'v1.7';
+  const version = data?.version ?? 'v1.9';
   _modelVersionCache = { version, ts: now };
   return version;
 }
@@ -967,19 +966,47 @@ export async function fetchPlayerPhotos(playerIds: number[]): Promise<Map<number
   return out;
 }
 
+// Fetch every row of a query in 1,000-row pages — PostgREST silently caps a
+// single response at 1,000 rows regardless of .limit(). Throws on error rather
+// than returning partial data.
+export async function pageAll<T>(fetchPage: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await fetchPage(from, from + 999);
+    if (error) throw error;
+    out.push(...(data ?? []));
+    if ((data ?? []).length < 1000) return out;
+  }
+}
+
+type OutcomeRow = { correct_winner: boolean | null; home_score_error: number | null; away_score_error: number | null; predictions: unknown };
+export function aggregateOutcomes(rows: OutcomeRow[]) {
+  const out = new Map<string, { withOutcome: number; correctWinner: number; totalHomeErr: number; totalAwayErr: number }>();
+  for (const row of rows) {
+    const version = (row.predictions as { model_version?: string } | null)?.model_version;
+    if (!version) continue;
+    const o = out.get(version) ?? { withOutcome: 0, correctWinner: 0, totalHomeErr: 0, totalAwayErr: 0 };
+    o.withOutcome++;
+    if (row.correct_winner) o.correctWinner++;
+    o.totalHomeErr += row.home_score_error ?? 0;
+    o.totalAwayErr += row.away_score_error ?? 0;
+    out.set(version, o);
+  }
+  return out;
+}
+
 export async function fetchAccuracy() {
   const VERSIONS = ['v1.0', 'v1.1', 'v1.2', 'v1.3', 'v1.4', 'v1.5', 'v1.6', 'v1.7', 'v1.8', 'v1.9'];
 
   // Three independent queries running in parallel:
   // 1. Model version metadata
   // 2. Total prediction counts per version (count-only — no row transfer, no limit issues)
-  // 3. All outcome records joined to model_version (outcomes table is far smaller than
-  //    predictions: ~1 row per completed game × 8 versions ≈ a few thousand rows max)
+  // 3. All outcome records joined to model_version (paged — several thousand rows)
   // 4. Recent predictions for the per-game comparison table (most recent 100 games × 8 versions)
   const [
     { data: modelVersionsMeta, error: mvErr },
     predCounts,
-    { data: outcomeRows },
+    outcomeRows,
     { data: recentPredRows },
   ] = await Promise.all([
     supabaseAdmin
@@ -997,16 +1024,12 @@ export async function fetchAccuracy() {
       )
     ),
 
-    // Fetch ALL outcome records with linked model_version — this is the authoritative
-    // source for resolved predictions. With ~1 outcome per game per version,
-    // limit 20000 covers 2500 completed games across all 8 versions with room to spare.
-    supabaseAdmin
+    // ALL outcome records with their model_version, paged (a single request
+    // would be silently cut at 1,000 rows and skew every version's accuracy).
+    pageAll<OutcomeRow>((from, to) => supabaseAdmin
       .from('prediction_outcomes')
-      .select(`
-        correct_winner, home_score_error, away_score_error,
-        predictions!inner ( model_version )
-      `)
-      .limit(20000),
+      .select('correct_winner, home_score_error, away_score_error, predictions!inner ( model_version )')
+      .order('id').range(from, to)),
 
     // Recent predictions for the comparison table — most recent 100 games only
     supabaseAdmin
@@ -1031,21 +1054,10 @@ export async function fetchAccuracy() {
 
   if (mvErr) throw mvErr;
 
-  // Build stats from outcome rows (accurate counts for the full season)
-  const outcomeStats: Record<string, { withOutcome: number; correctWinner: number; totalHomeErr: number; totalAwayErr: number }> = {};
-  for (const row of (outcomeRows ?? [])) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const version = (row.predictions as any)?.model_version;
-    if (!version) continue;
-    if (!outcomeStats[version]) outcomeStats[version] = { withOutcome: 0, correctWinner: 0, totalHomeErr: 0, totalAwayErr: 0 };
-    outcomeStats[version].withOutcome++;
-    if (row.correct_winner) outcomeStats[version].correctWinner++;
-    outcomeStats[version].totalHomeErr += row.home_score_error ?? 0;
-    outcomeStats[version].totalAwayErr += row.away_score_error ?? 0;
-  }
+  const outcomeStats = aggregateOutcomes(outcomeRows);
 
   const modelStats = predCounts.map(({ version, total }) => {
-    const o = outcomeStats[version] ?? { withOutcome: 0, correctWinner: 0, totalHomeErr: 0, totalAwayErr: 0 };
+    const o = outcomeStats.get(version) ?? { withOutcome: 0, correctWinner: 0, totalHomeErr: 0, totalAwayErr: 0 };
     return {
       version,
       totalPredictions: total,
@@ -1171,9 +1183,16 @@ export async function fetchTeam(id: string) {
 
 // ─── Match ────────────────────────────────────────────────────────────────────
 
+// The game row decides the page state (upcoming / live / final). A failed or
+// timed-out query must throw — rendering without it shows a finished game as
+// "upcoming" — while "no such row" (PGRST116) is left to the page.
+export function assertGameQuery(error: { message?: string; code?: string } | null): void {
+  if (error && error.code !== 'PGRST116') throw new Error(`Game query failed: ${error.message || error.code}`);
+}
+
 export async function fetchMatch(id: string) {
   // Game record, live NHL data, play-by-play, and model version can all start at once
-  const [{ data: game }, liveData, rawPlayByPlay, activeModel] = await Promise.all([
+  const [{ data: game, error: gameError }, liveData, rawPlayByPlay, activeModel] = await Promise.all([
     supabaseAdmin
       .from('games')
       .select(`
@@ -1188,6 +1207,7 @@ export async function fetchMatch(id: string) {
     latestModelVersion(),
   ]);
 
+  assertGameQuery(gameError);
   const homeTeamId = game?.home_team_id ?? null;
   const awayTeamId = game?.away_team_id ?? null;
   const gameDate = game?.game_date ?? null;
