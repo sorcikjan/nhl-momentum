@@ -1,6 +1,12 @@
+// Letters that don't decompose under NFD (ø is not o + accent).
+const FOLD: Record<string, string> = { ø: 'o', æ: 'ae', œ: 'oe', ß: 'ss', đ: 'd', ł: 'l', þ: 'th', ð: 'd' };
+
 export function slugify(text: string): string {
   return text
     .toLowerCase()
+    // Stützle → stutzle, Montréal → montreal (not st-tzle / montr-al).
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[øæœßđłþð]/g, c => FOLD[c])
     .replace(/['']/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');

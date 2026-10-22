@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { fetchTeam, teamLogoUrl, fetchSeasonPhase, deriveOutStatus } from '@/lib/data';
-import { playerUrl, gameUrl } from '@/lib/urls';
+import { permanentRedirect } from 'next/navigation';
+import { playerUrl, gameUrl, slugify, teamUrl } from '@/lib/urls';
+import { currentSeason } from '@/lib/nhl-api';
+import { SITE_URL } from '@/lib/site';
 import { assertDatabaseUp } from '@/lib/supabase';
 import { HeatPill, SectionHeading } from '@/components/ds';
 import { ppmToHeat } from '@/lib/heat';
@@ -21,12 +24,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { team, standing } = await fetchTeam(id).catch(() => ({ team: null, roster: [], recentGames: null, upcoming: null, seasonStats: null, standing: null }));
   if (!team) return { title: 'Team' };
   const record = standing ? `${standing.wins}–${standing.losses}–${standing.otLosses}` : '';
-  const season = '2025–26';
+  const s = currentSeason();
+  const season = `${s.slice(0, 4)}–${s.slice(6, 8)}`;
   const title = `${team.name} ${season} Stats & Standings`;
   const desc = `${team.name} ${season} NHL stats${record ? ' · ' + record : ''} — roster momentum rankings, player form, recent results, and upcoming schedule.`;
   return {
     title,
     description: desc,
+    alternates: { canonical: `${SITE_URL}${teamUrl(team.id, team.name)}` },
     openGraph: {
       title: `${team.name} — momentum.`,
       description: desc,
@@ -43,13 +48,14 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 export default async function TeamPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
   // Throw (→ keep serving the last good cached page) if the database is down.
   await assertDatabaseUp();
-  const { id } = await params;
+  const { id, slug } = await params;
   const [{ team, roster, recentGames, upcoming, standing }, seasonPhase] = await Promise.all([
     fetchTeam(id),
     fetchSeasonPhase().catch(() => ({ isPreseason: false, regularSeasonStartDate: null, daysUntilStart: null })),
   ]);
 
   if (!team) return <p style={{ color: 'var(--text)' }}>Team not found</p>;
+  if (slug !== slugify(team.name)) permanentRedirect(teamUrl(team.id, team.name));
 
   const logo = teamLogoUrl(team.abbrev);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

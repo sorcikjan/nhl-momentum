@@ -73,6 +73,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title,
     description: desc,
+    ...(game && { alternates: { canonical: `${SITE_URL}${gameUrl(game.id, away, home, game.game_date)}` } }),
     openGraph: {
       title: `${awayName} vs ${homeName} — momentum.`,
       description: desc,

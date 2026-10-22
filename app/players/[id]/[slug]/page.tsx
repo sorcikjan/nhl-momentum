@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { cache, Suspense } from 'react';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { AIBioBox } from '@/components/player/PlayerHero';
 import { ProfileBody } from '@/components/player/ProfileBody';
 import { daysAgo, deriveOutStatus, fetchLeagueAverages, fetchPlayer, fetchRankings, fetchSeasonPhase } from '@/lib/data';
@@ -41,6 +41,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const data = await cachedFetchPlayer(id);
   if (!data?.player) return { title: 'Player' };
   const { player } = data;
+  const canonicalPath = playerUrl(player.id, player.first_name, player.last_name);
   const name = `${player.first_name} ${player.last_name}`;
   const team = player.teams?.abbrev ?? '';
   const teamName = player.teams?.name ?? team;
@@ -51,6 +52,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return {
     title,
     description: desc,
+    alternates: { canonical: `${SITE_URL}${canonicalPath}` },
     openGraph: {
       title: `${name} — momentum.`,
       description: desc,
@@ -92,7 +94,7 @@ function goalieTiles(agg: any): Tile[] {
 export default async function PlayerPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
   // Throw (→ keep serving the last good cached page) if the database is down.
   await assertDatabaseUp();
-  const { id } = await params;
+  const { id, slug } = await params;
   const [data, leagueAvg, seasonPhase, rankings] = await Promise.all([
     cachedFetchPlayer(id),
     fetchLeagueAverages().catch(() => null),
@@ -100,6 +102,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     fetchRankings().catch(() => null),
   ]);
   if (!data?.player) notFound();
+  // Old or mistyped slugs (e.g. pre-accent-folding "tim-st-tzle") → one canonical URL.
+  // loading.tsx streams this page, so it goes out as an instant meta refresh
+  // (Google treats that as a permanent redirect), backed by the canonical tag.
+  const canonicalPath = playerUrl(data.player.id, data.player.first_name, data.player.last_name);
+  if (slug !== canonicalPath.split('/').pop()) permanentRedirect(canonicalPath);
 
   const { player, metricTimeline, recentGames, consecutiveGamesMissed, lastPlayedDate, goalieStats } = data;
   const isGoalie = player.position_code === 'G';
