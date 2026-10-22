@@ -1,31 +1,25 @@
 import type { HomeData } from '@/lib/home';
 import { ArticleGrid } from './ArticleGrid';
-import { ExploreStrip } from './ExploreStrip';
+import { HeatHero } from './HeatHero';
+import { MoreRankings } from './MoreRankings';
 import { ResultsSection } from './ResultsSection';
+import { TeamHeatGrid } from './TeamHeatGrid';
 import { TonightSlate } from './TonightSlate';
-import { TripleRankings } from './TripleRankings';
-import { ValuePropStrip } from './ValuePropStrip';
 
-// Regular-season homepage (design DesktopHomeFinal / MobileHomeFinal, playoffs={false}).
-// Same order on both breakpoints — the mobile artboard drops Tonight in regular season;
-// we keep it in the desktop position (agreed 2026-10-19).
-export const HOME_SECTIONS = ['value-prop', 'tonight', 'results', 'stories', 'rankings', 'explore'] as const;
+// Homepage (agreed 2026-10-22): finished games first — the reason to come
+// back — then Heat, the USP; tonight's games; goalies and rookies; stories;
+// teams last. Every heading is a SectionHeading, every player list a PlayerRow.
+export const HOME_SECTIONS = ['results', 'heat', 'tonight', 'rankings', 'stories', 'teams'] as const;
 
 export function HomeBody({ data, heroImageUrl }: { data: HomeData; heroImageUrl?: string | null }) {
   return (
-    <div className="flex flex-col gap-8 lg:gap-12">
-      <ValuePropStrip pickAccuracyPct={data.pickAccuracyPct} />
-      <TonightSlate games={data.tonight} nextGameDate={data.nextGameDate} />
+    <div className="flex flex-col gap-12 lg:gap-16">
       <ResultsSection date={data.resultsDate} results={data.results} />
+      <HeatHero leader={data.leader} leaders={data.leaders} heatingUp={data.heatingUp} coolingOff={data.coolingOff} />
+      <TonightSlate games={data.tonight} nextGameDate={data.nextGameDate} />
+      <MoreRankings goalies={data.goalies} rookies={data.rookies} />
       <ArticleGrid stories={data.stories} heroImageUrl={heroImageUrl} />
-      <TripleRankings
-        columns={[
-          { key: 'heat', tab: 'Heat', kicker: 'HEAT · TOP 5', title: 'Hottest skaters', sub: 'Last 5 games · all positions', color: 'var(--heat)', href: '/hot', rows: data.hottest },
-          { key: 'goalies', tab: 'Goalies', kicker: 'GOALIES · TOP 5', title: 'Best in net', sub: 'Save % · recent starts', color: 'var(--cold)', href: '/rankings?pos=G', rows: data.goalies },
-          { key: 'rookies', tab: 'Fresh faces', kicker: 'FRESH FACES · TOP 5', title: 'Rookies on the rise', sub: 'Up to 50 NHL games · by recent Heat', color: 'var(--rise)', href: '/hot', rows: data.rookies },
-        ]}
-      />
-      <ExploreStrip rankedCount={data.rankedCount} />
+      <TeamHeatGrid teams={data.teams} />
     </div>
   );
 }

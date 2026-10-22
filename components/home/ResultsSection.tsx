@@ -1,19 +1,13 @@
-import { SectionHeading } from '@/components/ds';
+import { SectionHeading, SectionLink } from '@/components/ds';
 import { GameCard } from '@/components/game/GameCard';
 import type { GameCardData } from '@/lib/game-card';
-import { dayLabel, MONO } from './format';
+import { dayLabel } from './format';
 
-function Tally({ results }: { results: GameCardData[] }) {
+// "Our picks went 1 for 2." — plain, in the heading's sub line.
+export function picksLine(results: GameCardData[]): string | null {
   const judged = results.filter(r => r.pickResult);
   if (!judged.length) return null;
-  const hits = judged.filter(r => r.pickResult === 'hit').length;
-  return (
-    <div className="flex items-center gap-3 rounded-[10px] border px-3 py-1.5 lg:px-4 lg:py-2.5" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}>
-      <span className="hidden text-[10px] font-bold lg:inline" style={{ ...MONO, color: 'var(--text-muted)', letterSpacing: 1 }}>WE GOT</span>
-      <span className="text-sm font-extrabold lg:text-[22px]" style={{ ...MONO, color: 'var(--rise)' }}>{hits}/{judged.length}</span>
-      <span className="text-[9px] font-semibold lg:text-[10px]" style={{ ...MONO, color: 'var(--text)' }}>right · {Math.round((hits / judged.length) * 100)}%</span>
-    </div>
-  );
+  return `Our picks went ${judged.filter(r => r.pickResult === 'hit').length} for ${judged.length}.`;
 }
 
 // Last game day: our pick vs the result, as GameCards (same card as tonight's).
@@ -22,10 +16,11 @@ export function ResultsSection({ date, results }: { date: string | null; results
   return (
     <section data-section="results">
       <SectionHeading
-        kicker={`${dayLabel(date).toUpperCase()} · ${results.length} GAME${results.length === 1 ? '' : 'S'}`}
-        title="Results & predictions."
+        kicker={`LAST NIGHT · ${dayLabel(date).toUpperCase()} · ${results.length} GAME${results.length === 1 ? '' : 'S'}`}
+        title="Last night."
+        sub={picksLine(results) ?? undefined}
         size="feature"
-        right={<Tally results={results} />}
+        right={<SectionLink href={`/predictions/${date}`}>All results</SectionLink>}
       />
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
         {results.map(r => <GameCard key={r.id} g={r} />)}

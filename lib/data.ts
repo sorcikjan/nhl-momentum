@@ -9,6 +9,8 @@ import { currentSeasonRows } from '@/lib/player-profile';
 import { currentSeason, getGamesByDate, getGameBoxscore, getGamePlayByPlay, getStandings, getTeamSeasonStats, getSeasonDates } from '@/lib/nhl-api';
 export { deriveOutStatus, daysAgo } from '@/lib/player-status';
 import { processPlayByPlay } from '@/lib/play-by-play';
+import { ppmToHeat } from '@/lib/heat';
+import { teamHeatByTeam } from '@/lib/team-heat';
 
 // NHL CDN logo URL — works for all 32 teams
 export function teamLogoUrl(abbrev: string) {
@@ -46,19 +48,14 @@ export async function fetchLeagueAverages() {
   if (_leagueAveragesCache && now - _leagueAveragesCache.ts < 30 * 60_000) {
     return _leagueAveragesCache.data;
   }
-  // Latest snapshot per active skater — limit 1500 covers all ~650 non-goalie players
-  const { data } = await supabaseAdmin
-    .from('player_metric_snapshots')
-    .select(`
+  // Latest snapshot per active skater.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = await latestSnapshotRows<any>(`
       player_id, season_ppm, momentum_ppm,
       season_goals, season_games, season_assists, season_shooting_pct,
       season_plus_minus, energy_bar,
       players!inner(position_code)
-    `)
-    .eq('players.is_active', true)
-    .neq('players.position_code', 'G')
-    .order('calculated_at', { ascending: false })
-    .limit(1500);
+    `, q => q.eq('players.is_active', true).neq('players.position_code', 'G'));
 
   // Deduplicate to latest per player
   const seen = new Set<number>();
@@ -129,9 +126,8 @@ export async function fetchRankings() {
 }
 
 async function buildRankings() {
-  const { data, error } = await supabaseAdmin
-    .from('player_metric_snapshots')
-    .select(`
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = await latestSnapshotRows<any>(`
       player_id, momentum_rank, composite_ppm, momentum_ppm, season_ppm,
       breakout_delta, energy_bar,
       momentum_games, momentum_goals, momentum_assists, momentum_points,
@@ -144,11 +140,7 @@ async function buildRankings() {
         headshot_url, injury_status, sweater_number, in_minors, birth_country, is_active,
         teams ( id, abbrev, name )
       )
-    `)
-    .order('calculated_at', { ascending: false })
-    .limit(1000);
-
-  if (error) throw error;
+    `);
 
   const seen = new Set<number>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -187,9 +179,10 @@ async function buildRankings() {
   sortedSkaters.forEach((s, i) => { s.momentum_rank = i + 1; });
 
   const top100 = sortedSkaters.slice(0, 100);
+  // 20 deep: the homepage skips the ones already on the Heat list.
   const breakoutWatch = [...skaters]
     .sort((a, b) => (b.breakout_delta ?? 0) - (a.breakout_delta ?? 0))
-    .slice(0, 10);
+    .slice(0, 20);
   const coolingWatch = [...skaters]
     .filter((r: any) => (r.breakout_delta ?? 0) < 0)
     .sort((a, b) => (a.breakout_delta ?? 0) - (b.breakout_delta ?? 0))
@@ -300,6 +293,19 @@ async function buildRankings() {
   return {
     top100,
     totalSkaters: skaters.length,
+    // Same 3-of-last-5 floor as the Heat leaders, so a team's number never
+    // rests on players the rankings leave out.
+    teamHeat: teamHeatByTeam(skaters
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((r: any) => (r.momentum_games ?? 0) >= 3)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((r: any) => ({ team: r.players?.teams?.abbrev ?? '', heat: ppmToHeat(r.momentum_ppm) }))),
+    // abbrev → team id + name, for links from team-level numbers.
+    teams: Object.fromEntries(skaters
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((r: any) => r.players?.teams?.abbrev)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((r: any) => [r.players.teams.abbrev, { id: r.players.teams.id as number, name: r.players.teams.name as string }])) as Record<string, { id: number; name: string }>,
     breakoutWatch,
     coolingWatch,
     momentumLeaders: { skaters: momentumLeaderSkaters, goalies: momentumLeaderGoalies },
@@ -1016,6 +1022,29 @@ export async function pageAll<T>(fetchPage: (from: number, to: number) => Promis
   }
 }
 
+// Every player's rows from the latest metrics run (newest snapshot − 30 h),
+// all pages. A plain "newest first" .limit(N) only reaches the players of the
+// last few ingest batches — 606 of 817 on 2026-10-22, so 211 players (both
+// Tkachuks among them) were missing from every ranking. Callers dedupe to the
+// latest row per player. `filter` adds joins' conditions to the query.
+export async function latestSnapshotRows<T>(
+  select: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  filter: (q: any) => any = q => q,
+): Promise<T[]> {
+  const { data: newest, error } = await supabaseAdmin
+    .from('player_metric_snapshots').select('calculated_at')
+    .order('calculated_at', { ascending: false }).limit(1);
+  if (error) throw error;
+  if (!newest?.length) return [];
+  const since = new Date(new Date(newest[0].calculated_at).getTime() - 30 * 3_600_000).toISOString();
+  return pageAll<T>((from, to) => filter(supabaseAdmin.from('player_metric_snapshots').select(select))
+    .gte('calculated_at', since)
+    .order('calculated_at', { ascending: false })
+    .order('player_id')
+    .range(from, to));
+}
+
 type OutcomeRow = { correct_winner: boolean | null; home_score_error: number | null; away_score_error: number | null; predictions: unknown };
 export function aggregateOutcomes(rows: OutcomeRow[]) {
   const out = new Map<string, { withOutcome: number; correctWinner: number; totalHomeErr: number; totalAwayErr: number }>();
@@ -1513,9 +1542,8 @@ export async function fetchGoalieRankings() {
 // ─── Newcomer Watch ───────────────────────────────────────────────────────────
 
 export async function fetchNewcomerWatch() {
-  const { data } = await supabaseAdmin
-    .from('player_metric_snapshots')
-    .select(`
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data = await latestSnapshotRows<any>(`
       player_id, season_games, momentum_games,
       momentum_goals, momentum_assists,
       season_goals, season_assists,
@@ -1526,10 +1554,7 @@ export async function fetchNewcomerWatch() {
         in_minors, injury_status, birth_country, birth_date,
         teams(id, abbrev)
       )
-    `)
-    .gte('season_games', 3)
-    .order('calculated_at', { ascending: false })
-    .limit(600);
+    `, q => q.gte('season_games', 3));
 
   // Latest snapshot per player
   const seen = new Set<number>();

@@ -5,7 +5,7 @@ import { rankingRows } from '@/lib/rankings-view';
 import { RankingsTable } from '@/components/rankings/RankingsTable';
 import { hotView } from '@/lib/hot-view';
 import { HotBody } from '@/components/hot/HotBody';
-import { RankList } from '@/components/home/TripleRankings';
+import { PlayerList } from '@/components/ds';
 
 const PHOTO = 'https://assets.nhle.com/mugs/nhl/20262027/EDM/8478402.png';
 const sk = (id: number, photo: string | null = PHOTO) => ({
@@ -42,9 +42,10 @@ describe('player photos in player rows', () => {
     expect(out.split(PHOTO).length - 1).toBeGreaterThanOrEqual(4);
   });
   it('homepage rank lists show headshots, initials when missing', () => {
-    const out = renderToStaticMarkup(<RankList rows={[
-      { playerId: 1, href: '/p/1', name: 'Connor McDavid', team: 'EDM', heat: 80, sub: 'Forward', photo: PHOTO },
-      { playerId: 2, href: '/p/2', name: 'Leon Draisaitl', team: 'EDM', heat: 70, sub: 'Forward', photo: null },
+    const row = { mark: '1', markTone: null, pos: 'C', l5: 'L5 3G 4A', chip: null, valueHeat: 80, value: '80' };
+    const out = renderToStaticMarkup(<PlayerList rows={[
+      { ...row, playerId: 1, href: '/p/1', name: 'Connor McDavid', team: 'EDM', photo: PHOTO },
+      { ...row, playerId: 2, href: '/p/2', name: 'Leon Draisaitl', team: 'EDM', photo: null },
     ]} />);
     expect(out).toContain(PHOTO);
     expect(out).toContain('LD');

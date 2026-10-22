@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { GameCard } from '@/components/game/GameCard';
-import { cardPlayers, lastName, type GameCardData } from '@/lib/game-card';
+import { cardPlayers, lastName, markGameOfTheNight, withTeamHeat, type GameCardData } from '@/lib/game-card';
 import type { KeyPlayer } from '@/lib/key-players';
 
 const kp = (id: number, name: string, heat: number, team: string): KeyPlayer =>
@@ -82,10 +82,19 @@ describe('GameCard', () => {
     expect(out).toContain('LIVE');
     expect(out).toContain('>1<');
   });
-  it('footer carries watchability or a recap link without nesting links', () => {
+  it('never shows watchability; the game of the night gets its badge', () => {
     const out = renderToStaticMarkup(<GameCard g={{ ...upcoming, watchability: 74, marquee: true }} />);
-    expect(out).toContain('74');
-    expect(out).toContain('WATCHABILITY');
+    expect(out).not.toContain('WATCHABILITY');
+    expect(out).not.toContain('>74<');
+    expect(out).toContain('★ GAME OF THE NIGHT');
+    expect(renderToStaticMarkup(<GameCard g={{ ...upcoming, watchability: 74 }} />)).not.toContain('GAME OF THE NIGHT');
+  });
+  it('shows each team\'s Heat under its name when known', () => {
+    const g: GameCardData = { ...upcoming, away: { ...upcoming.away, teamHeat: 79 }, home: { ...upcoming.home, teamHeat: null } };
+    const out = renderToStaticMarkup(<GameCard g={g} />);
+    expect(out.match(/HEAT \d+/g)).toEqual(['HEAT 79']);
+  });
+  it('recap link without nesting links', () => {
     const fin = renderToStaticMarkup(<GameCard g={{ ...upcoming, state: 'OFF', recapHref: '/recaps/x/y' }} />);
     expect(fin).toContain('href="/recaps/x/y"');
     expect(fin).not.toMatch(/<a\s[^>]*>(?:(?!<\/a>)[\s\S])*<a\s/);
@@ -109,5 +118,34 @@ describe('GameCard', () => {
   });
   it('names truncate in the narrow mobile columns', () => {
     expect(renderToStaticMarkup(<GameCard g={upcoming} />)).toContain('truncate');
+  });
+});
+
+describe('markGameOfTheNight', () => {
+  const card = (id: number, watchability: number | null, heats: number[]): GameCardData => ({
+    id, href: `/games/${id}/x`, state: 'FUT', startTimeUTC: null, pick: null, pickResult: null, watchability,
+    away: { abbrev: 'A', name: 'A', score: null, pct: null, players: heats.map((h, i) => ({ playerId: id * 10 + i, name: 'X', href: '', photo: null, heat: h, stat: null })) },
+    home: { abbrev: 'B', name: 'B', score: null, pct: null, players: [] },
+  });
+  it('picks the most watchable game', () => {
+    const cards = [card(1, 70, [90]), card(2, 91, [50]), card(3, 80, [99])];
+    markGameOfTheNight(cards);
+    expect(cards.map(c => !!c.marquee)).toEqual([false, true, false]);
+  });
+  it('breaks a tie on the key players\' combined Heat, not start time', () => {
+    const cards = [card(1, 91, [100, 100, 71]), card(2, 91, [100, 73, 69, 57, 54, 51].slice(0, 3).concat([]))];
+    cards[1].home.players = [54, 51, 0].map((h, i) => ({ playerId: 90 + i, name: 'Y', href: '', photo: null, heat: h, stat: null }));
+    markGameOfTheNight(cards);
+    expect(cards.map(c => !!c.marquee)).toEqual([false, true]);
+  });
+  it('needs at least two games', () => {
+    const cards = [card(1, 91, [100])];
+    markGameOfTheNight(cards);
+    expect(cards[0].marquee).toBeFalsy();
+  });
+  it('withTeamHeat fills both sides', () => {
+    const cards = [card(1, null, [])];
+    withTeamHeat(cards, { A: 60 });
+    expect([cards[0].away.teamHeat, cards[0].home.teamHeat]).toEqual([60, null]);
   });
 });

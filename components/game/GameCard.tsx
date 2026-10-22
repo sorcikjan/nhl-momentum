@@ -10,11 +10,15 @@ const timeET = (iso: string | null) =>
   iso ? new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' }) + ' ET' : 'TBD';
 
 // 1. Status: time before the game, LIVE / FINAL after — small, it frames the card.
+// The game of the night carries its badge here.
 function Status({ g }: { g: GameCardData }) {
   const view = gameView(g.state);
   return (
-    <div className="mb-2.5 text-[10px] font-bold" style={{ ...MONO, letterSpacing: 0.8, color: view === 'live' ? 'var(--heat)' : 'var(--text-muted)' }}>
-      {view === 'live' ? '● LIVE' : view === 'final' ? 'FINAL' : timeET(g.startTimeUTC)}
+    <div className="mb-2.5 flex items-center justify-between gap-2 text-[10px] font-bold" style={{ ...MONO, letterSpacing: 0.8 }}>
+      <span style={{ color: view === 'live' ? 'var(--heat)' : 'var(--text-muted)' }}>
+        {view === 'live' ? '● LIVE' : view === 'final' ? 'FINAL' : timeET(g.startTimeUTC)}
+      </span>
+      {g.marquee && <span className="rounded-full px-2 py-0.5" style={{ color: 'var(--gold)', background: 'rgba(255, 181, 71, 0.12)' }}>★ GAME OF THE NIGHT</span>}
     </div>
   );
 }
@@ -28,7 +32,12 @@ function TeamHead({ s, g, other }: { s: CardSide; g: GameCardData; other: CardSi
   return (
     <div className="flex min-w-0 items-center gap-2.5">
       <TeamChip abbrev={s.abbrev} size={34} />
-      <span className="min-w-0 flex-1 truncate text-[15px] lg:text-base" style={{ fontWeight: lit ? 800 : 600, color: lit ? 'var(--text-bright)' : 'var(--text-muted)' }}>{s.name}</span>
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="truncate text-[15px] lg:text-base" style={{ fontWeight: lit ? 800 : 600, color: lit ? 'var(--text-bright)' : 'var(--text-muted)' }}>{s.name}</span>
+        {s.teamHeat != null && (
+          <span className="text-[10px] font-bold" style={{ ...MONO, letterSpacing: 0.8, color: heatColor(s.teamHeat) }} title="Team Heat: average of its five hottest skaters">HEAT {s.teamHeat}</span>
+        )}
+      </span>
       {scored && <span className="text-[28px] font-extrabold leading-none" style={{ ...MONO, color: lit ? 'var(--text-bright)' : 'var(--text-muted)' }}>{s.score}</span>}
     </div>
   );
@@ -99,11 +108,14 @@ export function PlayerRows({ team, players, link = false }: { team: string; play
 // One game, any state: status + pick, both teams, then each team's three
 // highest-Heat players directly under it. Same layout everywhere.
 export function GameCard({ g }: { g: GameCardData }) {
-  const footer = g.watchability != null || g.recapHref || g.marquee;
   return (
     <article
       className="overflow-hidden rounded-xl border"
-      style={{ background: 'var(--bg-card)', borderColor: g.marquee ? 'rgba(255, 90, 36, 0.45)' : 'var(--border)' }}
+      style={{
+        background: 'var(--bg-card)',
+        borderColor: g.marquee ? 'rgba(255, 90, 36, 0.45)' : 'var(--border)',
+        boxShadow: g.marquee ? '0 0 32px rgba(255, 90, 36, 0.12)' : undefined,
+      }}
     >
       <Link href={g.href} className="block px-4 pb-3.5 pt-3 transition-colors hover:bg-[var(--bg-hover)]">
         <Status g={g} />
@@ -117,11 +129,9 @@ export function GameCard({ g }: { g: GameCardData }) {
           <PlayerRows team={g.home.abbrev} players={g.home.players} />
         </div>
       </Link>
-      {footer && (
-        <div className="flex items-center justify-between gap-2 border-t px-4 py-2 text-[10px] font-bold" style={{ ...MONO, borderColor: 'var(--border-soft)', letterSpacing: 0.8 }}>
-          <span style={{ color: 'var(--gold)' }}>{g.watchability != null ? `WATCHABILITY ${g.watchability}/100` : ''}</span>
-          {g.recapHref ? <Link href={g.recapHref} style={{ color: 'var(--heat)' }}>RECAP →</Link>
-            : g.marquee ? <span style={{ color: 'var(--gold)' }}>★ GAME OF THE NIGHT</span> : null}
+      {g.recapHref && (
+        <div className="flex items-center justify-end border-t px-4 py-2 text-[10px] font-bold" style={{ ...MONO, borderColor: 'var(--border-soft)', letterSpacing: 0.8 }}>
+          <Link href={g.recapHref} style={{ color: 'var(--heat)' }}>RECAP →</Link>
         </div>
       )}
     </article>

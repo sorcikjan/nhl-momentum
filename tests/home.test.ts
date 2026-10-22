@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatAccuracy, recapToStories, toResultCard, todayET } from '@/lib/home';
+import { recapToStories, toResultCard, todayET } from '@/lib/home';
 
 const game = (homeScore: number, awayScore: number, threeStars: unknown = null) => ({
   id: 2026020136,
@@ -29,14 +29,6 @@ describe('toResultCard', () => {
   });
 });
 
-describe('formatAccuracy', () => {
-  it('rounds the season pick accuracy', () => {
-    expect(formatAccuracy(66.6)).toBe('67% pick accuracy · YTD');
-  });
-  it('never invents a number', () => {
-    expect(formatAccuracy(null)).not.toContain('%');
-  });
-});
 
 describe('recapToStories', () => {
   const recap = {

@@ -1,7 +1,7 @@
 // Server-side assembly of GameCards for one or more game days — shared by the
 // schedule (/games) and the dated predictions pages (/predictions/[date]).
-import { fetchGamesRange, fetchPlayerPhotos, fetchRecap, fetchStatLines } from '@/lib/data';
-import { cardPlayers, type GameCardData } from '@/lib/game-card';
+import { fetchGamesRange, fetchPlayerPhotos, fetchRankings, fetchRecap, fetchStatLines } from '@/lib/data';
+import { cardPlayers, markGameOfTheNight, withTeamHeat, type GameCardData } from '@/lib/game-card';
 import { gameView } from '@/lib/game-state';
 import { ppmToHeat } from '@/lib/heat';
 import type { KeyPlayer } from '@/lib/key-players';
@@ -20,9 +20,10 @@ export async function fetchDayCards(dates: string[]): Promise<GameDay[]> {
   const all = games as any[];
   const startedIds = all.filter(g => gameView(g.gameState) !== 'upcoming').map(g => g.id as number);
   const keyIds = [...new Set([...keyPlayersByGameTeam.values()].flat().map(p => p.playerId))];
-  const [statsBy, photos] = await Promise.all([
+  const [statsBy, photos, rankings] = await Promise.all([
     fetchStatLines(startedIds).catch(() => new Map<number, Map<number, { goals: number; assists: number }>>()),
     keyIds.length ? fetchPlayerPhotos(keyIds).catch(() => new Map<number, string>()) : Promise.resolve(new Map<number, string>()),
+    fetchRankings().catch(() => null),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,9 +71,8 @@ export async function fetchDayCards(dates: string[]): Promise<GameDay[]> {
         marquee: false,
       };
     });
-    // ★ the single most watchable upcoming game of the day
-    const best = cards.reduce<GameCardData | null>((b, r) => (r.watchability != null && (!b || r.watchability > (b.watchability ?? -1)) ? r : b), null);
-    if (best && cards.length > 1) best.marquee = true;
+    markGameOfTheNight(cards);
+    withTeamHeat(cards, rankings?.teamHeat);
     return { date, cards };
   });
 }

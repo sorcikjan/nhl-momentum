@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { SectionHeading, TeamChip } from '@/components/ds';
+import { SectionHeading, SectionLink, TeamChip } from '@/components/ds';
 import { NEUTRAL_TINT, teamColor } from '@/lib/team-colors';
 import type { StoryCard } from '@/lib/home';
 import { MONO } from './format';
@@ -13,7 +13,7 @@ export function ArticleGrid({ stories, heroImageUrl }: { stories: StoryCard[]; h
   const [lead, ...others] = stories;
   return (
     <section data-section="stories">
-      <SectionHeading kicker="STORIES · LAST NIGHT" title="The night in stories." size="feature" />
+      <SectionHeading kicker="STORIES · LAST NIGHT" title="The night in stories." sub="What happened, told through the numbers." size="feature" right={<SectionLink href="/recaps">All stories</SectionLink>} />
       <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-[1.4fr_1fr] lg:gap-4">
         <Link href={lead.href} className="flex flex-col overflow-hidden rounded-xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
           <div className="relative aspect-video overflow-hidden" style={{ background: tint(lead.team, 'cc') }}>

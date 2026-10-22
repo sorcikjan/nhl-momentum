@@ -2,26 +2,35 @@
 // design's sections show (docs/design/redesign-2026/homepage-final.js).
 import {
   fetchGamesRange, fetchGoalieRankings, fetchNewcomerWatch, fetchRankings, fetchRecap,
-  fetchPlayerPhotos, fetchPregameKeyPlayers, fetchRecentCompletedGames, fetchRecentRecaps, fetchSeasonPickAccuracy, fetchStatLines,
+  fetchPlayerPhotos, fetchPregameKeyPlayers, fetchRecentCompletedGames, fetchRecentRecaps, fetchStatLines,
 } from '@/lib/data';
-import { cardPlayers, type GameCardData } from '@/lib/game-card';
+import { cardPlayers, markGameOfTheNight, withTeamHeat, type GameCardData } from '@/lib/game-card';
+import { goalieRow, pacePct, posLabel, rookieRow, skaterRow, type PlayerRowData } from '@/lib/player-row';
+import { calcWatchability } from '@/lib/watchability';
 import { gameView } from '@/lib/game-state';
 import { ppmToHeat } from '@/lib/heat';
 import type { KeyPlayer } from '@/lib/key-players';
 import { teamColor } from '@/lib/team-colors';
-import { gameUrl, playerUrl, recapUrl } from '@/lib/urls';
+import { gameUrl, playerUrl, recapUrl, teamUrl } from '@/lib/urls';
 
 export type TeamSide = { abbrev: string; name: string };
 export type StoryCard = { href: string; kicker: string; title: string; dek: string; team: string | null; lead: boolean };
-export type RankRow = { playerId: number; href: string; name: string; photo: string | null; team: string; heat: number | null; sub: string };
+// #1 on the Heat list: the hero card.
+export type HeatLeader = {
+  playerId: number; href: string; first: string; last: string; photo: string | null; team: string; teamName: string; pos: string;
+  heat: number; pace: number | null; goals: number; assists: number; games: number;
+  tonight: { href: string; opponent: string; time: string | null } | null;
+};
+export type TeamHeatRow = { abbrev: string; name: string; heat: number; href: string | null };
 export type HomeData = {
   today: string;
   tonight: GameCardData[]; nextGameDate: string | null;
   resultsDate: string | null; results: GameCardData[];
   stories: StoryCard[];
-  hottest: RankRow[]; goalies: RankRow[]; rookies: RankRow[];
-  pickAccuracyPct: number | null;
-  rankedCount: number | null;
+  leader: HeatLeader | null; leaders: PlayerRowData[];
+  heatingUp: PlayerRowData[]; coolingOff: PlayerRowData[];
+  goalies: PlayerRowData[]; rookies: PlayerRowData[];
+  teams: TeamHeatRow[];
   heroImageUrl: string | null;
 };
 
@@ -55,9 +64,6 @@ export function toResultCard(g: FinishedGame, pred: Pred): GameCardData {
   };
 }
 
-export function formatAccuracy(pct: number | null): string {
-  return pct == null ? 'Pick accuracy tracking' : `${Math.round(pct)}% pick accuracy · YTD`;
-}
 
 type Recap = { date: string; title: string; summary: string | null; content: string | null } | null;
 
@@ -93,14 +99,13 @@ export function todayET(now = new Date()): string {
 
 export async function fetchHomeData(today: string): Promise<HomeData> {
   const emptyRange = { games: [], predictions: [], odds: [], topHeatByGameTeam: new Map(), keyPlayersByGameTeam: new Map<string, KeyPlayer[]>() };
-  const [range, recent, rankings, goalies, rookies, recaps, accuracy] = await Promise.all([
+  const [range, recent, rankings, goalies, rookies, recaps] = await Promise.all([
     safe(fetchGamesRange([today]), emptyRange),
     safe(fetchRecentCompletedGames(4, 20), { games: [], predMap: new Map() }),
     safe(fetchRankings(), null),
     safe(fetchGoalieRankings(), []),
     safe(fetchNewcomerWatch(), []),
     safe(fetchRecentRecaps(1), []),
-    safe(fetchSeasonPickAccuracy(), null),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -120,6 +125,12 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
       away: { ...side(g.awayTeam.abbrev), score: g.awayTeam.score ?? null, pct: homePct == null ? null : 100 - homePct, players: [] },
       home: { ...side(g.homeTeam.abbrev), score: g.homeTeam.score ?? null, pct: homePct, players: [] },
       pick, pickResult: gameView(g.gameState) === 'final' && outcome != null && pick ? (outcome ? 'hit' : 'miss') : null,
+      watchability: gameView(g.gameState) === 'final' ? null : calcWatchability({
+        topHomeHeat: ppmToHeat(range.topHeatByGameTeam.get(`${g.id}-true`) ?? 0),
+        topAwayHeat: ppmToHeat(range.topHeatByGameTeam.get(`${g.id}-false`) ?? 0),
+        homeWinProbability: p,
+        isPlayoff: false,
+      }),
     };
   });
   // Off-day only: look a week ahead for the next game date (each extra day costs an NHL call + DB reads).
@@ -153,37 +164,53 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
   const latest = recaps[0] ?? null;
   const recap = latest ? await safe(fetchRecap(latest.date), null) : null;
   const stories = recapToStories(recap ? { date: recap.date, title: recap.title, summary: recap.summary, content: recap.content } : null, recap?.title ?? '');
+  if (recap && recap.date === resultsDate) for (const r of results) r.recapHref = stories[0].href;
+
+  // Tonight: the game of the night first; every card shows each team's Heat.
+  markGameOfTheNight(tonight);
+  tonight.sort((a, b) => Number(!!b.marquee) - Number(!!a.marquee));
+  withTeamHeat(cards, rankings?.teamHeat);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const hottest: RankRow[] = ((rankings?.momentumLeaders?.skaters ?? []) as any[]).slice(0, 5).map(r => ({
-    playerId: r.player_id,
-    href: playerUrl(r.player_id, r.players?.first_name ?? '', r.players?.last_name ?? ''),
-    name: `${r.players?.first_name ?? ''} ${r.players?.last_name ?? ''}`.trim(),
-    photo: r.players?.headshot_url ?? null,
-    team: r.players?.teams?.abbrev ?? '',
-    heat: ppmToHeat(r.momentum_ppm),
-    sub: r.players?.position_code === 'D' ? 'Defense' : 'Forward',
-  }));
+  const skaters = (rankings?.momentumLeaders?.skaters ?? []) as any[];
+  const top = skaters[0];
+  const topTonight = top ? tonight.find(c => c.away.abbrev === top.players?.teams?.abbrev || c.home.abbrev === top.players?.teams?.abbrev) : undefined;
+  const leader: HeatLeader | null = top ? {
+    playerId: top.player_id,
+    href: playerUrl(top.player_id, top.players?.first_name ?? '', top.players?.last_name ?? ''),
+    first: top.players?.first_name ?? '', last: top.players?.last_name ?? '',
+    photo: top.players?.headshot_url ?? null,
+    team: top.players?.teams?.abbrev ?? '', teamName: top.players?.teams?.name ?? '',
+    pos: posLabel(top.players?.position_code),
+    heat: ppmToHeat(top.momentum_ppm), pace: pacePct(top.momentum_ppm, top.season_ppm),
+    goals: top.momentum_goals ?? 0, assists: top.momentum_assists ?? 0, games: top.momentum_games ?? 0,
+    tonight: topTonight && gameView(topTonight.state) === 'upcoming' ? {
+      href: topTonight.href,
+      opponent: topTonight.away.abbrev === top.players?.teams?.abbrev ? topTonight.home.name : topTonight.away.name,
+      time: topTonight.startTimeUTC,
+    } : null,
+  } : null;
+  const leaders = skaters.slice(1, 9).map((r, i) => skaterRow(r, String(i + 2), 'rank'));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const goalieRows: RankRow[] = (goalies as any[]).slice(0, 5).map(g => ({
-    playerId: g.id,
-    href: playerUrl(g.id, g.first_name, g.last_name),
-    name: `${g.first_name} ${g.last_name}`,
-    photo: g.headshot_url ?? null,
-    team: g.teams?.abbrev ?? '',
-    heat: null,
-    sub: `SV% ${g.avgSavePct.toFixed(3).replace(/^0/, '')} · last ${g.gamesPlayed}`,
-  }));
+  // Not the players already on the Heat list right above — new names only.
+  const shown = new Set(skaters.slice(0, 9).map(r => r.player_id));
+  const heatingUp = ((rankings?.breakoutWatch ?? []) as any[])
+    .filter(r => !shown.has(r.player_id) && (pacePct(r.momentum_ppm, r.season_ppm) ?? 0) > 0).slice(0, 5).map(r => skaterRow(r, '↑', 'up'));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const rookieRows: RankRow[] = (rookies as any[]).slice(0, 5).map(r => ({
-    playerId: r.player_id,
-    href: playerUrl(r.player_id, r.players.first_name, r.players.last_name),
-    name: `${r.players.first_name} ${r.players.last_name}`,
-    photo: r.players.headshot_url ?? null,
-    team: r.players.teams?.abbrev ?? '',
-    heat: ppmToHeat(r.momentum_ppm),
-    sub: r.players.age != null ? `Age ${r.players.age}` : `${r.players.career_games} NHL games`,
-  }));
+  const coolingOff = ((rankings?.coolingWatch ?? []) as any[]).slice(0, 5).map(r => skaterRow(r, '↓', 'cool'));
+  const teams: TeamHeatRow[] = Object.entries(rankings?.teamHeat ?? {})
+    .map(([abbrev, heat]) => {
+      const t = rankings?.teams?.[abbrev];
+      return { abbrev, name: t?.name ?? teamColor(abbrev).name, heat, href: t ? teamUrl(t.id, t.name) : null };
+    })
+    .sort((a, b) => b.heat - a.heat);
 
-  return { today, tonight, nextGameDate, resultsDate, results, stories, hottest, goalies: goalieRows, rookies: rookieRows, pickAccuracyPct: accuracy, rankedCount: rankings?.totalSkaters ?? null, heroImageUrl: latest?.hero_image_url ?? null };
+  return {
+    today, tonight, nextGameDate, resultsDate, results, stories,
+    leader, leaders, heatingUp, coolingOff,
+    goalies: goalies.slice(0, 10).map((g, i) => goalieRow(g, i + 1)),
+    rookies: rookies.slice(0, 10).map((r, i) => rookieRow(r, i + 1)),
+    teams,
+    heroImageUrl: latest?.hero_image_url ?? null,
+  };
 }

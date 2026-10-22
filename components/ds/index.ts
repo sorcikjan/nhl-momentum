@@ -14,3 +14,4 @@ export { FormStreak } from './FormStreak';
 export { ScoreRow } from './ScoreRow';
 export { ArchetypeBadge } from './ArchetypeBadge';
 export { HeatPulseMark } from './HeatPulseMark';
+export { PlayerRow, PlayerList, SectionLink } from './PlayerRow';
