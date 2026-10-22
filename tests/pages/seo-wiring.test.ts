@@ -19,5 +19,7 @@ describe('player page', () => {
   it('uses the search title and Person structured data', () => {
     expect(player).toContain('playerTitle(');
     expect(player).toContain('personLd(');
+    expect(player).toContain('<ShareButton');
+    expect(player).toContain('playerShareText(');
   });
 });

@@ -32,6 +32,9 @@ describe('PredictionsBody', () => {
     expect(out).toContain('"@type":"ItemList"');
     expect(out).toContain('https://x/games/1/phi-at-buf-1022');
   });
+  it('offers sharing the day', () => {
+    expect(out).toContain('Share');
+  });
   it('an empty day says so', () => {
     const e = renderToStaticMarkup(<PredictionsBody date="2026-07-01" today="2026-10-22" cards={[]} accuracyPct={null} siteUrl="https://x" />);
     expect(e).toContain('No NHL games');

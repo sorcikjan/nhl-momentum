@@ -4,6 +4,8 @@ import { GameCard } from '@/components/game/GameCard';
 import { JsonLd } from '@/components/seo/JsonLd';
 import type { GameCardData } from '@/lib/game-card';
 import { itemListLd, predictionSentence, predictionsTitle } from '@/lib/seo';
+import { predictionsShareText } from '@/lib/share';
+import ShareButton from '@/components/ui/ShareButton';
 
 const MONO = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' } as const;
 const addDays = (d: string, n: number) => new Date(Date.parse(`${d}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
@@ -24,6 +26,7 @@ export function PredictionsBody({ date, today, cards, accuracyPct, siteUrl }: {
         size="page"
         kicker="PREDICTIONS"
         title={predictionsTitle(date, today)}
+        right={n ? <ShareButton path={`/predictions/${date}`} text={predictionsShareText(n, short(date))} /> : undefined}
         sub={n
           ? <>{n} game{n === 1 ? '' : 's'} · our pick for every one, with each team&apos;s three hottest players.{accuracyPct != null && <> Our model is <b style={{ color: 'var(--rise)' }}>{Math.round(accuracyPct)}%</b> on winners this season.</>}</>
           : 'No NHL games on this date.'}

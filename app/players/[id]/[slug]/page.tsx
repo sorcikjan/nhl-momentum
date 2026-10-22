@@ -12,6 +12,8 @@ import { formChips, gameLogRows, heatSeries, last5Tiles, radarStats, seasonTiles
 import { assertDatabaseUp } from '@/lib/supabase';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { personLd, playerTitle } from '@/lib/seo';
+import { playerShareText } from '@/lib/share';
+import ShareButton from '@/components/ui/ShareButton';
 import { SITE_URL } from '@/lib/site';
 import { playerUrl } from '@/lib/urls';
 
@@ -52,14 +54,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     openGraph: {
       title: `${name} — momentum.`,
       description: desc,
-      images: player.headshot_url ? [{ url: player.headshot_url, width: 160, height: 160, alt: name }] : [],
     },
-    twitter: {
-      card: 'summary',
-      title: `${name} — ${season} NHL Stats`,
-      description: desc,
-      ...(player.headshot_url && { images: [player.headshot_url] }),
-    },
+    // The image comes from ./opengraph-image (Heat card).
+    twitter: { card: 'summary_large_image', title: `${name} — ${season} NHL Stats`, description: desc },
   };
 }
 
@@ -219,6 +216,9 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         image: player.headshot_url ?? null,
         team: player.teams?.name ?? null,
       })} />
+      <div className="mb-4 flex justify-end">
+        <ShareButton text={playerShareText(`${player.first_name} ${player.last_name}`, heat)} />
+      </div>
       <ProfileBody view={view} />
     </>
   );

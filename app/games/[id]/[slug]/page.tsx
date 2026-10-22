@@ -14,6 +14,7 @@ import { periodScoresFromMomentum } from '@/lib/play-by-play';
 import ShareButton from '@/components/ui/ShareButton';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { gameTitle, sportsEventLd } from '@/lib/seo';
+import { gameShareText } from '@/lib/share';
 import { SITE_URL } from '@/lib/site';
 import { SectionHeading } from '@/components/ds';
 import { SECTION_META, gameView, pickHeadline, sectionPlan, type SectionKey } from '@/lib/game-state';
@@ -75,9 +76,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     openGraph: {
       title: `${awayName} vs ${homeName} — momentum.`,
       description: desc,
-      images: [{ url: teamLogoUrl(home), width: 80, height: 80, alt: home }],
     },
-    twitter: { card: 'summary', title: `${awayName} vs ${homeName}`, description: desc },
+    // The image comes from ./opengraph-image (teams, pick, key players).
+    twitter: { card: 'summary_large_image', title, description: desc },
   };
 }
 
@@ -429,6 +430,14 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const view = gameView(gameState);
   const favoredAbbrev = favoredIsHome ? homeAbbrev : awayAbbrev;
   const favoredPct = prediction ? Math.round(Math.max(prediction.home_win_probability, prediction.away_win_probability) * 100) : 0;
+  const homePct = prediction ? Math.round(prediction.home_win_probability * 100) : null;
+  const shareText = gameShareText({
+    id: Number(id), href: '', state: gameState, startTimeUTC: null,
+    away: { abbrev: awayAbbrev, name: awayName, score: awayScore, pct: homePct == null ? null : 100 - homePct, players: toRows(awayKeys) },
+    home: { abbrev: homeAbbrev, name: homeName, score: homeScore, pct: homePct, players: toRows(homeKeys) },
+    pick: prediction ? { abbrev: favoredAbbrev, pct: favoredPct } : null,
+    pickResult: outcome?.correct_winner == null ? null : outcome.correct_winner ? 'hit' : 'miss',
+  });
   const box = (child: React.ReactNode, padded = true) => (
     <div className={`rounded-xl border ${padded ? 'p-4' : ''}`} style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>{child}</div>
   );
@@ -513,7 +522,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
       />
 
       <div className="mb-4 flex justify-end">
-        <ShareButton title={`${awayName} vs ${homeName} — momentum.`} />
+        <ShareButton text={shareText} />
       </div>
 
       <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">

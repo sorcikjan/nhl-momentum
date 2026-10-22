@@ -40,3 +40,10 @@ describe('hot copy', () => {
     expect(hotView({ momentumLeaders: { skaters: [one] } }).top?.story).toMatch(/^1 goal and 1 assist in his last game/);
   });
 });
+
+describe('HotBody sharing', () => {
+  it('offers sharing the Heat leaders', () => {
+    const v = hotView({ momentumLeaders: { skaters: [sk(1, 0.1, 0.05), sk(2, 0.09, 0.05)] }, breakoutWatch: [], coolingWatch: [] });
+    expect(renderToStaticMarkup(<HotBody view={v} />)).toContain('Share');
+  });
+});

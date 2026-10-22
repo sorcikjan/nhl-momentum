@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import { Headshot, HeatDial, HeatPill, SectionHeading, TeamChip } from '@/components/ds';
 import { heatColor } from '@/lib/heat';
+import { hotShareText } from '@/lib/share';
+import ShareButton from '@/components/ui/ShareButton';
 import type { HotView } from '@/lib/hot-view';
 import { teamColor } from '@/lib/team-colors';
 
@@ -14,6 +16,7 @@ export function HotBody({ view }: { view: HotView }) {
       <SectionHeading
         as="h1" size="page" kicker="HEAT MAP · LAST 5 GAMES"
         title={<><span style={{ color: 'var(--heat)' }}>Burning</span> right now.</>}
+        right={top ? <ShareButton path="/hot" text={hotShareText([top, ...rest].slice(0, 3).map(p => ({ name: `${p.first} ${p.last}`, heat: p.heat })))} /> : undefined}
         sub="Highest Heat over the last five games, plus who is breaking out and who is cooling off. Refreshed after every game night."
       />
       {!top ? (

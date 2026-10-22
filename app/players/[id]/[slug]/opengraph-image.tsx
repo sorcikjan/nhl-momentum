@@ -94,7 +94,7 @@ export default async function Image({
       >
         <span style={{ color: TEXT_DIM, fontSize: 32 }}>momentum.</span>
       </div>,
-      { width: 1200, height: 630 },
+      { width: 1200, height: 630, headers: { 'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=86400' } },
     );
   }
 
@@ -310,6 +310,6 @@ export default async function Image({
         </div>
       </div>
     </div>,
-    { width: 1200, height: 630 },
+    { width: 1200, height: 630, headers: { 'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=86400' } },
   );
 }
