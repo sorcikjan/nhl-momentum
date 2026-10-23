@@ -118,7 +118,10 @@ export function TrendChart({ data }: { data: TrendData }) {
 
   let body: React.ReactNode, summary: React.ReactNode, from: string | null = null, to: string | null = null;
   if (metric.key === 'heat') {
-    const cutoff = range.days === Infinity ? '' : new Date(Date.now() - range.days * 86_400_000).toISOString().slice(0, 10);
+    // Counted back from the latest day with data (pure render: no clock, so
+    // the server and the browser draw the same span).
+    const lastDay = data.heat[data.heat.length - 1]?.date;
+    const cutoff = range.days === Infinity || !lastDay ? '' : new Date(Date.parse(`${lastDay}T12:00:00Z`) - range.days * 86_400_000).toISOString().slice(0, 10);
     const series = data.heat.filter(p => p.date >= cutoff);
     if (series.length < 2) body = null;
     else {
