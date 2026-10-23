@@ -833,6 +833,12 @@ export async function fetchRecapData(date: string) {
       snapshot: snapMap.get(p.player_id) ?? null,
     })),
     shutouts: goalieStats ?? [],
+    // Each game's skaters with a point, best first (game stories).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    gamePerformers: ((stats ?? []) as any[]).filter(r => r.players && (r.goals ?? 0) + (r.assists ?? 0) > 0)
+      .sort((a, b) => (b.goals + b.assists) - (a.goals + a.assists) || b.goals - a.goals)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .reduce((m, r) => m.set(r.game_id, [...(m.get(r.game_id) ?? []), r]), new Map<number, any[]>()),
   };
 }
 
@@ -845,6 +851,20 @@ export async function fetchRecentSoftSignals(withinHours = 48, limit = 15) {
     .order('published_at', { ascending: false })
     .limit(limit);
   return data ?? [];
+}
+
+// The AI game story for one finished game (migration 017), or null — also null
+// while the table doesn't exist yet, so game pages never depend on it.
+export async function fetchGameStory(gameId: number): Promise<{ headline: string; dek: string; body: string; game_date: string } | null> {
+  const { data, error } = await supabaseAdmin
+    .from('game_stories').select('headline, dek, body, game_date').eq('game_id', gameId).maybeSingle();
+  return error ? null : data;
+}
+
+// Headlines of a night's game stories, by game id (empty until migration 017).
+export async function fetchGameStoryHeadlines(date: string): Promise<Map<number, string>> {
+  const { data, error } = await supabaseAdmin.from('game_stories').select('game_id, headline').eq('game_date', date);
+  return new Map(error ? [] : (data ?? []).map(r => [r.game_id as number, r.headline as string]));
 }
 
 export async function fetchRecentRecaps(limit = 30) {

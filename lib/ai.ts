@@ -412,11 +412,7 @@ ARTICLE STRUCTURE — follow this exactly:
 2. GAME SECTIONS: One section per game, ordered from most to least interesting. Each section must start with EXACTLY this header format on its own line:
 ### {AWAY_ABBREV} {AWAY_SCORE} @ {HOME_ABBREV} {HOME_SCORE}
 
-Then exactly TWO paragraphs separated by a blank line:
-
-PARAGRAPH 1 (2-3 sentences) — The game story: how it unfolded, key scoring sequences, momentum shifts, turning points. Active verbs, specific moments. Make the reader feel like they watched it.
-
-PARAGRAPH 2 (2-3 sentences) — The analytical layer: what the pre-game momentum data said vs. what actually happened on the ice, the prediction outcome (if upset, explain why the data missed it; if correct, validate what the signal caught), standout individual performance with exact stats woven naturally into the sentence.
+Then exactly ONE paragraph (2-3 sentences): the result, the one thing that decided it, and the standout performance with exact stats. Each game has its own full story on its own page, linked from here — this article is the night at a glance, so don't retell every goal.
 
 Always use the player's FULL FIRST AND LAST NAME (e.g. "Connor McDavid", not just "McDavid") in both paragraphs.
 
@@ -426,7 +422,7 @@ Always use the player's FULL FIRST AND LAST NAME (e.g. "Connor McDavid", not jus
 4. LOOKING AHEAD section (start with "### Looking Ahead"):
 2-3 sentences. Forward-looking observations — back-to-backs, playoff implications, players to watch. Concrete, not generic. Use full names.
 
-TONE: ESPN excitement meets data credibility. Write like someone who watched every shift and ran every number. Direct sentences. Active verbs. Short paragraphs. One idea per sentence. No clichés ("lit the lamp", "finding the back of the net", "putting pucks on net", "battle in the trenches", "gutsy effort"). No filler ("it was a night of", "fans were treated to", "in what was a"). If it doesn't add information or energy, cut it. Depth over brevity — write approximately twice as much per game section as you normally would.
+TONE: ESPN excitement meets data credibility. Write like someone who watched every shift and ran every number. Direct sentences. Active verbs. Short paragraphs. One idea per sentence. No clichés ("lit the lamp", "finding the back of the net", "putting pucks on net", "battle in the trenches", "gutsy effort"). No filler ("it was a night of", "fans were treated to", "in what was a"). If it doesn't add information or energy, cut it.
 
 FULL NAMES: Every time you mention a player, use their full first and last name. Never use last name only.
 
@@ -437,7 +433,7 @@ Respond with valid JSON (no markdown, no code blocks):
   "title": "[headline max 70 chars — lead with the biggest story, name a specific player or team, make it compelling enough to click]",
   "summary": "2 sentences max 160 chars total. Name date, key players, teams. Written for Google snippet.",
   "featured_game": "[AWAY_ABBREV @ HOME_ABBREV — the exact game your headline is about, e.g. MTL @ TOR]",
-  "content": "[lede paragraph]\\n\\n[optional second lede paragraph]\\n\\n### {AWAY} {score} @ {HOME} {score}\\n\\n[paragraph 1 — game story]\\n\\n[paragraph 2 — analytics]\\n\\n[repeat for each game]\\n\\n### Momentum Watch\\n\\n[paragraph]\\n\\n### Looking Ahead\\n\\n[paragraph]"
+  "content": "[lede paragraph]\\n\\n[optional second lede paragraph]\\n\\n### {AWAY} {score} @ {HOME} {score}\\n\\n[one paragraph — the game at a glance]\\n\\n[repeat for each game]\\n\\n### Momentum Watch\\n\\n[paragraph]\\n\\n### Looking Ahead\\n\\n[paragraph]"
 }`;
 
   // Generate, then reject outputs that contradict the facts we supplied (the old
@@ -550,46 +546,131 @@ export function playerClaimProblem(text: string, tallies: PlayerTally[]): string
   return null;
 }
 
+// ─── Game story ───────────────────────────────────────────────────────────────
+// One article per finished game, shown on the game's page (the page people
+// search for: "Senators Panthers recap"). The night recap links to these.
+
+export interface GameStoryInput {
+  dateLabel: string;
+  game: RecapGame;              // with goals, tallies and how it ended
+  stars: string[];              // official three stars, e.g. "1. Tim Stützle (OTT): 1G 1A"
+  performers: RecapPerformer[]; // this game's skaters with a point
+}
+
+export interface GameStoryOutput { headline: string; dek: string; body: string }
+
+export async function generateGameStory(input: GameStoryInput): Promise<GameStoryOutput | null> {
+  const g = input.game;
+  const awayWon = g.awayScore > g.homeScore;
+  const winner = awayWon ? (g.awayName ?? g.awayTeam) : (g.homeName ?? g.homeTeam);
+  const finish = g.finish === 'OT' ? 'FINAL/OT' : g.finish === 'SO' ? 'FINAL/SHOOTOUT' : g.finish === 'REG' ? 'FINAL in regulation — no overtime' : 'FINAL';
+  const model = g.homeWinProbability == null ? 'No pre-game prediction.'
+    : `Our model gave ${winner} a ${Math.round((awayWon ? 1 - g.homeWinProbability : g.homeWinProbability) * 100)}% chance to win; the pick was ${g.predictedCorrectly ? 'right' : g.predictedCorrectly === false ? 'wrong' : 'not graded'}.`;
+  const sign = (n: number) => n >= 0 ? `+${n}` : String(n);
+  const performers = input.performers.map(p => {
+    const vs = p.momentumPpm && p.seasonPpm && p.seasonPpm > 0
+      ? `, recent form ${Math.round((p.momentumPpm - p.seasonPpm) / p.seasonPpm * 100)}% ${p.momentumPpm > p.seasonPpm ? 'above' : 'below'} his season average` : '';
+    return `  ${p.name} (${p.team}, ${p.position}): ${p.goals}G ${p.assists}A, ${sign(p.plusMinus)}, ${p.toiMin.toFixed(1)} min${vs}`;
+  }).join('\n');
+
+  const prompt = `You are a senior sports writer at momentum., an NHL analytics site. Write the game story for one game played ${input.dateLabel}. Readers find it by searching for the game, so it must stand on its own.
+
+GAME: ${g.awayName ?? g.awayTeam} ${g.awayScore} at ${g.homeName ?? g.homeTeam} ${g.homeScore} [${finish}]
+Goals (period, time, team, scorer, assists): ${g.goals?.length ? g.goals.join('; ') : 'not available'}
+Official three stars:
+${input.stars.join('\n') || '  not available'}
+Skaters with a point:
+${performers || '  not available'}
+${model}
+
+WRITE:
+- "headline": max 70 characters. Name the player or team that decided it, with a strong verb. No dates, no "recap".
+- "dek": one or two sentences, max 180 characters: who won, the score, and the one fact that mattered most.
+- "body": three paragraphs separated by a blank line, 170–230 words in total.
+  1. How the game unfolded: the scoring sequence and turning points, from the goals list.
+  2. The standout performances, with exact stats woven into sentences.
+  3. The data angle: what our model expected and whether it held, and the recent-form numbers above where they explain the result.
+
+RULES — NON-NEGOTIABLE: Use only the facts above. Every goal, scorer, assist, period and time is listed; if a detail isn't listed, don't write it. No invented saves, hits, crowd reactions, quotes or streaks. Never say overtime or shootout unless the game is marked so. Name teams only by the names given or their city or nickname from those names. Use each player's full name on first mention. No clichés ("lit the lamp", "found the back of the net").
+
+Respond with valid JSON only: {"headline": "...", "dek": "...", "body": "..."}`;
+
+  let feedback = '';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const raw = await ask(prompt + feedback);
+    if (!raw) return null;
+    let out: GameStoryOutput;
+    try {
+      out = parseJsonObject<GameStoryOutput>(raw);
+    } catch {
+      lastAiError = 'unparseable game story';
+      continue;
+    }
+    if (!out.headline?.trim() || !out.body?.trim() || out.body.replace(/[^a-zA-Z]/g, '').length < 200) {
+      lastAiError = 'game story too short or missing fields';
+      continue;
+    }
+    const problem = recapFactProblem({ title: out.headline, summary: out.dek ?? '', content: out.body }, [g]);
+    if (!problem) return { headline: out.headline.trim(), dek: (out.dek ?? '').trim(), body: out.body.trim() };
+    lastAiError = `game story rejected: ${problem}`;
+    console.warn(`[ai] game story ${g.awayTeam}@${g.homeTeam} attempt ${attempt + 1} rejected: ${problem}`);
+    feedback = `\n\nYOUR PREVIOUS DRAFT WAS REJECTED BY THE FACT CHECK: ${problem}. Write it again, using only the facts above.`;
+  }
+  return null;
+}
+
+
+// Repair literal control characters inside JSON string values.
+// Gemini occasionally outputs real \n/\r/\t inside string values instead of
+// their JSON escape sequences — this makes JSON.parse throw even though the
+// structure is otherwise valid.
+function repairJsonStrings(json: string): string {
+  let out = '';
+  let inStr = false;
+  let esc = false;
+  for (let i = 0; i < json.length; i++) {
+    const ch = json[i];
+    if (esc) { out += ch; esc = false; continue; }
+    if (ch === '\\') { out += ch; esc = true; continue; }
+    if (ch === '"') { out += ch; inStr = !inStr; continue; }
+    if (inStr) {
+      if (ch === '\n') { out += '\\n'; continue; }
+      if (ch === '\r') { out += '\\r'; continue; }
+      if (ch === '\t') { out += '\\t'; continue; }
+    }
+    out += ch;
+  }
+  return out;
+}
+
+// Find the balanced closing brace of the outermost JSON object.
+// lastIndexOf('}') picks up braces inside article text and truncates the parse.
+function findJsonEnd(str: string, start: number): number {
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < str.length; i++) {
+    const ch = str[i];
+    if (esc) { esc = false; continue; }
+    if (ch === '\\' && inStr) { esc = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (ch === '{') depth++;
+    else if (ch === '}' && --depth === 0) return i;
+  }
+  return -1;
+}
+
+// The outermost JSON object in a model response (code fences stripped,
+// raw control characters inside strings repaired). Throws if none parses.
+function parseJsonObject<T>(raw: string): T {
+  const stripped = raw.trim()
+    .replace(/^```json\s*/im, '').replace(/^```\s*/im, '').replace(/\s*```\s*$/im, '').trim();
+  const jsonStart = stripped.indexOf('{');
+  const jsonEnd = jsonStart !== -1 ? findJsonEnd(stripped, jsonStart) : -1;
+  const extracted = jsonStart !== -1 && jsonEnd > jsonStart ? stripped.slice(jsonStart, jsonEnd + 1) : stripped;
+  return JSON.parse(repairJsonStrings(extracted)) as T;
+}
+
 function parseRecapOutput(raw: string, input: DailyRecapInput): DailyRecapOutput | null {
-
-  // Repair literal control characters inside JSON string values.
-  // Gemini occasionally outputs real \n/\r/\t inside string values instead of
-  // their JSON escape sequences — this makes JSON.parse throw even though the
-  // structure is otherwise valid.
-  function repairJsonStrings(json: string): string {
-    let out = '';
-    let inStr = false;
-    let esc = false;
-    for (let i = 0; i < json.length; i++) {
-      const ch = json[i];
-      if (esc) { out += ch; esc = false; continue; }
-      if (ch === '\\') { out += ch; esc = true; continue; }
-      if (ch === '"') { out += ch; inStr = !inStr; continue; }
-      if (inStr) {
-        if (ch === '\n') { out += '\\n'; continue; }
-        if (ch === '\r') { out += '\\r'; continue; }
-        if (ch === '\t') { out += '\\t'; continue; }
-      }
-      out += ch;
-    }
-    return out;
-  }
-
-  // Find the balanced closing brace of the outermost JSON object.
-  // lastIndexOf('}') picks up braces inside article text and truncates the parse.
-  function findJsonEnd(str: string, start: number): number {
-    let depth = 0, inStr = false, esc = false;
-    for (let i = start; i < str.length; i++) {
-      const ch = str[i];
-      if (esc) { esc = false; continue; }
-      if (ch === '\\' && inStr) { esc = true; continue; }
-      if (ch === '"') { inStr = !inStr; continue; }
-      if (inStr) continue;
-      if (ch === '{') depth++;
-      else if (ch === '}' && --depth === 0) return i;
-    }
-    return -1;
-  }
 
   // A truncated or empty model response (e.g. "{" alone) parses/falls-through
   // "successfully" but produces a title/content with no real words — reject
@@ -597,15 +678,7 @@ function parseRecapOutput(raw: string, input: DailyRecapInput): DailyRecapOutput
   const hasRealWords = (s: string | undefined | null) => (s ?? '').replace(/[^a-zA-Z]/g, '').length >= 8;
 
   try {
-    // Strip markdown code fences, then extract the outermost JSON object
-    const stripped = raw.trim()
-      .replace(/^```json\s*/im, '').replace(/^```\s*/im, '').replace(/\s*```\s*$/im, '').trim();
-    const jsonStart = stripped.indexOf('{');
-    const jsonEnd = jsonStart !== -1 ? findJsonEnd(stripped, jsonStart) : -1;
-    const extracted = jsonStart !== -1 && jsonEnd > jsonStart
-      ? stripped.slice(jsonStart, jsonEnd + 1)
-      : stripped;
-    const parsed = JSON.parse(repairJsonStrings(extracted)) as DailyRecapOutput;
+    const parsed = parseJsonObject<DailyRecapOutput>(raw);
     if (!hasRealWords(parsed.title) || !hasRealWords(parsed.content)) return null;
     return parsed;
   } catch {

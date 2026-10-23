@@ -25,7 +25,7 @@ const handler: BackgroundHandler = async (event) => {
   }
 
   const body = event.body ? JSON.parse(event.body) : {};
-  const phases: string[] = body.phases ?? ['rosters', 'backfill', 'outcomes', 'outcomes-backfill', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy', 'extras', 'assignments', 'recap', 'prune'];
+  const phases: string[] = body.phases ?? ['rosters', 'backfill', 'outcomes', 'outcomes-backfill', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy', 'extras', 'assignments', 'recap', 'game-stories', 'prune'];
   const dateParam: string = body.date ?? '';
   const dateSuffix = dateParam ? `&date=${dateParam}` : '';
 
@@ -198,6 +198,23 @@ const handler: BackgroundHandler = async (event) => {
       const r = await call(`${base}/api/ingest/recap?date=${recapDate}`, h, { timeoutMs: RECAP_TIMEOUT_MS, retries: 1 });
       log.push(`recap: ${r.data?.skipped ? `skipped (${r.data.reason})` : r.data?.title ?? `err: ${r.error}`}`);
     } catch (e) { log.push(`recap: exception ${e}`); }
+  }
+
+  // 9a. Game stories — one article per finished game, on its game page. Three
+  //     games per call (each is a 10–40s AI call); stops when a batch writes
+  //     nothing (all done, or the AI keeps failing — the next run retries).
+  if (phases.includes('game-stories')) {
+    try {
+      const storyDate = dateParam || new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      let written = 0, failed = 0, remaining = 0;
+      for (let batch = 0; batch < 8; batch++) {
+        const r = await call(`${base}/api/ingest/game-stories?date=${storyDate}&limit=3`, h, { timeoutMs: RECAP_TIMEOUT_MS, retries: 0 });
+        if (!r.data) { log.push(`game-stories: err: ${r.error}`); break; }
+        written += r.data.written ?? 0; failed += r.data.failed ?? 0; remaining = r.data.remaining ?? 0;
+        if (!r.data.written || !remaining) break;
+      }
+      log.push(`game-stories: ${written} written, ${failed} failed, ${remaining} left`);
+    } catch (e) { log.push(`game-stories: exception ${e}`); }
   }
 
   // 9b. Soft signals — NHL RSS + Newsdata.io news ingestion

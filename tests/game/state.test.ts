@@ -23,7 +23,7 @@ describe('sectionPlan', () => {
   });
   it('orders live and final sections like the design', () => {
     expect(sectionPlan('live', all)).toEqual({ main: ['momentum', 'playByPlay'], side: ['winProb', 'liveStats', 'topPerformers'] });
-    expect(sectionPlan('final', all)).toEqual({ main: ['threeStars', 'keyPlayers', 'pick', 'heatImpact'], side: ['recap', 'highlights'] });
+    expect(sectionPlan('final', all)).toEqual({ main: ['story', 'threeStars', 'keyPlayers', 'pick', 'heatImpact'], side: ['recap', 'highlights'] });
   });
   it('drops sections without data but keeps the rest', () => {
     const plan = sectionPlan('upcoming', new Set(['goalies', 'watch']));

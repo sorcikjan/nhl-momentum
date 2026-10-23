@@ -3,7 +3,7 @@ import type React from 'react';
 import { cache } from 'react';
 import Link from 'next/link';
 import {
-  fetchMatch, fetchRecap, fetchSeasonPickAccuracy, fetchTeamSpecialTeams,
+  fetchGameStory, fetchMatch, fetchRecap, fetchSeasonPickAccuracy, fetchTeamSpecialTeams,
   fetchKeyPlayerForm, fetchPostGameHeat, teamLogoUrl,
 } from '@/lib/data';
 import { gameUrl, teamUrl, playerUrl, recapUrl } from '@/lib/urls';
@@ -29,6 +29,7 @@ import ThreeStarsRow from '@/components/games/ThreeStarsRow';
 import PredictionCard from '@/components/games/PredictionCard';
 import HeatImpactCard, { type Mover } from '@/components/games/HeatImpactCard';
 import RecapCard from '@/components/games/RecapCard';
+import { GameStory } from '@/components/games/GameStory';
 import HighlightsCard from '@/components/games/HighlightsCard';
 import GoalieMatchupCard from '@/components/games/GoalieMatchupCard';
 import { KeyPlayers } from '@/components/game/KeyPlayers';
@@ -50,6 +51,7 @@ export function generateStaticParams() {
 
 // Metadata and the page share one fetch per render (it's a few dozen queries).
 const cachedFetchMatch = cache((id: string) => fetchMatch(id));
+const cachedFetchStory = cache((id: number) => fetchGameStory(id).catch(() => null));
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string; slug: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -66,8 +68,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     ? new Date(game.game_date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     : '';
   const isFinalGame = ['FINAL', 'OFF'].includes(game?.game_state ?? '');
+  const story = isFinalGame && game ? await cachedFetchStory(game.id) : null;
   const title = gameTitle({ awayName, homeName, date: game?.game_date ?? null, state: game?.game_state ?? null, awayScore: game?.away_score ?? null, homeScore: game?.home_score ?? null });
-  const desc = isFinalGame
+  const desc = story?.dek ? story.dek : isFinalGame
     ? `${awayName} vs ${homeName} recap${dateLabel ? ' — ' + dateLabel : ''}: final score, whether our pick held, and how each team's three hottest players did.`
     : `${awayName} vs ${homeName} prediction${dateLabel ? ' — ' + dateLabel : ''}: our pick and win probability, plus each team's three hottest players by Heat.`;
   return {
@@ -299,6 +302,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   let recapHeadline = '';
   let recapBody = '';
   let recapHref: string | null = null;
+  let nightTitle: string | null = null;
+  let story: Awaited<ReturnType<typeof fetchGameStory>> = null;
   if (isFinal) {
     const winnerAbbrev = (homeScore ?? 0) > (awayScore ?? 0) ? homeAbbrev : awayAbbrev;
     const loserAbbrev = winnerAbbrev === homeAbbrev ? awayAbbrev : homeAbbrev;
@@ -318,7 +323,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
       : `Final score: ${awayAbbrev} ${awayScore}–${homeScore} ${homeAbbrev}.${ppNote}`;
 
     const dailyRecap = await fetchRecap(gameDate).catch(() => null);
-    if (dailyRecap) recapHref = recapUrl(gameDate, dailyRecap.title);
+    if (dailyRecap) { recapHref = recapUrl(gameDate, dailyRecap.title); nightTitle = dailyRecap.title; }
+    story = await cachedFetchStory(Number(id));
   }
 
 
@@ -485,7 +491,9 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         accuracyYtd={accuracyYtd} chips={predictionChips} factors={predictionFactors} awayAbbrev={awayAbbrev} homeAbbrev={homeAbbrev} />
     );
     if (heatImpactUp.length || heatImpactDown.length) nodes.heatImpact = <HeatImpactCard up={heatImpactUp} down={heatImpactDown} />;
-    if (recapHeadline || recapBody) nodes.recap = <RecapCard headline={recapHeadline} body={recapBody} recapHref={recapHref} />;
+    // The game's own story leads; without one, the templated box-score recap stays in the side column.
+    if (story) nodes.story = <GameStory dek={story.dek} body={story.body} nightHref={recapHref} nightTitle={nightTitle} />;
+    else if (recapHeadline || recapBody) nodes.recap = <RecapCard headline={recapHeadline} body={recapBody} recapHref={recapHref} />;
     nodes.highlights = <HighlightsCard youtubeId={youtubeId} nhlUrl={nhlUrl} awayAbbrev={awayAbbrev} homeAbbrev={homeAbbrev} />;
   }
   const plan = sectionPlan(view, new Set(Object.keys(nodes)));
@@ -495,10 +503,11 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const heroEyebrow = view === 'final' ? `FINAL · ${dayET}` : view === 'live' ? `LIVE · ${clockLabel ?? dayET}` : [dayET, timeET].filter(Boolean).join(' · ');
   // One real line: last night's recap headline, or who leads the Heat coming in.
   const heroStory = view === 'final'
-    ? recapHeadline ?? null
+    ? story?.headline ?? recapHeadline ?? null
     : heatRoster[0] ? `${heatRoster[0].name} comes in at ${heatRoster[0].heat} Heat — the hottest player on the ice.` : null;
   const titleFor = (k: SectionKey) =>
-    k === 'prediction' ? `${teamColor(favoredAbbrev).name} win.` : k === 'pick' ? pickHeadline(outcome?.correct_winner ?? null) : SECTION_META[k].title;
+    k === 'prediction' ? `${teamColor(favoredAbbrev).name} win.` : k === 'pick' ? pickHeadline(outcome?.correct_winner ?? null)
+      : k === 'story' ? story?.headline ?? '' : SECTION_META[k].title;
 
   return (
     <div className="pb-20 lg:pb-0">

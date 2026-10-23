@@ -3,7 +3,8 @@ import { requireIngestAuth } from '@/lib/ingest-auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { fetchRecapData, fetchRecentSoftSignals } from '@/lib/data';
 import { generateDailyRecap, lastAiError } from '@/lib/ai';
-import type { PlayerTally, RecapGame, RecapPerformer, RecapShutout } from '@/lib/ai';
+import type { RecapGame, RecapPerformer, RecapShutout } from '@/lib/ai';
+import { fetchScoreFeed } from '@/lib/score-feed';
 
 // Fetch a free hockey photo from Pixabay (Pixabay License — no attribution required).
 // Uses a date-seeded page offset so each recap gets a different image.
@@ -164,43 +165,7 @@ export async function GET(req: NextRequest) {
 
   // Scoring facts from the NHL score feed — the model may only describe these.
   // Without them it invented overtime winners and team nicknames.
-  const scoreFeed = new Map<number, { finish: 'REG' | 'OT' | 'SO'; goals: string[]; tallies: PlayerTally[] }>();
-  try {
-    const res = await fetch(`https://api-web.nhle.com/v1/score/${date}`, { cache: 'no-store', signal: AbortSignal.timeout(10_000) });
-    if (res.ok) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const fg of ((await res.json()).games ?? []) as any[]) {
-        const type = fg.gameOutcome?.lastPeriodType;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const goals = ((fg.goals ?? []) as any[]).map(gl => {
-          const per = gl.periodDescriptor?.periodType === 'OT' ? 'OT' : gl.periodDescriptor?.periodType === 'SO' ? 'SO' : `P${gl.period}`;
-          const scorer = `${gl.firstName?.default ?? ''} ${gl.lastName?.default ?? gl.name?.default ?? ''}`.trim();
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const assists = ((gl.assists ?? []) as any[]).map(a => a.name?.default).filter(Boolean).join(', ');
-          const tags = [gl.strength && gl.strength !== 'ev' ? gl.strength.toUpperCase() : '', gl.goalModifier === 'empty-net' ? 'EN' : ''].filter(Boolean).join(' ');
-          return `${per} ${gl.timeInPeriod} ${gl.teamAbbrev} ${scorer}${assists ? ` (${assists})` : ' (unassisted)'}${tags ? ` ${tags}` : ''}`;
-        });
-        // Per-player goals and assists, keyed by the feed's short name ("C. Knuble").
-        const tally = new Map<string, PlayerTally>();
-        const add = (name: string | undefined, k: 'goals' | 'assists') => {
-          if (!name) return;
-          const t = tally.get(name) ?? { name, goals: 0, assists: 0 };
-          t[k]++;
-          tally.set(name, t);
-        };
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        for (const gl of (fg.goals ?? []) as any[]) {
-          if (gl.periodDescriptor?.periodType === 'SO') continue; // shootout goals aren't goals
-          add(gl.name?.default, 'goals');
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          for (const a of (gl.assists ?? []) as any[]) add(a.name?.default, 'assists');
-        }
-        if (type === 'REG' || type === 'OT' || type === 'SO') scoreFeed.set(fg.id, { finish: type, goals, tallies: [...tally.values()] });
-      }
-    }
-  } catch (err) {
-    console.warn('[recap] score feed unavailable:', err);
-  }
+  const scoreFeed = await fetchScoreFeed(date);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const games: RecapGame[] = (raw.games as any[]).map(g => {
