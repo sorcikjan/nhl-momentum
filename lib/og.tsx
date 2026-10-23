@@ -145,6 +145,66 @@ export async function fallbackImage(kicker: string, title: string): Promise<Imag
   );
 }
 
+export type CoverData = {
+  away: string; home: string; awayScore: number; homeScore: number; date: string; tag: string | null;
+  star: { name: string; line: string; photo: string | null; team: string } | null;
+};
+
+function StarIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7.1L12 17.3 5.8 21l1.6-7.1L2 9.2l7.1-.6z" fill="#ffc94d" /></svg>
+  );
+}
+
+// A finished game's cover (story cards, the night recap, sharing): both teams'
+// colours split on a diagonal, the final score, the first star. One template,
+// different for every game — instead of the NHL's identical highlight thumbnails.
+export async function coverImage(c: CoverData): Promise<ImageResponse> {
+  const a = teamColor(c.away), h = teamColor(c.home);
+  // Same primary colour (Florida and Ottawa are both red): the home side takes its second colour.
+  const homeBg = a.bg.toLowerCase() === h.bg.toLowerCase() ? h.fg : h.bg;
+  const awayWon = c.awayScore > c.homeScore;
+  const dim = (won: boolean) => (won ? 1 : 0.5);
+  const side = (abbrev: string, won: boolean) => (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 190 }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={teamLogo(abbrev)} width={170} height={170} alt="" />
+      <div style={{ display: 'flex', fontSize: 32, fontWeight: 800, marginTop: 4, opacity: dim(won) }}>{abbrev}</div>
+    </div>
+  );
+  return new ImageResponse(
+    <div style={{ width: 1200, height: 675, display: 'flex', position: 'relative', background: BG, fontFamily: 'Inter, sans-serif', color: TEXT, overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', left: 0, top: 0, width: 1200, height: 675, display: 'flex', background: `linear-gradient(115deg, ${a.bg} 0%, ${a.bg} 49.8%, ${homeBg} 50.2%, ${homeBg} 100%)` }} />
+      <div style={{ position: 'absolute', left: 0, top: 0, width: 1200, height: 675, display: 'flex', background: 'linear-gradient(180deg, rgba(10,11,15,0.1) 0%, rgba(10,11,15,0.5) 50%, rgba(10,11,15,0.94) 100%)' }} />
+      <div style={{ position: 'absolute', left: 56, top: 40, display: 'flex', fontSize: 22, fontWeight: 700, letterSpacing: 3, color: 'rgba(244,245,248,0.85)' }}>FINAL · {c.date}</div>
+      <div style={{ position: 'absolute', right: 56, top: 34, display: 'flex' }}><Wordmark size={26} /></div>
+      <div style={{ position: 'absolute', left: 0, top: 110, width: 1200, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        {side(c.away, awayWon)}
+        <div style={{ display: 'flex', fontSize: 190, fontWeight: 800, letterSpacing: -6, lineHeight: 1, margin: '0 40px' }}>
+          <span style={{ opacity: dim(awayWon) }}>{c.awayScore}</span>
+          <span style={{ opacity: 0.45, margin: '0 26px' }}>–</span>
+          <span style={{ opacity: dim(!awayWon) }}>{c.homeScore}</span>
+        </div>
+        {side(c.home, !awayWon)}
+      </div>
+      {c.star && (
+        <div style={{ position: 'absolute', left: 56, right: 56, bottom: 44, display: 'flex', alignItems: 'center' }}>
+          {c.star.photo
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={c.star.photo} width={150} height={150} alt="" style={{ borderRadius: 75, background: teamColor(c.star.team).bg, border: `5px solid ${HEAT}` }} />
+            : <div style={{ display: 'flex', width: 150, height: 150, borderRadius: 75, background: teamColor(c.star.team).bg, border: `5px solid ${HEAT}` }} />}
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, marginLeft: 26 }}>
+            <div style={{ display: 'flex', alignItems: 'center', fontSize: 22, fontWeight: 700, letterSpacing: 2.5, color: '#ffc94d' }}><StarIcon size={24} /><span style={{ marginLeft: 8 }}>FIRST STAR</span></div>
+            <div style={{ display: 'flex', fontSize: 52, fontWeight: 800, letterSpacing: -1.5, marginTop: 2 }}>{c.star.name}<span style={{ color: HEAT, marginLeft: 18 }}>{c.star.line}</span></div>
+          </div>
+          {c.tag && <div style={{ display: 'flex', padding: '12px 20px', borderRadius: 12, background: HEAT, color: BG, fontSize: 26, fontWeight: 800, letterSpacing: 2 }}>{c.tag}</div>}
+        </div>
+      )}
+    </div>,
+    { ...(await opts()), width: 1200, height: 675, headers: { 'Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800' } },
+  );
+}
+
 export type BrandLeader = { name: string; team: string; photo: string | null; heat: number };
 
 // The site's default share image (homepage and every page without its own):

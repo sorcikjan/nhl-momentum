@@ -25,7 +25,7 @@ const base: HomeData = {
     away: { abbrev: 'FLA', name: 'Florida', score: 1, pct: null, players: [] }, home: { abbrev: 'OTT', name: 'Ottawa', score: 5, pct: null, players: [] },
     pick: { abbrev: 'FLA', pct: 53 }, pickResult: 'miss',
   }],
-  night: { href: '/recaps/x', kicker: 'THE NIGHT · WEDNESDAY · OCTOBER 21', title: 'Senators Explode for Five', dek: 'd', image: null, watchLabel: null,
+  night: { href: '/recaps/x', kicker: 'THE NIGHT · WEDNESDAY · OCTOBER 21', title: 'Senators Explode for Five', dek: 'd', image: null, watchLabel: null, watchHref: null,
     scores: [{ away: 'FLA', awayScore: 1, home: 'OTT', homeScore: 5, href: '/games/2/fla-at-ott-1021' }] },
   gameStories: [],
   leader: {

@@ -883,6 +883,23 @@ export async function fetchRecentSoftSignals(withinHours = 48, limit = 15) {
   return data ?? [];
 }
 
+// What a finished game's cover needs: teams, score, three stars, and whether
+// our pick missed (the "upset" tag). Null until the game is final.
+export async function fetchGameCover(gameId: number) {
+  const [{ data: g }, version] = await Promise.all([
+    supabaseAdmin.from('games')
+      .select('id, game_date, game_state, home_score, away_score, three_stars, home_team:teams!games_home_team_id_fkey(abbrev), away_team:teams!games_away_team_id_fkey(abbrev)')
+      .eq('id', gameId).maybeSingle(),
+    latestModelVersion(),
+  ]);
+  if (!g || !['FINAL', 'OFF'].includes(g.game_state ?? '')) return null;
+  const { data: pred } = await supabaseAdmin.from('predictions')
+    .select('prediction_outcomes(correct_winner)').eq('game_id', gameId).eq('model_version', version).maybeSingle();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const outcome = (pred?.prediction_outcomes as any)?.[0]?.correct_winner ?? (pred?.prediction_outcomes as any)?.correct_winner;
+  return { game: g, pickMissed: outcome === false };
+}
+
 // The AI game story for one finished game (migration 017), or null — also null
 // while the table doesn't exist yet, so game pages never depend on it.
 export async function fetchGameStory(gameId: number): Promise<{ headline: string; dek: string; body: string; game_date: string } | null> {

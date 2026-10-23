@@ -1,3 +1,4 @@
+import { gameCover } from '@/lib/cover';
 import { fetchGameShareCard } from '@/lib/data';
 import { fallbackImage, gameImage, OG_SIZE } from '@/lib/og';
 
@@ -8,6 +9,9 @@ export const alt = 'Game card: teams, our pick and each team’s three hottest p
 // Same layout as the game cards, from a few small queries (not fetchMatch).
 export default async function Image({ params }: { params: Promise<{ id: string; slug: string }> }) {
   const { id } = await params;
+  // Finished: the game's cover (the same image as on its story card).
+  const cover = await gameCover(Number(id));
+  if (cover) return cover;
   const card = await fetchGameShareCard(Number(id)).catch(() => null);
   if (!card) return fallbackImage('NHL GAME', 'Hockey Intelligence, Daily.');
   const day = card.startTimeUTC

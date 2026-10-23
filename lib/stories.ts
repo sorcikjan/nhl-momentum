@@ -16,18 +16,16 @@ export type GameStoryText = { headline: string; dek: string };
 export type NightScore = { away: string; awayScore: number; home: string; homeScore: number; href: string };
 export type NightStory = {
   href: string; kicker: string; title: string; dek: string;
-  image: string | null; watchLabel: string | null; scores: NightScore[];
+  image: string | null; watchLabel: string | null; watchHref: string | null; scores: NightScore[];
 };
 export type GameStoryCard = {
-  id: number; href: string; image: string | null; score: string; watchLabel: string;
+  id: number; href: string; image: string; score: string; watchLabel: string; highlight: boolean;
   kicker: string; title: string; dek: string; hasStory: boolean; goals: number;
   star: { name: string; line: string; team: string; photo: string | null } | null;
 };
 
 const abbr = (t: Team) => t?.abbrev ?? '?';
 const hrefOf = (g: FinishedGame) => gameUrl(g.id, abbr(g.away_team), abbr(g.home_team), g.game_date);
-// mqdefault is 16:9 (hqdefault is 4:3 with black bars); maxres for the lead.
-export const thumb = (id: string, size: 'card' | 'hero') => `https://i.ytimg.com/vi/${id}/${size === 'hero' ? 'maxresdefault' : 'mqdefault'}.jpg`;
 const youtubeIdOf = (url: string | null | undefined) => url?.match(/\/vi\/([\w-]{6,})\//)?.[1] ?? null;
 const scoreLine = (g: FinishedGame) => `${abbr(g.away_team)} ${g.away_score ?? 0} – ${g.home_score ?? 0} ${abbr(g.home_team)}`;
 
@@ -37,16 +35,33 @@ function starOf(g: FinishedGame): GameStoryCard['star'] {
   const s = firstStar(g);
   if (!s?.name?.default) return null;
   const line = s.position === 'G'
-    ? (s.savePctg != null ? `${(s.savePctg * 100).toFixed(1)} SV%` : 'in net')
+    ? (s.savePctg != null ? `${s.savePctg.toFixed(3).replace(/^0/, '')} SV%` : 'in net')
     : [s.goals ? `${s.goals}G` : '', s.assists ? `${s.assists}A` : ''].filter(Boolean).join(' ') || '0 PTS';
   return { name: s.name.default, line, team: s.teamAbbrev ?? '', photo: s.headshot ?? null };
 }
 
-// The game's tag: what made it worth a story.
-function kickerOf(g: FinishedGame, pickMissed: boolean): string {
+// What made the game worth a story (card kicker and cover badge).
+export function gameTag(g: FinishedGame, pickMissed: boolean): string | null {
   const hi = Math.max(g.home_score ?? 0, g.away_score ?? 0), lo = Math.min(g.home_score ?? 0, g.away_score ?? 0);
-  const tag = (g.three_stars ?? []).some(s => (s.goals ?? 0) >= 3) ? 'HAT TRICK' : lo === 0 ? 'SHUTOUT' : pickMissed ? 'UPSET' : hi - lo === 1 ? 'ONE-GOAL GAME' : hi - lo >= 4 ? 'ROUT' : null;
-  return tag ? `GAME STORY · ${tag}` : 'GAME STORY';
+  return (g.three_stars ?? []).some(s => (s.goals ?? 0) >= 3) ? 'HAT TRICK' : lo === 0 ? 'SHUTOUT' : pickMissed ? 'UPSET' : hi - lo === 1 ? 'ONE-GOAL GAME' : hi - lo >= 4 ? 'ROUT' : null;
+}
+const kickerOf = (g: FinishedGame, pickMissed: boolean) => { const t = gameTag(g, pickMissed); return t ? `GAME STORY · ${t}` : 'GAME STORY'; };
+
+// The game's cover image (app/games/[id]/cover): ours, not the NHL highlight thumbnail.
+export const coverUrl = (gameId: number) => `/games/${gameId}/cover`;
+
+// The game a night recap is about: the one whose highlight was its hero
+// image, else the night's first game.
+export function featuredGameId(heroImageUrl: string | null | undefined, games: FinishedGame[]): number | null {
+  const yt = youtubeIdOf(heroImageUrl);
+  return (games.find(g => g.youtube_highlight_id && g.youtube_highlight_id === yt) ?? games[0])?.id ?? null;
+}
+
+// The cover's first-star line and photo.
+export function coverStar(g: FinishedGame) {
+  const s = firstStar(g);
+  const star = starOf(g);
+  return star ? { ...star, photo: s?.headshot ?? null } : null;
 }
 
 export function gameStoryCard(g: FinishedGame, story: GameStoryText | undefined, pickMissed: boolean): GameStoryCard {
@@ -61,7 +76,8 @@ export function gameStoryCard(g: FinishedGame, story: GameStoryText | undefined,
     : `Final: ${scoreLine(g)}.`;
   return {
     id: g.id, href: hrefOf(g),
-    image: g.youtube_highlight_id ? thumb(g.youtube_highlight_id, 'card') : null,
+    image: coverUrl(g.id),
+    highlight: !!g.youtube_highlight_id,
     score: scoreLine(g),
     watchLabel: `${city(g.away_team)} ${g.away_score ?? 0}, ${city(g.home_team)} ${g.home_score ?? 0}`,
     kicker: kickerOf(g, pickMissed),
@@ -75,7 +91,7 @@ export function gameStoryCard(g: FinishedGame, story: GameStoryText | undefined,
 
 // How much a game deserves one of the few story slots.
 function interest(c: GameStoryCard): number {
-  return (c.hasStory ? 4 : 0) + (c.image ? 1 : 0) + c.goals * 0.25
+  return (c.hasStory ? 4 : 0) + (c.highlight ? 1 : 0) + c.goals * 0.25
     + (c.kicker.includes('HAT TRICK') ? 3 : c.kicker.includes('UPSET') ? 2 : c.kicker.includes('SHUTOUT') ? 1.5 : c.kicker.includes('ONE-GOAL') ? 1 : 0);
 }
 
@@ -94,15 +110,17 @@ export function nightStories(
   if (!recap) return { night: null, games: [] };
   const ofNight = games.filter(g => g.game_date === recap.date);
   const featuredYt = youtubeIdOf(recap.hero_image_url);
-  const featured = ofNight.find(g => g.youtube_highlight_id && g.youtube_highlight_id === featuredYt) ?? null;
+  // The game the recap's headline is about (its hero image was that game's highlight).
+  const featured = ofNight.find(g => g.youtube_highlight_id && g.youtube_highlight_id === featuredYt) ?? ofNight[0] ?? null;
   const day = new Date(`${recap.date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' }).toUpperCase().replace(', ', ' · ');
   const night: NightStory = {
     href: recapUrl(recap.date, recap.title),
     kicker: `THE NIGHT · ${day}`,
     title: recap.title,
     dek: recap.summary ?? '',
-    image: featuredYt ? thumb(featuredYt, 'hero') : recap.hero_image_url ?? null,
-    watchLabel: featured ? `Highlights · ${scoreLine(featured).replace(' – ', '–')}` : null,
+    image: featured ? coverUrl(featured.id) : null,
+    watchLabel: featured?.youtube_highlight_id ? `Highlights · ${scoreLine(featured).replace(' – ', '–')}` : null,
+    watchHref: featured ? hrefOf(featured) : null,
     scores: ofNight.map(g => ({ away: abbr(g.away_team), awayScore: g.away_score ?? 0, home: abbr(g.home_team), homeScore: g.home_score ?? 0, href: hrefOf(g) })),
   };
   const cards = rankStoryCards(ofNight
@@ -127,9 +145,10 @@ export function nightCard(r: RecapRow, games: FinishedGame[]): NightCard {
   const ofNight = games.filter(g => g.game_date === r.date);
   const count = ofNight.length || r.games_count || 0;
   const yt = youtubeIdOf(r.hero_image_url);
+  const featured = ofNight.find(g => g.youtube_highlight_id && g.youtube_highlight_id === yt) ?? ofNight[0];
   return {
     date: r.date, href: recapUrl(r.date, r.title), kicker: dayLabel(r.date), title: r.title, dek: r.summary ?? '',
-    image: yt ? thumb(yt, 'card') : r.hero_image_url ?? null,
+    image: featured ? coverUrl(featured.id) : null,
     gamesLabel: `${count} GAME${count === 1 ? '' : 'S'}`,
     scores: ofNight.slice(0, 3).map(g => scoreLine(g).replace(' – ', '–')),
     more: Math.max(0, ofNight.length - 3),

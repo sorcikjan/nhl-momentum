@@ -3,7 +3,8 @@ import { SHARE_IMAGE } from '@/lib/seo';
 import React, { cache, Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { fetchGameStoriesByDate, fetchRecap, fetchRecapData, teamLogoUrl } from '@/lib/data';
+import { fetchFinishedGamesBetween, fetchGameStoriesByDate, fetchRecap, fetchRecapData, teamLogoUrl } from '@/lib/data';
+import { coverUrl, featuredGameId, type FinishedGame } from '@/lib/stories';
 import { recapUrl, gameUrl, playerUrl, teamUrl } from '@/lib/urls';
 import { SITE_URL } from '@/lib/site';
 import { assertDatabaseUp, databaseDown } from '@/lib/supabase';
@@ -19,6 +20,12 @@ export function generateStaticParams() {
 
 // Deduplicate fetchRecap between generateMetadata and the page component.
 const cachedFetchRecap = cache((date: string) => fetchRecap(date).catch(() => null));
+// The night's cover: the cover of the game the recap is about.
+const cachedCover = cache(async (date: string, heroImageUrl: string | null) => {
+  const games = await fetchFinishedGamesBetween(date, date).catch(() => []);
+  const id = featuredGameId(heroImageUrl, games as FinishedGame[]);
+  return id ? coverUrl(id) : null;
+});
 
 export async function generateMetadata(
   { params }: { params: Promise<{ date: string; slug: string }> }
@@ -32,6 +39,7 @@ export async function generateMetadata(
   });
 
   const canonical = `${SITE_URL}${recapUrl(date, recap.title)}`;
+  const cover = await cachedCover(date, recap.hero_image_url ?? null);
 
   return {
     title: recap.title,
@@ -42,13 +50,13 @@ export async function generateMetadata(
       description: recap.summary ?? undefined,
       type: 'article',
       publishedTime: recap.generated_at,
-      images: recap.hero_image_url ? [{ url: recap.hero_image_url, width: 1200, height: 500, alt: recap.title }] : [SHARE_IMAGE],
+      images: cover ? [{ url: `${SITE_URL}${cover}`, width: 1200, height: 675, alt: recap.title }] : [SHARE_IMAGE],
     },
     twitter: {
       card: 'summary_large_image',
       title: recap.title,
       description: recap.summary ?? undefined,
-      images: [recap.hero_image_url ?? SHARE_IMAGE.url],
+      images: [cover ? `${SITE_URL}${cover}` : SHARE_IMAGE.url],
     },
   };
 }
@@ -614,6 +622,7 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   });
 
+  const cover = await cachedCover(date, recap.hero_image_url ?? null);
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'NewsArticle',
@@ -621,7 +630,7 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
     description: recap.summary,
     datePublished: recap.generated_at,
     dateModified: recap.generated_at,
-    ...(recap.hero_image_url && { image: recap.hero_image_url }),
+    ...(cover && { image: `${SITE_URL}${cover}` }),
     author: { '@type': 'Organization', name: 'momentum.' },
     publisher: {
       '@type': 'Organization',
@@ -670,20 +679,13 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
           </div>
         </div>
 
-        {/* Hero image — renders immediately without waiting for game data */}
-        <div className="relative w-full rounded-xl overflow-hidden mb-8"
-          style={{ aspectRatio: '12/5', background: 'linear-gradient(135deg, #0d1117 0%, #1a1f35 100%)' }}>
-          {recap.hero_image_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={recap.hero_image_url}
-              alt={cleanTitle}
-              className="absolute inset-0 w-full h-full object-cover opacity-50"
-            />
-          )}
-          <div className="absolute inset-0"
-            style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.1) 60%, rgba(0,0,0,0.3) 100%)' }} />
-        </div>
+        {/* The night's cover: the game the headline is about */}
+        {cover && (
+          <div className="relative mb-8 w-full overflow-hidden rounded-xl" style={{ aspectRatio: '16/9', background: 'var(--bg-raised)' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={cover} alt={cleanTitle} className="absolute inset-0 h-full w-full object-cover" />
+          </div>
+        )}
 
         {/* Article body, game cards, top performers — stream in while fetchRecapData resolves */}
         <Suspense fallback={<ArticleSkeleton />}>

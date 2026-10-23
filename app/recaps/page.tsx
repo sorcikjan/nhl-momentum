@@ -25,7 +25,6 @@ export const metadata: Metadata = {
 };
 
 const MONO = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' } as const;
-const SHADE = 'linear-gradient(180deg, rgba(10,11,15,0) 50%, rgba(10,11,15,0.85) 100%)';
 
 function Play({ size }: { size: number }) {
   return (
@@ -109,13 +108,7 @@ export default async function RecapsPage() {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={night.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
             )}
-            <span className="absolute inset-0" style={{ background: SHADE }} />
-            <span className="absolute left-5 top-4 rounded-md px-2.5 py-1 text-[10px] font-bold" style={{ ...MONO, background: 'var(--heat)', color: 'var(--bg)', letterSpacing: 1.2 }}>LATEST</span>
-            {night.watchLabel && (
-              <span className="absolute bottom-4 left-5 flex items-center gap-2.5 text-[13px] font-bold" style={{ color: 'var(--text-bright)' }}>
-                <Play size={42} /> {night.watchLabel}
-              </span>
-            )}
+            <span className="absolute bottom-4 left-5 rounded-md px-2.5 py-1 text-[10px] font-bold" style={{ ...MONO, background: 'var(--heat)', color: 'var(--bg)', letterSpacing: 1.2 }}>LATEST</span>
           </Link>
           <div className="flex flex-col gap-4 p-6 lg:px-8 lg:py-7">
             <div className="text-[10px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.4 }}>{night.kicker.replace('THE NIGHT · ', '')} · {night.scores.length} GAMES</div>
@@ -134,7 +127,12 @@ export default async function RecapsPage() {
                 <GameRows cards={coverGames.slice(4)} />
               </details>
             )}
-            <Link href={night.href} className="mt-auto text-xs font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 0.5 }}>READ THE NIGHT →</Link>
+            <div className="mt-auto flex flex-wrap items-center justify-between gap-3">
+              <Link href={night.href} className="text-xs font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 0.5 }}>READ THE NIGHT →</Link>
+              {night.watchLabel && night.watchHref && (
+                <Link href={night.watchHref} className="flex items-center gap-2 text-xs font-bold" style={{ color: 'var(--text-bright)' }}><Play size={26} /> {night.watchLabel}</Link>
+              )}
+            </div>
           </div>
         </article>
       )}

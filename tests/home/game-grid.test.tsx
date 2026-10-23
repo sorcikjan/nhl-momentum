@@ -33,9 +33,9 @@ describe('GameGrid', () => {
 });
 
 describe('ArticleGrid layout', () => {
-  const night: NightStory = { href: '/recaps/x', kicker: 'THE NIGHT', title: 'T', dek: 'd', image: null, watchLabel: null,
+  const night: NightStory = { href: '/recaps/x', kicker: 'THE NIGHT', title: 'T', dek: 'd', image: null, watchLabel: null, watchHref: null,
     scores: Array.from({ length: 12 }, (_, i) => ({ away: 'AAA', awayScore: 1, home: 'HHH', homeScore: i, href: `/games/${i}/x` })) };
-  const story = (id: number): GameStoryCard => ({ id, href: `/games/${id}/x`, image: null, score: 'A 1 – 2 H', watchLabel: 'w', kicker: 'GAME STORY', title: `S${id}`, dek: 'd', hasStory: true, goals: 3, star: null });
+  const story = (id: number): GameStoryCard => ({ id, href: `/games/${id}/x`, image: `/games/${id}/cover`, highlight: false, score: 'A 1 – 2 H', watchLabel: 'w', kicker: 'GAME STORY', title: `S${id}`, dek: 'd', hasStory: true, goals: 3, star: null });
   it('one game card shares the night\'s row instead of sitting alone under it', () => {
     expect(renderToStaticMarkup(<ArticleGrid night={night} games={[story(1)]} />)).toContain('lg:col-span-2');
   });

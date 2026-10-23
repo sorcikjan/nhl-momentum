@@ -13,7 +13,14 @@ function Play({ size }: { size: number }) {
 
 // A big night (12+ games) stays a summary, not a table of scores.
 const SCORE_CHIPS = 6;
-const SHADE = 'linear-gradient(180deg, rgba(10,11,15,0) 45%, rgba(10,11,15,0.85) 100%)';
+// The game page carries the video; covers carry the score.
+function Highlight({ href, label }: { href: string; label: string }) {
+  return (
+    <Link href={href} className="flex items-center gap-2 text-xs font-bold" style={{ color: 'var(--text-bright)' }}>
+      <Play size={26} /> {label}
+    </Link>
+  );
+}
 
 // The night: highlight, headline, dek and every score of the night. Side by
 // side when it has the row to itself, stacked when it shares one.
@@ -24,12 +31,6 @@ function NightCard({ n, stacked = false, className = '' }: { n: NightStory; stac
         {n.image && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={n.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        )}
-        <span className="absolute inset-0" style={{ background: SHADE }} />
-        {n.watchLabel && (
-          <span className="absolute bottom-4 left-4 flex items-center gap-2.5 text-[13px] font-bold" style={{ color: 'var(--text-bright)' }}>
-            <Play size={40} /> {n.watchLabel}
-          </span>
         )}
       </Link>
       <div className="flex flex-col gap-3.5 p-5 lg:px-7 lg:py-6">
@@ -52,7 +53,10 @@ function NightCard({ n, stacked = false, className = '' }: { n: NightStory; stac
             )}
           </div>
         )}
-        <Link href={n.href} className="mt-auto pt-1 text-xs font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 0.5 }}>READ THE NIGHT →</Link>
+        <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-1">
+          <Link href={n.href} className="text-xs font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 0.5 }}>READ THE NIGHT →</Link>
+          {n.watchLabel && n.watchHref && <Highlight href={n.watchHref} label={n.watchLabel} />}
+        </div>
       </div>
     </article>
   );
@@ -63,17 +67,14 @@ function GameCard({ g }: { g: GameStoryCard }) {
   return (
     <article className="flex flex-col overflow-hidden rounded-[14px] border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
       <Link href={g.href} className="relative block aspect-video" style={{ background: 'var(--bg-raised)' }} aria-label={`${g.title} — ${g.watchLabel}`}>
-        {g.image && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={g.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
-        )}
-        <span className="absolute inset-0" style={{ background: SHADE }} />
-        <span className="absolute bottom-2.5 left-3 flex items-center gap-2 rounded-lg py-1 pl-1.5 pr-2.5 text-xs font-bold" style={{ ...MONO, background: 'rgba(10,11,15,0.82)', color: 'var(--text-bright)' }}>
-          {g.image && <Play size={22} />} {g.score}
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={g.image} alt={g.score} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
       </Link>
       <Link href={g.href} className="flex flex-1 flex-col gap-2 px-[18px] pb-[18px] pt-4">
-        <span className="text-[10px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.2 }}>{g.kicker}</span>
+        <span className="flex items-center justify-between gap-2">
+          <span className="text-[10px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.2 }}>{g.kicker}</span>
+          {g.highlight && <span className="flex items-center gap-1.5 text-[10px] font-bold" style={{ ...MONO, color: 'var(--text)', letterSpacing: 0.8 }}><Play size={16} /> HIGHLIGHTS</span>}
+        </span>
         <h3 className="text-[19px] font-extrabold leading-snug" style={{ color: 'var(--text-bright)', letterSpacing: '-0.02em', textWrap: 'pretty' }}>{g.title}</h3>
         <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>{g.dek}</p>
         {g.star && (
