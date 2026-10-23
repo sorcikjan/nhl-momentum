@@ -172,9 +172,9 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
     } : null,
   } : null;
   const leaders = skaters.slice(1, 9).map((r, i) => skaterRow(r, String(i + 2), 'rank'));
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   // Not the players already on the Heat list right above — new names only.
   const shown = new Set(skaters.slice(0, 9).map(r => r.player_id));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const heatingUp = ((rankings?.breakoutWatch ?? []) as any[])
     .filter(r => !shown.has(r.player_id) && (pacePct(r.momentum_ppm, r.season_ppm) ?? 0) > 0).slice(0, 5).map(r => skaterRow(r, '↑', 'up'));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
