@@ -595,6 +595,8 @@ WRITE:
 
 RULES — NON-NEGOTIABLE: Use only the facts above. Every goal, scorer, assist, period and time is listed; if a detail isn't listed, don't write it. No invented saves, hits, crowd reactions, quotes or streaks. Never say overtime or shootout unless the game is marked so. Name teams only by the names given or their city or nickname from those names. Use each player's full name on first mention. No clichés ("lit the lamp", "found the back of the net").
 
+STYLE: Write like a newspaper, not a data feed. Times as readers say them ("10 minutes into the first period", "late in the second"), never "P1 10:00". Never copy the goal list's format or its parenthesised assist lists; name assists in a sentence only when they matter.
+
 Respond with valid JSON only: {"headline": "...", "dek": "...", "body": "..."}`;
 
   let feedback = '';
