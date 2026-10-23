@@ -1515,20 +1515,26 @@ export async function fetchTeamSpecialTeams(teamId: number) {
 // "who moved up / who moved down" card. Pre-game value comes from the snapshot
 // captured before puck drop (the same input the prediction model used); the
 // "moved to" value is each player's latest computed snapshot after the game.
-export async function fetchPostGameHeat(playerIds: number[]) {
-  if (!playerIds.length) return new Map<number, number>();
+// Each player's Heat PPM from the first metrics run after this game (start
+// + 3 h, within two days) — the Heat the game produced. The latest snapshot
+// would be today's Heat, unrelated to an older game.
+export async function fetchPostGameHeat(playerIds: number[], gameStartUtc: string | null) {
+  if (!playerIds.length || !gameStartUtc) return new Map<number, number>();
+  const start = Date.parse(gameStartUtc);
   const { data } = await supabaseAdmin
     .from('player_metric_snapshots')
-    .select('player_id, composite_ppm, calculated_at')
+    .select('player_id, momentum_ppm, calculated_at')
     .in('player_id', playerIds)
-    .order('calculated_at', { ascending: false })
-    .limit(playerIds.length * 5);
+    .gte('calculated_at', new Date(start + 3 * 3_600_000).toISOString())
+    .lt('calculated_at', new Date(start + 48 * 3_600_000).toISOString())
+    .order('calculated_at', { ascending: true })
+    .limit(playerIds.length * 6);
 
-  const latest = new Map<number, number>();
+  const first = new Map<number, number>();
   for (const row of data ?? []) {
-    if (!latest.has(row.player_id)) latest.set(row.player_id, row.composite_ppm ?? 0);
+    if (!first.has(row.player_id)) first.set(row.player_id, row.momentum_ppm ?? 0);
   }
-  return latest;
+  return first;
 }
 
 // ─── Pipeline Status ──────────────────────────────────────────────────────────

@@ -44,6 +44,13 @@ export function lastName(full: string): string {
   return i > 0 ? full.slice(i + 1) : full;
 }
 
+// Last names for a list of players, with an initial where two share one
+// ("B. Tkachuk", "M. Tkachuk") so a card never shows the same name twice.
+export function shortNames(names: string[]): string[] {
+  const last = names.map(lastName);
+  return names.map((n, i) => last.filter(l => l === last[i]).length > 1 && n.indexOf(' ') > 0 ? `${n[0]}. ${last[i]}` : last[i]);
+}
+
 // Three per team from a Heat-ordered pool. `stats` is null before the game;
 // afterwards only players with a box-score row (who actually played) qualify —
 // the pre-game snapshot can't know late scratches.

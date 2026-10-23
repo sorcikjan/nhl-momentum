@@ -30,6 +30,8 @@ import PredictionCard from '@/components/games/PredictionCard';
 import HeatImpactCard, { type Mover } from '@/components/games/HeatImpactCard';
 import RecapCard from '@/components/games/RecapCard';
 import { GameStory } from '@/components/games/GameStory';
+import { BoxScore } from '@/components/games/BoxScore';
+import { boxFromDb, boxFromNhl } from '@/lib/box-score';
 import HighlightsCard from '@/components/games/HighlightsCard';
 import GoalieMatchupCard from '@/components/games/GoalieMatchupCard';
 import { KeyPlayers } from '@/components/game/KeyPlayers';
@@ -111,22 +113,6 @@ function normPlayers(teamPlayers: any, teamId: number): any[] {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   }).sort((a: any, b: any) => (b.goals + b.assists) - (a.goals + a.assists));
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function normGoalie(goalies: any[], teamId: number): any | null {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const g = (goalies ?? []).find((x: any) => x.starter) ?? goalies?.[0] ?? null;
-  if (!g) return null;
-  const full: string = g.name?.default ?? '';
-  const sp = full.indexOf(' ');
-  return {
-    player_id: g.playerId,
-    team_id: teamId,
-    shots_against: g.shotsAgainst ?? 0,
-    goals_against: g.goalsAgainst ?? 0,
-    save_pct: (g.shotsAgainst ?? 0) > 0 ? (g.saves ?? 0) / g.shotsAgainst : null,
-    players: { first_name: sp > 0 ? full.slice(0, sp) : '', last_name: sp > 0 ? full.slice(sp + 1) : full },
-  };
-}
 
 export default async function MatchPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
   // Throws only if the database is down and nothing was saved to render from.
@@ -184,16 +170,26 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
 
   const homeStats = (playerStats ?? []).filter((p: { team_id: number }) => p.team_id === homeId);
   const awayStats = (playerStats ?? []).filter((p: { team_id: number }) => p.team_id === awayId);
-  const homeGoalie = (goalieStats ?? []).find((g: { team_id: number }) => g.team_id === homeId);
-  const awayGoalie = (goalieStats ?? []).find((g: { team_id: number }) => g.team_id === awayId);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const liveBoxscore = (live?.playerByGameStats as any) ?? null;
   const hasBoxscore = liveBoxscore != null;
   const homeBoxPlayers = hasBoxscore ? normPlayers(liveBoxscore.homeTeam, homeId) : null;
   const awayBoxPlayers = hasBoxscore ? normPlayers(liveBoxscore.awayTeam, awayId) : null;
-  const homeBoxGoalie  = hasBoxscore ? normGoalie(liveBoxscore.homeTeam?.goalies ?? [], homeId) : null;
-  const awayBoxGoalie  = hasBoxscore ? normGoalie(liveBoxscore.awayTeam?.goalies ?? [], awayId) : null;
+
+  // ── Box score: everyone who played — the official NHL boxscore, our stored stats as fallback.
+  const boxNames = new Map<number, string>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of [...(playerStats ?? []), ...(goalieStats ?? [])] as any[]) {
+    if (r.players?.last_name) boxNames.set(r.player_id, `${r.players.first_name ?? ''} ${r.players.last_name}`.trim());
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const gwgIds = new Set(((playerStats ?? []) as any[]).filter(r => (r.game_winning_goals ?? 0) > 0).map(r => r.player_id as number));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const goaliesOf = (teamId: number) => ((goalieStats ?? []) as any[]).filter(g => g.team_id === teamId);
+  const awayBox = (isLive || isFinal) ? boxFromNhl(liveBoxscore?.awayTeam, boxNames, gwgIds) ?? boxFromDb(awayStats, goaliesOf(awayId)) : null;
+  const homeBox = (isLive || isFinal) ? boxFromNhl(liveBoxscore?.homeTeam, boxNames, gwgIds) ?? boxFromDb(homeStats, goaliesOf(homeId)) : null;
+  const gameStartUtc: string | null = game?.start_time_utc ?? live?.startTimeUTC ?? null;
 
   // ── Period breakdown (real, from play-by-play goal sequence) ──────────────
   const currentPeriod = live?.periodDescriptor?.number ?? (isFinal ? Math.max(3, ...playByPlay.momentum.map(m => m.period)) : 1);
@@ -259,16 +255,21 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const accuracyRaw = prediction ? await fetchSeasonPickAccuracy().catch(() => null) : null;
   const accuracyYtd: number | null = accuracyRaw == null ? null : Math.round(accuracyRaw);
 
-  // ── Heat Impact (FINAL only): pre-game snapshot Heat vs. most recent Heat ──
+  // ── Heat Impact (FINAL only): Heat coming in vs. Heat from the first metrics
+  // run after this game, for players who played in it.
+  const pregameHeat = new Map<number, number>([...awaySkaters, ...homeSkaters].map(s => [s.playerId as number, ppmToHeat(s.momentumPpm ?? s.compositePpm)]));
   let heatImpactUp: Mover[] = [];
   let heatImpactDown: Mover[] = [];
+  let postHeat = new Map<number, number>();
   if (isFinal) {
-    const allSkaters = [...awaySkaters.map(s => ({ ...s, teamAbbrev: awayAbbrev })), ...homeSkaters.map(s => ({ ...s, teamAbbrev: homeAbbrev }))];
-    const postHeat = await fetchPostGameHeat(allSkaters.map(s => s.playerId)).catch(() => new Map<number, number>());
+    const played = new Set([awayBox, homeBox].flatMap(b => b ? [...b.forwards, ...b.defense].map(p => p.id) : []));
+    const allSkaters = [...awaySkaters.map(s => ({ ...s, teamAbbrev: awayAbbrev })), ...homeSkaters.map(s => ({ ...s, teamAbbrev: homeAbbrev }))]
+      .filter(s => !played.size || played.has(s.playerId));
+    postHeat = await fetchPostGameHeat(allSkaters.map(s => s.playerId), gameStartUtc).catch(() => new Map<number, number>());
     const movers: Mover[] = allSkaters
       .filter(s => postHeat.has(s.playerId))
       .map(s => {
-        const before = ppmToHeat(s.compositePpm);
+        const before = pregameHeat.get(s.playerId) ?? 0;
         const after = ppmToHeat(postHeat.get(s.playerId));
         return { playerId: s.playerId, href: playerUrl(s.playerId, ...splitName(s.playerName)), name: s.playerName, teamAbbrev: s.teamAbbrev, before, after, delta: after - before };
       })
@@ -276,6 +277,11 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     heatImpactUp = movers.filter(m => m.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 3);
     heatImpactDown = movers.filter(m => m.delta < 0).sort((a, b) => a.delta - b.delta).slice(0, 3);
   }
+
+  // Box score Heat: after a final, the Heat this game produced; otherwise the Heat coming in.
+  const boxHeat = isFinal && postHeat.size
+    ? new Map([...postHeat].map(([pid, ppm]) => [pid, ppmToHeat(ppm)]))
+    : pregameHeat;
 
   // ── Key players: three per team by pre-game Heat (same as the game cards).
   // Before: why to watch; after: what they did in this game.
@@ -355,13 +361,14 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   const predictionFactors: PredictionFactor[] = [];
   if (prediction) {
     // 1. Top Heat — leading player by composite PPM, each side
-    const awayTopStar = [...awaySkaters].sort((a, b) => (b.compositePpm ?? 0) - (a.compositePpm ?? 0))[0];
-    const homeTopStar = [...homeSkaters].sort((a, b) => (b.compositePpm ?? 0) - (a.compositePpm ?? 0))[0];
+    const heatPpm = (s: SnapSkater) => s.momentumPpm ?? s.compositePpm ?? 0;
+    const awayTopStar = [...awaySkaters].sort((a, b) => heatPpm(b) - heatPpm(a))[0];
+    const homeTopStar = [...homeSkaters].sort((a, b) => heatPpm(b) - heatPpm(a))[0];
     if (awayTopStar && homeTopStar) {
       predictionFactors.push({
         label: 'Top Heat',
-        away: { name: awayTopStar.playerName, value: ppmToHeat(awayTopStar.compositePpm) },
-        home: { name: homeTopStar.playerName, value: ppmToHeat(homeTopStar.compositePpm) },
+        away: { name: awayTopStar.playerName, value: ppmToHeat(heatPpm(awayTopStar)) },
+        home: { name: homeTopStar.playerName, value: ppmToHeat(heatPpm(homeTopStar)) },
       });
     }
 
@@ -642,23 +649,31 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         );
       })()}
 
-      {/* ── Full lineups — depth on demand ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <LineupCard
-          abbrev={awayAbbrev} teamName={awayName} logo={awayLogo}
-          skaters={isLive ? (awayBoxPlayers ?? awaySkaters) : isFinal ? (awayStats.length ? awayStats : (awayBoxPlayers ?? awaySkaters)) : awaySkaters}
-          goalie={isLive ? awayBoxGoalie : isFinal ? (awayGoalie ?? awayBoxGoalie) : awayGoalieSnap ? { players: { first_name: '', last_name: awayGoalieSnap.playerName }, shots_against: null, goals_against: null, save_pct: awayGoalieSnap.seasonSavePct } : null}
-          isLive={isLive || isFinal}
-          teamId={awayId}
-        />
-        <LineupCard
-          abbrev={homeAbbrev} teamName={homeName} logo={homeLogo}
-          skaters={isLive ? (homeBoxPlayers ?? homeSkaters) : isFinal ? (homeStats.length ? homeStats : (homeBoxPlayers ?? homeSkaters)) : homeSkaters}
-          goalie={isLive ? homeBoxGoalie : isFinal ? (homeGoalie ?? homeBoxGoalie) : homeGoalieSnap ? { players: { first_name: '', last_name: homeGoalieSnap.playerName }, shots_against: null, goals_against: null, save_pct: homeGoalieSnap.seasonSavePct } : null}
-          isLive={isLive || isFinal}
-          teamId={homeId}
-        />
-      </div>
+      {/* ── Box score (live and final): everyone who played. Before the game: lineups with Heat. ── */}
+      {awayBox || homeBox ? (
+        <section className="mb-8 flex flex-col gap-3.5" data-section="boxScore">
+          <SectionHeading kicker={`BOX SCORE · ${isLive ? 'LIVE · ' : ''}SOURCE: NHL.COM`} title="Everyone who played." sub="Sorted by points, then ice time. Heat is each player's form over his last five games." />
+          {awayBox && <BoxScore abbrev={awayAbbrev} name={awayName} href={awayId ? teamUrl(awayId, awayName) : null} team={awayBox} heat={boxHeat} />}
+          {homeBox && <BoxScore abbrev={homeAbbrev} name={homeName} href={homeId ? teamUrl(homeId, homeName) : null} team={homeBox} heat={boxHeat} />}
+        </section>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <LineupCard
+            abbrev={awayAbbrev} teamName={awayName} logo={awayLogo}
+            skaters={awaySkaters}
+            goalie={awayGoalieSnap ? { players: { first_name: '', last_name: awayGoalieSnap.playerName }, shots_against: null, goals_against: null, save_pct: awayGoalieSnap.seasonSavePct } : null}
+            isLive={false}
+            teamId={awayId}
+          />
+          <LineupCard
+            abbrev={homeAbbrev} teamName={homeName} logo={homeLogo}
+            skaters={homeSkaters}
+            goalie={homeGoalieSnap ? { players: { first_name: '', last_name: homeGoalieSnap.playerName }, shots_against: null, goals_against: null, save_pct: homeGoalieSnap.seasonSavePct } : null}
+            isLive={false}
+            teamId={homeId}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -705,7 +720,7 @@ function LineupCard({
             </tr>
           </thead>
           <tbody>
-            {skaters.slice(0, 12).map((p, i) => {
+            {skaters.map((p, i) => {
               const name = isLive ? `${p.players?.first_name?.[0]}. ${p.players?.last_name}` : `${p.playerName ?? ''}`;
               const playerId = isLive ? p.player_id : p.playerId;
               const playerHref = isLive && p.player_id && p.players?.first_name

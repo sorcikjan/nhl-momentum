@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Headshot, TeamChip } from '@/components/ds';
 import { heatColor } from '@/lib/heat';
 import { gameView } from '@/lib/game-state';
-import { lastName, type CardPlayer, type CardSide, type GameCardData } from '@/lib/game-card';
+import { shortNames, type CardPlayer, type CardSide, type GameCardData } from '@/lib/game-card';
 
 const MONO = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' } as const;
 
@@ -80,14 +80,15 @@ function Prediction({ g }: { g: GameCardData }) {
 // link (not inside a card, which is itself one link).
 export function PlayerRows({ team, players, link = false }: { team: string; players: CardPlayer[]; link?: boolean }) {
   if (!players.length) return <p className="py-1 text-[11px]" style={{ color: 'var(--text-muted)' }}>Lineup pending</p>;
+  const shown = shortNames(players.map(p => p.name));
   return (
     <ul className="flex flex-col gap-1">
-      {players.map(p => {
+      {players.map((p, i) => {
         const row = (
           <>
             <Headshot src={p.photo} name={p.name} team={team} size={20} />
             <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
-              <span className="truncate text-[12px] font-medium" style={{ color: 'var(--text)' }}>{lastName(p.name)}</span>
+              <span className="truncate text-[12px] font-medium" style={{ color: 'var(--text)' }}>{shown[i]}</span>
               {p.stat && <span className="shrink-0 text-[10px]" style={{ ...MONO, color: 'var(--text-muted)' }}>{p.stat}</span>}
             </span>
             {p.heat != null && <span className="text-[11px] font-bold" style={{ ...MONO, color: heatColor(p.heat) }}>{p.heat}</span>}
