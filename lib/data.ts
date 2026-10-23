@@ -330,6 +330,23 @@ async function buildRankings() {
 // Recent completed games from the DB — used on the homepage "Last Night" section.
 // Returns up to `limit` games from the past `days` days, newest first.
 // Also returns one prediction per game (active model preferred).
+// Finished games between two dates (inclusive), for story listings: scores,
+// highlight and three stars — no predictions.
+export async function fetchFinishedGamesBetween(from: string, to: string) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return pageAll<any>((f, t) => supabaseAdmin
+    .from('games')
+    .select(`
+      id, game_date, home_score, away_score, youtube_highlight_id, three_stars,
+      home_team:teams!games_home_team_id_fkey(abbrev, name),
+      away_team:teams!games_away_team_id_fkey(abbrev, name)
+    `)
+    .gte('game_date', from).lte('game_date', to)
+    .in('game_state', ['FINAL', 'OFF'])
+    .order('game_date', { ascending: false }).order('id')
+    .range(f, t));
+}
+
 export async function fetchRecentCompletedGames(days = 3, limit = 20) {
   const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
 

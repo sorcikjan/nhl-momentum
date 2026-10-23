@@ -47,3 +47,25 @@ describe('gameStoryCard', () => {
     expect(gameStoryCard(games[4], undefined, true).kicker).toBe('GAME STORY · UPSET');
   });
 });
+
+import { groupByWeek, nightCard, weekOf } from '@/lib/stories';
+
+describe('stories page', () => {
+  it('weeks start on Monday', () => {
+    expect(weekOf('2026-10-21')).toBe('Week of Oct 19'); // Wednesday
+    expect(weekOf('2026-10-19')).toBe('Week of Oct 19'); // Monday
+    expect(weekOf('2026-10-18')).toBe('Week of Oct 12'); // Sunday
+  });
+  it('a night card carries its scores, three at most, plus how many more', () => {
+    const n = nightCard({ date: '2026-10-20', title: 'T', summary: 's', hero_image_url: 'https://img.youtube.com/vi/BYC_zpYERJQ/maxresdefault.jpg' }, games);
+    expect(n.gamesLabel).toBe('5 GAMES');
+    expect(n.scores).toEqual(['SJS 4–3 MTL', 'BOS 2–3 DAL', 'WPG 1–2 STL']);
+    expect(n.more).toBe(2);
+    expect(n.image).toBe('https://i.ytimg.com/vi/BYC_zpYERJQ/mqdefault.jpg');
+  });
+  it('groups nights by week, newest first', () => {
+    const mk = (date: string) => nightCard({ date, title: date, summary: null }, []);
+    expect(groupByWeek(['2026-10-20', '2026-10-19', '2026-10-18', '2026-10-14'].map(mk)).map(w => [w.title, w.nights.length]))
+      .toEqual([['Week of Oct 19', 2], ['Week of Oct 12', 2]]);
+  });
+});

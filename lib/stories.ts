@@ -110,3 +110,44 @@ export function nightStories(
     .map(x => x.c);
   return { night, games: cards };
 }
+
+// ─── The stories page ─────────────────────────────────────────────────────────
+
+type RecapRow = { date: string; title: string; summary: string | null; games_count?: number | null; hero_image_url?: string | null };
+export type NightCard = {
+  date: string; href: string; kicker: string; title: string; dek: string; image: string | null;
+  gamesLabel: string; scores: string[]; more: number;
+};
+
+const dayLabel = (date: string) =>
+  new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' }).toUpperCase().replace(', ', ' · ');
+
+export function nightCard(r: RecapRow, games: FinishedGame[]): NightCard {
+  const ofNight = games.filter(g => g.game_date === r.date);
+  const count = ofNight.length || r.games_count || 0;
+  const yt = youtubeIdOf(r.hero_image_url);
+  return {
+    date: r.date, href: recapUrl(r.date, r.title), kicker: dayLabel(r.date), title: r.title, dek: r.summary ?? '',
+    image: yt ? thumb(yt, 'card') : r.hero_image_url ?? null,
+    gamesLabel: `${count} GAME${count === 1 ? '' : 'S'}`,
+    scores: ofNight.slice(0, 3).map(g => scoreLine(g).replace(' – ', '–')),
+    more: Math.max(0, ofNight.length - 3),
+  };
+}
+
+// Monday of the week a date falls in, as "Week of Oct 19".
+export function weekOf(date: string): string {
+  const d = new Date(`${date}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return `Week of ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`;
+}
+
+export function groupByWeek(nights: NightCard[]): { title: string; nights: NightCard[] }[] {
+  const out: { title: string; nights: NightCard[] }[] = [];
+  for (const n of nights) {
+    const title = weekOf(n.date);
+    const last = out[out.length - 1];
+    if (last?.title === title) last.nights.push(n); else out.push({ title, nights: [n] });
+  }
+  return out;
+}
