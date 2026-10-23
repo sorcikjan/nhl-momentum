@@ -7,6 +7,10 @@ import type { GameCardData } from '@/lib/game-card';
 const dayFmt = (date: string, opts: Intl.DateTimeFormatOptions) =>
   new Date(`${date}T12:00:00Z`).toLocaleDateString('en-US', { ...opts, timeZone: 'UTC' });
 
+// The site's default share image (app/opengraph-image.tsx). Pages that set
+// their own openGraph/twitter metadata replace the inherited one, so they name it.
+export const SHARE_IMAGE = { url: '/opengraph-image', width: 1200, height: 630, alt: "momentum. — who's hot in the NHL right now" };
+
 export function gameTitle(g: { awayName: string; homeName: string; date: string | null; state: string | null; awayScore: number | null; homeScore: number | null }): string {
   const when = g.date ? ` — ${dayFmt(g.date, { month: 'short', day: 'numeric', year: 'numeric' })}` : '';
   const final = gameView(g.state) === 'final' && g.awayScore != null && g.homeScore != null;

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SHARE_IMAGE } from '@/lib/seo';
 import ModelStatsCard from '@/components/accuracy/ModelStatsCard';
 import MatchComparisonTable from '@/components/accuracy/MatchComparisonTable';
 import { fetchAccuracy } from '@/lib/data';
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
   title: 'Prediction Accuracy',
   description: 'Track Momentum model performance — winner prediction accuracy, score error by version, and per-game history.',
   openGraph: {
+    images: [SHARE_IMAGE],
     title: 'Prediction Accuracy — momentum.',
     description: 'Track Momentum model performance — winner prediction accuracy, score error by version, and per-game history.',
   },

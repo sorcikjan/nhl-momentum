@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SHARE_IMAGE } from '@/lib/seo';
 import Link from 'next/link';
 import { fetchTeam, teamLogoUrl, fetchSeasonPhase, deriveOutStatus } from '@/lib/data';
 import { permanentRedirect } from 'next/navigation';
@@ -35,10 +36,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     openGraph: {
       title: `${team.name} — momentum.`,
       description: desc,
-      images: [{ url: teamLogoUrl(team.abbrev), width: 80, height: 80, alt: team.name }],
+      images: [SHARE_IMAGE],
     },
     twitter: {
-      card: 'summary',
+      images: [SHARE_IMAGE.url],
+      card: 'summary_large_image',
       title,
       description: desc,
     },

@@ -30,12 +30,32 @@ async function opts() {
   return { ...OG_SIZE, headers: CACHE, ...(fonts.length ? { fonts } : {}) };
 }
 
+// components/ds/HeatPulseMark.tsx, with literal colours for Satori.
+function Mark({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <path d="M4 30 L12 30 L15 22 L19 36 L23 14 L27 28 L30 24 C32 22 35 22 36 26 C37 30 35 34 30 36 C28 37 26 37 24 36"
+        stroke={HEAT} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="36" cy="26" r="2.5" fill={HEAT} />
+    </svg>
+  );
+}
+
+function Wordmark({ size }: { size: number }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', fontSize: size, letterSpacing: -size / 30, color: TEXT, fontWeight: 800 }}>
+      <Mark size={size * 1.25} />
+      <div style={{ display: 'flex', marginLeft: size / 4 }}>momentum<span style={{ color: HEAT }}>.</span></div>
+    </div>
+  );
+}
+
 function Frame({ children, kicker }: { children: React.ReactNode; kicker: string }) {
   return (
     <div style={{ width: 1200, height: 630, background: BG, display: 'flex', flexDirection: 'column', padding: '44px 56px', fontFamily: 'Inter, sans-serif', color: TEXT }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 22, letterSpacing: 3, color: HEAT, fontWeight: 700 }}>
         <div style={{ display: 'flex' }}>{kicker}</div>
-        <div style={{ display: 'flex', fontSize: 30, letterSpacing: -1, color: TEXT, fontWeight: 800 }}>momentum<span style={{ color: HEAT }}>.</span></div>
+        <Wordmark size={30} />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', flex: 1, marginTop: 28 }}>{children}</div>
     </div>
@@ -121,6 +141,51 @@ export async function listImage(kicker: string, title: string, rows: ListRow[]):
 export async function fallbackImage(kicker: string, title: string): Promise<ImageResponse> {
   return new ImageResponse(
     <Frame kicker={kicker}><div style={{ display: 'flex', fontSize: 64, fontWeight: 800 }}>{title}</div></Frame>,
+    await opts(),
+  );
+}
+
+export type BrandLeader = { name: string; team: string; photo: string | null; heat: number };
+
+// The site's default share image (homepage and every page without its own):
+// brand, the promise, and who is hottest right now. Brand-only without data.
+export async function brandImage(leaders: BrandLeader[]): Promise<ImageResponse> {
+  const [first, ...rest] = leaders;
+  return new ImageResponse(
+    <div style={{ width: 1200, height: 630, display: 'flex', background: `linear-gradient(105deg, ${BG} 0%, ${BG} 45%, #2a130c 100%)`, padding: '56px 64px', fontFamily: 'Inter, sans-serif', color: TEXT }}>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, justifyContent: 'space-between' }}>
+        <Wordmark size={40} />
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', fontSize: 22, letterSpacing: 3, color: HEAT, fontWeight: 700 }}>NHL · HEAT INDEX</div>
+          <div style={{ display: 'flex', flexDirection: 'column', fontSize: first ? 64 : 80, fontWeight: 800, letterSpacing: -2.5, lineHeight: 1.02, marginTop: 14 }}>
+            <div style={{ display: 'flex' }}>Who&apos;s hot in the</div>
+            <div style={{ display: 'flex' }}>NHL right <span style={{ color: HEAT, marginLeft: 18 }}>now.</span></div>
+          </div>
+          <div style={{ display: 'flex', fontSize: 28, color: DIM, marginTop: 20 }}>Every player&apos;s form in one number, 0–100.</div>
+        </div>
+      </div>
+      {!first && <div style={{ display: 'flex', alignItems: 'center', marginLeft: 40 }}><Mark size={340} /></div>}
+      {first && (
+        <div style={{ display: 'flex', flexDirection: 'column', width: 380, marginLeft: 40, justifyContent: 'center' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', background: CARD, border: `2px solid rgba(255,90,36,0.45)`, borderRadius: 28, padding: '30px 24px 26px' }}>
+            <div style={{ display: 'flex', fontSize: 18, letterSpacing: 2.5, color: HEAT, fontWeight: 700 }}>#1 RIGHT NOW</div>
+            <div style={{ display: 'flex', marginTop: 18 }}><Face src={first.photo} team={first.team} size={132} /></div>
+            <div style={{ display: 'flex', fontSize: 34, fontWeight: 800, marginTop: 16, letterSpacing: -1 }}>{first.name}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', marginTop: 4 }}>
+              <div style={{ display: 'flex', fontSize: 22, color: DIM, marginRight: 14 }}>{first.team} · HEAT</div>
+              <div style={{ display: 'flex', fontSize: 72, fontWeight: 800, color: heatColor(first.heat) }}>{first.heat}</div>
+            </div>
+          </div>
+          {rest.slice(0, 2).map((r, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', marginTop: 12, background: CARD, border: `2px solid ${BORDER}`, borderRadius: 18, padding: '8px 20px' }}>
+              <Face src={r.photo} team={r.team} size={44} />
+              <div style={{ display: 'flex', flex: 1, marginLeft: 14, fontSize: 24, fontWeight: 700 }}>{r.name}</div>
+              <div style={{ display: 'flex', fontSize: 30, fontWeight: 800, color: heatColor(r.heat) }}>{r.heat}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>,
     await opts(),
   );
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SHARE_IMAGE } from '@/lib/seo';
 import Link from 'next/link';
 import { FilterChips, SectionHeading } from '@/components/ds';
 import { ScheduleEmpty } from '@/components/schedule/ScheduleEmpty';
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
   title: 'NHL Schedule & Predictions',
   description: 'Every NHL game, every AI win prediction, grouped by day — with live scores, betting-market comparisons, and who to watch.',
   openGraph: {
+    images: [SHARE_IMAGE],
     title: 'NHL Schedule & Predictions — momentum.',
     description: 'Every NHL game with AI win predictions, live scores, and who to watch tonight.',
   },

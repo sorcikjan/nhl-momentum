@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SHARE_IMAGE } from '@/lib/seo';
 import Link from 'next/link';
 import HeatCircle from '@/components/ui/HeatCircle';
 import HeatBadge from '@/components/ui/HeatBadge';
@@ -11,10 +12,12 @@ export const metadata: Metadata = {
   title: 'Hockey Intelligence, Daily',
   description: 'Momentum gives every NHL player a Heat score from 0 to 100, updated every game. AI-powered predictions, rankings, and stories for fans who want more than box scores.',
   openGraph: {
+    images: [SHARE_IMAGE],
     title: 'momentum. — Hockey Intelligence, Daily',
     description: 'Every player, one number. See who’s burning, who’s cooling, and which games tonight are worth watching.',
   },
   twitter: {
+    images: [SHARE_IMAGE.url],
     card: 'summary_large_image',
     title: 'momentum. — Hockey Intelligence, Daily',
     description: 'Every player, one number. AI-powered NHL predictions and momentum tracking.',

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SHARE_IMAGE } from '@/lib/seo';
 import Link from 'next/link';
 import { fetchRecentRecaps } from '@/lib/data';
 import { recapUrl } from '@/lib/urls';
@@ -11,10 +12,12 @@ export const metadata: Metadata = {
   title: 'Last Night — NHL Stories',
   description: 'Data-driven stories from every NHL game night — top performers, momentum analytics, and how our model did.',
   openGraph: {
+    images: [SHARE_IMAGE],
     title: 'Last Night — momentum.',
     description: 'Data-driven stories from every NHL game night — top performers, momentum analytics, and prediction accuracy.',
   },
   twitter: {
+    images: [SHARE_IMAGE.url],
     card: 'summary_large_image',
     title: 'Last Night — momentum.',
     description: 'Data-driven stories from every NHL game night — top performers, predictions, and momentum analytics.',

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SHARE_IMAGE } from '@/lib/seo';
 import React, { cache, Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -41,13 +42,13 @@ export async function generateMetadata(
       description: recap.summary ?? undefined,
       type: 'article',
       publishedTime: recap.generated_at,
-      ...(recap.hero_image_url && { images: [{ url: recap.hero_image_url, width: 1200, height: 500, alt: recap.title }] }),
+      images: recap.hero_image_url ? [{ url: recap.hero_image_url, width: 1200, height: 500, alt: recap.title }] : [SHARE_IMAGE],
     },
     twitter: {
       card: 'summary_large_image',
       title: recap.title,
       description: recap.summary ?? undefined,
-      ...(recap.hero_image_url && { images: [recap.hero_image_url] }),
+      images: [recap.hero_image_url ?? SHARE_IMAGE.url],
     },
   };
 }

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { SHARE_IMAGE } from '@/lib/seo';
 import { Suspense } from 'react';
 import { RankingsFromUrl, RankingsView, type GoalieRow } from '@/components/rankings/RankingsView';
 import { fetchGoalieRankings, fetchRankings } from '@/lib/data';
@@ -14,10 +15,12 @@ export const metadata: Metadata = {
   title: 'NHL Player Rankings 2026–27',
   description: 'NHL player rankings — top skaters by Heat (recent form), season totals and trend, plus the best goalies by recent save percentage.',
   openGraph: {
+    images: [SHARE_IMAGE],
     title: 'NHL Player Rankings — momentum.',
     description: 'Top NHL skaters ranked by Heat and season performance.',
   },
   twitter: {
+    images: [SHARE_IMAGE.url],
     card: 'summary_large_image',
     title: 'NHL Player Rankings 2026–27',
     description: 'NHL player rankings by Heat. Updated after every game night.',
