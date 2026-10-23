@@ -462,22 +462,24 @@ export function recapFactProblem(out: DailyRecapOutput, games: RecapGame[]): str
   if (allKnown && !anyExtra && /overtime|\bOT\b|shootout|extra (frame|period|session)|sudden death/i.test(text)) {
     return 'mentions overtime/shootout but every game ended in regulation';
   }
-  for (const g of games) {
-    for (const full of [g.awayName, g.homeName]) {
-      if (!full) continue;
-      // Two-word nicknames: Maple Leafs, Red Wings, Blue Jackets, Golden Knights
-      const words = full.split(' ');
-      const nickLen = /^(Maple|Red|Blue|Golden)$/.test(words[words.length - 2] ?? '') ? 2 : 1;
-      const city = words.slice(0, -nickLen).join(' ');            // "Buffalo", "Vegas"
-      const nick = words[words.length - nickLen];                 // "Sabres", "Golden"
-      if (!city) continue;
-      // "<City> <Word>" where Word isn't the real nickname → invented name ("Buffalo Bills")
-      const re = new RegExp(`\\b${city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+([A-Z][a-z]+)`, 'g');
-      for (const m of text.matchAll(re)) {
-        if (m[1] !== nick) {
-          return `wrong team name "${city} ${m[1]}" (should be ${full})`;
-        }
-      }
+  // Every nickname each city has tonight: New York can be the Rangers and the
+  // Islanders on the same night (2026-10-22 — the recap was rejected three
+  // times for "New York Rangers" until this allowed both).
+  const nicksByCity = new Map<string, Set<string>>();
+  for (const full of games.flatMap(g => [g.awayName, g.homeName])) {
+    if (!full) continue;
+    // Two-word nicknames: Maple Leafs, Red Wings, Blue Jackets, Golden Knights
+    const words = full.split(' ');
+    const nickLen = /^(Maple|Red|Blue|Golden)$/.test(words[words.length - 2] ?? '') ? 2 : 1;
+    const city = words.slice(0, -nickLen).join(' ');            // "Buffalo", "Vegas"
+    if (!city) continue;
+    nicksByCity.set(city, (nicksByCity.get(city) ?? new Set()).add(words[words.length - nickLen])); // "Sabres", "Golden"
+  }
+  for (const [city, nicks] of nicksByCity) {
+    // "<City> <Word>" where Word isn't a real nickname → invented name ("Buffalo Bills")
+    const re = new RegExp(`\\b${city.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+([A-Z][a-z]+)`, 'g');
+    for (const m of text.matchAll(re)) {
+      if (!nicks.has(m[1])) return `wrong team name "${city} ${m[1]}" (should be ${[...nicks].map(n => `${city} ${n}`).join(' or ')})`;
     }
   }
   return playerClaimProblem(text, games.flatMap(g => g.tallies ?? []));

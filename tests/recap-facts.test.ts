@@ -65,3 +65,20 @@ describe('playerClaimProblem — team numbers', () => {
     expect(playerClaimProblem('Macklin Celebrini had a four-point night.', tallies)).toMatch(/not four points/);
   });
 });
+
+describe('recapFactProblem — team names', () => {
+  const base = { awayScore: 1, homeScore: 2, predictedCorrectly: null, homeWinProbability: null } as const;
+  const night = [
+    { ...base, awayTeam: 'NYR', homeTeam: 'TOR', awayName: 'New York Rangers', homeName: 'Toronto Maple Leafs' },
+    { ...base, awayTeam: 'LAK', homeTeam: 'NYI', awayName: 'Los Angeles Kings', homeName: 'New York Islanders' },
+    { ...base, awayTeam: 'FLA', homeTeam: 'BUF', awayName: 'Florida Panthers', homeName: 'Buffalo Sabres' },
+  ] as RecapGame[];
+  const check = (content: string) => recapFactProblem({ title: 't', summary: '', content }, night);
+  it('allows two teams from one city on the same night (2026-10-22)', () => {
+    expect(check('The New York Rangers won in Toronto while the New York Islanders beat Los Angeles.')).toBeNull();
+  });
+  it('still catches an invented name', () => {
+    expect(check('The Buffalo Bills fell to Florida.')).toMatch(/Buffalo Bills/);
+    expect(check('The New York Knicks won.')).toMatch(/New York Knicks/);
+  });
+});
