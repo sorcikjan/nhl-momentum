@@ -1,5 +1,5 @@
 import { SectionHeading, SectionLink } from '@/components/ds';
-import { GameCard } from '@/components/game/GameCard';
+import { GameGrid, splitResults } from './GameGrid';
 import type { GameCardData } from '@/lib/game-card';
 import { dayLabel } from './format';
 
@@ -22,9 +22,7 @@ export function ResultsSection({ date, results }: { date: string | null; results
         size="feature"
         right={<SectionLink href={`/predictions/${date}`}>All results</SectionLink>}
       />
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-        {results.map(r => <GameCard key={r.id} g={r} />)}
-      </div>
+      <GameGrid {...splitResults(results)} />
     </section>
   );
 }

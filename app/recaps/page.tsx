@@ -4,7 +4,7 @@ import { SHARE_IMAGE } from '@/lib/seo';
 import { fetchFinishedGamesBetween, fetchGameStoriesByDate, fetchRecentRecaps } from '@/lib/data';
 import { assertDatabaseUp } from '@/lib/supabase';
 import { SectionHeading } from '@/components/ds';
-import { gameStoryCard, groupByWeek, nightCard, nightStories, type FinishedGame, type NightCard } from '@/lib/stories';
+import { gameStoryCard, groupByWeek, nightCard, nightStories, rankStoryCards, type FinishedGame, type GameStoryCard, type NightCard } from '@/lib/stories';
 
 export const revalidate = 3600;
 
@@ -32,6 +32,22 @@ function Play({ size }: { size: number }) {
     <span className="flex shrink-0 items-center justify-center rounded-full" style={{ width: size, height: size, background: 'var(--heat)' }}>
       <svg width={size * 0.4} height={size * 0.4} viewBox="0 0 24 24" fill="var(--bg)" aria-hidden><path d="M7 4.5v15l13-7.5z" /></svg>
     </span>
+  );
+}
+
+function GameRows({ cards }: { cards: GameStoryCard[] }) {
+  return (
+    <ul className="flex flex-col">
+      {cards.map(c => (
+        <li key={c.id} className="border-t" style={{ borderColor: 'var(--border-soft)' }}>
+          <Link href={c.href} className="flex min-h-[52px] flex-wrap items-center gap-x-3 gap-y-0.5 py-2 hover:opacity-80">
+            <span className="min-w-[112px] text-xs font-bold" style={{ ...MONO, color: 'var(--text-bright)' }}>{c.score.replace(' – ', '–')}</span>
+            <span className="min-w-0 flex-1 text-sm font-bold" style={{ color: 'var(--text-bright)' }}>{c.title}</span>
+            {c.star && <span className="text-xs" style={{ color: 'var(--text)' }}>★ {c.star.name} {c.star.line}</span>}
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -74,7 +90,8 @@ export default async function RecapsPage() {
   const stories = latest ? await fetchGameStoriesByDate(latest.date).catch(() => new Map()) : new Map();
   // The cover: the latest night, its highlight, and every game with its story (or box-score line).
   const { night } = nightStories(latest ?? null, games, stories, new Set(), 0);
-  const coverGames = latest ? games.filter(g => g.game_date === latest.date).map(g => gameStoryCard(g, stories.get(g.id), false)) : [];
+  // The most interesting four in view, the rest one click away.
+  const coverGames = rankStoryCards(latest ? games.filter(g => g.game_date === latest.date).map(g => gameStoryCard(g, stories.get(g.id), false)) : []);
   const weeks = groupByWeek(older.map(r => nightCard(r, games)));
 
   return (
@@ -106,17 +123,17 @@ export default async function RecapsPage() {
               <Link href={night.href}>{night.title}</Link>
             </h2>
             {night.dek && <p className="text-base leading-relaxed" style={{ color: 'var(--text)' }}>{night.dek}</p>}
-            <ul className="flex flex-col">
-              {coverGames.map(c => (
-                <li key={c.id} className="border-t" style={{ borderColor: 'var(--border-soft)' }}>
-                  <Link href={c.href} className="flex min-h-[52px] flex-wrap items-center gap-x-3 gap-y-0.5 py-2 hover:opacity-80">
-                    <span className="min-w-[112px] text-xs font-bold" style={{ ...MONO, color: 'var(--text-bright)' }}>{c.score.replace(' – ', '–')}</span>
-                    <span className="min-w-0 flex-1 text-sm font-bold" style={{ color: 'var(--text-bright)' }}>{c.title}</span>
-                    {c.star && <span className="text-xs" style={{ color: 'var(--text)' }}>★ {c.star.name} {c.star.line}</span>}
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <GameRows cards={coverGames.slice(0, 4)} />
+            {coverGames.length > 4 && (
+              <details className="group">
+                <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 text-[13px] font-bold [&::-webkit-details-marker]:hidden" style={{ color: 'var(--text-bright)' }}>
+                  <span className="group-open:hidden">All {coverGames.length} games</span>
+                  <span className="hidden group-open:inline">Fewer games</span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden className="transition-transform group-open:rotate-180"><polyline points="6 9 12 15 18 9" /></svg>
+                </summary>
+                <GameRows cards={coverGames.slice(4)} />
+              </details>
+            )}
             <Link href={night.href} className="mt-auto text-xs font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 0.5 }}>READ THE NIGHT →</Link>
           </div>
         </article>

@@ -11,13 +11,16 @@ function Play({ size }: { size: number }) {
   );
 }
 
+// A big night (12+ games) stays a summary, not a table of scores.
+const SCORE_CHIPS = 6;
 const SHADE = 'linear-gradient(180deg, rgba(10,11,15,0) 45%, rgba(10,11,15,0.85) 100%)';
 
-// The night: highlight, headline, dek and every score of the night.
-function NightCard({ n }: { n: NightStory }) {
+// The night: highlight, headline, dek and every score of the night. Side by
+// side when it has the row to itself, stacked when it shares one.
+function NightCard({ n, stacked = false, className = '' }: { n: NightStory; stacked?: boolean; className?: string }) {
   return (
-    <article className="grid overflow-hidden rounded-2xl border lg:grid-cols-2" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <Link href={n.href} className="relative block aspect-video lg:aspect-auto lg:min-h-[300px]" style={{ background: 'var(--bg-raised)' }} aria-label={n.title}>
+    <article className={`grid overflow-hidden rounded-2xl border ${stacked ? '' : 'lg:grid-cols-2'} ${className}`} style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <Link href={n.href} className={`relative block aspect-video ${stacked ? '' : 'lg:aspect-auto lg:min-h-[300px]'}`} style={{ background: 'var(--bg-raised)' }} aria-label={n.title}>
         {n.image && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={n.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
@@ -37,13 +40,16 @@ function NightCard({ n }: { n: NightStory }) {
         {n.dek && <p className="text-[15px] leading-relaxed" style={{ color: 'var(--text)' }}>{n.dek}</p>}
         {n.scores.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {n.scores.map(s => (
+            {n.scores.slice(0, SCORE_CHIPS).map(s => (
               <Link key={s.href} href={s.href} className="inline-flex min-h-[30px] items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-bold transition-colors hover:bg-[var(--bg-hover)]" style={{ ...MONO, background: 'var(--bg)', borderColor: 'var(--border)' }}>
                 <span style={{ color: s.awayScore > s.homeScore ? 'var(--text-bright)' : 'var(--text-muted)' }}>{s.away} {s.awayScore}</span>
                 <span style={{ color: 'var(--text-muted)' }}>·</span>
                 <span style={{ color: s.homeScore > s.awayScore ? 'var(--text-bright)' : 'var(--text-muted)' }}>{s.homeScore} {s.home}</span>
               </Link>
             ))}
+            {n.scores.length > SCORE_CHIPS && (
+              <Link href={n.href} className="inline-flex min-h-[30px] items-center rounded-lg px-2 text-[11px] font-bold" style={{ ...MONO, color: 'var(--heat)' }}>+{n.scores.length - SCORE_CHIPS} more</Link>
+            )}
           </div>
         )}
         <Link href={n.href} className="mt-auto pt-1 text-xs font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 0.5 }}>READ THE NIGHT →</Link>
@@ -85,12 +91,26 @@ function GameCard({ g }: { g: GameStoryCard }) {
 }
 
 // Last night in stories: the night recap, then the best games, each linking to
-// its game page (where its full story lives).
+// its game page (where its full story lives). Three game cards get their own
+// row under the night; one or two share the night's row, so a short night
+// doesn't leave a lone card under a wide box.
 export function ArticleGrid({ night, games }: { night: NightStory | null; games: GameStoryCard[] }) {
   if (!night) return null;
+  const heading = <SectionHeading kicker={`STORIES · ${night.scores.length} GAME${night.scores.length === 1 ? '' : 'S'}`} title="The night in stories." sub="What happened, told through the numbers." size="feature" right={<SectionLink href="/recaps">All stories</SectionLink>} />;
+  if (games.length === 1 || games.length === 2) {
+    return (
+      <section data-section="stories" className="flex flex-col gap-3.5">
+        {heading}
+        <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-3">
+          <NightCard n={night} stacked={games.length === 2} className={games.length === 1 ? 'lg:col-span-2' : ''} />
+          {games.map(g => <GameCard key={g.id} g={g} />)}
+        </div>
+      </section>
+    );
+  }
   return (
     <section data-section="stories" className="flex flex-col gap-3.5">
-      <SectionHeading kicker={`STORIES · ${night.scores.length} GAMES`} title="The night in stories." sub="What happened, told through the numbers." size="feature" right={<SectionLink href="/recaps">All stories</SectionLink>} />
+      {heading}
       <NightCard n={night} />
       {games.length > 0 && (
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">

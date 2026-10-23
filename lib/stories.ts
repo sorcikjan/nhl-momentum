@@ -20,7 +20,7 @@ export type NightStory = {
 };
 export type GameStoryCard = {
   id: number; href: string; image: string | null; score: string; watchLabel: string;
-  kicker: string; title: string; dek: string; hasStory: boolean;
+  kicker: string; title: string; dek: string; hasStory: boolean; goals: number;
   star: { name: string; line: string; team: string; photo: string | null } | null;
 };
 
@@ -68,16 +68,19 @@ export function gameStoryCard(g: FinishedGame, story: GameStoryText | undefined,
     title: story?.headline ?? `${city(w)} beats ${city(l)} ${hi}–${lo}`,
     dek: story?.dek || fallbackDek,
     hasStory: !!story,
+    goals: (g.home_score ?? 0) + (g.away_score ?? 0),
     star,
   };
 }
 
 // How much a game deserves one of the few story slots.
-function interest(c: GameStoryCard, g: FinishedGame): number {
-  const goals = (g.home_score ?? 0) + (g.away_score ?? 0);
-  return (c.hasStory ? 4 : 0) + (c.image ? 1 : 0) + goals * 0.25
+function interest(c: GameStoryCard): number {
+  return (c.hasStory ? 4 : 0) + (c.image ? 1 : 0) + c.goals * 0.25
     + (c.kicker.includes('HAT TRICK') ? 3 : c.kicker.includes('UPSET') ? 2 : c.kicker.includes('SHUTOUT') ? 1.5 : c.kicker.includes('ONE-GOAL') ? 1 : 0);
 }
+
+// Most interesting first (stable: ties keep their order).
+export const rankStoryCards = (cards: GameStoryCard[]) => [...cards].sort((a, b) => interest(b) - interest(a));
 
 // The lead: the night recap with every score of the night. Its featured game
 // (the one in its hero image) is left out of the game cards below it.
@@ -102,12 +105,10 @@ export function nightStories(
     watchLabel: featured ? `Highlights · ${scoreLine(featured).replace(' – ', '–')}` : null,
     scores: ofNight.map(g => ({ away: abbr(g.away_team), awayScore: g.away_score ?? 0, home: abbr(g.home_team), homeScore: g.home_score ?? 0, href: hrefOf(g) })),
   };
-  const cards = ofNight
+  const cards = rankStoryCards(ofNight
     .filter(g => g.id !== featured?.id)
-    .map(g => ({ g, c: gameStoryCard(g, stories.get(g.id), missedPicks.has(g.id)) }))
-    .sort((a, b) => interest(b.c, b.g) - interest(a.c, a.g))
-    .slice(0, count)
-    .map(x => x.c);
+    .map(g => gameStoryCard(g, stories.get(g.id), missedPicks.has(g.id))))
+    .slice(0, count);
   return { night, games: cards };
 }
 

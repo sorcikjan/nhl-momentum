@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { SectionHeading, SectionLink } from '@/components/ds';
-import { GameCard } from '@/components/game/GameCard';
+import { GameGrid, splitTonight } from './GameGrid';
 import type { GameCardData } from '@/lib/game-card';
 import { dayLabel } from './format';
 
@@ -34,9 +34,7 @@ export function TonightSlate({ games, nextGameDate }: { games: GameCardData[]; n
           {nextGameDate ? <>Next games: <Link href="/games?range=week" className="font-semibold" style={{ color: 'var(--text-bright)' }}>{dayLabel(nextGameDate)}</Link></> : 'No games scheduled this week.'}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {games.map(g => <GameCard key={g.id} g={g} />)}
-        </div>
+        <GameGrid {...splitTonight(games)} />
       )}
     </section>
   );
