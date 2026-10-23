@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 
 // One static ISR page; position/sort filters are applied on the client from the URL.
 export default async function RankingsPage() {
-  // Throw (→ keep serving the last good cached page) if the database is down.
+  // Throws only if the database is down and nothing was saved to render from.
   await assertDatabaseUp();
   const [data, goaliesRaw] = await Promise.all([
     fetchRankings().catch(() => null),

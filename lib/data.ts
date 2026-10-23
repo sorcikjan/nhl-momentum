@@ -2,6 +2,7 @@
 // Pages should call these directly — never fetch their own API over HTTP.
 
 import { supabaseAdmin } from '@/lib/supabase';
+import { sharedResult } from '@/lib/db-fallback';
 import { buildSearchIndex } from '@/lib/search';
 import { pregameKeyPlayers, type KeyPlayer } from '@/lib/key-players';
 import { cardPlayers, type GameCardData } from '@/lib/game-card';
@@ -48,6 +49,12 @@ export async function fetchLeagueAverages() {
   if (_leagueAveragesCache && now - _leagueAveragesCache.ts < 30 * 60_000) {
     return _leagueAveragesCache.data;
   }
+  const result = await sharedResult('league-averages', 30 * 60_000, buildLeagueAverages);
+  _leagueAveragesCache = { data: result, ts: now };
+  return result;
+}
+
+async function buildLeagueAverages() {
   // Latest snapshot per active skater.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data = await latestSnapshotRows<any>(`
@@ -100,7 +107,6 @@ export async function fetchLeagueAverages() {
     p95PlusMinusPerGame:   percentile(pmPG, 95),
     p5PlusMinusPerGame:    percentile(pmPG,  5),
   };
-  _leagueAveragesCache = { data: result, ts: now };
   return result;
 }
 
@@ -118,7 +124,7 @@ let _rankingsInFlight: ReturnType<typeof buildRankings> | null = null;
 export async function fetchRankings() {
   if (_rankingsCache && Date.now() - _rankingsCache.ts < 3 * 60_000) return _rankingsCache.value;
   if (!_rankingsInFlight) {
-    _rankingsInFlight = buildRankings()
+    _rankingsInFlight = sharedResult('rankings', 3 * 60_000, buildRankings)
       .then(value => { _rankingsCache = { value, ts: Date.now() }; return value; })
       .finally(() => { _rankingsInFlight = null; });
   }

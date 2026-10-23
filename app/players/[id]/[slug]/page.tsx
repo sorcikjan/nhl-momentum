@@ -9,7 +9,7 @@ import { deriveArchetype } from '@/lib/archetype';
 import { ppmToHeat } from '@/lib/heat';
 import { currentSeason } from '@/lib/nhl-api';
 import { formChips, gameLogRows, heatSeries, last5Tiles, radarStats, seasonTiles, vsLeagueRows, type Tile } from '@/lib/player-profile';
-import { assertDatabaseUp } from '@/lib/supabase';
+import { assertDatabaseUp, databaseDown } from '@/lib/supabase';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { personLd, playerTitle } from '@/lib/seo';
 import { playerShareText } from '@/lib/share';
@@ -92,7 +92,7 @@ function goalieTiles(agg: any): Tile[] {
 
 // Player profile per docs/design/redesign-2026/player-profile-final.js.
 export default async function PlayerPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
-  // Throw (→ keep serving the last good cached page) if the database is down.
+  // Throws only if the database is down and nothing was saved to render from.
   await assertDatabaseUp();
   const { id, slug } = await params;
   const [data, leagueAvg, seasonPhase, rankings] = await Promise.all([
@@ -101,7 +101,8 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     fetchSeasonPhase().catch(() => ({ isPreseason: false, regularSeasonStartDate: null, daysUntilStart: null })),
     fetchRankings().catch(() => null),
   ]);
-  if (!data?.player) notFound();
+  // A player missing because the database is down is not a 404 (crawlers would drop the page).
+  if (!data?.player) { if (databaseDown()) throw new Error('Database unavailable'); notFound(); }
   // Old or mistyped slugs (e.g. pre-accent-folding "tim-st-tzle") → one canonical URL.
   // loading.tsx streams this page, so it goes out as an instant meta refresh
   // (Google treats that as a permanent redirect), backed by the canonical tag.

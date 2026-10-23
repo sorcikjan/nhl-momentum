@@ -5,7 +5,7 @@ import { permanentRedirect } from 'next/navigation';
 import { playerUrl, gameUrl, slugify, teamUrl } from '@/lib/urls';
 import { currentSeason } from '@/lib/nhl-api';
 import { SITE_URL } from '@/lib/site';
-import { assertDatabaseUp } from '@/lib/supabase';
+import { assertDatabaseUp, databaseDown } from '@/lib/supabase';
 import { HeatPill, SectionHeading } from '@/components/ds';
 import { ppmToHeat } from '@/lib/heat';
 
@@ -46,7 +46,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 export default async function TeamPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
-  // Throw (→ keep serving the last good cached page) if the database is down.
+  // Throws only if the database is down and nothing was saved to render from.
   await assertDatabaseUp();
   const { id, slug } = await params;
   const [{ team, roster, recentGames, upcoming, standing }, seasonPhase] = await Promise.all([
@@ -54,7 +54,10 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
     fetchSeasonPhase().catch(() => ({ isPreseason: false, regularSeasonStartDate: null, daysUntilStart: null })),
   ]);
 
-  if (!team) return <p style={{ color: 'var(--text)' }}>Team not found</p>;
+  if (!team) {
+    if (databaseDown()) throw new Error('Database unavailable');
+    return <p style={{ color: 'var(--text)' }}>Team not found</p>;
+  }
   if (slug !== slugify(team.name)) permanentRedirect(teamUrl(team.id, team.name));
 
   const logo = teamLogoUrl(team.abbrev);

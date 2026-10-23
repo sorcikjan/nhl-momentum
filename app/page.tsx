@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 
 // Homepage: results, Heat, tonight, goalies and rookies, stories, teams.
 export default async function HomePage() {
-  // Throw (→ keep serving the last good cached page) if the database is down.
+  // Throws only if the database is down and nothing was saved to render from.
   await assertDatabaseUp();
   const data = await fetchHomeData(todayET());
   const top = data.leader ? [{ name: `${data.leader.first} ${data.leader.last}`, url: `${SITE_URL}${data.leader.href}` }] : [];

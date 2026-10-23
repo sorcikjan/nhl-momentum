@@ -44,7 +44,7 @@ function dayHeader(d: string, today: string) {
 
 // Schedule per docs/design/redesign-2026 DesktopScheduleEnhanced / MobileGamesList.
 export default async function GamesPage({ searchParams }: { searchParams: Promise<{ range?: string; date?: string }> }) {
-  // Throw (→ keep serving the last good cached page) if the database is down.
+  // Throws only if the database is down and nothing was saved to render from.
   await assertDatabaseUp();
   const { range: raw, date: custom } = await searchParams;
   const range: Range = (['today', 'tomorrow', 'week', 'all', 'custom'] as const).includes(raw as Range) ? (raw as Range) : 'today';

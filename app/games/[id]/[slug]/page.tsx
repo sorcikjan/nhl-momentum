@@ -126,7 +126,7 @@ function normGoalie(goalies: any[], teamId: number): any | null {
 }
 
 export default async function MatchPage({ params }: { params: Promise<{ id: string; slug: string }> }) {
-  // Throw (→ keep serving the last good cached page) if the database is down.
+  // Throws only if the database is down and nothing was saved to render from.
   await assertDatabaseUp();
   const { id } = await params;
   const {

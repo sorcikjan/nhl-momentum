@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 
 // Heat page per docs/design/redesign-2026 DesktopHotPlayers / MobileHotPlayers.
 export default async function HotPage() {
-  // Throw (→ keep serving the last good cached page) if the database is down.
+  // Throws only if the database is down and nothing was saved to render from.
   await assertDatabaseUp();
   const rankings = await fetchRankings().catch(() => null);
   return <HotBody view={hotView(rankings)} />;

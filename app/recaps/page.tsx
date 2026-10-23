@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 export default async function RecapsPage() {
-  // Throw (→ keep serving the last good cached page) if the database is down.
+  // Throws only if the database is down and nothing was saved to render from.
   await assertDatabaseUp();
   const recaps = await fetchRecentRecaps(30).catch(() => []);
 

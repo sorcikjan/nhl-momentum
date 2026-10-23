@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import { fetchRecap, fetchRecapData, teamLogoUrl } from '@/lib/data';
 import { recapUrl, gameUrl, playerUrl, teamUrl } from '@/lib/urls';
 import { SITE_URL } from '@/lib/site';
-import { assertDatabaseUp } from '@/lib/supabase';
+import { assertDatabaseUp, databaseDown } from '@/lib/supabase';
 import { SectionHeading } from '@/components/ds';
 
 export const revalidate = 3600;
@@ -589,14 +589,14 @@ function ArticleSkeleton() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function RecapSlugPage({ params }: { params: Promise<{ date: string; slug: string }> }) {
-  // Throw (→ keep serving the last good cached page) if the database is down.
+  // Throws only if the database is down and nothing was saved to render from.
   await assertDatabaseUp();
   const { date } = await params;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) notFound();
 
   const recap = await cachedFetchRecap(date);
-  if (!recap) notFound();
+  if (!recap) { if (databaseDown()) throw new Error('Database unavailable'); notFound(); }
 
   const dateLabel = new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',

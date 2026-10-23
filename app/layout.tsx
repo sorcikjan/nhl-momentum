@@ -9,6 +9,7 @@ import { SITE_URL } from '@/lib/site';
 import { Suspense } from 'react';
 import { Analytics } from '@/components/analytics/Analytics';
 import { GA_ID, gtagBootstrap } from '@/lib/analytics';
+import { DataDelayNotice } from '@/components/layout/DataDelayNotice';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
@@ -62,6 +63,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <div className="flex min-h-screen flex-col">
           {/* Offsets: fixed header 48px mobile / 72px desktop; design gutters 16 / 48px. */}
           <main className="flex-1 overflow-x-hidden px-4 pb-6 pt-16 lg:px-12 lg:pb-10 lg:pt-[104px]">
+            <Suspense fallback={null}>
+              <DataDelayNotice />
+            </Suspense>
             {children}
           </main>
           <SiteFooter />

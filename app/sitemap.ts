@@ -33,13 +33,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [start, end] = regularSeasonGameIdRange(new Date());
   const weekAhead = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
 
+  // A deploy during a database outage ships the static entries; ISR refills the
+  // rest within the hour. At runtime a failure throws, keeping the last sitemap.
+  const orEmpty = <T,>(p: Promise<T[]>) => p.catch(err => {
+    if (process.env.NEXT_PHASE === 'phase-production-build') return [] as T[];
+    throw err;
+  });
   const [{ data: teams }, players, games, { data: recaps }] = await Promise.all([
     supabaseAdmin.from('teams').select('id, name'),
     // Every active player — each profile is a landing page for "[name] stats".
-    pageAll<{ id: number; first_name: string | null; last_name: string | null }>((f, t) => supabaseAdmin
-      .from('players').select('id, first_name, last_name').eq('is_active', true).order('id').range(f, t)),
+    orEmpty(pageAll<{ id: number; first_name: string | null; last_name: string | null }>((f, t) => supabaseAdmin
+      .from('players').select('id, first_name, last_name').eq('is_active', true).order('id').range(f, t))),
     // This regular season up to a week ahead (further-out games have nothing to show yet).
-    pageAll<{ id: number; game_date: string; away_team_id: number; home_team_id: number; away_team: unknown; home_team: unknown }>((f, t) => supabaseAdmin
+    orEmpty(pageAll<{ id: number; game_date: string; away_team_id: number; home_team_id: number; away_team: unknown; home_team: unknown }>((f, t) => supabaseAdmin
       .from('games')
       .select(`
         id, game_date, away_team_id, home_team_id,
@@ -47,7 +53,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         home_team:teams!games_home_team_id_fkey ( abbrev )
       `)
       .gte('id', start).lt('id', end).lte('game_date', weekAhead)
-      .order('id').range(f, t)),
+      .order('id').range(f, t))),
     supabaseAdmin.from('daily_recaps').select('date, title, generated_at').order('date', { ascending: false }).limit(1000),
   ]);
 
