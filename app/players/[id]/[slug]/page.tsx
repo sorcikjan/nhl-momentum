@@ -20,9 +20,10 @@ import { playerUrl } from '@/lib/urls';
 // Deduplicate fetchPlayer between generateMetadata and the page component
 const cachedFetchPlayer = cache((id: string) => fetchPlayer(id).catch(() => null));
 
-// Player data changes at most a few times a night; the pipeline also calls
-// /api/revalidate after each run. 10 min keeps crawler traffic off the database.
-export const revalidate = 600;
+// Player data changes only when the pipeline runs, and every run (nightly and
+// after each finished game) calls /api/revalidate. 6 h keeps crawlers — 800+
+// player pages in the sitemap — off the database without costing freshness.
+export const revalidate = 21600;
 
 // Render on first visit, then serve from the ISR cache for `revalidate` seconds.
 // Without this, a dynamic-segment page is rendered on every request.

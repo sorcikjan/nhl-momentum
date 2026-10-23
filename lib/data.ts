@@ -472,14 +472,24 @@ export async function fetchPlayer(id: string) {
 
   const isGoalie = player?.position_code === 'G';
 
-  // Metric timeline and game stats are independent of each other
-  const [{ data: metricTimelineDesc }, { data: rawGameStats }] = await Promise.all([
+  // The page needs the latest snapshot in full and, for the 42-day Heat chart,
+  // three columns of the rest (it used to read 300 full rows per render).
+  // A date (not a timestamp) keeps the query's fallback key stable all day.
+  const since = new Date(Date.now() - 43 * 86_400_000).toISOString().slice(0, 10);
+  const [{ data: latestSnap }, { data: history }, { data: rawGameStats }] = await Promise.all([
     supabaseAdmin
       .from('player_metric_snapshots')
       .select('*')
       .eq('player_id', id)
       .order('calculated_at', { ascending: false })
-      .limit(300),
+      .limit(1),
+    supabaseAdmin
+      .from('player_metric_snapshots')
+      .select('calculated_at, momentum_ppm, momentum_games')
+      .eq('player_id', id)
+      .gte('calculated_at', since)
+      .order('calculated_at', { ascending: true })
+      .limit(500),
     isGoalie
       ? supabaseAdmin
           .from('game_goalie_stats')
@@ -495,8 +505,12 @@ export async function fetchPlayer(id: string) {
           .limit(100),
   ]);
 
-  // Newest first → reverse for timeline chart
-  const metricTimeline = (metricTimelineDesc ?? []).slice().reverse();
+  // Oldest first, ending with the full latest snapshot.
+  const latest = latestSnap?.[0];
+  const metricTimeline = [
+    ...(history ?? []).filter(h => h.calculated_at !== latest?.calculated_at),
+    ...(latest ? [latest] : []),
+  ];
 
   // Enrich game stats with game metadata, and fetch team recent games for scratch detection.
   // These are independent — teamId is known from the player record, game IDs from rawGameStats.

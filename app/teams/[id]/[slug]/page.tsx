@@ -12,7 +12,7 @@ import { ppmToHeat } from '@/lib/heat';
 
 // Free-tier database: data changes only when the pipeline runs, and pipeline
 // runs call /api/revalidate — so a longer interval costs no freshness.
-export const revalidate = 600;
+export const revalidate = 21600;
 
 // Render on first visit, then serve from the ISR cache for `revalidate` seconds.
 // Without this, a dynamic-segment page is rendered on every request.
