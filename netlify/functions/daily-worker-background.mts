@@ -200,15 +200,17 @@ const handler: BackgroundHandler = async (event) => {
     } catch (e) { log.push(`recap: exception ${e}`); }
   }
 
-  // 9a. Game stories — one article per finished game, on its game page. Three
-  //     games per call (each is a 10–40s AI call); stops when a batch writes
-  //     nothing (all done, or the AI keeps failing — the next run retries).
+  // 9a. Game stories — one article per finished game, on its game page. One
+  //     game per call: each is a 10–40s AI call and the route runs as a
+  //     synchronous function (direct recap calls hit its time limit on
+  //     2026-10-23). Stops when a call writes nothing (all done, or the AI keeps
+  //     failing — the next run retries).
   if (phases.includes('game-stories')) {
     try {
       const storyDate = dateParam || new Date(Date.now() - 86400000).toISOString().slice(0, 10);
       let written = 0, failed = 0, remaining = 0;
-      for (let batch = 0; batch < 8; batch++) {
-        const r = await call(`${base}/api/ingest/game-stories?date=${storyDate}&limit=3`, h, { timeoutMs: RECAP_TIMEOUT_MS, retries: 0 });
+      for (let batch = 0; batch < 16; batch++) {
+        const r = await call(`${base}/api/ingest/game-stories?date=${storyDate}&limit=1`, h, { timeoutMs: RECAP_TIMEOUT_MS, retries: 0 });
         if (!r.data) { log.push(`game-stories: err: ${r.error}`); break; }
         written += r.data.written ?? 0; failed += r.data.failed ?? 0; remaining = r.data.remaining ?? 0;
         if (!r.data.written || !remaining) break;

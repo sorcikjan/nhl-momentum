@@ -7,7 +7,7 @@ import { fetchScoreFeed } from '@/lib/score-feed';
 
 export const maxDuration = 300;
 
-// GET /api/ingest/game-stories?date=YYYY-MM-DD[&limit=3]
+// GET /api/ingest/game-stories?date=YYYY-MM-DD[&limit=1]
 // One story per finished game of the date (default: yesterday), each with its
 // own fact check, so one bad draft costs one game, not the night. Writes at
 // most `limit` stories per call (each takes 10–40s) and reports how many games
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   const date = req.nextUrl.searchParams.get('date')
     ?? new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
-  const limit = Math.min(15, Math.max(1, Number(req.nextUrl.searchParams.get('limit')) || 3));
+  const limit = Math.min(15, Math.max(1, Number(req.nextUrl.searchParams.get('limit')) || 1));
 
   const { data: existing, error: exErr } = await supabaseAdmin.from('game_stories').select('game_id').eq('game_date', date);
   if (exErr) {
