@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { BYPASS_HEADER, databaseDown, fallbackReady, fetchWithFallback, markDatabaseDown } from './db-fallback';
+import { BYPASS_HEADER, databaseDown, fallbackReady, fetchWithFallback, healDegradedPages, markDatabaseDown } from './db-fallback';
 
 export { databaseDown } from './db-fallback';
 
@@ -90,6 +90,7 @@ export async function assertDatabaseUp(): Promise<void> {
         .abortSignal(timeoutSignal(4_000));
       if (!error) {
         _dbOkUntil = Date.now() + 30_000;
+        healDegradedPages();
         return;
       }
     }

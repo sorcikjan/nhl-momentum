@@ -6,6 +6,7 @@ vi.mock('@netlify/blobs', () => ({
     get: async (k: string) => blobs.get(k) ?? null,
     set: async (k: string, v: unknown) => { blobs.set(k, v); },
     setJSON: async (k: string, v: unknown) => { blobs.set(k, v); },
+    delete: async (k: string) => { blobs.delete(k); },
   }),
 }));
 let route: string | undefined = '/players/[id]/[slug]';
@@ -79,5 +80,26 @@ describe('fallback store safety', () => {
     const res = await fetchWithFallback(URL_, {}, async () => new Response('{}', { status: 500 }));
     expect(res.status).toBe(500);
     expect(databaseDown()).toBe(false);
+  });
+});
+
+describe('healing pages cached while the database was down', () => {
+  beforeEach(() => { vi.resetModules(); blobs.clear(); route = '/players/[id]/[slug]'; process.env.INGEST_API_KEY = 'k'; });
+
+  it('a fallback render leaves a mark; recovery revalidates once the mark is a minute old', async () => {
+    const { fetchWithFallback, healDegradedPages, markDatabaseDown } = await import('@/lib/db-fallback');
+    markDatabaseDown();
+    await fetchWithFallback(URL_, {}, async () => ok('[]'));
+    await flush();
+    expect(blobs.has('meta/degraded')).toBe(true);
+
+    blobs.set('meta/degraded', new Date(Date.now() - 120_000).toISOString());
+    const calls: string[] = [];
+    vi.stubGlobal('fetch', async (u: string) => { calls.push(u); return new Response('{}'); });
+    healDegradedPages();
+    await new Promise(r => setTimeout(r, 10));
+    expect(calls).toEqual([expect.stringMatching(/\/api\/revalidate$/)]);
+    expect(blobs.has('meta/degraded')).toBe(false);
+    vi.unstubAllGlobals();
   });
 });
