@@ -23,6 +23,11 @@ export const BYPASS_HEADER = 'x-db-direct';
 let downUntil = 0;
 const savedAt = new Map<string, number>();
 let store: Store | null | undefined;
+let blobsOffUntil = 0;
+// No store call may hold up a render: a slow or hanging Blobs call counts as
+// "no saved copy", and this instance stops using the store for 5 minutes.
+const BLOBS_TIMEOUT_MS = 1_500;
+const BLOBS_OFF_MS = 5 * 60_000;
 let markedReady = false;
 const READY_KEY = 'meta/ready';
 
@@ -34,7 +39,21 @@ export function markDatabaseDown(): void {
   downUntil = Date.now() + DOWN_FOR_MS;
 }
 
+function timed<T>(op: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    op,
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        blobsOffUntil = Date.now() + BLOBS_OFF_MS;
+        reject(new Error('Blobs timed out'));
+      }, BLOBS_TIMEOUT_MS);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 function blobs(): Store | null {
+  if (Date.now() < blobsOffUntil) return null;
   if (store !== undefined) return store;
   try {
     store = getStore({ name: STORE, consistency: 'eventual' });
@@ -69,7 +88,8 @@ type Saved = { body: string; headers: Record<string, string> };
 
 async function load(key: string): Promise<Response | null> {
   try {
-    const saved = (await blobs()?.get(key, { type: 'json' })) as Saved | null;
+    const s = blobs();
+    const saved = s ? (await timed(s.get(key, { type: 'json' }))) as Saved | null : null;
     return saved ? new Response(saved.body, { status: 200, headers: { ...saved.headers, 'x-db-fallback': '1' } }) : null;
   } catch {
     return null;
@@ -86,8 +106,8 @@ function save(key: string, res: Response): void {
     if (v) headers[name] = v;
   }
   const job = res.text()
-    .then(body => s.setJSON(key, { body, headers } satisfies Saved))
-    .then(() => { if (!markedReady) return s.set(READY_KEY, new Date().toISOString()).then(() => { markedReady = true; }); })
+    .then(body => timed(s.setJSON(key, { body, headers } satisfies Saved)))
+    .then(() => { if (!markedReady) return timed(s.set(READY_KEY, new Date().toISOString())).then(() => { markedReady = true; }); })
     .catch(() => {});
   try { after(job); } catch { /* outside a request: let it run */ }
 }
@@ -116,10 +136,13 @@ export async function fetchWithFallback(
   if (databaseDown()) return (await load(key)) ?? unavailable();
   try {
     const res = await doFetch(input, init);
-    if (res.status >= 500) {
+    // Gateway errors mean the database is unreachable: stop asking for a while.
+    // A plain 500 is one statement failing (e.g. its timeout): that query only.
+    if (res.status >= 502) {
       markDatabaseDown();
       return (await load(key)) ?? res;
     }
+    if (res.status === 500) return (await load(key)) ?? res;
     if (res.ok) save(key, res.clone());
     return res;
   } catch (err) {
@@ -141,7 +164,7 @@ export async function sharedResult<T>(key: string, ttlMs: number, build: () => P
   type Hit = { at: number; value: T };
   let hit: Hit | null = null;
   try {
-    hit = (await s.get(k, { type: 'json' })) as Hit | null;
+    hit = (await timed(s.get(k, { type: 'json' }))) as Hit | null;
     if (hit && Date.now() - hit.at < ttlMs) return hit.value;
   } catch { /* store unreachable: build it */ }
   let value: T;
@@ -151,15 +174,39 @@ export async function sharedResult<T>(key: string, ttlMs: number, build: () => P
     if (hit) return (hit as Hit).value;
     throw err;
   }
-  const job = s.setJSON(k, { at: Date.now(), value }).catch(() => {});
+  const job = timed(s.setJSON(k, { at: Date.now(), value })).catch(() => {});
   try { after(job); } catch { /* outside a request: let it run */ }
   return value;
+}
+
+// For /api/debug/blobs: is the store reachable from this function, and how fast?
+export async function blobsHealth() {
+  const t0 = Date.now();
+  const s = blobs();
+  if (!s) return { store: false, offForMs: Math.max(0, blobsOffUntil - Date.now()) };
+  const result: Record<string, unknown> = { store: true };
+  for (const [name, op] of [
+    ['set', () => s.set('meta/health', new Date().toISOString())],
+    ['get', () => s.get('meta/health')],
+    ['ready', () => s.get(READY_KEY)],
+  ] as const) {
+    const t = Date.now();
+    try {
+      const value = await timed(op() as Promise<unknown>);
+      result[name] = { ok: true, ms: Date.now() - t, value };
+    } catch (e) {
+      result[name] = { ok: false, ms: Date.now() - t, error: String(e) };
+    }
+  }
+  result.totalMs = Date.now() - t0;
+  return result;
 }
 
 // True when saved answers can be read (on Netlify, once anything was saved).
 export async function fallbackReady(): Promise<boolean> {
   try {
-    return (await blobs()?.get(READY_KEY)) != null;
+    const s = blobs();
+    return s ? (await timed(s.get(READY_KEY))) != null : false;
   } catch {
     return false;
   }

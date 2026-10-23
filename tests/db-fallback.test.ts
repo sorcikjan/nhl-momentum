@@ -70,3 +70,14 @@ describe('fetchWithFallback', () => {
     expect(at('2026-10-23T10:01:56Z').startsWith('soft_signals/')).toBe(true);
   });
 });
+
+describe('fallback store safety', () => {
+  beforeEach(() => { vi.resetModules(); blobs.clear(); route = '/players/[id]/[slug]'; });
+
+  it('a single failing statement (HTTP 500) does not switch off the database', async () => {
+    const { fetchWithFallback, databaseDown } = await import('@/lib/db-fallback');
+    const res = await fetchWithFallback(URL_, {}, async () => new Response('{}', { status: 500 }));
+    expect(res.status).toBe(500);
+    expect(databaseDown()).toBe(false);
+  });
+});
