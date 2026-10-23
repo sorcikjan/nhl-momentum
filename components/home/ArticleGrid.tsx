@@ -1,52 +1,102 @@
 import Link from 'next/link';
-import { SectionHeading, SectionLink, TeamChip } from '@/components/ds';
-import { NEUTRAL_TINT, teamColor } from '@/lib/team-colors';
-import type { StoryCard } from '@/lib/home';
+import { Headshot, SectionHeading, SectionLink } from '@/components/ds';
+import type { GameStoryCard, NightStory } from '@/lib/stories';
 import { MONO } from './format';
 
-const tint = (team: string | null, alpha: string) =>
-  `linear-gradient(155deg, ${team ? teamColor(team).bg : NEUTRAL_TINT}${alpha} 0%, var(--bg) 100%)`;
-
-// Last night's recap as a lead story + its game stories (design ArticleGrid).
-export function ArticleGrid({ stories, heroImageUrl }: { stories: StoryCard[]; heroImageUrl?: string | null }) {
-  if (!stories.length) return null;
-  const [lead, ...others] = stories;
+function Play({ size }: { size: number }) {
   return (
-    <section data-section="stories">
-      <SectionHeading kicker="STORIES · LAST NIGHT" title="The night in stories." sub="What happened, told through the numbers." size="feature" right={<SectionLink href="/recaps">All stories</SectionLink>} />
-      <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-[1.4fr_1fr] lg:gap-4">
-        <Link href={lead.href} className="flex flex-col overflow-hidden rounded-xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <div className="relative aspect-video overflow-hidden" style={{ background: tint(lead.team, 'cc') }}>
-            {heroImageUrl && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={heroImageUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80" />
-            )}
-            {lead.team && <div className="absolute left-3.5 top-3.5"><TeamChip abbrev={lead.team} size={32} /></div>}
-          </div>
-          <div className="flex-1 px-4 pb-4 pt-3.5 lg:px-[22px] lg:pb-[22px] lg:pt-5">
-            <div className="mb-2.5 text-[9px] font-bold lg:text-[10px]" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.4 }}>{lead.kicker}</div>
-            <h3 className="mb-2.5 text-lg font-extrabold leading-tight lg:text-[26px]" style={{ color: 'var(--text-bright)', letterSpacing: -0.8, textWrap: 'pretty' }}>{lead.title}</h3>
-            {lead.dek && <p className="text-xs leading-relaxed lg:text-sm" style={{ color: 'var(--text)' }}>{lead.dek}</p>}
-            <div className="mt-4 text-xs font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 0.5 }}>READ MORE →</div>
-          </div>
-        </Link>
-        {others.length > 0 && (
-          <div className="flex flex-col gap-2 lg:gap-2.5">
-            {others.map(s => (
-              <Link key={s.title} href={s.href} className="flex flex-1 gap-3 rounded-[10px] border p-3 lg:p-3.5" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}>
-                <div className="relative aspect-square w-14 shrink-0 self-start rounded-md lg:w-20 lg:rounded-lg" style={{ background: tint(s.team, 'aa') }}>
-                  {s.team && <div className="absolute left-1.5 top-1.5"><TeamChip abbrev={s.team} size={18} /></div>}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="mb-1.5 text-[8px] font-bold lg:text-[9px]" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.2 }}>{s.kicker}</div>
-                  <div className="mb-1 text-[13px] font-bold leading-tight lg:text-sm" style={{ color: 'var(--text-bright)' }}>{s.title}</div>
-                  <div className="line-clamp-2 text-[11px] leading-snug" style={{ color: 'var(--text-muted)' }}>{s.dek}</div>
-                </div>
+    <span className="flex shrink-0 items-center justify-center rounded-full" style={{ width: size, height: size, background: 'var(--heat)' }}>
+      <svg width={size * 0.4} height={size * 0.4} viewBox="0 0 24 24" fill="var(--bg)" aria-hidden><path d="M7 4.5v15l13-7.5z" /></svg>
+    </span>
+  );
+}
+
+const SHADE = 'linear-gradient(180deg, rgba(10,11,15,0) 45%, rgba(10,11,15,0.85) 100%)';
+
+// The night: highlight, headline, dek and every score of the night.
+function NightCard({ n }: { n: NightStory }) {
+  return (
+    <article className="grid overflow-hidden rounded-2xl border lg:grid-cols-2" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <Link href={n.href} className="relative block aspect-video lg:aspect-auto lg:min-h-[300px]" style={{ background: 'var(--bg-raised)' }} aria-label={n.title}>
+        {n.image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={n.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        )}
+        <span className="absolute inset-0" style={{ background: SHADE }} />
+        {n.watchLabel && (
+          <span className="absolute bottom-4 left-4 flex items-center gap-2.5 text-[13px] font-bold" style={{ color: 'var(--text-bright)' }}>
+            <Play size={40} /> {n.watchLabel}
+          </span>
+        )}
+      </Link>
+      <div className="flex flex-col gap-3.5 p-5 lg:px-7 lg:py-6">
+        <div className="text-[10px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.4 }}>{n.kicker}</div>
+        <h3 className="text-2xl font-extrabold leading-tight lg:text-[30px]" style={{ color: 'var(--text-bright)', letterSpacing: '-0.03em', textWrap: 'pretty' }}>
+          <Link href={n.href}>{n.title}</Link>
+        </h3>
+        {n.dek && <p className="text-[15px] leading-relaxed" style={{ color: 'var(--text)' }}>{n.dek}</p>}
+        {n.scores.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {n.scores.map(s => (
+              <Link key={s.href} href={s.href} className="inline-flex min-h-[30px] items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-bold transition-colors hover:bg-[var(--bg-hover)]" style={{ ...MONO, background: 'var(--bg)', borderColor: 'var(--border)' }}>
+                <span style={{ color: s.awayScore > s.homeScore ? 'var(--text-bright)' : 'var(--text-muted)' }}>{s.away} {s.awayScore}</span>
+                <span style={{ color: 'var(--text-muted)' }}>·</span>
+                <span style={{ color: s.homeScore > s.awayScore ? 'var(--text-bright)' : 'var(--text-muted)' }}>{s.homeScore} {s.home}</span>
               </Link>
             ))}
           </div>
         )}
+        <Link href={n.href} className="mt-auto pt-1 text-xs font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 0.5 }}>READ THE NIGHT →</Link>
       </div>
+    </article>
+  );
+}
+
+// One game: its highlight with the score, its story's headline and dek, its star.
+function GameCard({ g }: { g: GameStoryCard }) {
+  return (
+    <article className="flex flex-col overflow-hidden rounded-[14px] border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
+      <Link href={g.href} className="relative block aspect-video" style={{ background: 'var(--bg-raised)' }} aria-label={`${g.title} — ${g.watchLabel}`}>
+        {g.image && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={g.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        )}
+        <span className="absolute inset-0" style={{ background: SHADE }} />
+        <span className="absolute bottom-2.5 left-3 flex items-center gap-2 rounded-lg py-1 pl-1.5 pr-2.5 text-xs font-bold" style={{ ...MONO, background: 'rgba(10,11,15,0.82)', color: 'var(--text-bright)' }}>
+          {g.image && <Play size={22} />} {g.score}
+        </span>
+      </Link>
+      <Link href={g.href} className="flex flex-1 flex-col gap-2 px-[18px] pb-[18px] pt-4">
+        <span className="text-[10px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.2 }}>{g.kicker}</span>
+        <h3 className="text-[19px] font-extrabold leading-snug" style={{ color: 'var(--text-bright)', letterSpacing: '-0.02em', textWrap: 'pretty' }}>{g.title}</h3>
+        <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>{g.dek}</p>
+        {g.star && (
+          <span className="mt-auto flex items-center gap-2.5 border-t pt-2.5" style={{ borderColor: 'var(--border-soft)' }}>
+            <Headshot src={g.star.photo} name={g.star.name} team={g.star.team} size={30} />
+            <span className="min-w-0 flex-1 truncate text-[13px]" style={{ color: 'var(--text)' }}>
+              <span style={{ color: '#ffc94d' }}>★</span> <span className="font-bold" style={{ color: 'var(--text-bright)' }}>{g.star.name}</span> · {g.star.line}
+            </span>
+            <span className="text-[11px] font-bold" style={{ ...MONO, color: 'var(--heat)' }}>READ →</span>
+          </span>
+        )}
+      </Link>
+    </article>
+  );
+}
+
+// Last night in stories: the night recap, then the best games, each linking to
+// its game page (where its full story lives).
+export function ArticleGrid({ night, games }: { night: NightStory | null; games: GameStoryCard[] }) {
+  if (!night) return null;
+  return (
+    <section data-section="stories" className="flex flex-col gap-3.5">
+      <SectionHeading kicker={`STORIES · ${night.scores.length} GAMES`} title="The night in stories." sub="What happened, told through the numbers." size="feature" right={<SectionLink href="/recaps">All stories</SectionLink>} />
+      <NightCard n={night} />
+      {games.length > 0 && (
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+          {games.map(g => <GameCard key={g.id} g={g} />)}
+        </div>
+      )}
     </section>
   );
 }

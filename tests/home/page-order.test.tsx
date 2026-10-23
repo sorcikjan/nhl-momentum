@@ -25,7 +25,9 @@ const base: HomeData = {
     away: { abbrev: 'FLA', name: 'Florida', score: 1, pct: null, players: [] }, home: { abbrev: 'OTT', name: 'Ottawa', score: 5, pct: null, players: [] },
     pick: { abbrev: 'FLA', pct: 53 }, pickResult: 'miss',
   }],
-  stories: [{ href: '/recaps/x', kicker: 'LAST NIGHT · BIG STORY', title: 'Senators Explode for Five', dek: 'd', team: null, lead: true }],
+  night: { href: '/recaps/x', kicker: 'THE NIGHT · WEDNESDAY · OCTOBER 21', title: 'Senators Explode for Five', dek: 'd', image: null, watchLabel: null,
+    scores: [{ away: 'FLA', awayScore: 1, home: 'OTT', homeScore: 5, href: '/games/2/fla-at-ott-1021' }] },
+  gameStories: [],
   leader: {
     playerId: 9, href: '/players/9/connor-mcdavid', first: 'Connor', last: 'McDavid', photo: null, team: 'EDM', teamName: 'Edmonton Oilers',
     pos: 'C', heat: 100, pace: -2, goals: 3, assists: 11, games: 5,
@@ -37,7 +39,6 @@ const base: HomeData = {
   goalies: [row(5, 'Jake Oettinger', '.946', { valueHeat: null, pos: 'G', l5: 'L5 3–1–1', chip: { text: '1.20 GAA', tone: 'muted' } })],
   rookies: [row(6, 'Stephen Halliday', '48')],
   teams: [{ abbrev: 'FLA', name: 'Florida Panthers', heat: 79, href: '/teams/13/florida-panthers' }],
-  heroImageUrl: null,
 };
 
 const html = (d: HomeData) => renderToStaticMarkup(<HomeBody data={d} />);
@@ -94,7 +95,7 @@ describe('homepage', () => {
   });
 
   it('omits the stories section when there is no recap', () => {
-    expect(order(html({ ...base, stories: [] }))).not.toContain('stories');
+    expect(order(html({ ...base, night: null }))).not.toContain('stories');
   });
 
   it('links every team in Teams running hot', () => {

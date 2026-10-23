@@ -861,10 +861,10 @@ export async function fetchGameStory(gameId: number): Promise<{ headline: string
   return error ? null : data;
 }
 
-// Headlines of a night's game stories, by game id (empty until migration 017).
-export async function fetchGameStoryHeadlines(date: string): Promise<Map<number, string>> {
-  const { data, error } = await supabaseAdmin.from('game_stories').select('game_id, headline').eq('game_date', date);
-  return new Map(error ? [] : (data ?? []).map(r => [r.game_id as number, r.headline as string]));
+// A night's game stories (headline and dek), by game id — empty until migration 017.
+export async function fetchGameStoriesByDate(date: string): Promise<Map<number, { headline: string; dek: string }>> {
+  const { data, error } = await supabaseAdmin.from('game_stories').select('game_id, headline, dek').eq('game_date', date);
+  return new Map(error ? [] : (data ?? []).map(r => [r.game_id as number, { headline: r.headline as string, dek: r.dek as string }]));
 }
 
 export async function fetchRecentRecaps(limit = 30) {

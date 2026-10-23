@@ -11,14 +11,14 @@ import { TonightSlate } from './TonightSlate';
 // teams last. Every heading is a SectionHeading, every player list a PlayerRow.
 export const HOME_SECTIONS = ['results', 'heat', 'tonight', 'rankings', 'stories', 'teams'] as const;
 
-export function HomeBody({ data, heroImageUrl }: { data: HomeData; heroImageUrl?: string | null }) {
+export function HomeBody({ data }: { data: HomeData }) {
   return (
     <div className="flex flex-col gap-12 lg:gap-16">
       <ResultsSection date={data.resultsDate} results={data.results} />
       <HeatHero leader={data.leader} leaders={data.leaders} heatingUp={data.heatingUp} coolingOff={data.coolingOff} />
       <TonightSlate games={data.tonight} nextGameDate={data.nextGameDate} />
       <MoreRankings goalies={data.goalies} rookies={data.rookies} />
-      <ArticleGrid stories={data.stories} heroImageUrl={heroImageUrl} />
+      <ArticleGrid night={data.night} games={data.gameStories} />
       <TeamHeatGrid teams={data.teams} />
     </div>
   );

@@ -3,7 +3,7 @@ import { SHARE_IMAGE } from '@/lib/seo';
 import React, { cache, Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { fetchGameStoryHeadlines, fetchRecap, fetchRecapData, teamLogoUrl } from '@/lib/data';
+import { fetchGameStoriesByDate, fetchRecap, fetchRecapData, teamLogoUrl } from '@/lib/data';
 import { recapUrl, gameUrl, playerUrl, teamUrl } from '@/lib/urls';
 import { SITE_URL } from '@/lib/site';
 import { assertDatabaseUp, databaseDown } from '@/lib/supabase';
@@ -364,9 +364,9 @@ function GameCard({ game, pred, gUrl, seriesContext }: { game: any; pred: any; g
 
 async function ArticleBody({ date, content }: { date: string; content: string }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [raw, storyHeadlines] = await Promise.all([
+  const [raw, gameStories] = await Promise.all([
     fetchRecapData(date).catch(() => null),
-    fetchGameStoryHeadlines(date).catch(() => new Map<number, string>()),
+    fetchGameStoriesByDate(date).catch(() => new Map<number, { headline: string; dek: string }>()),
   ]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -465,10 +465,10 @@ async function ArticleBody({ date, content }: { date: string; content: string })
               ))}
 
               {/* 3. The game's full story lives on its page */}
-              {game && storyHeadlines.get(game.id) && (
+              {game && gameStories.get(game.id) && (
                 <Link href={gUrl} className="block rounded-xl border px-4 py-3 hover:opacity-80" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
                   <span className="block text-[10px] font-bold uppercase" style={{ color: 'var(--heat)', fontFamily: 'var(--font-geist-mono), ui-monospace, monospace', letterSpacing: '0.12em' }}>Game story</span>
-                  <span className="mt-1 block text-[15px] font-bold" style={{ color: 'var(--text-bright)' }}>{storyHeadlines.get(game.id)} →</span>
+                  <span className="mt-1 block text-[15px] font-bold" style={{ color: 'var(--text-bright)' }}>{gameStories.get(game.id)?.headline} →</span>
                 </Link>
               )}
             </div>

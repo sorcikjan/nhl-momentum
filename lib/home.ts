@@ -1,7 +1,7 @@
 // Homepage data (regular season) — shapes the existing fetchers into what the
 // design's sections show (docs/design/redesign-2026/homepage-final.js).
 import {
-  fetchGamesRange, fetchGoalieRankings, fetchNewcomerWatch, fetchRankings, fetchRecap,
+  fetchGameStoriesByDate, fetchGamesRange, fetchGoalieRankings, fetchNewcomerWatch, fetchRankings,
   fetchPlayerPhotos, fetchPregameKeyPlayers, fetchRecentCompletedGames, fetchRecentRecaps, fetchStatLines,
 } from '@/lib/data';
 import { cardPlayers, markGameOfTheNight, withTeamHeat, type GameCardData } from '@/lib/game-card';
@@ -11,10 +11,10 @@ import { gameView } from '@/lib/game-state';
 import { ppmToHeat } from '@/lib/heat';
 import type { KeyPlayer } from '@/lib/key-players';
 import { teamColor } from '@/lib/team-colors';
-import { gameUrl, playerUrl, recapUrl, teamUrl } from '@/lib/urls';
+import { nightStories, type FinishedGame as StoryGame, type GameStoryCard, type NightStory } from '@/lib/stories';
+import { gameUrl, playerUrl, teamUrl } from '@/lib/urls';
 
 export type TeamSide = { abbrev: string; name: string };
-export type StoryCard = { href: string; kicker: string; title: string; dek: string; team: string | null; lead: boolean };
 // #1 on the Heat list: the hero card.
 export type HeatLeader = {
   playerId: number; href: string; first: string; last: string; photo: string | null; team: string; teamName: string; pos: string;
@@ -26,12 +26,11 @@ export type HomeData = {
   today: string;
   tonight: GameCardData[]; nextGameDate: string | null;
   resultsDate: string | null; results: GameCardData[];
-  stories: StoryCard[];
+  night: NightStory | null; gameStories: GameStoryCard[];
   leader: HeatLeader | null; leaders: PlayerRowData[];
   heatingUp: PlayerRowData[]; coolingOff: PlayerRowData[];
   goalies: PlayerRowData[]; rookies: PlayerRowData[];
   teams: TeamHeatRow[];
-  heroImageUrl: string | null;
 };
 
 const side = (abbrev: string): TeamSide => ({ abbrev, name: teamColor(abbrev).name });
@@ -64,27 +63,6 @@ export function toResultCard(g: FinishedGame, pred: Pred): GameCardData {
   };
 }
 
-
-type Recap = { date: string; title: string; summary: string | null; content: string | null } | null;
-
-// Lead = the recap itself; then up to 3 of its per-game sections ("### CAR 2 @ CGY 3").
-export function recapToStories(recap: Recap, slugTitle: string): StoryCard[] {
-  if (!recap) return [];
-  const href = recapUrl(recap.date, slugTitle || recap.title);
-  const out: StoryCard[] = [{ href, kicker: 'LAST NIGHT · BIG STORY', title: recap.title, dek: recap.summary ?? '', team: null, lead: true }];
-  const sections = (recap.content ?? '').split(/^### /m).slice(1);
-  for (const sec of sections) {
-    const [header, ...rest] = sec.split('\n');
-    const m = header.trim().match(/^([A-Z]{2,3}) (\d+) @ ([A-Z]{2,3}) (\d+)$/);
-    if (!m) continue;
-    const body = rest.join(' ').trim();
-    const firstSentence = body.match(/^.*?[.!?](\s|$)/)?.[0].trim() ?? body.slice(0, 140);
-    const winner = Number(m[2]) > Number(m[4]) ? m[1] : m[3];
-    out.push({ href, kicker: 'GAME STORY', title: header.trim(), dek: firstSentence, team: winner, lead: false });
-    if (out.length === 4) break;
-  }
-  return out;
-}
 
 async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
   try { return await p; } catch (err) { console.error('[home]', err); return fallback; }
@@ -161,10 +139,13 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
     c.home.players = cardPlayers(keyOf(c.id, true), photos, stats);
   }
 
+  // Stories: the latest night with a recap, its games as story cards.
   const latest = recaps[0] ?? null;
-  const recap = latest ? await safe(fetchRecap(latest.date), null) : null;
-  const stories = recapToStories(recap ? { date: recap.date, title: recap.title, summary: recap.summary, content: recap.content } : null, recap?.title ?? '');
-  if (recap && recap.date === resultsDate) for (const r of results) r.recapHref = stories[0].href;
+  const storyTexts = latest ? await safe(fetchGameStoriesByDate(latest.date), new Map()) : new Map();
+  const missedPicks = new Set((recent.games as StoryGame[])
+    .filter(g => recent.predMap.get(g.id)?.prediction_outcomes?.[0]?.correct_winner === false).map(g => g.id));
+  const { night, games: gameStories } = nightStories(latest, recent.games as StoryGame[], storyTexts, missedPicks);
+  if (night && latest?.date === resultsDate) for (const r of results) r.recapHref = night.href;
 
   // Tonight: the game of the night first; every card shows each team's Heat.
   markGameOfTheNight(tonight);
@@ -206,11 +187,10 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
     .sort((a, b) => b.heat - a.heat);
 
   return {
-    today, tonight, nextGameDate, resultsDate, results, stories,
+    today, tonight, nextGameDate, resultsDate, results, night, gameStories,
     leader, leaders, heatingUp, coolingOff,
     goalies: goalies.slice(0, 10).map((g, i) => goalieRow(g, i + 1)),
     rookies: rookies.slice(0, 10).map((r, i) => rookieRow(r, i + 1)),
     teams,
-    heroImageUrl: latest?.hero_image_url ?? null,
   };
 }

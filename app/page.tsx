@@ -30,7 +30,7 @@ export default async function HomePage() {
   return (
     <>
       {top.length > 0 && <JsonLd data={itemListLd([...top, ...data.leaders.map(r => ({ name: r.name, url: `${SITE_URL}${r.href}` }))])} />}
-      <HomeBody data={data} heroImageUrl={data.heroImageUrl} />
+      <HomeBody data={data} />
     </>
   );
 }
