@@ -38,15 +38,21 @@ const base: HomeData = {
   coolingOff: [row(4, 'Jaden Schwartz', '0', { mark: '↓', markTone: 'cold', l5: 'L5 0G 0A · season 36' })],
   goalies: [row(5, 'Jake Oettinger', '.946', { valueHeat: null, pos: 'G', l5: 'L5 3–1–1', chip: { text: '1.20 GAA', tone: 'muted' } })],
   rookies: [row(6, 'Stephen Halliday', '48')],
-  teams: [{ abbrev: 'FLA', name: 'Florida Panthers', heat: 79, href: '/teams/13/florida-panthers' }],
+  standings: [
+    { abbrev: 'FLA', name: 'Panthers', href: '/teams/13/florida-panthers', conference: 'Eastern', division: 'Atlantic', gp: 11, w: 5, l: 4, otl: 2, pts: 12, gd: -3, l10: '4-4-2', streak: 'L2', heat: 79 },
+    { abbrev: 'EDM', name: 'Oilers', href: '/teams/22/edmonton-oilers', conference: 'Western', division: 'Pacific', gp: 10, w: 8, l: 1, otl: 1, pts: 17, gd: 15, l10: '8-1-1', streak: 'W3', heat: 60 },
+  ],
+  statLeaders: [{ key: 'points', title: 'Points', unit: 'PTS', rows: [
+    { id: 8478402, name: 'Connor McDavid', team: 'EDM', pos: 'C', photo: null, href: '/players/8478402/connor-mcdavid', value: '31', heat: 100 },
+  ] }],
 };
 
 const html = (d: HomeData) => renderToStaticMarkup(<HomeBody data={d} />);
 const order = (out: string) => [...out.matchAll(/<section data-section="([a-z-]+)"/g)].map(m => m[1]);
 
 describe('homepage', () => {
-  it('renders the agreed sections in order: results, Heat, tonight, rankings, stories, teams', () => {
-    expect(HOME_SECTIONS).toEqual(['results', 'heat', 'tonight', 'rankings', 'stories', 'teams']);
+  it('renders the agreed sections in order: results, Heat, tonight, rankings, stories, standings, leaders', () => {
+    expect(HOME_SECTIONS).toEqual(['results', 'heat', 'tonight', 'rankings', 'stories', 'standings', 'leaders']);
     expect(order(html(base))).toEqual([...HOME_SECTIONS]);
   });
 
@@ -98,8 +104,17 @@ describe('homepage', () => {
     expect(order(html({ ...base, night: null }))).not.toContain('stories');
   });
 
-  it('links every team in Teams running hot', () => {
-    expect(html(base)).toContain('href="/teams/13/florida-panthers"');
+  it('shows both conferences with each team linked and its Heat, and the leaders with theirs', () => {
+    const out = html(base);
+    expect(out).toContain('Eastern Conference');
+    expect(out).toContain('Western Conference');
+    expect(out).toContain('href="/teams/13/florida-panthers"');
+    expect(out).toMatch(/Heat <!-- -->100|Heat 100/);
+    expect(out).toContain('Source: NHL.com'.toUpperCase());
+  });
+
+  it('leaves the standings out when NHL.com is unreachable', () => {
+    expect(order(html({ ...base, standings: [], statLeaders: [] }))).not.toContain('standings');
   });
 
   it('constrains every mobile grid to the viewport (no horizontal scroll at 390px)', () => {

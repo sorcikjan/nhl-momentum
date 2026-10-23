@@ -314,6 +314,12 @@ async function buildRankings() {
       .map((r: any) => [r.players.teams.abbrev, { id: r.players.teams.id as number, name: r.players.teams.name as string }])) as Record<string, { id: number; name: string }>,
     breakoutWatch,
     coolingWatch,
+    // Every active skater's Heat, for numbers shown next to official stats.
+    heatByPlayer: Object.fromEntries(latest
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((r: any) => r.players?.position_code !== 'G' && (r.momentum_games ?? 0) > 0)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((r: any) => [r.player_id as number, ppmToHeat(r.momentum_ppm)])) as Record<number, number>,
     momentumLeaders: { skaters: momentumLeaderSkaters, goalies: momentumLeaderGoalies },
     sparklineSnapshots: (rawSparklines ?? []) as { player_id: number; calculated_at: string; momentum_ppm: number }[],
   };

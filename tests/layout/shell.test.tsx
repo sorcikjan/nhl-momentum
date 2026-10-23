@@ -6,8 +6,8 @@ import { SiteFooter } from '@/components/layout/SiteFooter';
 
 describe('header', () => {
   it('has the design nav, in order', () => {
-    expect(NAV_ITEMS.map(i => i.href)).toEqual(['/', '/games', '/hot', '/rankings', '/recaps']);
-    expect(NAV_ITEMS.map(i => i.label)).toEqual(['Tonight', 'Games', 'Heat map', 'Rankings', 'Stories']);
+    expect(NAV_ITEMS.map(i => i.href)).toEqual(['/', '/games', '/hot', '/rankings', '/standings', '/recaps']);
+    expect(NAV_ITEMS.map(i => i.label)).toEqual(['Tonight', 'Games', 'Heat map', 'Rankings', 'Standings', 'Stories']);
   });
   it('keeps a mobile tab bar with the schedule and a Search action (no /search page)', () => {
     expect(MOBILE_NAV_ITEMS.map(i => i.label)).toEqual(['Tonight', 'Games', 'Heat', 'Rankings', 'Search']);

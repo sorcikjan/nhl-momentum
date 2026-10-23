@@ -3,13 +3,14 @@ import { ArticleGrid } from './ArticleGrid';
 import { HeatHero } from './HeatHero';
 import { MoreRankings } from './MoreRankings';
 import { ResultsSection } from './ResultsSection';
-import { TeamHeatGrid } from './TeamHeatGrid';
+import { LeadersSection, StandingsSection } from './StandingsSection';
 import { TonightSlate } from './TonightSlate';
 
 // Homepage (agreed 2026-10-22): finished games first — the reason to come
 // back — then Heat, the USP; tonight's games; goalies and rookies; stories;
-// teams last. Every heading is a SectionHeading, every player list a PlayerRow.
-export const HOME_SECTIONS = ['results', 'heat', 'tonight', 'rankings', 'stories', 'teams'] as const;
+// the official standings and leaders (with Heat beside them) last. Every
+// heading is a SectionHeading, every player list a PlayerRow.
+export const HOME_SECTIONS = ['results', 'heat', 'tonight', 'rankings', 'stories', 'standings', 'leaders'] as const;
 
 export function HomeBody({ data }: { data: HomeData }) {
   return (
@@ -19,7 +20,8 @@ export function HomeBody({ data }: { data: HomeData }) {
       <TonightSlate games={data.tonight} nextGameDate={data.nextGameDate} />
       <MoreRankings goalies={data.goalies} rookies={data.rookies} />
       <ArticleGrid night={data.night} games={data.gameStories} />
-      <TeamHeatGrid teams={data.teams} />
+      <StandingsSection rows={data.standings} />
+      <LeadersSection boards={data.statLeaders} />
     </div>
   );
 }

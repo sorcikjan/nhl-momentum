@@ -10,6 +10,7 @@ export const NAV_ITEMS = [
   { href: '/games', label: 'Games' },
   { href: '/hot', label: 'Heat map' },
   { href: '/rankings', label: 'Rankings' },
+  { href: '/standings', label: 'Standings' },
   { href: '/recaps', label: 'Stories' },
 ];
 

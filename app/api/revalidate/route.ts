@@ -14,6 +14,8 @@ export async function POST(request: Request) {
   revalidatePath('/');
   revalidatePath('/games');
   revalidatePath('/rankings');
+  revalidatePath('/standings');
+  revalidatePath('/stats');
   revalidatePath('/hot');
   revalidatePath('/players/[id]/[slug]', 'page');
   revalidatePath('/teams/[id]/[slug]', 'page');

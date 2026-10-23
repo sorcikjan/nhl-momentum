@@ -11,6 +11,7 @@ import { gameView } from '@/lib/game-state';
 import { ppmToHeat } from '@/lib/heat';
 import type { KeyPlayer } from '@/lib/key-players';
 import { teamColor } from '@/lib/team-colors';
+import { GOALIE_BOARDS, SKATER_BOARDS, fetchLeaders, fetchStandings, type LeaderBoard, type StandingRow } from '@/lib/nhl-stats';
 import { nightStories, type FinishedGame as StoryGame, type GameStoryCard, type NightStory } from '@/lib/stories';
 import { gameUrl, playerUrl, teamUrl } from '@/lib/urls';
 
@@ -21,7 +22,6 @@ export type HeatLeader = {
   heat: number; pace: number | null; goals: number; assists: number; games: number;
   tonight: { href: string; opponent: string; time: string | null } | null;
 };
-export type TeamHeatRow = { abbrev: string; name: string; heat: number; href: string | null };
 export type HomeData = {
   today: string;
   tonight: GameCardData[]; nextGameDate: string | null;
@@ -30,7 +30,7 @@ export type HomeData = {
   leader: HeatLeader | null; leaders: PlayerRowData[];
   heatingUp: PlayerRowData[]; coolingOff: PlayerRowData[];
   goalies: PlayerRowData[]; rookies: PlayerRowData[];
-  teams: TeamHeatRow[];
+  standings: StandingRow[]; statLeaders: LeaderBoard[];
 };
 
 const side = (abbrev: string): TeamSide => ({ abbrev, name: teamColor(abbrev).name });
@@ -179,18 +179,18 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
     .filter(r => !shown.has(r.player_id) && (pacePct(r.momentum_ppm, r.season_ppm) ?? 0) > 0).slice(0, 5).map(r => skaterRow(r, '↑', 'up'));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const coolingOff = ((rankings?.coolingWatch ?? []) as any[]).slice(0, 5).map(r => skaterRow(r, '↓', 'cool'));
-  const teams: TeamHeatRow[] = Object.entries(rankings?.teamHeat ?? {})
-    .map(([abbrev, heat]) => {
-      const t = rankings?.teams?.[abbrev];
-      return { abbrev, name: t?.name ?? teamColor(abbrev).name, heat, href: t ? teamUrl(t.id, t.name) : null };
-    })
-    .sort((a, b) => b.heat - a.heat);
+  // Official standings and leaders (NHL.com), each with our Heat beside it.
+  const [standings, skaterBoards, goalieBoards] = await Promise.all([
+    safe(fetchStandings(rankings?.teamHeat, rankings?.teams), []),
+    safe(fetchLeaders(SKATER_BOARDS.slice(0, 3), 'skater', 5, rankings?.heatByPlayer), []),
+    safe(fetchLeaders(GOALIE_BOARDS.slice(0, 1), 'goalie', 5), []),
+  ]);
 
   return {
     today, tonight, nextGameDate, resultsDate, results, night, gameStories,
     leader, leaders, heatingUp, coolingOff,
     goalies: goalies.slice(0, 10).map((g, i) => goalieRow(g, i + 1)),
     rookies: rookies.slice(0, 10).map((r, i) => rookieRow(r, i + 1)),
-    teams,
+    standings, statLeaders: [...skaterBoards, ...goalieBoards],
   };
 }
