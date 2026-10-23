@@ -306,10 +306,15 @@ export interface RecapGame {
   homeScore: number;
   finish?: 'REG' | 'OT' | 'SO'; // how the game ended (NHL score feed)
   goals?: string[];           // "P1 05:58 BUF Josh Doan (P. Krebs) EV" — the only scoring facts the model may use
+  tallies?: PlayerTally[];    // per-player goals/assists from the same feed, to check the article against
   predictedCorrectly: boolean | null;
   homeWinProbability: number | null;
   seriesContext?: string;
 }
+
+// One player's line in one game, from the NHL score feed. `name` is the feed's
+// short form ("C. Knuble"): initial, period, last name.
+export interface PlayerTally { name: string; goals: number; assists: number }
 
 export interface RecapPerformer {
   name: string;
@@ -438,8 +443,9 @@ Respond with valid JSON (no markdown, no code blocks):
   // Generate, then reject outputs that contradict the facts we supplied (the old
   // prompt had no scoring data, and recaps invented overtime winners and team
   // nicknames). One retry, then give up — no recap beats a wrong one.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const raw = await ask(prompt);
+  let feedback = '';
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const raw = await ask(prompt + feedback);
     if (!raw) return null;
     const parsed = parseRecapOutput(raw, input);
     if (!parsed) { lastAiError = 'unparseable model response'; continue; }
@@ -447,6 +453,7 @@ Respond with valid JSON (no markdown, no code blocks):
     if (!problem) return parsed;
     lastAiError = `recap rejected: ${problem}`;
     console.warn(`[ai] recap attempt ${attempt + 1} rejected: ${problem}`);
+    feedback = `\n\nYOUR PREVIOUS DRAFT WAS REJECTED BY THE FACT CHECK: ${problem}. Write it again, using only the facts above.`;
   }
   return null;
 }
@@ -475,6 +482,69 @@ export function recapFactProblem(out: DailyRecapOutput, games: RecapGame[]): str
           return `wrong team name "${city} ${m[1]}" (should be ${full})`;
         }
       }
+    }
+  }
+  return playerClaimProblem(text, games.flatMap(g => g.tallies ?? []));
+}
+
+const NUM: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
+const num = (w: string) => NUM[w.toLowerCase()] ?? (/^\d+$/.test(w) ? Number(w) : null);
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// Player stat claims checked against the score feed: hat tricks, "two goals",
+// "scored twice", "three assists", "four-point night". Each claim belongs to
+// the nearest player named before it in the same sentence ("Celebrini's hat
+// trick", "Knuble scored twice"); sentences pooling players ("combined for")
+// and team numbers ("a two-goal lead") are left alone. The recap of 2026-10-20
+// gave Macklin Celebrini a hat trick; the feed had him at two goals.
+const TEAM_NOUN = /^\s*(deficit|lead|cushion|advantage|margin|hole|gap|win|victory|game|edge|swing|outburst|period|frame|rally|comeback|burst)/i;
+// "a four-point night" is about a player; "a five-goal unanswered run" is not.
+const PLAYER_NOUN = /^\s*(night|performance|outing|effort|showing|evening|afternoon|haul|day)\b/i;
+// A claim and its player sit in the same clause: nothing like this between them.
+const CLAUSE_BREAK = /[:;]|\b(while|but|only|before|after|then|whereas|until)\b/i;
+
+export function playerClaimProblem(text: string, tallies: PlayerTally[]): string | null {
+  const players = tallies.flatMap(t => {
+    const m = t.name.match(/^(\p{L})\.\s*(.+)$/u);
+    if (!m) return [];
+    const [, first, last] = m;
+    const shared = tallies.filter(o => o.name.replace(/^\p{L}\.\s*/u, '') === last).length > 1;
+    // "Cole Knuble" always; plain "Knuble" too unless two players share the name (the Tkachuks).
+    const re = shared
+      ? new RegExp(`\\b${esc(first)}[\\p{L}'’-]*\\s+${esc(last)}(?![\\p{L}])`, 'gu')
+      : new RegExp(`(?<![\\p{L}])${esc(last)}(?![\\p{L}])`, 'gu');
+    return [{ ...t, re }];
+  });
+  if (!players.length) return null;
+  const maxGoals = Math.max(...tallies.map(t => t.goals));
+  for (const sentence of text.split(/(?<=[.!?])\s+(?=[A-Z])|\n+/)) {
+    if (/hat[- ]trick/i.test(sentence) && maxGoals < 3) return `"${sentence.trim()}" — nobody scored three goals`;
+    if (/\bcombined\b|\btogether\b|between them/i.test(sentence)) continue;
+    const mentions = players.flatMap(p => [...sentence.matchAll(p.re)].map(m => ({ p, at: m.index ?? 0 })));
+    if (!mentions.length) continue;
+    const owner = (at: number) => {
+      const m = mentions.filter(x => x.at < at).sort((a, b) => b.at - a.at)[0];
+      return m && !CLAUSE_BREAK.test(sentence.slice(m.at, at)) ? m.p : undefined;
+    };
+    const claims: { at: number; claim: string; ok: (t: PlayerTally) => boolean }[] = [];
+    for (const m of sentence.matchAll(/hat[- ]trick/gi)) claims.push({ at: m.index ?? 0, claim: 'a hat trick', ok: t => t.goals >= 3 });
+    for (const m of sentence.matchAll(/scored twice/gi)) claims.push({ at: m.index ?? 0, claim: 'two goals', ok: t => t.goals === 2 });
+    const counted: [RegExp, string, (t: PlayerTally) => number][] = [
+      [/\b(\w+)([- ])goals?\b/gi, 'goals', t => t.goals],
+      [/\b(\w+)([- ])assists?\b/gi, 'assists', t => t.assists],
+      [/\b(\w+)([- ])points?\b/gi, 'points', t => t.goals + t.assists],
+    ];
+    for (const [re, what, value] of counted) {
+      for (const m of sentence.matchAll(re)) {
+        const n = num(m[1]);
+        const after = sentence.slice((m.index ?? 0) + m[0].length);
+        if (n == null || (m[2] === '-' ? !PLAYER_NOUN.test(after) : TEAM_NOUN.test(after))) continue;
+        claims.push({ at: m.index ?? 0, claim: `${m[1]} ${what}`, ok: t => value(t) === n });
+      }
+    }
+    for (const c of claims) {
+      const p = owner(c.at);
+      if (p && !c.ok(p)) return `"${sentence.trim()}" — ${p.name} had ${p.goals}G ${p.assists}A, not ${c.claim}`;
     }
   }
   return null;

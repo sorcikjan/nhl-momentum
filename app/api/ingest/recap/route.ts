@@ -3,7 +3,7 @@ import { requireIngestAuth } from '@/lib/ingest-auth';
 import { supabaseAdmin } from '@/lib/supabase';
 import { fetchRecapData, fetchRecentSoftSignals } from '@/lib/data';
 import { generateDailyRecap, lastAiError } from '@/lib/ai';
-import type { RecapGame, RecapPerformer, RecapShutout } from '@/lib/ai';
+import type { PlayerTally, RecapGame, RecapPerformer, RecapShutout } from '@/lib/ai';
 
 // Fetch a free hockey photo from Pixabay (Pixabay License — no attribution required).
 // Uses a date-seeded page offset so each recap gets a different image.
@@ -164,7 +164,7 @@ export async function GET(req: NextRequest) {
 
   // Scoring facts from the NHL score feed — the model may only describe these.
   // Without them it invented overtime winners and team nicknames.
-  const scoreFeed = new Map<number, { finish: 'REG' | 'OT' | 'SO'; goals: string[] }>();
+  const scoreFeed = new Map<number, { finish: 'REG' | 'OT' | 'SO'; goals: string[]; tallies: PlayerTally[] }>();
   try {
     const res = await fetch(`https://api-web.nhle.com/v1/score/${date}`, { cache: 'no-store', signal: AbortSignal.timeout(10_000) });
     if (res.ok) {
@@ -180,7 +180,22 @@ export async function GET(req: NextRequest) {
           const tags = [gl.strength && gl.strength !== 'ev' ? gl.strength.toUpperCase() : '', gl.goalModifier === 'empty-net' ? 'EN' : ''].filter(Boolean).join(' ');
           return `${per} ${gl.timeInPeriod} ${gl.teamAbbrev} ${scorer}${assists ? ` (${assists})` : ' (unassisted)'}${tags ? ` ${tags}` : ''}`;
         });
-        if (type === 'REG' || type === 'OT' || type === 'SO') scoreFeed.set(fg.id, { finish: type, goals });
+        // Per-player goals and assists, keyed by the feed's short name ("C. Knuble").
+        const tally = new Map<string, PlayerTally>();
+        const add = (name: string | undefined, k: 'goals' | 'assists') => {
+          if (!name) return;
+          const t = tally.get(name) ?? { name, goals: 0, assists: 0 };
+          t[k]++;
+          tally.set(name, t);
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        for (const gl of (fg.goals ?? []) as any[]) {
+          if (gl.periodDescriptor?.periodType === 'SO') continue; // shootout goals aren't goals
+          add(gl.name?.default, 'goals');
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          for (const a of (gl.assists ?? []) as any[]) add(a.name?.default, 'assists');
+        }
+        if (type === 'REG' || type === 'OT' || type === 'SO') scoreFeed.set(fg.id, { finish: type, goals, tallies: [...tally.values()] });
       }
     }
   } catch (err) {
@@ -207,6 +222,7 @@ export async function GET(req: NextRequest) {
       homeName: g.home_team?.name ?? undefined,
       finish: scoreFeed.get(g.id)?.finish,
       goals: scoreFeed.get(g.id)?.goals,
+      tallies: scoreFeed.get(g.id)?.tallies,
       awayScore: g.away_score ?? 0,
       homeScore: g.home_score ?? 0,
       predictedCorrectly,
