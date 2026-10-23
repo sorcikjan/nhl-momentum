@@ -13,7 +13,7 @@ import type { KeyPlayer } from '@/lib/key-players';
 import { teamColor } from '@/lib/team-colors';
 import { GOALIE_BOARDS, SKATER_BOARDS, fetchLeaders, fetchStandings, type LeaderBoard, type StandingRow } from '@/lib/nhl-stats';
 import { nightStories, type FinishedGame as StoryGame, type GameStoryCard, type NightStory } from '@/lib/stories';
-import { gameUrl, playerUrl, teamUrl } from '@/lib/urls';
+import { gameUrl, playerUrl } from '@/lib/urls';
 
 export type TeamSide = { abbrev: string; name: string };
 // #1 on the Heat list: the hero card.
