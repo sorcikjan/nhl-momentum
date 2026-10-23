@@ -1,6 +1,7 @@
 import { HeatPill, SectionHeading, TeamChip } from '@/components/ds';
 import type { Chip, GameRow, Tile, Tone, VsRow } from '@/lib/player-profile';
 import { PlayerHero, type HeroProps } from './PlayerHero';
+import { TrendChart, type TrendData } from './TrendChart';
 
 const MONO = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' } as const;
 const tone = (t?: Tone) =>
@@ -9,8 +10,7 @@ const card = { background: 'var(--bg-card)', borderColor: 'var(--border)' } as c
 
 export type ProfileView = {
   hero: HeroProps;
-  series: { date: string; heat: number }[];
-  seasonAvgHeat: number | null;
+  trend: TrendData;
   chips: Chip[];
   perfEval: React.ReactNode;
   last5: Tile[];
@@ -21,41 +21,6 @@ export type ProfileView = {
   radar: { label: string; value: number }[];
   vsRows: VsRow[];
 };
-
-// Heat over time (design FORM TRACKER): area + line, end dot, season-average guide.
-function FormTracker({ series, seasonAvgHeat }: { series: ProfileView['series']; seasonAvgHeat: number | null }) {
-  const W = 1280, H = 220, pad = 18;
-  if (series.length < 2) {
-    return <div className="rounded-xl border p-6 text-sm" style={{ ...card, color: 'var(--text-muted)' }}>Not enough games yet for a trend.</div>;
-  }
-  const x = (i: number) => (i / (series.length - 1)) * W;
-  const y = (h: number) => H - pad - (h / 100) * (H - pad * 2);
-  const line = series.map((p, i) => `${i ? 'L' : 'M'} ${x(i).toFixed(1)} ${y(p.heat).toFixed(1)}`).join(' ');
-  const last = series[series.length - 1];
-  const fmt = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
-  return (
-    <div className="rounded-xl border p-4 lg:p-6" style={card}>
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-[140px] w-full lg:h-[220px]" preserveAspectRatio="none" aria-label="Heat over time">
-        {[0.2, 0.4, 0.6, 0.8].map(f => (
-          <line key={f} x1="0" y1={H * f} x2={W} y2={H * f} stroke="var(--border-soft)" strokeWidth="1" strokeDasharray="3 5" />
-        ))}
-        {seasonAvgHeat != null && (
-          <>
-            <line x1="0" y1={y(seasonAvgHeat)} x2={W} y2={y(seasonAvgHeat)} stroke="var(--text-muted)" strokeWidth="1" strokeDasharray="6 6" />
-            <text x={W - 10} y={y(seasonAvgHeat) - 6} fontSize="12" fill="var(--text-muted)" textAnchor="end" style={MONO}>season avg {seasonAvgHeat}</text>
-          </>
-        )}
-        <path d={`${line} L ${W} ${H} L 0 ${H} Z`} fill="var(--heat)" opacity="0.12" />
-        <path d={line} stroke="var(--heat)" strokeWidth="3" fill="none" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        <circle cx={x(series.length - 1)} cy={y(last.heat)} r="6" fill="var(--heat)" />
-      </svg>
-      <div className="mt-3 flex justify-between text-[10px] font-semibold" style={{ ...MONO, color: 'var(--text-muted)' }}>
-        <span>{fmt(series[0].date)}</span>
-        <span className="font-bold" style={{ color: 'var(--heat)' }}>NOW · {last.heat}</span>
-      </div>
-    </div>
-  );
-}
 
 function Tiles({ tiles, cols }: { tiles: Tile[]; cols: string }) {
   return (
@@ -152,12 +117,10 @@ export function ProfileBody({ view }: { view: ProfileView }) {
     <div className="flex flex-col gap-8">
       <PlayerHero {...view.hero} />
 
-      {view.hero.heatNote == null && (
-        <section>
-          <SectionHeading kicker="FORM TRACKER" title="Heat over time." size="feature" />
-          <FormTracker series={view.series} seasonAvgHeat={view.seasonAvgHeat} />
-        </section>
-      )}
+      <section>
+        <SectionHeading kicker="FORM TRACKER" title={view.trend.kind === 'goalie' ? 'Form over time.' : 'Heat over time.'} sub="Pick a stat and a time span: the last two weeks, the last 25 games or the whole season." size="feature" />
+        <TrendChart data={view.trend} />
+      </section>
 
       <section>
         <SectionHeading kicker="RECENT FORM · AI" title="What the numbers say." size="feature" />

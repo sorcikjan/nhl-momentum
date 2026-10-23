@@ -12,8 +12,8 @@ const hero: HeroProps = {
 
 const view: ProfileView = {
   hero,
-  series: [{ date: '2026-10-10', heat: 80 }, { date: '2026-10-18', heat: 100 }],
-  seasonAvgHeat: 90,
+  trend: { kind: 'skater', heat: [{ date: '2026-10-10', heat: 80 }, { date: '2026-10-18', heat: 100 }], seasonAvgHeat: 90,
+    games: [{ date: '2026-10-10', opp: 'TOR', g: 1, a: 0, pts: 1, sog: 3, toi: 18.5, pm: 1 }, { date: '2026-10-18', opp: 'BOS', g: 0, a: 2, pts: 2, sog: 2, toi: 20.1, pm: 0 }] },
   chips: [{ label: 'Trend', value: 'Climbing', tone: 'rise' }],
   perfEval: null,
   last5: [{ label: 'G', value: '5' }],

@@ -194,10 +194,15 @@ async function buildRankings() {
     .sort((a, b) => (a.breakout_delta ?? 0) - (b.breakout_delta ?? 0))
     .slice(0, 10);
   // Layer 2: momentum window floor — at least 3 of last 5 games played.
-  const momentumLeaderSkaters = [...skaters]
+  const heatOrder = [...skaters]
     .filter((r: any) => (r.momentum_games ?? 0) >= 3)
-    .sort((a, b) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0))
-    .slice(0, 10);
+    .sort((a, b) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0));
+  // The Heat Index: top 50 (homepage shows 9, /hot all of them).
+  const momentumLeaderSkaters = heatOrder.slice(0, 50);
+  // Each team's hottest skater ("who's hot on my team").
+  const hottestByTeam = [...new Map(heatOrder.filter((r: any) => r.players?.teams?.abbrev)
+    .map((r: any) => [r.players.teams.abbrev as string, r] as const).reverse()).values()]
+    .sort((a: any, b: any) => (b.momentum_ppm ?? 0) - (a.momentum_ppm ?? 0));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const goalies = latest.filter((r: any) => r.players?.position_code === 'G');
   const momentumLeaderGoalies = [...goalies]
@@ -321,6 +326,7 @@ async function buildRankings() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((r: any) => [r.player_id as number, ppmToHeat(r.momentum_ppm)])) as Record<number, number>,
     momentumLeaders: { skaters: momentumLeaderSkaters, goalies: momentumLeaderGoalies },
+    hottestByTeam,
     sparklineSnapshots: (rawSparklines ?? []) as { player_id: number; calculated_at: string; momentum_ppm: number }[],
   };
 }
@@ -495,10 +501,11 @@ export async function fetchPlayer(id: string) {
 
   const isGoalie = player?.position_code === 'G';
 
-  // The page needs the latest snapshot in full and, for the 42-day Heat chart,
-  // three columns of the rest (it used to read 300 full rows per render).
+  // The page needs the latest snapshot in full and, for the season-long trend
+  // chart, three columns of the rest — about one row a day (older days keep
+  // one snapshot each). It used to read 300 full rows per render.
   // A date (not a timestamp) keeps the query's fallback key stable all day.
-  const since = new Date(Date.now() - 43 * 86_400_000).toISOString().slice(0, 10);
+  const since = `${currentSeason().slice(0, 4)}-09-01`;
   const [{ data: latestSnap }, { data: history }, { data: rawGameStats }] = await Promise.all([
     supabaseAdmin
       .from('player_metric_snapshots')

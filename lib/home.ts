@@ -64,6 +64,27 @@ export function toResultCard(g: FinishedGame, pred: Pred): GameCardData {
 }
 
 
+// The #1 on the Heat list as the hero card (homepage and /hot). `tonight` is
+// his team's game today, if any.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function heatLeader(top: any, topTonight?: GameCardData): HeatLeader {
+  return {
+    playerId: top.player_id,
+    href: playerUrl(top.player_id, top.players?.first_name ?? '', top.players?.last_name ?? ''),
+    first: top.players?.first_name ?? '', last: top.players?.last_name ?? '',
+    photo: top.players?.headshot_url ?? null,
+    team: top.players?.teams?.abbrev ?? '', teamName: top.players?.teams?.name ?? '',
+    pos: posLabel(top.players?.position_code),
+    heat: ppmToHeat(top.momentum_ppm), pace: pacePct(top.momentum_ppm, top.season_ppm),
+    goals: top.momentum_goals ?? 0, assists: top.momentum_assists ?? 0, games: top.momentum_games ?? 0,
+    tonight: topTonight && gameView(topTonight.state) === 'upcoming' ? {
+      href: topTonight.href,
+      opponent: topTonight.away.abbrev === top.players?.teams?.abbrev ? topTonight.home.name : topTonight.away.name,
+      time: topTonight.startTimeUTC,
+    } : null,
+  };
+}
+
 async function safe<T>(p: Promise<T>, fallback: T): Promise<T> {
   try { return await p; } catch (err) { console.error('[home]', err); return fallback; }
 }
@@ -156,21 +177,7 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
   const skaters = (rankings?.momentumLeaders?.skaters ?? []) as any[];
   const top = skaters[0];
   const topTonight = top ? tonight.find(c => c.away.abbrev === top.players?.teams?.abbrev || c.home.abbrev === top.players?.teams?.abbrev) : undefined;
-  const leader: HeatLeader | null = top ? {
-    playerId: top.player_id,
-    href: playerUrl(top.player_id, top.players?.first_name ?? '', top.players?.last_name ?? ''),
-    first: top.players?.first_name ?? '', last: top.players?.last_name ?? '',
-    photo: top.players?.headshot_url ?? null,
-    team: top.players?.teams?.abbrev ?? '', teamName: top.players?.teams?.name ?? '',
-    pos: posLabel(top.players?.position_code),
-    heat: ppmToHeat(top.momentum_ppm), pace: pacePct(top.momentum_ppm, top.season_ppm),
-    goals: top.momentum_goals ?? 0, assists: top.momentum_assists ?? 0, games: top.momentum_games ?? 0,
-    tonight: topTonight && gameView(topTonight.state) === 'upcoming' ? {
-      href: topTonight.href,
-      opponent: topTonight.away.abbrev === top.players?.teams?.abbrev ? topTonight.home.name : topTonight.away.name,
-      time: topTonight.startTimeUTC,
-    } : null,
-  } : null;
+  const leader = top ? heatLeader(top, topTonight) : null;
   const leaders = skaters.slice(1, 9).map((r, i) => skaterRow(r, String(i + 2), 'rank'));
   // Not the players already on the Heat list right above — new names only.
   const shown = new Set(skaters.slice(0, 9).map(r => r.player_id));

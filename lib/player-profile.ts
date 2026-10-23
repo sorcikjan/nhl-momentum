@@ -39,6 +39,21 @@ export function formChips(i: { heats: number[]; pointsByGame: number[]; energy: 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export type GameRow = { date: string; opponent: string; home: boolean; result: 'W' | 'L' | null; goals: number; assists: number; plusMinus: number; toi: string; heat: number };
 
+// The trend chart's games, oldest first, this season only. Skater rows come
+// from game_player_stats, goalie rows from game_goalie_stats (both with games joined).
+export function trendGames(games: any[], teamId: number | null, kind: 'skater' | 'goalie', seasonStart: string): import('@/components/player/TrendChart').TrendGame[] {
+  return games
+    .filter(g => (g.games?.game_date ?? '') >= seasonStart)
+    .map(g => {
+      const gm = g.games ?? {};
+      const opp = (gm.home_team_id === teamId ? gm.away_team?.abbrev : gm.home_team?.abbrev) ?? '';
+      return kind === 'goalie'
+        ? { date: gm.game_date, opp, svPct: g.save_pct != null ? Number(g.save_pct) : null, ga: g.goals_against ?? 0, sa: g.shots_against ?? 0 }
+        : { date: gm.game_date, opp, g: g.goals ?? 0, a: g.assists ?? 0, pts: (g.goals ?? 0) + (g.assists ?? 0), sog: g.shots_on_goal ?? 0, toi: Math.round(Number(g.toi_seconds ?? 0) / 6) / 10, pm: g.plus_minus ?? 0 };
+    })
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export function gameLogRows(games: any[], teamId: number | null): GameRow[] {
   return games.map(g => {
     const gm = g.games ?? {};

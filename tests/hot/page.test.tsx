@@ -3,47 +3,44 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { hotView } from '@/lib/hot-view';
 import { HotBody } from '@/components/hot/HotBody';
 
-const sk = (id: number, ppm: number, sea: number) => ({
+const sk = (id: number, ppm: number, sea: number, team = 'EDM') => ({
   player_id: id, momentum_ppm: ppm, season_ppm: sea, momentum_goals: 3, momentum_assists: 4, momentum_games: 5, season_points: 20,
-  players: { first_name: 'Joe', last_name: `Player${id}`, position_code: 'C', teams: { abbrev: 'EDM' } },
+  players: { first_name: 'Joe', last_name: `Player${id}`, position_code: 'C', teams: { abbrev: team, name: `Team ${team}` } },
 });
+const leaders = Array.from({ length: 30 }, (_, i) => sk(i + 1, 0.12 - i * 0.003, 0.06));
 
 describe('hotView', () => {
-  it('takes #1, then up to 8 more, then breakouts and cooling', () => {
-    const leaders = Array.from({ length: 10 }, (_, i) => sk(i + 1, 0.12 - i * 0.01, 0.06));
-    const v = hotView({ momentumLeaders: { skaters: leaders }, breakoutWatch: [sk(20, 0.1, 0.04)], coolingWatch: [sk(30, 0.02, 0.08)] });
-    expect(v.top?.playerId).toBe(1);
-    expect(v.rest.map(r => r.playerId)).toEqual([2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(v.breakouts[0].sub).toBe('+150% vs season pace');
-    expect(v.cooling[0]).toMatchObject({ heat: 17, prev: 67 });
+  it('#1 as the leader card, 2–10 beside it, 11–50 below', () => {
+    const v = hotView({ momentumLeaders: { skaters: leaders } });
+    expect(v.leader?.playerId).toBe(1);
+    expect(v.top.map(r => r.mark)).toEqual(['2', '3', '4', '5', '6', '7', '8', '9', '10']);
+    expect(v.more[0]).toMatchObject({ mark: '11', playerId: 11 });
+    expect(v.more).toHaveLength(20);
   });
-  it('renders with fewer than nine players', () => {
-    const v = hotView({ momentumLeaders: { skaters: [sk(1, 0.1, 0.05), sk(2, 0.09, 0.05)] }, breakoutWatch: [], coolingWatch: [] });
-    expect(v.rest).toHaveLength(1);
+  it('heating up shows new names only, rising above season pace', () => {
+    const v = hotView({ momentumLeaders: { skaters: leaders }, breakoutWatch: [sk(2, 0.1, 0.04), sk(40, 0.1, 0.04), sk(41, 0.03, 0.05)] });
+    expect(v.heatingUp.map(r => r.playerId)).toEqual([40]);
+  });
+  it('one row per team', () => {
+    const v = hotView({ hottestByTeam: [sk(1, 0.1, 0.05, 'EDM'), sk(2, 0.08, 0.05, 'FLA')] });
+    expect(v.teams.map(t => [t.team, t.teamName, t.row.playerId])).toEqual([['EDM', 'Team EDM', 1], ['FLA', 'Team FLA', 2]]);
   });
 });
 
 describe('HotBody', () => {
-  it('orders sections like the design and never claims hourly updates', () => {
-    const v = hotView({ momentumLeaders: { skaters: [sk(1, 0.1, 0.05), sk(2, 0.09, 0.05)] }, breakoutWatch: [sk(3, 0.1, 0.04)], coolingWatch: [sk(4, 0.02, 0.08)] });
-    const out = renderToStaticMarkup(<HotBody view={v} />);
-    const idx = ['#1 · HOTTEST RIGHT NOW', 'RANKED 2–', 'BREAKOUT WATCH', 'COOLING OFF'].map(k => out.indexOf(k));
+  const v = hotView({ momentumLeaders: { skaters: leaders }, breakoutWatch: [sk(40, 0.1, 0.04)], coolingWatch: [sk(41, 0.02, 0.08)], hottestByTeam: [sk(1, 0.1, 0.05)] });
+  const out = renderToStaticMarkup(<HotBody view={v} updated="OCT 23" />);
+  it('reads top-down: what Heat is, who leads, who moves, every team, the rest, FAQ', () => {
+    const idx = ['HOW TO READ HEAT', '#1 · HOTTEST RIGHT NOW', 'Heating up.', 'Going cold.', 'Who&#x27;s hot on every team.', 'The rest of the Heat Index.', 'Questions, answered.'].map(k => out.indexOf(k));
     expect(idx.every(i => i >= 0)).toBe(true);
     expect([...idx].sort((a, b) => a - b)).toEqual(idx);
-    expect(out).not.toContain('Updated every hour');
   });
-});
-
-describe('hot copy', () => {
-  it('pluralizes the story line', () => {
-    const one = { ...{ player_id: 1, momentum_ppm: 0.1, season_ppm: 0.05, momentum_goals: 1, momentum_assists: 1, momentum_games: 1 }, players: { first_name: 'A', last_name: 'B', position_code: 'C', teams: { abbrev: 'EDM' } } };
-    expect(hotView({ momentumLeaders: { skaters: [one] } }).top?.story).toMatch(/^1 goal and 1 assist in his last game/);
+  it('one h1, search-facing', () => {
+    expect(out.match(/<h1/g)).toHaveLength(1);
+    expect(out).toContain('The hottest players in the NHL right now.');
   });
-});
-
-describe('HotBody sharing', () => {
-  it('offers sharing the Heat leaders', () => {
-    const v = hotView({ momentumLeaders: { skaters: [sk(1, 0.1, 0.05), sk(2, 0.09, 0.05)] }, breakoutWatch: [], coolingWatch: [] });
-    expect(renderToStaticMarkup(<HotBody view={v} />)).toContain('Share');
+  it('the long tail is in the HTML, behind a click', () => {
+    expect(out).toContain('<details');
+    expect(out).toContain('Player30');
   });
 });

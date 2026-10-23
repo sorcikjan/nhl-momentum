@@ -37,8 +37,8 @@ describe('player photos in player rows', () => {
   });
   it('heat page shows headshots', () => {
     const v = hotView({ momentumLeaders: { skaters: [sk(1), sk(2)] }, breakoutWatch: [sk(3)], coolingWatch: [sk(4)] });
-    expect(v.top?.photo).toBe(PHOTO);
-    const out = renderToStaticMarkup(<HotBody view={v} />);
+    expect(v.leader?.photo).toBe(PHOTO);
+    const out = renderToStaticMarkup(<HotBody view={v} updated="OCT 23" />);
     expect(out.split(PHOTO).length - 1).toBeGreaterThanOrEqual(4);
   });
   it('homepage rank lists show headshots, initials when missing', () => {

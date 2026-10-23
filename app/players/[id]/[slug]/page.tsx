@@ -8,7 +8,7 @@ import { getPlayerInsights, type PlayerAIInput } from '@/lib/ai';
 import { deriveArchetype } from '@/lib/archetype';
 import { ppmToHeat } from '@/lib/heat';
 import { currentSeason } from '@/lib/nhl-api';
-import { formChips, gameLogRows, heatSeries, last5Tiles, radarStats, seasonTiles, vsLeagueRows, type Tile } from '@/lib/player-profile';
+import { formChips, gameLogRows, heatSeries, trendGames, last5Tiles, radarStats, seasonTiles, vsLeagueRows, type Tile } from '@/lib/player-profile';
 import { assertDatabaseUp, databaseDown } from '@/lib/supabase';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { personLd, playerTitle } from '@/lib/seo';
@@ -121,7 +121,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   // Heat is a skater scoring metric: goalies and players without games this season get none.
   const heat = !isGoalie && hasSeason ? ppmToHeat(snap.momentum_ppm) : null;
   // Change vs the previous day with data (daily series, empty windows skipped).
-  const daily = heatSeries(metricTimeline ?? [], new Date(), 42);
+  const daily = heatSeries(metricTimeline ?? [], new Date(), 400);
   const heatDelta = heat != null && daily.length >= 2 ? heat - daily[daily.length - 2].heat : null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rankIdx = (rankings?.top100 ?? []).findIndex((r: any) => r.player_id === Number(id));
@@ -170,7 +170,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   };
 
   const heightIn = player.height_inches;
-  const series = daily;
   const view = {
     hero: {
       first: player.first_name, last: player.last_name, team,
@@ -200,9 +199,13 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
         </Suspense>
       ),
     },
-    series: isGoalie ? [] : series,
-    seasonAvgHeat: !isGoalie && hasSeason ? ppmToHeat(snap.season_ppm) : null,
-    chips: formChips({ heats: series.map(p => p.heat), pointsByGame: games.slice(0, 10).map(g => (g.goals ?? 0) + (g.assists ?? 0)), energy, heat }),
+    trend: {
+      kind: isGoalie ? 'goalie' as const : 'skater' as const,
+      heat: isGoalie ? [] : daily,
+      seasonAvgHeat: !isGoalie && hasSeason ? ppmToHeat(snap.season_ppm) : null,
+      games: trendGames(games, player.team_id, isGoalie ? 'goalie' : 'skater', `${currentSeason().slice(0, 4)}-09-01`),
+    },
+    chips: formChips({ heats: daily.slice(-42).map(p => p.heat), pointsByGame: games.slice(0, 10).map(g => (g.goals ?? 0) + (g.assists ?? 0)), energy, heat }),
     perfEval: (
       <Suspense fallback={<div className="h-28 animate-pulse rounded-lg" style={{ background: 'var(--bg)' }} />}>
         <AIPerfEval playerId={Number(id)} aiInput={aiInput} />

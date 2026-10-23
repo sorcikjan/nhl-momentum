@@ -1,46 +1,28 @@
-// Heat page view (docs/design/redesign-2026 DesktopHotPlayers / MobileHotPlayers).
-import { ppmToHeat } from '@/lib/heat';
-import { playerUrl } from '@/lib/urls';
+// The Heat Index page (/hot): built for someone who lands here from a search
+// and needs to get it in seconds — what Heat is, who leads, who's rising or
+// falling, who's hot on their team — with the same rows as the homepage.
+import { heatLeader, type HeatLeader } from '@/lib/home';
+import { skaterRow, type PlayerRowData } from '@/lib/player-row';
+import { pacePct } from '@/lib/player-row';
 
-export type HotPlayer = {
-  playerId: number; href: string; first: string; last: string; photo: string | null; team: string; pos: string;
-  heat: number; prev: number; sub: string; story: string;
+export type TeamHot = { team: string; teamName: string; row: PlayerRowData };
+export type HotView = {
+  leader: HeatLeader | null; top: PlayerRowData[]; more: PlayerRowData[];
+  heatingUp: PlayerRowData[]; coolingOff: PlayerRowData[]; teams: TeamHot[];
 };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-const pace = (s: any) => {
-  const sea = Number(s.season_ppm ?? 0);
-  return sea > 0 ? Math.round(((Number(s.momentum_ppm ?? 0) - sea) / sea) * 100) : null;
-};
-
-const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
-
-function toHot(s: any): HotPlayer {
-  const p = pace(s);
-  const g = s.momentum_goals ?? 0, a = s.momentum_assists ?? 0, n = s.momentum_games ?? 0;
+export function hotView(r: { momentumLeaders?: { skaters?: any[] }; breakoutWatch?: any[]; coolingWatch?: any[]; hottestByTeam?: any[] } | null): HotView {
+  const leaders = r?.momentumLeaders?.skaters ?? [];
+  const shown = new Set(leaders.slice(0, 10).map(s => s.player_id));
   return {
-    playerId: s.player_id,
-    href: playerUrl(s.player_id, s.players?.first_name ?? '', s.players?.last_name ?? ''),
-    first: s.players?.first_name ?? '',
-    last: s.players?.last_name ?? '',
-    photo: s.players?.headshot_url ?? null,
-    team: s.players?.teams?.abbrev ?? '',
-    pos: s.players?.position_code ?? '',
-    heat: ppmToHeat(s.momentum_ppm),
-    prev: ppmToHeat(s.season_ppm),
-    sub: p == null ? `${g + a} pts last ${n}` : `${p > 0 ? '+' : ''}${p}% vs season pace`,
-    story: `${plural(g, 'goal')} and ${plural(a, 'assist')} in his last ${n === 1 ? 'game' : `${n} games`}${p != null && p > 0 ? ` — ${p}% above his season pace` : ''}.`,
-  };
-}
-
-export function hotView(r: { momentumLeaders?: { skaters?: any[] }; breakoutWatch?: any[]; coolingWatch?: any[] } | null) {
-  const leaders = (r?.momentumLeaders?.skaters ?? []).map(toHot);
-  return {
-    top: leaders[0] ?? null,
-    rest: leaders.slice(1, 9),
-    breakouts: (r?.breakoutWatch ?? []).filter(s => (pace(s) ?? 0) > 0).slice(0, 4).map(toHot),
-    cooling: (r?.coolingWatch ?? []).slice(0, 3).map(toHot),
+    leader: leaders[0] ? heatLeader(leaders[0]) : null,
+    top: leaders.slice(1, 10).map((s, i) => skaterRow(s, String(i + 2), 'rank')),
+    more: leaders.slice(10, 50).map((s, i) => skaterRow(s, String(i + 11), 'rank')),
+    // New names only: not the ones already in the top ten.
+    heatingUp: (r?.breakoutWatch ?? []).filter(s => !shown.has(s.player_id) && (pacePct(s.momentum_ppm, s.season_ppm) ?? 0) > 0).slice(0, 10).map(s => skaterRow(s, '↑', 'up')),
+    coolingOff: (r?.coolingWatch ?? []).slice(0, 10).map(s => skaterRow(s, '↓', 'cool')),
+    teams: (r?.hottestByTeam ?? []).map(s => ({ team: s.players?.teams?.abbrev ?? '', teamName: s.players?.teams?.name ?? '', row: skaterRow(s, '', 'rank') })),
   };
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
-export type HotView = ReturnType<typeof hotView>;

@@ -13,7 +13,7 @@ function Chip({ children, accent = false }: { children: React.ReactNode; accent?
   );
 }
 
-function LeaderCard({ p }: { p: HeatLeader }) {
+export function LeaderCard({ p }: { p: HeatLeader }) {
   const pace = p.pace == null ? null : `${p.pace > 0 ? '+' : p.pace < 0 ? '−' : ''}${Math.abs(p.pace)}% vs season pace`;
   return (
     <Link
