@@ -145,7 +145,7 @@ ${draftLine}
 Career (${input.careerGames} GP): ${input.careerGoals}G ${input.careerAssists}A ${careerPoints}pts | ${goalsPerGame} G/game | ${assistsPerGame} A/game${input.careerPlusMinus != null ? ` | ${input.careerPlusMinus > 0 ? '+' : ''}${input.careerPlusMinus} +/-` : ''}
 Current season (${input.seaGames} GP): ${input.seaGoals}G ${input.seaAssists}A | ${input.seaToiMin.toFixed(1)} min/game
 
-Write 2–3 sentences that capture who this player IS. What makes them worth watching? Are they a pure scorer, a playmaker who makes everyone around them better, a two-way force, a power play weapon, an iron-minutes shutdown defender? Let the goals/assists split, ice time, and career rate do the talking — but say it in a way a fan wants to read. Direct. Specific. Third person. No generic praise like "plays hard every night" or "gives 110%".`;
+Write 2–3 sentences, at most 60 words in total, that capture who this player IS. What makes them worth watching? Are they a pure scorer, a playmaker who makes everyone around them better, a two-way force, a power play weapon, an iron-minutes shutdown defender? Let the goals/assists split, ice time, and career rate do the talking — but say it in a way a fan wants to read. Direct. Specific. Third person. No generic praise like "plays hard every night" or "gives 110%".`;
 }
 
 // ─── Player performance eval ──────────────────────────────────────────────────
@@ -176,7 +176,7 @@ Breakout delta: ${sign(Number(input.breakoutDelta.toFixed(4)))} PPM
 Recent game log:
 ${gameLogLines || '  No recent games'}
 
-Write 2–3 sentences on this player's current form. Hot streak or cold spell? Is the recent trend meaningful or noise? Connect the numbers to what it means in practice — if a scorer has gone quiet, say so and why it might matter. If someone's quietly playing the best hockey of their season, make that clear. Data-backed but readable. Third person. No clichés.`;
+Write exactly 2 sentences, at most 45 words in total, on this player's current form over these last games. Hot streak or cold spell? Is the recent trend meaningful or noise? Connect the numbers to what it means in practice — if a scorer has gone quiet, say so and why it might matter. If someone's quietly playing the best hockey of their season, make that clear. Data-backed but readable. Third person. No clichés.`;
 }
 
 // ─── Supabase-cached player insights ─────────────────────────────────────────
@@ -190,19 +190,23 @@ export async function getPlayerInsights(
   const PERF_TTL_H  = 24;      // form changes at most once per game day
 
   // Load existing row
-  const { data: row } = await supabaseAdmin
+  const { data: row, error: readErr } = await supabaseAdmin
     .from('ai_player_insights')
     .select('bio, perf_eval, generated_at')
     .eq('player_id', playerId)
-    .single();
+    .maybeSingle();
+  // Unknown what's stored: generating now could write over good texts.
+  if (readErr) return { bio: null, perfEval: null };
 
   const now = Date.now();
   const ageH = row?.generated_at
     ? (now - new Date(row.generated_at).getTime()) / 3_600_000
     : Infinity;
 
-  const needsBio  = !row?.bio  || ageH > BIO_TTL_H;
-  const needsPerf = !row?.perf_eval || ageH > PERF_TTL_H;
+  // Texts from before the length limits (bio 60 words, form 45) are redone.
+  const words = (t: string) => t.trim().split(/\s+/).length;
+  const needsBio  = !row?.bio  || ageH > BIO_TTL_H || words(row.bio) > 75;
+  const needsPerf = !row?.perf_eval || ageH > PERF_TTL_H || words(row.perf_eval) > 60;
 
   if (!needsBio && !needsPerf) {
     return { bio: row!.bio, perfEval: row!.perf_eval };
@@ -213,6 +217,9 @@ export async function getPlayerInsights(
     needsBio  ? ask(buildBioPrompt(input), BULK)      : Promise.resolve(null),
     needsPerf ? ask(buildPerfEvalPrompt(input), BULK) : Promise.resolve(null),
   ]);
+
+  // Nothing new (quota, outage): keep what's stored, untouched, and try again next render.
+  if (!newBio && !newPerf) return { bio: row?.bio ?? null, perfEval: row?.perf_eval ?? null };
 
   const upsertData = {
     player_id:    playerId,

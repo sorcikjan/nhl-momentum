@@ -3,9 +3,9 @@
 
 const BASE = 'https://api-web.nhle.com/v1';
 
-async function get<T>(path: string): Promise<T> {
+async function get<T>(path: string, revalidate = 300): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    next: { revalidate: 300 }, // Next.js cache — 5 min
+    next: { revalidate }, // Next.js data cache, 5 min unless the caller says otherwise
   });
   if (!res.ok) throw new Error(`NHL API ${res.status}: ${path}`);
   return res.json();
@@ -50,8 +50,8 @@ export async function getGoalieGameLog(playerId: number, season: string) {
 
 // ─── Player Info ──────────────────────────────────────────────────────────────
 
-export async function getPlayerLanding(playerId: number) {
-  return get<Record<string, unknown>>(`/player/${playerId}/landing`);
+export async function getPlayerLanding(playerId: number, revalidate = 300) {
+  return get<Record<string, unknown>>(`/player/${playerId}/landing`, revalidate);
 }
 
 // ─── Team Roster ──────────────────────────────────────────────────────────────

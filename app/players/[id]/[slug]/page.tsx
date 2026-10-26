@@ -1,14 +1,14 @@
 import type { Metadata } from 'next';
 import { cache, Suspense } from 'react';
 import { notFound, permanentRedirect } from 'next/navigation';
-import { AIBioBox } from '@/components/player/PlayerHero';
 import { ProfileBody } from '@/components/player/ProfileBody';
-import { daysAgo, deriveOutStatus, fetchLeagueAverages, fetchPlayer, fetchRankings, fetchSeasonPhase } from '@/lib/data';
+import { daysAgo, deriveOutStatus, fetchPeers, fetchPlayer, fetchRankings, fetchSeasonPhase } from '@/lib/data';
 import { getPlayerInsights, type PlayerAIInput } from '@/lib/ai';
 import { deriveArchetype } from '@/lib/archetype';
 import { ppmToHeat } from '@/lib/heat';
-import { currentSeason } from '@/lib/nhl-api';
-import { formChips, gameLogRows, heatSeries, trendGames, last5Tiles, radarStats, seasonTiles, vsLeagueRows, type Tile } from '@/lib/player-profile';
+import { currentSeason, getPlayerLanding } from '@/lib/nhl-api';
+import { gameLogRows, heatSeries, trendGames, type Tile } from '@/lib/player-profile';
+import { energyAverage, gameLines, groupOf, groupWords, heatContext, last5, last5Line, ordinal, paceLine, peerFromSnapshot, peersOf, radarAxes, seasonRows, standings, strengthsLine, trendLine } from '@/lib/profile-context';
 import { assertDatabaseUp, databaseDown } from '@/lib/supabase';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { personLd, playerTitle } from '@/lib/seo';
@@ -19,6 +19,8 @@ import { playerUrl } from '@/lib/urls';
 
 // Deduplicate fetchPlayer between generateMetadata and the page component
 const cachedFetchPlayer = cache((id: string) => fetchPlayer(id).catch(() => null));
+// The two AI texts render in separate Suspense boundaries; one lookup serves both.
+const cachedInsights = cache((playerId: number, aiInput: PlayerAIInput) => getPlayerInsights(playerId, aiInput).catch(() => ({ bio: null, perfEval: null })));
 
 // Player data changes only when the pipeline runs, and every run (nightly and
 // after each finished game) calls /api/revalidate. 6 h keeps crawlers — 800+
@@ -76,6 +78,8 @@ function ageOf(birthDate: string | null | undefined): number | null {
   return birthDate ? Math.floor((Date.now() - Date.parse(birthDate)) / (365.25 * 86_400_000)) : null;
 }
 
+const POSITION: Record<string, string> = { C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defenseman', G: 'Goalie' };
+
 const OUT_LABEL = { injured: 'INJURED', out: 'OUT', scratch: 'SCRATCHED', minors: 'MINORS' } as const;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -96,11 +100,13 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   // Throws only if the database is down and nothing was saved to render from.
   await assertDatabaseUp();
   const { id, slug } = await params;
-  const [data, leagueAvg, seasonPhase, rankings] = await Promise.all([
+  const [data, allPeers, seasonPhase, rankings, landing] = await Promise.all([
     cachedFetchPlayer(id),
-    fetchLeagueAverages().catch(() => null),
+    fetchPeers().catch(() => []),
     fetchSeasonPhase().catch(() => ({ isPreseason: false, regularSeasonStartDate: null, daysUntilStart: null })),
     fetchRankings().catch(() => null),
+    // Career seasons from NHL.com; they change once a game, so the page's own 6 h.
+    getPlayerLanding(Number(id), 21600).catch(() => null),
   ]);
   // A player missing because the database is down is not a 404 (crawlers would drop the page).
   if (!data?.player) { if (databaseDown()) throw new Error('Database unavailable'); notFound(); }
@@ -125,7 +131,6 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   const heatDelta = heat != null && daily.length >= 2 ? heat - daily[daily.length - 2].heat : null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rankIdx = (rankings?.top100 ?? []).findIndex((r: any) => r.player_id === Number(id));
-  const rankLine = heat != null && rankIdx >= 0 ? `#${rankIdx + 1} of ${rankings!.totalSkaters}` : null;
   const energy = snap.energy_bar != null ? Number(snap.energy_bar) : null;
   const lastPlayedDaysAgo = lastPlayedDate ? daysAgo(lastPlayedDate) : null;
   const outStatus = deriveOutStatus(consecutiveGamesMissed ?? null, lastPlayedDaysAgo, player.in_minors ?? false, !seasonPhase.isPreseason);
@@ -169,55 +174,82 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
     })),
   };
 
+  // His position's field: average, rank, leader and percentiles come from it.
+  const me = !isGoalie && hasSeason ? peerFromSnapshot({ ...snap, player_id: player.id, players: { last_name: player.last_name, position_code: player.position_code, teams: { abbrev: team } } }) : null;
+  const peers = me ? peersOf(me, allPeers) : [];
+  const group = groupOf(player.position_code);
+  const words = groupWords(group);
+  const ctx = me && peers.length >= 10 ? { heat: heatContext(me, peers), stands: standings(me, peers), radar: radarAxes(me, peers), energyAvg: energyAverage(peers) } : null;
+  const seasonStart = `${currentSeason().slice(0, 4)}-09-01`;
+  const lines = isGoalie ? [] : gameLines(games, player.team_id, seasonStart, daily);
+  const l5 = me && ctx ? last5(lines, me, peers) : null;
+  const pts = ctx?.stands.find(s => s.key === 'pts');
+  const career = seasonRows(landing);
+  const curSeason = seasonLabel();
+  const gs = goalieStats?.season;
+
   const heightIn = player.height_inches;
   const view = {
     hero: {
-      first: player.first_name, last: player.last_name, team,
-      number: player.sweater_number ?? null, position: player.position_code ?? '', age,
+      first: player.first_name, last: player.last_name, team, teamName: player.teams?.name ?? '',
+      number: player.sweater_number ?? null, position: POSITION[player.position_code ?? ''] ?? player.position_code ?? '', age,
       shoots: player.shoots_catches ?? null,
       height: heightIn ? `${Math.floor(heightIn / 12)}'${heightIn % 12}"` : null,
       weight: player.weight_pounds ? `${player.weight_pounds} lb` : null,
       birthPlace: [player.birth_city, player.birth_state_province ?? player.birth_country].filter(Boolean).join(', ') || null,
       flag: player.birth_country ? COUNTRY_FLAG[player.birth_country] ?? null : null,
       drafted: player.draft_year ? `${player.draft_year} · Rd ${player.draft_round} #${player.draft_pick}` : 'Undrafted',
-      seasonLine: isGoalie && goalieStats
-        ? `${goalieStats.season.wins}-${goalieStats.season.losses}-${goalieStats.season.otl} · ${goalieStats.season.savePct.toFixed(3).replace(/^0/, '')}`
-        : hasSeason ? `${snap.season_goals ?? 0}G · ${snap.season_assists ?? 0}A · ${Number(snap.season_goals ?? 0) + Number(snap.season_assists ?? 0)} pts` : 'No games yet',
       photo: player.headshot_url ?? null,
-      heat, heatDelta, rankLine,
-      heatNote: isGoalie ? 'Heat tracks skater scoring' : undefined,
-      energy,
-      energyNote: lastPlayedDaysAgo != null ? `Last game ${lastPlayedDaysAgo === 0 ? 'today' : lastPlayedDaysAgo === 1 ? '1 day ago' : `${lastPlayedDaysAgo} days ago`}.` : null,
-      archetype: archetype ? { name: archetype.label, blurb: archetype.basis, tags: archetype.tags.map(t => t.text) } : null,
+      archetype: archetype ? { name: archetype.label, basis: archetype.basis } : null,
+      headline: isGoalie
+        ? (gs?.gp
+          ? <><b>{gs.wins}-{gs.losses}-{gs.otl}</b> in {gs.gp} games · save percentage <b>{gs.savePct.toFixed(3).replace(/^0/, '')}</b> · {gs.gaa.toFixed(2)} goals against a game.</>
+          : 'No games yet this season.')
+        : pts
+          ? <><b>{pts.me} point{pts.me === 1 ? '' : 's'} in {seaGames} game{seaGames === 1 ? '' : 's'}</b> — {ordinal(pts.rank)} of {pts.n} {words.many}. The average {words.one} has {pts.avg.toFixed(1).replace(/\.0$/, '')}.</>
+          : hasSeason ? <><b>{snap.season_goals ?? 0} goals, {snap.season_assists ?? 0} assists</b> in {seaGames} games.</> : 'No games yet this season.',
+      heat: isGoalie ? 'none' as const : heat != null && ctx ? { value: heat, delta: heatDelta, pct: ctx.heat.pct, avg: ctx.heat.avg, one: words.one, many: words.many } : null,
+      energy: energy != null ? {
+        value: energy, avg: ctx?.energyAvg ?? null, one: ctx ? words.one : null,
+        note: lastPlayedDaysAgo != null ? `last game ${lastPlayedDaysAgo === 0 ? 'today' : lastPlayedDaysAgo === 1 ? 'yesterday' : `${lastPlayedDaysAgo} days ago`}` : null,
+      } : null,
       outBanner: outStatus ? {
         label: OUT_LABEL[outStatus],
         note: consecutiveGamesMissed ? `Missed ${consecutiveGamesMissed} straight team game${consecutiveGamesMissed === 1 ? '' : 's'}` : 'Not in recent lineups',
       } : null,
+    },
+    last: player.last_name,
+    peers: ctx ? words : null,
+    scouting: {
       bio: (
-        <Suspense fallback={<div className="h-24 animate-pulse rounded-[10px]" style={{ background: 'var(--bg-card)' }} />}>
-          <AIBio playerId={Number(id)} aiInput={aiInput} />
+        <Suspense fallback={<div className="h-20 animate-pulse rounded-lg" style={{ background: 'var(--bg)' }} />}>
+          <AIText playerId={Number(id)} aiInput={aiInput} which="bio" />
+        </Suspense>
+      ),
+      now: (
+        <Suspense fallback={<div className="h-20 animate-pulse rounded-lg" style={{ background: 'var(--bg)' }} />}>
+          <AIText playerId={Number(id)} aiInput={aiInput} which="perfEval" />
         </Suspense>
       ),
     },
     trend: {
       kind: isGoalie ? 'goalie' as const : 'skater' as const,
-      heat: isGoalie ? [] : daily,
-      seasonAvgHeat: !isGoalie && hasSeason ? ppmToHeat(snap.season_ppm) : null,
-      games: trendGames(games, player.team_id, isGoalie ? 'goalie' : 'skater', `${currentSeason().slice(0, 4)}-09-01`),
+      games: isGoalie
+        ? trendGames(games, player.team_id, 'goalie', seasonStart)
+        : lines.map(l => ({ date: l.date, opp: l.opp, home: l.home, res: l.result, heat: l.heat, g: l.g, a: l.a, pts: l.g + l.a, sog: l.sog, toi: Math.round(l.toi / 6) / 10, pm: l.pm })),
+      heatAvg: ctx?.heat.avg ?? null,
+      heatTop: ctx?.heat.top ?? null,
+      peers: ctx ? words : null,
     },
-    chips: formChips({ heats: daily.slice(-42).map(p => p.heat), pointsByGame: games.slice(0, 10).map(g => (g.goals ?? 0) + (g.assists ?? 0)), energy, heat }),
-    perfEval: (
-      <Suspense fallback={<div className="h-28 animate-pulse rounded-lg" style={{ background: 'var(--bg)' }} />}>
-        <AIPerfEval playerId={Number(id)} aiInput={aiInput} />
-      </Suspense>
-    ),
-    last5: isGoalie ? goalieTiles(goalieStats?.recent) : last5Tiles(games),
-    gameLog: isGoalie ? [] : gameLogRows(games.slice(0, 5), player.team_id),
-    seasonLabel: seasonLabel(),
-    seasonGames: isGoalie ? goalieStats?.season.gp ?? 0 : seaGames,
-    seasonTiles: isGoalie ? goalieTiles(goalieStats?.season) : seasonTiles(snap),
-    radar: isGoalie || !hasSeason ? [] : radarStats(snap, leagueAvg),
-    vsRows: isGoalie || !hasSeason ? [] : vsLeagueRows(snap, leagueAvg),
+    trendLine: ctx ? trendLine(lines, ctx.heat, group) : null,
+    last5: { table: l5, line: l5 ? last5Line(l5, group) : null, games: lines.slice(-5) },
+    goalieLast5: isGoalie ? goalieTiles(goalieStats?.recent) : [],
+    seasonLabel: curSeason,
+    seasonGames: isGoalie ? gs?.gp ?? 0 : seaGames,
+    goalieSeason: isGoalie ? goalieTiles(gs) : [],
+    stands: ctx?.stands ?? [],
+    radar: ctx ? { axes: ctx.radar, ...strengthsLine(ctx.radar) } : null,
+    seasons: { rows: career, current: curSeason, pace: isGoalie ? null : paceLine(career, curSeason), goalie: isGoalie },
   };
 
   return (
@@ -236,15 +268,11 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
   );
 }
 
-async function AIBio({ playerId, aiInput }: { playerId: number; aiInput: PlayerAIInput }) {
-  const { bio } = await getPlayerInsights(playerId, aiInput).catch(() => ({ bio: null, perfEval: null }));
-  return bio ? <AIBioBox text={bio} /> : null;
-}
-
-async function AIPerfEval({ playerId, aiInput }: { playerId: number; aiInput: PlayerAIInput }) {
-  const { perfEval } = await getPlayerInsights(playerId, aiInput).catch(() => ({ bio: null, perfEval: null }));
-  if (!perfEval) {
-    return <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Form analysis appears once there are enough recent games.</p>;
+// One of the two scouting texts; both come from one cached lookup per render.
+async function AIText({ playerId, aiInput, which }: { playerId: number; aiInput: PlayerAIInput; which: 'bio' | 'perfEval' }) {
+  const text = (await cachedInsights(playerId, aiInput))[which];
+  if (!text) {
+    return <p className="text-sm" style={{ color: 'var(--text-muted)' }}>{which === 'bio' ? 'The scouting report isn’t written yet — check back later.' : 'The read on his form isn’t written yet — check back after his next game.'}</p>;
   }
-  return <p className="text-[13px] leading-relaxed lg:text-sm" style={{ color: 'var(--text)', textWrap: 'pretty' }}>{perfEval}</p>;
+  return <p className="text-[15px] leading-relaxed" style={{ color: 'var(--text-bright)', textWrap: 'pretty' }}>{text}</p>;
 }

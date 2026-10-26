@@ -14,6 +14,7 @@ export function SectionHeading({
   as: Tag = 'h2',
   size = 'section',
   kickerColor = 'var(--heat)',
+  id,
 }: {
   kicker: React.ReactNode;
   title: React.ReactNode;
@@ -22,6 +23,7 @@ export function SectionHeading({
   as?: 'h1' | 'h2' | 'h3';
   size?: keyof typeof SIZES;
   kickerColor?: string;
+  id?: string; // for aria-labelledby on the section
 }) {
   const s = SIZES[size];
   return (
@@ -40,6 +42,7 @@ export function SectionHeading({
           {kicker}
         </div>
         <Tag
+          id={id}
           className="font-extrabold leading-none"
           style={{
             fontSize: `clamp(${Math.round(s.title * 0.7)}px, 6vw, ${s.title}px)`,

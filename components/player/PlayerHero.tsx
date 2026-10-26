@@ -1,147 +1,121 @@
-import { ArchetypeBadge, EnergyBar, HeatDial, TeamChip, energyColor, energyLabel } from '@/components/ds';
+import { TeamChip, energyColor, energyLabel } from '@/components/ds';
+import { heatColor } from '@/lib/heat';
 import { teamColor } from '@/lib/team-colors';
 
 const MONO = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' } as const;
-const DISPLAY = { fontFamily: 'var(--font-fraunces), Georgia, serif' } as const;
 
 export type HeroProps = {
-  first: string; last: string; team: string; number: number | null; position: string; age: number | null;
+  first: string; last: string; team: string; teamName: string; number: number | null; position: string; age: number | null;
   shoots: string | null; height: string | null; weight: string | null;
-  birthPlace: string | null; flag: string | null; drafted: string | null; seasonLine: string;
+  birthPlace: string | null; flag: string | null; drafted: string | null;
   photo: string | null;
-  heat: number | null; heatDelta: number | null; rankLine: string | null; heatNote?: string;
-  energy: number | null; energyNote: string | null;
-  archetype: { name: string; blurb: string | null; tags: string[] } | null;
+  archetype: { name: string; basis: string | null } | null;
+  // "11 points in 11 games — 23rd of 346 forwards. The average forward has 5."
+  headline: React.ReactNode;
+  // Heat against his position: share he's hotter than, the average, the top 5%.
+  // null: no games yet; 'none': a goalie (Heat measures skater scoring).
+  heat: { value: number; delta: number | null; pct: number; avg: number; one: string; many: string } | null | 'none';
+  energy: { value: number; avg: number | null; one: string | null; note: string | null } | null;
   outBanner: { label: string; note: string } | null;
-  bio: React.ReactNode;
 };
 
-function Meta({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <div className="mb-1 text-[8px] font-bold lg:text-[9px]" style={{ ...MONO, color: 'var(--text-muted)', letterSpacing: 1 }}>{label}</div>
-      <div className="truncate text-[11px] font-semibold lg:text-[13px]" style={{ color: 'var(--text-bright)' }}>{children}</div>
-    </div>
-  );
-}
+const HEAT_SCALE = 'linear-gradient(90deg, #4a88ff 0%, #8a94a6 25%, #f7b267 45%, #ff8a47 60%, #ff5a24 75%, #ff3a0f 100%)';
 
-function HeatCard({ heat, heatDelta, rankLine, heatNote }: Pick<HeroProps, 'heat' | 'heatDelta' | 'rankLine' | 'heatNote'>) {
+function HeatBlock({ heat }: { heat: Exclude<HeroProps['heat'], 'none'> }) {
+  if (!heat) {
+    return (
+      <div className="flex flex-col gap-1">
+        <span className="text-[11px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.4 }}>HEAT · FORM, LAST 5 GAMES</span>
+        <span className="text-sm" style={{ color: 'var(--text-muted)' }}>No games yet this season</span>
+      </div>
+    );
+  }
   return (
-    <div className="flex-1 rounded-[10px] border p-3 lg:rounded-[14px] lg:p-4" style={{ background: 'var(--bg-card)', borderColor: 'rgba(255, 90, 36, 0.33)', boxShadow: '0 0 24px rgba(255, 90, 36, 0.2)' }}>
-      <div className="mb-1.5 text-[9px] font-bold lg:mb-2" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.4 }}>HEAT · L5</div>
-      <div className="flex items-center gap-3.5">
-        <span className="lg:hidden"><HeatDial heat={heat} size={44} /></span>
-        <span className="hidden lg:inline-flex"><HeatDial heat={heat} size={80} /></span>
-        <div className="min-w-0">
-          {heat == null ? (
-            <div className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{heatNote ?? 'No games yet this season'}</div>
-          ) : (
-            <>
-              {heatDelta != null && heatDelta !== 0 && (
-                <div className="text-[10px] font-bold lg:text-xs" style={{ ...MONO, color: heatDelta > 0 ? 'var(--rise)' : 'var(--cold)', letterSpacing: 0.5 }}>
-                  {heatDelta > 0 ? '↑ +' : '↓ '}{heatDelta}
-                </div>
-              )}
-              {rankLine && <div className="mt-0.5 text-[9px] lg:text-[11px]" style={{ color: 'var(--text-muted)' }}>{rankLine}</div>}
-            </>
-          )}
-        </div>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-baseline gap-3.5">
+        <span className="text-[56px] font-extrabold leading-[0.9] lg:text-[64px]" style={{ color: heatColor(heat.value), letterSpacing: -2 }}>{heat.value}</span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[11px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.4 }}>
+            HEAT · FORM, LAST 5 GAMES
+            {heat.delta != null && heat.delta !== 0 && <span style={{ color: heat.delta > 0 ? 'var(--rise)' : 'var(--cold)' }}> {heat.delta > 0 ? '↑ +' : '↓ '}{heat.delta}</span>}
+          </span>
+          <span className="text-sm" style={{ color: 'var(--text-bright)' }}>
+            hotter than <b>{heat.pct}%</b> of {heat.many} · average {heat.one} {heat.avg}
+          </span>
+        </span>
+      </div>
+      <div className="relative h-2 rounded" style={{ background: HEAT_SCALE }} aria-hidden>
+        <span className="absolute -top-[5px] h-[18px] w-0.5" style={{ left: `${heat.avg}%`, background: 'var(--text-bright)' }} title={`Average ${heat.one}`} />
+        <span className="absolute -top-1 h-4 w-4 rounded-full" style={{ left: `calc(${Math.min(heat.value, 99)}% - 8px)`, background: heatColor(heat.value), border: '3px solid var(--bg)' }} />
       </div>
     </div>
   );
 }
 
-function EnergyCard({ energy, energyNote }: Pick<HeroProps, 'energy' | 'energyNote'>) {
-  if (energy == null) return null;
+function EnergyBlock({ energy }: { energy: NonNullable<HeroProps['energy']> }) {
+  const c = energyColor(energy.value);
   return (
-    <div className="flex-1 rounded-[10px] border p-3 lg:rounded-[14px] lg:p-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <div className="mb-2.5 flex justify-between text-[9px] font-bold" style={{ ...MONO, letterSpacing: 1.4 }}>
-        <span style={{ color: energyColor(energy) }}>ENERGY</span>
-        <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>{energyLabel(energy)}</span>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex items-baseline gap-3.5">
+        <span className="text-[40px] font-extrabold leading-[0.9]" style={{ color: c }}>{energy.value}</span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[11px] font-bold" style={{ ...MONO, color: c, letterSpacing: 1.4 }}>ENERGY · {energyLabel(energy.value).toUpperCase()}</span>
+          <span className="text-sm" style={{ color: 'var(--text-bright)' }}>
+            {[energy.avg != null && energy.one ? `average ${energy.one} ${energy.avg}` : null, energy.note].filter(Boolean).join(' · ')}
+          </span>
+        </span>
       </div>
-      <EnergyBar value={energy} size="lg" />
-      {energyNote && <div className="mt-2 text-[9px] leading-snug lg:text-[10px]" style={{ color: 'var(--text-muted)' }}>{energyNote}</div>}
+      <div className="relative h-2 rounded" style={{ background: 'var(--border-soft)' }} aria-hidden>
+        <span className="absolute left-0 top-0 h-2 rounded" style={{ width: `${energy.value}%`, background: c }} />
+        {energy.avg != null && <span className="absolute -top-[5px] h-[18px] w-0.5" style={{ left: `${energy.avg}%`, background: 'var(--text-bright)' }} />}
+      </div>
     </div>
   );
 }
 
-// Player hero (design DesktopPlayerFinal / MobilePlayerFinal). Full-bleed: cancels
-// the layout's top padding and side gutters.
+// Player hero: who he is (archetype, his season against his position) and
+// how he's doing now (Heat and Energy, each against the average at his position).
 export function PlayerHero(p: HeroProps) {
   const tc = teamColor(p.team);
-  const meta = [tc.name.toUpperCase(), p.position, p.age != null ? `AGE ${p.age}` : null].filter(Boolean).join(' · ');
-  const body = [p.shoots ? `${p.shoots}-shoots` : null, p.height, p.weight].filter(Boolean).join(' · ');
+  const meta = [p.teamName || tc.name, p.number != null ? `#${p.number}` : null, p.position, p.age != null ? `age ${p.age}` : null, p.height, p.weight, p.shoots ? `shoots ${p.shoots}` : null].filter(Boolean).join(' · ');
+  const origin = [p.birthPlace ? `Born ${p.flag ? `${p.flag} ` : ''}${p.birthPlace}` : null, p.drafted ? (p.drafted === 'Undrafted' ? 'Undrafted' : `Drafted ${p.drafted}`) : null].filter(Boolean).join(' · ');
   return (
-    <section className="relative -mx-4 -mt-4 overflow-hidden border-b lg:-mx-12 lg:-mt-8" style={{ borderColor: 'var(--border-soft)' }}>
-      <div className="absolute inset-0" style={{ background: `linear-gradient(115deg, ${tc.bg} 0%, var(--bg) 65%)` }} />
-      <div className="absolute inset-0" style={{ background: 'radial-gradient(circle at 75% 30%, rgba(255, 90, 36, 0.32) 0%, transparent 55%)' }} />
-      {p.number != null && (
-        <div aria-hidden className="pointer-events-none absolute -right-5 -top-10 select-none font-black leading-[0.8] lg:right-10 lg:-top-20" style={{ ...DISPLAY, fontSize: 'clamp(240px, 38vw, 560px)', color: 'rgba(255,255,255,0.045)', letterSpacing: '-0.05em' }}>
-          {p.number}
-        </div>
-      )}
-
-      <div className="relative grid grid-cols-1 gap-3.5 px-4 pb-5 pt-4 lg:grid-cols-[320px_1fr_200px] lg:items-end lg:gap-9 lg:px-12 lg:pb-9 lg:pt-10">
-        {/* Photo */}
-        <div className="relative aspect-[5/3] overflow-hidden rounded-xl border lg:aspect-auto lg:h-[360px] lg:w-[320px] lg:rounded-2xl" style={{ background: 'linear-gradient(160deg, var(--bg-raised) 0%, var(--bg) 100%)', borderColor: 'var(--border)' }}>
-          {p.photo && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={p.photo} alt={`${p.first} ${p.last}`} className="absolute inset-0 h-full w-full object-contain object-bottom" />
-          )}
-          <div className="absolute left-2.5 top-2.5 lg:left-3.5 lg:top-3.5"><TeamChip abbrev={p.team} size={42} /></div>
-          {p.number != null && (
-            <div className="absolute bottom-2.5 right-2.5 rounded-full px-3 py-1.5 text-[11px] font-bold lg:bottom-3.5 lg:right-3.5 lg:text-[13px]" style={{ ...MONO, background: 'rgba(10,11,15,0.7)', backdropFilter: 'blur(8px)', color: 'var(--text-bright)' }}>
-              #{p.number}
-            </div>
-          )}
-        </div>
-
-        {/* Identity */}
-        <div className="min-w-0">
-          {p.outBanner && (
-            <div className="mb-3 inline-flex items-center gap-2 rounded-md px-2.5 py-1 text-[10px] font-bold" style={{ ...MONO, background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: 'var(--red)', letterSpacing: 1 }}>
-              {p.outBanner.label}<span className="font-medium" style={{ color: 'var(--text)' }}>{p.outBanner.note}</span>
-            </div>
-          )}
-          <div className="mb-2 flex flex-wrap items-center gap-2.5 text-[10px] font-bold lg:mb-3 lg:text-[11px]" style={{ ...MONO, color: 'rgba(255,255,255,0.85)', letterSpacing: 1 }}>
-            <span>{meta}</span>
-            {body && <><span className="h-1 w-1 rounded-full" style={{ background: 'var(--text-muted)' }} /><span className="font-normal" style={{ color: 'rgba(255,255,255,0.7)' }}>{body}</span></>}
+    <section aria-label="Player" className="grid grid-cols-1 gap-7 rounded-[18px] border p-5 lg:grid-cols-2 lg:p-7" style={{ borderColor: 'var(--border)', background: `linear-gradient(150deg, color-mix(in srgb, ${tc.bg} 40%, transparent) 0%, var(--bg-card) 55%)` }}>
+      <div className="flex min-w-0 flex-col gap-3.5">
+        {p.outBanner && (
+          <div className="inline-flex w-fit items-center gap-2 rounded-md px-2.5 py-1 text-[10px] font-bold" style={{ ...MONO, background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.4)', color: 'var(--red)', letterSpacing: 1 }}>
+            {p.outBanner.label}<span className="font-medium" style={{ color: 'var(--text)' }}>{p.outBanner.note}</span>
           </div>
-          <h1 className="mb-3.5 font-black text-white lg:mb-[18px]" style={{ ...DISPLAY, fontSize: 'clamp(44px, 6vw, 88px)', letterSpacing: '-0.036em', lineHeight: 0.92, textShadow: '0 4px 24px rgba(0,0,0,0.5)' }}>
-            {p.first}<br /><span style={{ color: 'var(--heat)' }}>{p.last}.</span>
-          </h1>
-          <div className="mb-3.5 grid grid-cols-3 gap-2 lg:flex lg:gap-6">
-            {p.birthPlace && <Meta label="BORN">{p.flag} {p.birthPlace}</Meta>}
-            {p.drafted && <Meta label="DRAFTED">{p.drafted}</Meta>}
-            <Meta label="SEASON">{p.seasonLine}</Meta>
+        )}
+        <div className="flex items-center gap-4">
+          <div className="relative h-[84px] w-[84px] shrink-0 overflow-hidden rounded-full border-[3px] lg:h-[104px] lg:w-[104px]" style={{ background: tc.bg, borderColor: 'var(--border)' }}>
+            {p.photo && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={p.photo} alt={`${p.first} ${p.last}`} className="absolute inset-0 h-full w-full object-cover" />
+            )}
           </div>
-          {p.archetype && (
-            <div className="mb-3.5">
-              <span className="lg:hidden"><ArchetypeBadge archetype={p.archetype.name} compact /></span>
-              <span className="hidden lg:block"><ArchetypeBadge archetype={p.archetype.name} blurb={p.archetype.blurb} tags={p.archetype.tags} /></span>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <h1 className="text-[32px] font-extrabold leading-none lg:text-[42px]" style={{ color: 'var(--text-bright)', letterSpacing: '-0.035em' }}>
+              {p.first} <span style={{ color: 'var(--heat)' }}>{p.last}</span>
+            </h1>
+            <div className="flex flex-wrap items-center gap-2 text-[13px] lg:text-sm" style={{ color: 'var(--text)' }}>
+              <TeamChip abbrev={p.team} size={22} /><span>{meta}</span>
             </div>
-          )}
-          {p.bio}
+            {origin && <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{origin}</div>}
+          </div>
         </div>
-
-        {/* Heat + energy (stacked on desktop, side by side on mobile) */}
-        <div className="flex gap-2 lg:flex-col lg:gap-3.5">
-          <HeatCard heat={p.heat} heatDelta={p.heatDelta} rankLine={p.rankLine} heatNote={p.heatNote} />
-          <EnergyCard energy={p.energy} energyNote={p.energyNote} />
-        </div>
+        {p.archetype && (
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="rounded-lg px-3 py-1.5 text-[15px] font-extrabold" style={{ background: 'var(--heat)', color: 'var(--bg)', letterSpacing: 0.4 }}>{p.archetype.name.toUpperCase()}</span>
+            {p.archetype.basis && <span className="text-[13px]" style={{ color: 'var(--text)' }}>{p.archetype.basis}</span>}
+          </div>
+        )}
+        <div className="text-[15px] leading-relaxed" style={{ color: 'var(--text-bright)' }}>{p.headline}</div>
+      </div>
+      <div className="flex flex-col justify-center gap-5">
+        {p.heat !== 'none' && <HeatBlock heat={p.heat} />}
+        {p.energy && <EnergyBlock energy={p.energy} />}
       </div>
     </section>
-  );
-}
-
-// "AI CHARACTER" bio box under the archetype (design hero center column).
-export function AIBioBox({ text }: { text: string }) {
-  return (
-    <div className="relative rounded-[10px] border px-[18px] py-3.5" style={{ background: 'rgba(10,11,15,0.4)', backdropFilter: 'blur(8px)', borderColor: 'var(--border-soft)' }}>
-      <div className="absolute -top-2 left-3.5 rounded-[3px] border px-2 py-0.5 text-[9px] font-bold" style={{ ...MONO, background: 'var(--bg)', color: 'var(--story)', borderColor: 'rgba(229, 80, 139, 0.33)', letterSpacing: 1.2 }}>
-        AI CHARACTER
-      </div>
-      <p className="text-xs leading-relaxed lg:text-[13px]" style={{ color: 'var(--text)', textWrap: 'pretty' }}>{text}</p>
-    </div>
   );
 }

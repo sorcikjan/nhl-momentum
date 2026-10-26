@@ -12,6 +12,7 @@ export { deriveOutStatus, daysAgo } from '@/lib/player-status';
 import { processPlayByPlay } from '@/lib/play-by-play';
 import { ppmToHeat } from '@/lib/heat';
 import { teamHeatByTeam } from '@/lib/team-heat';
+import { peerFromSnapshot, type Peer } from '@/lib/profile-context';
 
 // NHL CDN logo URL — works for all 32 teams
 export function teamLogoUrl(abbrev: string) {
@@ -108,6 +109,27 @@ async function buildLeagueAverages() {
     p5PlusMinusPerGame:    percentile(pmPG,  5),
   };
   return result;
+}
+
+// ─── Position peers (player profile context) ─────────────────────────────────
+
+// Every active skater's season in one compact row, for the profile's
+// comparisons (average at his position, rank, leader, percentiles). One build
+// per 30 min shared across instances: 800 profile pages, one snapshot read.
+let _peersCache: { value: Peer[]; ts: number } | null = null;
+export async function fetchPeers(): Promise<Peer[]> {
+  if (_peersCache && Date.now() - _peersCache.ts < 30 * 60_000) return _peersCache.value;
+  const value = await sharedResult('peers', 30 * 60_000, async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows = await latestSnapshotRows<any>(
+      'player_id, season_games, season_goals, season_assists, season_points, season_shots, season_toi_sec, season_plus_minus, season_pp_points, momentum_ppm, energy_bar, players!inner(last_name, position_code, is_active, teams(abbrev))',
+      q => q.eq('players.is_active', true).neq('players.position_code', 'G'),
+    );
+    const seen = new Set<number>();
+    return rows.filter(r => !seen.has(r.player_id) && !!seen.add(r.player_id)).map(peerFromSnapshot);
+  });
+  _peersCache = { value, ts: Date.now() };
+  return value;
 }
 
 // ─── Out Status ───────────────────────────────────────────────────────────────

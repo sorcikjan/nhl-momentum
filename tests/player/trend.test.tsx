@@ -6,15 +6,22 @@ import { trendGames } from '@/lib/player-profile';
 const day = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
 
 describe('TrendChart', () => {
-  it('skaters: Heat by default, every stat and three horizons to switch to', () => {
-    const html = renderToStaticMarkup(<TrendChart data={{ kind: 'skater', seasonAvgHeat: 50, games: [], heat: [{ date: day(20), heat: 40 }, { date: day(1), heat: 70 }] }} />);
-    for (const label of ['Heat', 'Points', 'Goals', 'Shots', 'Ice time', '+/-', 'Last 2 weeks', 'Last 6 weeks', 'Season']) expect(html).toContain(`>${label}</button>`);
+  const games = [{ date: day(20), opp: 'TOR', res: 'W' as const, heat: 40 }, { date: day(1), opp: 'BOS', res: 'L' as const, heat: 70 }];
+  const words = { one: 'forward', many: 'forwards' };
+  it('skaters: Heat by default, game by game, against the average and the top 5% of his position', () => {
+    const html = renderToStaticMarkup(<TrendChart data={{ kind: 'skater', heatAvg: 30, heatTop: 80, peers: words, games }} />).replace(/<!-- -->/g, '');
+    for (const label of ['Heat', 'Points', 'Goals', 'Shots', 'Ice time', '+/-', 'Last 10 games', 'Last 25 games', 'Season']) expect(html).toContain(`>${label}</button>`);
     const pressed = [...html.matchAll(/aria-pressed="true"[^>]*>([^<]+)</g)].map(m => m[1]);
-    expect(pressed).toEqual(['Heat', 'Last 6 weeks']);
-    expect(html.replace(/<!-- -->/g, '')).toMatch(/Now <b[^>]*>70<\/b> · \+30 over this span/);
+    expect(pressed).toEqual(['Heat', 'Last 25 games']);
+    expect(html).toMatch(/Now <b[^>]*>70<\/b> · \+30 over these 2 games/);
+    expect(html).toContain('average forward (30)');
+    expect(html).toContain('top 5% of forwards (80)');
+    // Opponent logo and result under each game
+    expect(html).toContain('BOS_dark.svg');
+    expect(html).toMatch(/>W<\/span>[\s\S]*>L<\/span>/);
   });
   it('goalies get goalie stats, not Heat', () => {
-    const html = renderToStaticMarkup(<TrendChart data={{ kind: 'goalie', seasonAvgHeat: null, heat: [], games: [
+    const html = renderToStaticMarkup(<TrendChart data={{ kind: 'goalie', heatAvg: null, heatTop: null, peers: null, games: [
       { date: day(5), opp: 'TOR', svPct: 0.9, ga: 3, sa: 30 }, { date: day(2), opp: 'BOS', svPct: 0.95, ga: 1, sa: 20 },
     ] }} />);
     expect([...html.matchAll(/aria-pressed="true"[^>]*>([^<]+)</g)].map(m => m[1])).toEqual(['Save %', 'Last 25 games']);
@@ -23,7 +30,7 @@ describe('TrendChart', () => {
     expect(html.replace(/<!-- -->/g, '')).toContain('.920</b> SV% over 2 games');
   });
   it('says so when a span has too little data', () => {
-    expect(renderToStaticMarkup(<TrendChart data={{ kind: 'skater', seasonAvgHeat: null, games: [], heat: [] }} />)).toContain('Not enough games in this span yet.');
+    expect(renderToStaticMarkup(<TrendChart data={{ kind: 'skater', heatAvg: null, heatTop: null, peers: null, games: [] }} />)).toContain('Not enough games in this span yet.');
   });
 });
 
