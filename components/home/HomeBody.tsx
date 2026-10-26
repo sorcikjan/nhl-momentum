@@ -19,7 +19,7 @@ export function HomeBody({ data }: { data: HomeData }) {
       <HeatHero leader={data.leader} leaders={data.leaders} heatingUp={data.heatingUp} coolingOff={data.coolingOff} />
       <TonightSlate games={data.tonight} nextGameDate={data.nextGameDate} />
       <MoreRankings goalies={data.goalies} rookies={data.rookies} />
-      <ArticleGrid night={data.night} games={data.gameStories} />
+      <ArticleGrid night={data.night} games={data.gameStories} moments={data.moments} />
       <StandingsSection rows={data.standings} />
       <LeadersSection boards={data.statLeaders} />
     </div>

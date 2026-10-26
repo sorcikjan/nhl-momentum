@@ -14,6 +14,8 @@ import { teamColor } from '@/lib/team-colors';
 import { GOALIE_BOARDS, SKATER_BOARDS, fetchLeaders, fetchStandings, type LeaderBoard, type StandingRow } from '@/lib/nhl-stats';
 import { nightStories, type FinishedGame as StoryGame, type GameStoryCard, type NightStory } from '@/lib/stories';
 import { gameUrl, playerUrl } from '@/lib/urls';
+import { getScore } from '@/lib/nhl-api';
+import { bestGoals, type Moment } from '@/lib/moments';
 
 export type TeamSide = { abbrev: string; name: string };
 // #1 on the Heat list: the hero card.
@@ -26,7 +28,7 @@ export type HomeData = {
   today: string;
   tonight: GameCardData[]; nextGameDate: string | null;
   resultsDate: string | null; results: GameCardData[];
-  night: NightStory | null; gameStories: GameStoryCard[];
+  night: NightStory | null; gameStories: GameStoryCard[]; moments: Moment[];
   leader: HeatLeader | null; leaders: PlayerRowData[];
   heatingUp: PlayerRowData[]; coolingOff: PlayerRowData[];
   goalies: PlayerRowData[]; rookies: PlayerRowData[];
@@ -167,6 +169,9 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
     .filter(g => recent.predMap.get(g.id)?.prediction_outcomes?.[0]?.correct_winner === false).map(g => g.id));
   const { night, games: gameStories } = nightStories(latest, recent.games as StoryGame[], storyTexts, missedPicks);
   if (night && latest?.date === resultsDate) for (const r of results) r.recapHref = night.href;
+  // Best goals of that night: one NHL call, cached; nothing on failure.
+  const momentsDate = latest?.date ?? resultsDate;
+  const moments = momentsDate ? bestGoals(await safe(getScore(momentsDate), {}), rankings?.heatByPlayer) : [];
 
   // Tonight: the game of the night first; every card shows each team's Heat.
   markGameOfTheNight(tonight);
@@ -194,7 +199,7 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
   ]);
 
   return {
-    today, tonight, nextGameDate, resultsDate, results, night, gameStories,
+    today, tonight, nextGameDate, resultsDate, results, night, gameStories, moments,
     leader, leaders, heatingUp, coolingOff,
     goalies: goalies.slice(0, 10).map((g, i) => goalieRow(g, i + 1)),
     rookies: rookies.slice(0, 10).map((r, i) => rookieRow(r, i + 1)),

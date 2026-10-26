@@ -1,28 +1,13 @@
 import Link from 'next/link';
 import { Headshot, SectionHeading, SectionLink } from '@/components/ds';
 import type { GameStoryCard, NightStory } from '@/lib/stories';
+import type { Moment } from '@/lib/moments';
+import { BestGoals } from './BestGoals';
 import { MONO } from './format';
-
-function Play({ size }: { size: number }) {
-  return (
-    <span className="flex shrink-0 items-center justify-center rounded-full" style={{ width: size, height: size, background: 'var(--heat)' }}>
-      <svg width={size * 0.4} height={size * 0.4} viewBox="0 0 24 24" fill="var(--bg)" aria-hidden><path d="M7 4.5v15l13-7.5z" /></svg>
-    </span>
-  );
-}
 
 // A big night (12+ games) stays a summary, not a table of scores.
 const SCORE_CHIPS = 6;
-// The game page carries the video; covers carry the score.
-function Highlight({ href, label }: { href: string; label: string }) {
-  return (
-    <Link href={href} className="flex items-center gap-2 text-xs font-bold" style={{ color: 'var(--text-bright)' }}>
-      <Play size={26} /> {label}
-    </Link>
-  );
-}
-
-// The night: highlight, headline, dek and every score of the night. Side by
+// The night: cover, headline, dek and every score of the night. Side by
 // side when it has the row to itself, stacked when it shares one.
 function NightCard({ n, stacked = false, className = '' }: { n: NightStory; stacked?: boolean; className?: string }) {
   return (
@@ -53,28 +38,24 @@ function NightCard({ n, stacked = false, className = '' }: { n: NightStory; stac
             )}
           </div>
         )}
-        <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-1">
+        <div className="mt-auto pt-1">
           <Link href={n.href} className="text-xs font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 0.5 }}>READ THE NIGHT →</Link>
-          {n.watchLabel && n.watchHref && <Highlight href={n.watchHref} label={n.watchLabel} />}
         </div>
       </div>
     </article>
   );
 }
 
-// One game: its highlight with the score, its story's headline and dek, its star.
+// One game: its cover with the score, its story's headline and dek, its star.
 function GameCard({ g }: { g: GameStoryCard }) {
   return (
     <article className="flex flex-col overflow-hidden rounded-[14px] border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <Link href={g.href} className="relative block aspect-video" style={{ background: 'var(--bg-raised)' }} aria-label={`${g.title} — ${g.watchLabel}`}>
+      <Link href={g.href} className="relative block aspect-video" style={{ background: 'var(--bg-raised)' }} aria-label={g.title}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={g.image} alt={g.score} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
       </Link>
       <Link href={g.href} className="flex flex-1 flex-col gap-2 px-[18px] pb-[18px] pt-4">
-        <span className="flex items-center justify-between gap-2">
-          <span className="text-[10px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.2 }}>{g.kicker}</span>
-          {g.highlight && <span className="flex items-center gap-1.5 text-[10px] font-bold" style={{ ...MONO, color: 'var(--text)', letterSpacing: 0.8 }}><Play size={16} /> HIGHLIGHTS</span>}
-        </span>
+        <span className="text-[10px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.2 }}>{g.kicker}</span>
         <h3 className="text-[19px] font-extrabold leading-snug" style={{ color: 'var(--text-bright)', letterSpacing: '-0.02em', textWrap: 'pretty' }}>{g.title}</h3>
         <p className="text-sm leading-relaxed" style={{ color: 'var(--text)' }}>{g.dek}</p>
         {g.star && (
@@ -91,11 +72,11 @@ function GameCard({ g }: { g: GameStoryCard }) {
   );
 }
 
-// Last night in stories: the night recap, then the best games, each linking to
+// Last night in stories: the night recap, its best goals (clips), then the best games, each linking to
 // its game page (where its full story lives). Three game cards get their own
 // row under the night; one or two share the night's row, so a short night
 // doesn't leave a lone card under a wide box.
-export function ArticleGrid({ night, games }: { night: NightStory | null; games: GameStoryCard[] }) {
+export function ArticleGrid({ night, games, moments = [] }: { night: NightStory | null; games: GameStoryCard[]; moments?: Moment[] }) {
   if (!night) return null;
   const heading = <SectionHeading kicker={`STORIES · ${night.scores.length} GAME${night.scores.length === 1 ? '' : 'S'}`} title="The night in stories." sub="What happened, told through the numbers." size="feature" right={<SectionLink href="/recaps">All stories</SectionLink>} />;
   if (games.length === 1 || games.length === 2) {
@@ -106,6 +87,7 @@ export function ArticleGrid({ night, games }: { night: NightStory | null; games:
           <NightCard n={night} stacked={games.length === 2} className={games.length === 1 ? 'lg:col-span-2' : ''} />
           {games.map(g => <GameCard key={g.id} g={g} />)}
         </div>
+        <BestGoals moments={moments} />
       </section>
     );
   }
@@ -113,6 +95,7 @@ export function ArticleGrid({ night, games }: { night: NightStory | null; games:
     <section data-section="stories" className="flex flex-col gap-3.5">
       {heading}
       <NightCard n={night} />
+      <BestGoals moments={moments} />
       {games.length > 0 && (
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
           {games.map(g => <GameCard key={g.id} g={g} />)}

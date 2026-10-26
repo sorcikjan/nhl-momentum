@@ -27,7 +27,7 @@ const base: HomeData = {
   }],
   night: { href: '/recaps/x', kicker: 'THE NIGHT · WEDNESDAY · OCTOBER 21', title: 'Senators Explode for Five', dek: 'd', image: null, watchLabel: null, watchHref: null,
     scores: [{ away: 'FLA', awayScore: 1, home: 'OTT', homeScore: 5, href: '/games/2/fla-at-ott-1021' }] },
-  gameStories: [],
+  gameStories: [], moments: [],
   leader: {
     playerId: 9, href: '/players/9/connor-mcdavid', first: 'Connor', last: 'McDavid', photo: null, team: 'EDM', teamName: 'Edmonton Oilers',
     pos: 'C', heat: 100, pace: -2, goals: 3, assists: 11, games: 5,

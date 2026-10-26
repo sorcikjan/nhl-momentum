@@ -25,6 +25,12 @@ export async function getGamesByDate(date: string) {
   return data.gameWeek?.find(d => d.date === date)?.games ?? [];
 }
 
+// One night's scores with every goal (scorer, clip, game state at the goal).
+export async function getScore(date: string, revalidate = 1800) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return get<{ games?: any[] }>(`/score/${date}`, revalidate);
+}
+
 export async function getSeasonDates(date: string) {
   // Same /schedule/{date} response also carries season-level fields alongside
   // the gameWeek — separate typed accessor so callers don't need `as` casts.
