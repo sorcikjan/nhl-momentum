@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
-import { bestGoals } from '@/lib/moments';
+import { bestGoals, parseClipPage } from '@/lib/moments';
 import { BestGoals } from '@/components/home/BestGoals';
 
 type G = { team: string; period?: number; time: string; h: number; a: number; ot?: boolean; mod?: string; str?: string; pid?: number };
@@ -44,5 +44,15 @@ describe('bestGoals', () => {
     const html = renderToStaticMarkup(createElement(BestGoals, { moments: picks }));
     expect(html).toContain('target="_blank"');
     expect(html).toContain('BEST GOALS LAST NIGHT');
+    // with a player: a button that opens the popup instead of leaving the site
+    const withPlayer = renderToStaticMarkup(createElement(BestGoals, { moments: picks.map(p => ({ ...p, embed: 'https://players.example/x?videoId=1', thumb: 'https://img/x.jpg' })) }));
+    expect(withPlayer).not.toContain('target="_blank"');
+    expect(withPlayer).toContain('https://img/x.jpg');
+  });
+  it('reads a clip page: still, title without the site name, the clip\'s own player', () => {
+    const html = '<meta property="og:image" content="https://media.d3.nhle.com/a.jpg" /><meta property="og:title" content="Jones&#x27; shot goes in off M. Tkachuk for PPG | NHL.com" />'
+      + '<iframe src="https://players.brightcove.net/6415718365001/D3UCGynRWU_default/index.html?videoId=999"></iframe><x src="https://players.brightcove.net/1/a_default/index.html?videoId=123">';
+    expect(parseClipPage(html, '123')).toEqual({ thumb: 'https://media.d3.nhle.com/a.jpg', title: "Jones' shot goes in off M. Tkachuk for PPG", embed: 'https://players.brightcove.net/1/a_default/index.html?videoId=123' });
+    expect(parseClipPage('', '1')).toEqual({ thumb: null, title: null, embed: null });
   });
 });

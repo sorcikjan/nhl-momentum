@@ -12,7 +12,8 @@ const SCORE_CHIPS = 6;
 function NightCard({ n, stacked = false, className = '' }: { n: NightStory; stacked?: boolean; className?: string }) {
   return (
     <article className={`grid overflow-hidden rounded-2xl border ${stacked ? '' : 'lg:grid-cols-2'} ${className}`} style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-      <Link href={n.href} className={`relative block aspect-video ${stacked ? '' : 'lg:aspect-auto lg:min-h-[300px]'}`} style={{ background: 'var(--bg-raised)' }} aria-label={n.title}>
+      {/* The cover is 16:9 at every width — stretched taller it crops the logos and the star */}
+      <Link href={n.href} className={`relative block aspect-video ${stacked ? '' : 'lg:self-center'}`} style={{ background: 'var(--bg-raised)' }} aria-label={n.title}>
         {n.image && (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={n.image} alt="" className="absolute inset-0 h-full w-full object-cover" />

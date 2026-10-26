@@ -15,7 +15,7 @@ import { GOALIE_BOARDS, SKATER_BOARDS, fetchLeaders, fetchStandings, type Leader
 import { nightStories, type FinishedGame as StoryGame, type GameStoryCard, type NightStory } from '@/lib/stories';
 import { gameUrl, playerUrl } from '@/lib/urls';
 import { getScore } from '@/lib/nhl-api';
-import { bestGoals, type Moment } from '@/lib/moments';
+import { bestGoals, withClips, type Moment } from '@/lib/moments';
 
 export type TeamSide = { abbrev: string; name: string };
 // #1 on the Heat list: the hero card.
@@ -171,7 +171,7 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
   if (night && latest?.date === resultsDate) for (const r of results) r.recapHref = night.href;
   // Best goals of that night: one NHL call, cached; nothing on failure.
   const momentsDate = latest?.date ?? resultsDate;
-  const moments = momentsDate ? bestGoals(await safe(getScore(momentsDate), {}), rankings?.heatByPlayer) : [];
+  const moments = momentsDate ? await withClips(bestGoals(await safe(getScore(momentsDate), {}), rankings?.heatByPlayer)) : [];
 
   // Tonight: the game of the night first; every card shows each team's Heat.
   markGameOfTheNight(tonight);

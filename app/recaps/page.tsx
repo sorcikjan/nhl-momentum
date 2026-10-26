@@ -103,7 +103,7 @@ export default async function RecapsPage() {
         </div>
       ) : (
         <article className="grid overflow-hidden rounded-[18px] border lg:grid-cols-2" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
-          <Link href={night.href} className="relative block aspect-video lg:aspect-auto lg:min-h-[380px]" style={{ background: 'var(--bg-raised)' }} aria-label={night.title}>
+          <Link href={night.href} className="relative block aspect-video lg:self-center" style={{ background: 'var(--bg-raised)' }} aria-label={night.title}>
             {night.image && (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={night.image} alt="" className="absolute inset-0 h-full w-full object-cover" />

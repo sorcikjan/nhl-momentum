@@ -76,7 +76,7 @@ function Side({ s, g, other }: { s: CardSide; g: GameCardData; other: CardSide }
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, background: CARD, border: `2px solid ${BORDER}`, borderRadius: 24, padding: '28px 32px' }}>
       <div style={{ display: 'flex', alignItems: 'center' }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={teamLogo(s.abbrev)} width={84} height={84} alt="" />
+        <img src={teamLogo(s.abbrev)} width={126} height={84} alt="" />
         <div style={{ display: 'flex', flex: 1, marginLeft: 20, fontSize: 38, fontWeight: 800, color: lit ? TEXT : DIM }}>{teamColor(s.abbrev).name}</div>
         {scored && <div style={{ display: 'flex', fontSize: 84, fontWeight: 800, color: lit ? TEXT : DIM }}>{s.score}</div>}
       </div>
@@ -125,7 +125,7 @@ export async function listImage(kicker: string, title: string, rows: ListRow[]):
             {r.photo !== undefined
               ? <Face src={r.photo} team={r.team} size={44} />
               // eslint-disable-next-line @next/next/no-img-element
-              : <img src={teamLogo(r.team)} width={44} height={44} alt="" />}
+              : <img src={teamLogo(r.team)} width={66} height={44} alt="" />}
             <div style={{ display: 'flex', flex: 1, marginLeft: 18, fontSize: 30, fontWeight: 700 }}>
               {r.label}{r.sub ? <span style={{ marginLeft: 14, color: DIM, fontSize: 24 }}>{r.sub}</span> : null}
             </div>
@@ -166,9 +166,10 @@ export async function coverImage(c: CoverData): Promise<ImageResponse> {
   const awayWon = c.awayScore > c.homeScore;
   const dim = (won: boolean) => (won ? 1 : 0.5);
   const side = (abbrev: string, won: boolean) => (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 190 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 255 }}>
+      {/* NHL logo SVGs are 3:2 (viewBox 960×640) — a square box squeezes them */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={teamLogo(abbrev)} width={170} height={170} alt="" />
+      <img src={teamLogo(abbrev)} width={255} height={170} alt="" />
       <div style={{ display: 'flex', fontSize: 32, fontWeight: 800, marginTop: 4, opacity: dim(won) }}>{abbrev}</div>
     </div>
   );

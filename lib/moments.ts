@@ -13,8 +13,13 @@ export type Moment = {
   photo: string | null;
   score: string;         // "FLA 4–3 CHI"
   when: string;          // "OT 2:11", "3rd 18:40"
-  line: string;          // "His 5th of the season · Heat 81"
+  line: string;          // "5th goal of the season · Heat 81"
   points: number;
+  // From the clip's NHL.com page (withClips): its still, its title and the
+  // player NHL.com itself embeds. Null when the page couldn't be read.
+  thumb?: string | null;
+  title?: string | null;
+  embed?: string | null;
 };
 
 const BAR = 4;
@@ -89,4 +94,31 @@ export function bestGoals(feed: { games?: any[] }, heatBy: Record<number, number
   all.sort((a, b) => b.points - a.points);
   const strong = all.filter(m => m.points >= BAR);
   return (strong.length >= MIN ? strong : all.slice(0, MIN)).slice(0, MAX);
+}
+
+const decode = (t: string) => t.replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+
+// What a clip page publishes about itself: og:image, og:title, and the
+// player URL NHL.com embeds for that clip.
+export function parseClipPage(html: string, clipId: string | null) {
+  const meta = (prop: string) => html.match(new RegExp(`<meta[^>]+property="${prop}"[^>]+content="([^"]+)"`))?.[1] ?? null;
+  const title = meta('og:title');
+  const embed = clipId
+    ? html.match(new RegExp(`https://players\\.brightcove\\.net/\\d+/[\\w-]+/index\\.html\\?videoId=${clipId}`))?.[0] ?? null
+    : null;
+  return { thumb: meta('og:image'), title: title ? decode(title).replace(/\s*\|\s*NHL\.com\s*$/, '') : null, embed };
+}
+
+// Each moment's still, title and player. A clip page that fails leaves the
+// card as it was (it still links to NHL.com). Clip pages don't change: a day's cache.
+export async function withClips(moments: Moment[]): Promise<Moment[]> {
+  return Promise.all(moments.map(async m => {
+    try {
+      const res = await fetch(m.href, { next: { revalidate: 86400 }, signal: AbortSignal.timeout(5000) });
+      if (!res.ok) return m;
+      return { ...m, ...parseClipPage(await res.text(), m.href.match(/-(\d+)$/)?.[1] ?? null) };
+    } catch {
+      return m;
+    }
+  }));
 }
