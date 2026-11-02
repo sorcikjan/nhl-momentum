@@ -11,7 +11,7 @@ import type { Config } from '@netlify/functions';
 // always timeout before receiving the response. The background worker has 15 min.
 
 export default async function handler() {
-  const base = process.env.URL ?? 'https://nhl-momentum.netlify.app';
+  const base = process.env.INTERNAL_URL ?? 'https://nhl-momentum.netlify.app';
   const ingestKey = process.env.INGEST_API_KEY ?? '';
 
   const res = await fetch(`${base}/.netlify/functions/daily-worker-background`, {

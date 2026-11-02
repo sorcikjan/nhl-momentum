@@ -21,7 +21,7 @@ import type { BackgroundHandler } from '@netlify/functions';
 import { call, paginate, alert, syncMissingStats } from '../lib/pipeline';
 
 const handler: BackgroundHandler = async (event) => {
-  const base = process.env.URL ?? 'https://nhl-momentum.netlify.app';
+  const base = process.env.INTERNAL_URL ?? 'https://nhl-momentum.netlify.app';
   const ingestKey = process.env.INGEST_API_KEY ?? '';
   const h = { 'x-api-key': ingestKey };
 

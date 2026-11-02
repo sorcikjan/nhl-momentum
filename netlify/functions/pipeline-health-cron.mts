@@ -10,7 +10,7 @@ import type { Config } from '@netlify/functions';
 import { call, alert } from '../lib/pipeline';
 
 export default async function handler() {
-  const base      = process.env.URL ?? 'https://nhl-momentum.netlify.app';
+  const base      = process.env.INTERNAL_URL ?? 'https://nhl-momentum.netlify.app';
   const ingestKey = process.env.INGEST_API_KEY ?? '';
   const h = { 'x-api-key': ingestKey };
 
