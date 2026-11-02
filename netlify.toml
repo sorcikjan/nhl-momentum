@@ -10,3 +10,17 @@
 
 [functions]
   directory = "netlify/functions"
+
+# The old domain moves permanently to the new one, path for path. The
+# netlify.app address keeps serving: the scheduled functions call it.
+[[redirects]]
+  from = "https://nhl-momentum.com/*"
+  to = "https://hockeymomentum.com/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://www.nhl-momentum.com/*"
+  to = "https://hockeymomentum.com/:splat"
+  status = 301
+  force = true
