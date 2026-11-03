@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { img } from '@/lib/img';
 import { SHARE_IMAGE } from '@/lib/seo';
 import React, { cache, Suspense } from 'react';
 import Link from 'next/link';
@@ -223,7 +224,7 @@ async function ArticleBody({ date, content, dek, cover, title }: { date: string;
         {cover && (
           <div className="relative mb-2 w-full overflow-hidden rounded-[18px] border" style={{ aspectRatio: '16/9', background: 'var(--bg-raised)', borderColor: 'var(--border)' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={cover} alt={title} className="absolute inset-0 h-full w-full object-cover" />
+            <img src={img(cover, 860)} alt={title} className="absolute inset-0 h-full w-full object-cover" />
           </div>
         )}
         {dek && <p className="text-base font-semibold leading-relaxed lg:text-lg" style={{ color: 'var(--text-bright)' }}>{dek}</p>}
@@ -328,7 +329,7 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
     datePublished: recap.generated_at,
     dateModified: recap.generated_at,
     ...(cover && { image: `${SITE_URL}${cover}` }),
-    author: { '@type': 'Organization', name: 'momentum.' },
+    author: { '@type': 'Organization', name: 'momentum.', url: `${SITE_URL}/about` },
     publisher: { '@type': 'Organization', name: 'momentum.', url: SITE_URL },
   };
 

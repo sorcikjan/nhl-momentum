@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { img } from '@/lib/img';
 import { Headshot, SectionHeading, SectionLink } from '@/components/ds';
 import type { GameStoryCard, NightStory } from '@/lib/stories';
 import type { Moment } from '@/lib/moments';
@@ -16,7 +17,7 @@ function NightCard({ n, stacked = false, className = '' }: { n: NightStory; stac
       <Link href={n.href} className={`relative block aspect-video ${stacked ? '' : 'lg:self-center'}`} style={{ background: 'var(--bg-raised)' }} aria-label={n.title}>
         {n.image && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={n.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={img(n.image, 720)} alt="" className="absolute inset-0 h-full w-full object-cover" />
         )}
       </Link>
       <div className="flex flex-col gap-3.5 p-5 lg:px-7 lg:py-6">
@@ -53,7 +54,7 @@ function GameCard({ g }: { g: GameStoryCard }) {
     <article className="flex flex-col overflow-hidden rounded-[14px] border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
       <Link href={g.href} className="relative block aspect-video" style={{ background: 'var(--bg-raised)' }} aria-label={g.title}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={g.image} alt={g.score} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <img src={img(g.image, 420)} alt={g.score} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
       </Link>
       <Link href={g.href} className="flex flex-1 flex-col gap-2 px-[18px] pb-[18px] pt-4">
         <span className="text-[10px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.2 }}>{g.kicker}</span>

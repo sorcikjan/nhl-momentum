@@ -9,6 +9,8 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Netlify builds serve images through its image CDN (lib/img.ts).
+  env: { NEXT_PUBLIC_IMAGE_CDN: process.env.NETLIFY ? '1' : '' },
   experimental: {
     optimizePackageImports: ['recharts'],
   },

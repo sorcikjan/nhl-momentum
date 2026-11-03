@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { img } from '@/lib/img';
 import type { Moment } from '@/lib/moments';
 import { teamColor } from '@/lib/team-colors';
 import { MONO } from './format';
@@ -59,7 +60,7 @@ export function GoalStrip({ moments, cols }: { moments: Moment[]; cols?: number 
                 // eslint-disable-next-line @next/next/no-img-element
                 ? <img src={m.thumb} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
                 // eslint-disable-next-line @next/next/no-img-element
-                : m.photo && <img src={m.photo} alt="" loading="lazy" className="absolute bottom-0 right-2 h-[92%] w-auto object-contain" />}
+                : m.photo && <img src={img(m.photo, 140)} alt="" loading="lazy" className="absolute bottom-0 right-2 h-[92%] w-auto object-contain" />}
               <span className="absolute inset-0 flex items-center justify-center" style={{ background: m.thumb ? 'linear-gradient(180deg, transparent 50%, rgba(0,0,0,0.55) 100%)' : undefined }}>
                 <PlayIcon size={44} />
               </span>

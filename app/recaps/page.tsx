@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { img } from '@/lib/img';
 import Link from 'next/link';
 import { SHARE_IMAGE } from '@/lib/seo';
 import { fetchFinishedGamesBetween, fetchGameStoriesByDate, fetchRecentRecaps } from '@/lib/data';
@@ -57,7 +58,7 @@ function NightTile({ n }: { n: NightCard }) {
         <span className="relative block aspect-video" style={{ background: 'var(--bg-raised)' }}>
           {n.image && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={n.image} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+            <img src={img(n.image, 420)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
           )}
           <span className="absolute bottom-2.5 left-3 rounded-md px-2 py-1 text-[10px] font-bold" style={{ ...MONO, background: 'rgba(10,11,15,0.82)', color: 'var(--text-bright)', letterSpacing: 1 }}>{n.gamesLabel}</span>
         </span>
@@ -106,7 +107,7 @@ export default async function RecapsPage() {
           <Link href={night.href} className="relative block aspect-video lg:self-center" style={{ background: 'var(--bg-raised)' }} aria-label={night.title}>
             {night.image && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={night.image} alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <img src={img(night.image, 720)} alt="" className="absolute inset-0 h-full w-full object-cover" />
             )}
             <span className="absolute bottom-4 left-5 rounded-md px-2.5 py-1 text-[10px] font-bold" style={{ ...MONO, background: 'var(--heat)', color: 'var(--bg)', letterSpacing: 1.2 }}>LATEST</span>
           </Link>

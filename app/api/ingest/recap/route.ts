@@ -5,6 +5,8 @@ import { fetchRecapData, fetchRecentSoftSignals } from '@/lib/data';
 import { generateDailyRecap, lastAiError } from '@/lib/ai';
 import type { RecapGame, RecapPerformer, RecapShutout } from '@/lib/ai';
 import { fetchScoreFeed } from '@/lib/score-feed';
+import { notifyIndexNow } from '@/lib/indexnow';
+import { gameUrl, recapUrl } from '@/lib/urls';
 
 // Fetch a free hockey photo from Pixabay (Pixabay License — no attribution required).
 // Uses a date-seeded page offset so each recap gets a different image.
@@ -254,8 +256,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data: null, error: upsertErr.message }, { status: 500 });
   }
 
+  // The new night and its games, straight to Bing/Yandex. Best effort, never fails the recap.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const indexed = await notifyIndexNow([recapUrl(date, result.title), '/', '/recaps', ...(raw.games as any[]).map(g =>
+    gameUrl(g.id, g.away_team?.abbrev ?? '', g.home_team?.abbrev ?? '', g.game_date ?? date))]);
+
   return NextResponse.json({
-    data: { date, title: result.title, gamesCount: games.length },
+    data: { date, title: result.title, gamesCount: games.length, indexed },
     error: null,
   });
 }

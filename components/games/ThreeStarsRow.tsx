@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { img } from '@/lib/img';
 import HeatBadge from '@/components/ui/HeatBadge';
 
 const MEDAL_LABEL = { 1: '★1', 2: '★2', 3: '★3' } as const;
@@ -46,7 +47,7 @@ export default function ThreeStarsRow({ stars, heatByPlayerId }: { stars: any[];
 
               {/* Team logo or headshot */}
               {star.headshot ? (
-                <img src={star.headshot} alt={star.name?.default ?? ''} className="w-8 h-8 rounded-full object-cover mb-2.5" />
+                <img src={img(star.headshot, 32)} alt={star.name?.default ?? ''} className="w-8 h-8 rounded-full object-cover mb-2.5" />
               ) : (
                 <div className="w-8 h-8 rounded-lg mb-2.5 flex items-center justify-center text-xs font-bold" style={{ background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   {(star.name?.default ?? '?')[0]}

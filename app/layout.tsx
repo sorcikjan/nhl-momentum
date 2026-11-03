@@ -38,7 +38,8 @@ export const metadata: Metadata = {
     title: 'momentum. — Hockey Intelligence, Daily',
     description: 'Hockey intelligence powered by AI. Daily stories, predictions and player rankings — updated live.',
   },
-  robots: { index: true, follow: true },
+  // Large previews let Google Discover show our covers full width.
+  robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1, 'max-video-preview': -1 } },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

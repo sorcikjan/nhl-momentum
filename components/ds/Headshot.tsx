@@ -1,4 +1,5 @@
 import { teamColor } from '@/lib/team-colors';
+import { img } from '@/lib/img';
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/);
@@ -41,7 +42,7 @@ export function Headshot({
     >
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={name} width={size} height={size} className="h-full w-full object-cover" loading="lazy" />
+        <img src={img(src, size)} alt={name} width={size} height={size} className="h-full w-full object-cover" loading="lazy" />
       ) : (
         initials(name)
       )}

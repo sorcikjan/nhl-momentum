@@ -16,8 +16,9 @@ export function SiteFooter() {
         DATA · NHL Stats API
       </div>
       <nav className="flex gap-5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-        <Link href="/predictions" className="hover:text-[var(--text-bright)]">Tonight's predictions</Link>
-        <Link href="/welcome" className="hover:text-[var(--text-bright)]">How Heat works</Link>
+        <Link href="/predictions" className="hover:text-[var(--text-bright)]">Tonight&apos;s predictions</Link>
+        <Link href="/about#heat" className="hover:text-[var(--text-bright)]">How Heat works</Link>
+        <Link href="/about" className="hover:text-[var(--text-bright)]">About</Link>
         <Link href="/accuracy" className="hover:text-[var(--text-bright)]">Methodology</Link>
         <CookieSettingsButton />
       </nav>

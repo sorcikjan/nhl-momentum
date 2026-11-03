@@ -8,6 +8,10 @@
 [build.environment]
   NODE_VERSION = "20"
 
+# Player photos from the NHL, resized by the image CDN (lib/img.ts).
+[images]
+  remote_images = ["https://assets\\.nhle\\.com/.*"]
+
 [functions]
   directory = "netlify/functions"
 

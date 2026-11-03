@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { img } from '@/lib/img';
 import { SHARE_IMAGE } from '@/lib/seo';
 import Link from 'next/link';
 import { fetchTeam, teamLogoUrl, fetchSeasonPhase, deriveOutStatus } from '@/lib/data';
@@ -127,7 +128,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                 className="flex items-center gap-3 px-4 py-2.5 hover:opacity-80 transition-opacity"
                 style={{ background: 'var(--bg)' }}>
                 {p.players.headshot_url
-                  ? <img src={p.players.headshot_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                  ? <img src={img(p.players.headshot_url, 32)} alt="" className="w-8 h-8 rounded-full object-cover" />
                   : <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
                       style={{ background: 'var(--border)', color: 'var(--text)' }}>
                       {p.players.position_code}
@@ -183,7 +184,7 @@ export default async function TeamPage({ params }: { params: Promise<{ id: strin
                     className="flex items-center gap-3 px-4 py-2.5 hover:opacity-80"
                     style={{ background: 'var(--bg)' }}>
                     {p.players.headshot_url
-                      ? <img src={p.players.headshot_url} alt="" className="w-8 h-8 rounded-full object-cover" />
+                      ? <img src={img(p.players.headshot_url, 32)} alt="" className="w-8 h-8 rounded-full object-cover" />
                       : <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
                           style={{ background: 'var(--border)', color: 'var(--text)' }}>G</div>
                     }

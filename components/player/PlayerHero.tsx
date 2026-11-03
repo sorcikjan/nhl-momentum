@@ -1,4 +1,5 @@
 import { TeamChip, energyColor, energyLabel } from '@/components/ds';
+import { img } from '@/lib/img';
 import { heatColor } from '@/lib/heat';
 import { teamColor } from '@/lib/team-colors';
 
@@ -91,7 +92,7 @@ export function PlayerHero(p: HeroProps) {
           <div className="relative h-[84px] w-[84px] shrink-0 overflow-hidden rounded-full border-[3px] lg:h-[104px] lg:w-[104px]" style={{ background: tc.bg, borderColor: 'var(--border)' }}>
             {p.photo && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={p.photo} alt={`${p.first} ${p.last}`} className="absolute inset-0 h-full w-full object-cover" />
+              <img src={img(p.photo, 320)} alt={`${p.first} ${p.last}`} className="absolute inset-0 h-full w-full object-cover" />
             )}
           </div>
           <div className="flex min-w-0 flex-col gap-1.5">
