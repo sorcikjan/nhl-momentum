@@ -22,6 +22,7 @@ export async function POST(request: Request) {
   revalidatePath('/games/[id]/[slug]', 'page');
   revalidatePath('/playoffs');
   revalidatePath('/accuracy');
+  revalidatePath('/cesi-v-nhl');
   revalidatePath('/recaps', 'layout');
   // Data cached across renders (finished game pages) — expire it now, not stale-while-revalidate.
   revalidateTag('pipeline', { expire: 0 });

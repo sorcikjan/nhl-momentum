@@ -27,6 +27,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/games`,        lastModified: now, changeFrequency: 'hourly',  priority: 0.9 },
     { url: `${base}/predictions`,  lastModified: now, changeFrequency: 'hourly',  priority: 0.9 },
     { url: `${base}/recaps`,       lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
+    { url: `${base}/cesi-v-nhl`,   lastModified: now, changeFrequency: 'hourly',  priority: 0.8 },
     { url: `${base}/welcome`,      changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/about`,        changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/accuracy`,     lastModified: now, changeFrequency: 'daily',   priority: 0.5 },

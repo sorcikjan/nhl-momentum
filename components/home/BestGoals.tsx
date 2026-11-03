@@ -14,9 +14,13 @@ function PlayIcon({ size }: { size: number }) {
   );
 }
 
+// The words on the cards and in the popup; the nation pages pass their own.
+export type GoalLabels = { watch: string; onNhl: string; close: string };
+const EN: GoalLabels = { watch: 'watch the goal', onNhl: 'WATCH ON NHL.COM', close: 'Close' };
+
 // The clip in a popup: NHL.com's own player, with NHL.com one click away
 // in case the player won't start here.
-function ClipModal({ m, onClose }: { m: Moment; onClose: () => void }) {
+function ClipModal({ m, onClose, t }: { m: Moment; onClose: () => void; t: GoalLabels }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     const overflow = document.body.style.overflow;
@@ -33,13 +37,13 @@ function ClipModal({ m, onClose }: { m: Moment; onClose: () => void }) {
             <span className="text-[10px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.1 }}>{m.kicker} · {m.score} · {m.when}</span>
             <span className="text-base font-extrabold leading-snug lg:text-lg" style={{ color: '#fff' }}>{m.title ?? m.scorer}</span>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xl" style={{ background: 'rgba(255,255,255,0.12)', color: '#fff' }}>×</button>
+          <button type="button" onClick={onClose} aria-label={t.close} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xl" style={{ background: 'rgba(255,255,255,0.12)', color: '#fff' }}>×</button>
         </div>
         <div className="relative w-full overflow-hidden rounded-xl" style={{ aspectRatio: '16/9', background: '#000' }}>
           <iframe src={`${m.embed}&autoplay=true`} title={m.title ?? m.scorer} className="absolute inset-0 h-full w-full"
             allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen />
         </div>
-        <a href={m.href} target="_blank" rel="noopener noreferrer" className="self-end text-xs font-bold" style={{ ...MONO, color: 'var(--text)' }}>WATCH ON NHL.COM ↗</a>
+        <a href={m.href} target="_blank" rel="noopener noreferrer" className="self-end text-xs font-bold" style={{ ...MONO, color: 'var(--text)' }}>{t.onNhl} ↗</a>
       </div>
     </div>
   );
@@ -48,7 +52,7 @@ function ClipModal({ m, onClose }: { m: Moment; onClose: () => void }) {
 // Goal cards: each shows the clip's still and opens it in a popup (or on
 // NHL.com when we have no player for it). Scroll sideways on phones; on
 // wide screens one row (`cols` unset) or a grid of `cols` columns.
-export function GoalStrip({ moments, cols }: { moments: Moment[]; cols?: number }) {
+export function GoalStrip({ moments, cols, labels: t = EN }: { moments: Moment[]; cols?: number; labels?: GoalLabels }) {
   const [open, setOpen] = useState<Moment | null>(null);
   return (
     <>
@@ -77,13 +81,13 @@ export function GoalStrip({ moments, cols }: { moments: Moment[]; cols?: number 
           );
           const cls = 'group flex w-[240px] shrink-0 snap-start flex-col overflow-hidden rounded-[14px] border transition-colors hover:border-[var(--heat)] lg:w-auto';
           const style = { background: 'var(--bg-card)', borderColor: 'var(--border)' };
-          const label = `${m.kicker}: ${m.scorer}, ${m.score} — watch the goal`;
+          const label = `${m.kicker}: ${m.scorer}, ${m.score} — ${t.watch}`;
           return m.embed
             ? <button key={m.href} type="button" onClick={() => setOpen(m)} className={cls} style={style} aria-label={label}>{still}{text}</button>
             : <a key={m.href} href={m.href} target="_blank" rel="noopener noreferrer" className={cls} style={style} aria-label={label}>{still}{text}</a>;
         })}
       </div>
-      {open && <ClipModal m={open} onClose={() => setOpen(null)} />}
+      {open && <ClipModal m={open} onClose={() => setOpen(null)} t={t} />}
     </>
   );
 }
