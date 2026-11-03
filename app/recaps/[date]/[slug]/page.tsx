@@ -342,19 +342,14 @@ export default async function RecapSlugPage({ params }: { params: Promise<{ date
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <div className="flex flex-col gap-8 pb-20 lg:pb-0">
-        <header className="flex max-w-[860px] flex-col gap-3">
-          <div className="flex flex-wrap items-center gap-x-2 text-[11px] font-bold" style={{ ...MONO, letterSpacing: 1.4 }}>
-            <Link href="/recaps" style={{ color: 'var(--heat)' }}>STORIES</Link>
-            <span style={{ color: 'var(--text-muted)' }}>·</span>
-            <span style={{ color: 'var(--text-bright)' }}>THE NIGHT · {dateLabel.toUpperCase()}</span>
-          </div>
-          <h1 className="font-extrabold leading-[1.08]" style={{ fontSize: 'clamp(30px, 4.4vw, 48px)', letterSpacing: '-0.03em', color: 'var(--text-bright)', textWrap: 'balance' }}>{cleanTitle}</h1>
-          <div className="flex flex-wrap items-center gap-x-2 text-[11px]" style={{ ...MONO, color: 'var(--text-muted)' }}>
-            {recap.games_count != null && <span>{recap.games_count} GAMES</span>}
-            <span>·</span>
-            <span>momentum.</span>
-            {published && <><span>·</span><span>{published}</span></>}
-          </div>
+        <header className="max-w-[860px]">
+          <SectionHeading
+            as="h1"
+            size="page"
+            kicker={<><Link href="/recaps">STORIES</Link> <span style={{ color: 'var(--text-muted)' }}>·</span> <span style={{ color: 'var(--text-bright)' }}>THE NIGHT · {dateLabel.toUpperCase()}</span></>}
+            title={cleanTitle}
+            sub={<span className="text-[11px]" style={{ ...MONO, color: 'var(--text-muted)' }}>{[recap.games_count != null ? `${recap.games_count} GAMES` : null, 'momentum.', published].filter(Boolean).join(' · ')}</span>}
+          />
         </header>
 
         {/* Cover, article, game cards, scoreboard, top performers — stream in while fetchRecapData resolves */}

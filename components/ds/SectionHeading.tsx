@@ -43,7 +43,7 @@ export function SectionHeading({
         </div>
         <Tag
           id={id}
-          className="font-extrabold leading-none"
+          className="font-extrabold leading-[1.05]"
           style={{
             fontSize: `clamp(${Math.round(s.title * 0.7)}px, 6vw, ${s.title}px)`,
             letterSpacing: s.tracking,
