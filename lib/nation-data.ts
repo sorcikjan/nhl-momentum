@@ -16,10 +16,11 @@ import {
 
 const BASE = 'https://api-web.nhle.com/v1';
 
-// The NHL API answers a burst of 50 calls with 429s: a second try after a
-// pause, and never more than a few calls at once (pool()). Null = we don't know.
+// The NHL API answers a burst of 50 calls with 429s: up to two more tries,
+// longer pauses each time, and never more than a few calls at once (pool()).
+// Null = we don't know.
 async function nhl<T>(path: string, revalidate: number): Promise<T | null> {
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const res = await fetch(`${BASE}${path}`, { next: { revalidate }, signal: AbortSignal.timeout(8_000) });
       if (res.ok) return (await res.json()) as T;
@@ -27,7 +28,7 @@ async function nhl<T>(path: string, revalidate: number): Promise<T | null> {
     } catch {
       return null;
     }
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
   }
   return null;
 }
