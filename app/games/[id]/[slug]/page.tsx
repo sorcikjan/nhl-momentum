@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type React from 'react';
 import { cache } from 'react';
+import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
 import {
   fetchGameStory, fetchMatch, fetchRecap, fetchSeasonPickAccuracy, fetchTeamSpecialTeams,
@@ -55,7 +56,25 @@ export function generateStaticParams() {
 }
 
 // Metadata and the page share one fetch per render (it's a few dozen queries).
-const cachedFetchMatch = cache((id: string) => fetchMatch(id));
+// A finished game's data changes only when the pipeline writes, and the pipeline
+// then calls /api/revalidate, which drops the 'pipeline' tag. So a final game
+// reads the database once per 6 h, not on every 60 s re-render; live and
+// upcoming games read fresh. (The Map doesn't survive the cache's JSON.)
+const finishedMatch = unstable_cache(
+  async (id: string) => {
+    const m = await fetchMatch(id);
+    return { ...m, goalieSeasonStats: [...m.goalieSeasonStats] };
+  },
+  ['match-final-v1'],
+  { revalidate: 21600, tags: ['pipeline'] },
+);
+const cachedFetchMatch = cache(async (id: string) => {
+  const m = await finishedMatch(id);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const state = (m.liveData as any)?.gameState ?? m.game?.game_state;
+  if (state === 'FINAL' || state === 'OFF') return { ...m, goalieSeasonStats: new Map(m.goalieSeasonStats) };
+  return fetchMatch(id);
+});
 const cachedFetchStory = cache((id: number) => fetchGameStory(id).catch(() => null));
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string; slug: string }> }): Promise<Metadata> {

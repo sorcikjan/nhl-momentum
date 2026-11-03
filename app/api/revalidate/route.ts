@@ -1,4 +1,4 @@
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 
 // Called by pipeline workers (game-finish-worker, daily-worker) after writing
@@ -23,6 +23,8 @@ export async function POST(request: Request) {
   revalidatePath('/playoffs');
   revalidatePath('/accuracy');
   revalidatePath('/recaps', 'layout');
+  // Data cached across renders (finished game pages) — expire it now, not stale-while-revalidate.
+  revalidateTag('pipeline', { expire: 0 });
 
   return NextResponse.json({ revalidated: true, ts: new Date().toISOString() });
 }

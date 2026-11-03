@@ -6,8 +6,12 @@ const player = readFileSync('app/players/[id]/[slug]/page.tsx', 'utf8');
 
 describe('game page', () => {
   it('fetches the match once per render (metadata and page share a cached call)', () => {
-    expect(game).toMatch(/cache\(\(id: string\) => fetchMatch\(id\)/);
-    expect(game.match(/fetchMatch\(/g)).toHaveLength(1);
+    expect(game).toMatch(/const cachedFetchMatch = cache\(/);
+    expect(game.match(/cachedFetchMatch\(id\)/g)).toHaveLength(2);
+  });
+  it('a finished game reads the database from the pipeline-tagged cache', () => {
+    expect(game).toMatch(/tags: \['pipeline'\]/);
+    expect(readFileSync('app/api/revalidate/route.ts', 'utf8')).toContain("revalidateTag('pipeline'");
   });
   it('uses the search title and SportsEvent structured data', () => {
     expect(game).toContain('gameTitle(');
