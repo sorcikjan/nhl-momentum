@@ -251,4 +251,136 @@ export async function brandImage(leaders: BrandLeader[]): Promise<ImageResponse>
   );
 }
 
+// ─── Morning share cards (1080×1350, portrait: fits Reddit, Instagram, X) ─────
+
+export const POST_SIZE = { width: 1080, height: 1350 };
+const POST_CACHE = { 'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600' };
+async function postOpts() {
+  return { ...(await opts()), ...POST_SIZE, headers: POST_CACHE };
+}
+
+// `title` is one entry per line: Satori doesn't lay out fragments, so lines are explicit.
+function PostFrame({ kicker, title, children, foot }: { kicker: string; title: React.ReactNode[]; children: React.ReactNode; foot: string }) {
+  return (
+    <div style={{ width: 1080, height: 1350, display: 'flex', flexDirection: 'column', background: `linear-gradient(170deg, #1a0f0b 0%, ${BG} 38%)`, padding: '60px 64px 52px', fontFamily: 'Inter, sans-serif', color: TEXT }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', fontSize: 24, letterSpacing: 3.5, color: HEAT, fontWeight: 700 }}>{kicker}</div>
+        <Wordmark size={34} />
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', fontSize: 74, fontWeight: 800, letterSpacing: -2.6, lineHeight: 1.04, marginTop: 34 }}>
+        {title.map((line, i) => <div key={i} style={{ display: 'flex' }}>{line}</div>)}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', flex: 1, marginTop: 40 }}>{children}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `2px solid ${BORDER}`, marginTop: 28, paddingTop: 24, fontSize: 22, color: DIM }}>
+        <div style={{ display: 'flex' }}>{foot}</div>
+        <div style={{ display: 'flex', color: TEXT, fontWeight: 700 }}>hockeymomentum.com</div>
+      </div>
+    </div>
+  );
+}
+
+export type PostRow = { photo: string | null; team: string; name: string; sub: string; value: string; heat: number | null; chip?: { text: string; color: string } | null };
+
+function PostRows({ rows, compact = false }: { rows: PostRow[]; compact?: boolean }) {
+  const k = compact ? 0.82 : 1;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {rows.map((r, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', marginTop: compact ? 10 : 14, background: CARD, border: `2px solid ${BORDER}`, borderRadius: 22, padding: compact ? '9px 24px' : '14px 26px' }}>
+          <Face src={r.photo} team={r.team} size={Math.round(76 * k)} />
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, marginLeft: 22 }}>
+            <div style={{ display: 'flex', fontSize: Math.round(36 * k), fontWeight: 800, letterSpacing: -0.8 }}>{r.name}</div>
+            <div style={{ display: 'flex', fontSize: Math.round(24 * k), color: DIM, marginTop: 3 }}>{r.sub}</div>
+          </div>
+          {r.chip && <div style={{ display: 'flex', fontSize: Math.round(26 * k), fontWeight: 800, color: r.chip.color, marginRight: 26 }}>{r.chip.text}</div>}
+          <div style={{ display: 'flex', fontSize: Math.round(56 * k), fontWeight: 800, color: r.heat == null ? COLD : heatColor(r.heat) }}>{r.value}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export type HeatPostLeader = { name: string; team: string; teamName: string; photo: string | null; heat: number; line: string; pace: number | null };
+
+export async function heatPostImage(dateLabel: string, leader: HeatPostLeader, rows: PostRow[]): Promise<ImageResponse> {
+  return new ImageResponse(
+    <PostFrame kicker={`HEAT INDEX · ${dateLabel}`} title={['Who\'s hot in the', <>NHL right <span style={{ color: HEAT, marginLeft: 22 }}>now.</span></>]}
+      foot="Heat = points per minute of ice time, last 5 games">
+      <div style={{ display: 'flex', alignItems: 'center', background: CARD, border: '2px solid rgba(255,90,36,0.5)', borderRadius: 30, padding: '30px 34px' }}>
+        <Face src={leader.photo} team={leader.team} size={170} />
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, marginLeft: 30 }}>
+          <div style={{ display: 'flex', fontSize: 22, letterSpacing: 3, color: HEAT, fontWeight: 700 }}>#1 RIGHT NOW</div>
+          <div style={{ display: 'flex', fontSize: 50, fontWeight: 800, letterSpacing: -1.5, marginTop: 8 }}>{leader.name}</div>
+          <div style={{ display: 'flex', fontSize: 26, color: DIM, marginTop: 6 }}>{leader.teamName} · {leader.line}</div>
+          {leader.pace != null && leader.pace > 0 && <div style={{ display: 'flex', fontSize: 26, fontWeight: 800, color: RISE, marginTop: 10 }}>+{leader.pace}% vs his season pace</div>}
+        </div>
+        <div style={{ display: 'flex', fontSize: 140, fontWeight: 800, letterSpacing: -5, color: heatColor(leader.heat) }}>{leader.heat}</div>
+      </div>
+      <PostRows rows={rows} />
+    </PostFrame>,
+    await postOpts(),
+  );
+}
+
+export async function trendsPostImage(dateLabel: string, up: PostRow[], down: PostRow[]): Promise<ImageResponse> {
+  const head = (text: string, color: string) => <div style={{ display: 'flex', fontSize: 24, letterSpacing: 3, color, fontWeight: 700 }}>{text}</div>;
+  return new ImageResponse(
+    <PostFrame kicker={`FORM WATCH · ${dateLabel}`} title={['Heating up.', <span key="c" style={{ color: DIM }}>Cooling off.</span>]}
+      foot="Last 5 games vs their own season pace · big number = Heat">
+      {head('↑ HEATING UP', RISE)}
+      <PostRows rows={up} compact />
+      {down.length > 0 && <div style={{ display: 'flex', marginTop: 26 }}>{head('↓ COOLING OFF', COLD)}</div>}
+      {down.length > 0 && <PostRows rows={down} compact />}
+    </PostFrame>,
+    await postOpts(),
+  );
+}
+
+export type NightPostGoal = { scorer: string; team: string; photo: string | null; kicker: string; score: string; when: string };
+
+// A quiet night gets big rows and three goals; a full one two columns and fewer goals.
+export async function nightPostImage(dateLabel: string, games: { away: string; awayScore: number; home: string; homeScore: number }[], goals: NightPostGoal[]): Promise<ImageResponse> {
+  const wide = games.length <= 6;
+  const shown = games.slice(0, 14);
+  const best = goals.slice(0, wide ? 3 : games.length <= 10 ? 2 : 1);
+  const Score = ({ n, lit }: { n: number; lit: boolean }) => <div style={{ display: 'flex', fontSize: wide ? 52 : 40, fontWeight: 800, color: lit ? TEXT : DIM }}>{n}</div>;
+  return new ImageResponse(
+    <PostFrame kicker={`LAST NIGHT · ${dateLabel}`} title={[`${games.length} game${games.length === 1 ? '' : 's'}. Here's the night.`]}
+      foot={games.length > shown.length ? `+${games.length - shown.length} more on the site` : 'Every score, story and goal on the site'}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+        {shown.map((g, i) => {
+          const awayWon = g.awayScore > g.homeScore;
+          return (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', width: wide ? 952 : 466, marginBottom: 12, background: CARD, border: `2px solid ${BORDER}`, borderRadius: 18, padding: wide ? '14px 28px' : '12px 20px' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={teamLogo(g.away)} width={wide ? 72 : 60} height={wide ? 48 : 40} alt="" />
+              {wide && <div style={{ display: 'flex', fontSize: 32, fontWeight: 700, marginLeft: 16, color: awayWon ? TEXT : DIM }}>{teamColor(g.away).name}</div>}
+              <div style={{ display: 'flex', flex: 1 }} />
+              <Score n={g.awayScore} lit={awayWon} />
+              <div style={{ display: 'flex', fontSize: 26, color: DIM, margin: '0 18px' }}>–</div>
+              <Score n={g.homeScore} lit={!awayWon} />
+              <div style={{ display: 'flex', flex: 1 }} />
+              {wide && <div style={{ display: 'flex', fontSize: 32, fontWeight: 700, marginRight: 16, color: awayWon ? DIM : TEXT }}>{teamColor(g.home).name}</div>}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={teamLogo(g.home)} width={wide ? 72 : 60} height={wide ? 48 : 40} alt="" />
+            </div>
+          );
+        })}
+      </div>
+      {best.length > 0 && <div style={{ display: 'flex', fontSize: 24, letterSpacing: 3, color: HEAT, fontWeight: 700, marginTop: 'auto', marginBottom: 2 }}>{best.length === 1 ? 'GOAL OF THE NIGHT' : 'BEST GOALS OF THE NIGHT'}</div>}
+      {best.map((g, i) => (
+        <div key={i} style={{ display: 'flex', alignItems: 'center', marginTop: 12, background: CARD, border: `2px solid ${i === 0 ? 'rgba(255,90,36,0.5)' : BORDER}`, borderRadius: 24, padding: '16px 26px' }}>
+          <Face src={g.photo} team={g.team} size={92} />
+          <div style={{ display: 'flex', flexDirection: 'column', flex: 1, marginLeft: 24 }}>
+            <div style={{ display: 'flex', fontSize: 20, letterSpacing: 2.5, color: HEAT, fontWeight: 700 }}>{g.kicker}</div>
+            <div style={{ display: 'flex', fontSize: 38, fontWeight: 800, letterSpacing: -1, marginTop: 4 }}>{g.scorer}</div>
+            <div style={{ display: 'flex', fontSize: 24, color: DIM, marginTop: 2 }}>{g.score} · {g.when}</div>
+          </div>
+        </div>
+      ))}
+    </PostFrame>,
+    await postOpts(),
+  );
+}
+
 export { heatColor };
