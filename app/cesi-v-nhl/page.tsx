@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { cache } from 'react';
 import { NationBody } from '@/components/nation/NationBody';
 import { JsonLd } from '@/components/seo/JsonLd';
 import { fetchNationData } from '@/lib/nation-data';
@@ -13,7 +14,7 @@ export const revalidate = 900;
 const TITLE = 'Češi v NHL – výsledky, góly a forma českých hráčů';
 const DESC = 'Jak hráli Češi v NHL v noci: body, čas na ledě, góly s videem, forma podle Heat, čeští brankáři a kdo hraje dnes. Aktualizováno po každém zápase.';
 
-export const metadata: Metadata = {
+const metadata: Metadata = {
   title: { absolute: `${TITLE} | momentum.` },
   description: DESC,
   alternates: { canonical: `${SITE_URL}${CZE.path}` },
@@ -21,8 +22,17 @@ export const metadata: Metadata = {
   twitter: { card: 'summary_large_image', title: TITLE, description: DESC, images: [SHARE_IMAGE.url] },
 };
 
+// Metadata and the page share one fetch per render.
+const nationData = cache(() => fetchNationData(CZE));
+
+// The snippet changes with every night: its summary first, then what's on the page.
+export async function generateMetadata(): Promise<Metadata> {
+  const summary = (await nationData().catch(() => null))?.night?.summary;
+  return { ...metadata, description: summary ? `${summary} Góly s videem, forma podle Heat a kdo hraje dnes.` : DESC };
+}
+
 export default async function CzechsPage() {
-  const data = await fetchNationData(CZE);
+  const data = await nationData();
   const updated = new Date().toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: 'Europe/Prague' });
   return (
     <>

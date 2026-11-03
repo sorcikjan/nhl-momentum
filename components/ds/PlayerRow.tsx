@@ -22,6 +22,7 @@ export function PlayerRow({ r }: { r: PlayerRowData }) {
         <span className="truncate text-xs" style={{ color: 'var(--text)' }}>
           {r.team} · {r.pos} · <span style={{ ...MONO, color: 'var(--text-bright)', opacity: 0.8 }}>{r.l5}</span>
         </span>
+        {r.league && <span className="truncate text-[11px]" style={{ ...MONO, color: 'var(--text-muted)' }}>{r.league}</span>}
       </span>
       {r.chip && (
         <span

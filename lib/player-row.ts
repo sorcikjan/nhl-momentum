@@ -14,6 +14,8 @@ export type PlayerRowData = {
   value: string;
   // Heat colours the number; null = not a Heat number (goalie SV%).
   valueHeat: number | null;
+  // Optional second line: where he stands in the whole league (nation pages).
+  league?: string | null;
 };
 
 const POS: Record<string, string> = { C: 'C', L: 'LW', R: 'RW', D: 'D', G: 'G' };

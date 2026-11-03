@@ -10,7 +10,7 @@ import { TEAMS } from '@/lib/team-colors';
 import { gameUrl, playerUrl } from '@/lib/urls';
 import type { PlayerRowData } from '@/lib/player-row';
 import {
-  czechGoal, goalieForm, goalieLine, goalieRow, nationPlayers, nightLabel, pointsPhrase, pragueTime,
+  GOALIE_MIN_GP, czechGoal, goalieForm, goalieLeague, median, nightSummary, rankOf, skaterLeague, goalieLine, goalieRow, nationPlayers, nightLabel, pointsPhrase, pragueTime,
   skaterForm, skaterLine, skaterRow, type LogGame, type Nation, type NationPlayer,
 } from '@/lib/nations';
 
@@ -41,7 +41,7 @@ async function pool<T, R>(items: T[], size: number, fn: (x: T) => Promise<R>): P
   return out;
 }
 
-export type NightPlayer = { name: string; href: string; phrase: string; line: string; points: number };
+export type NightPlayer = { name: string; href: string; phrase: string; line: string; points: number; goals: Moment[] };
 export type NightGame = {
   href: string; away: string; home: string; awayScore: number; homeScore: number; suffix: string;
   players: NightPlayer[];
@@ -53,15 +53,30 @@ export type TonightGame = {
 export type NationData = {
   count: number;
   partial: boolean;      // some players' NHL data didn't load: they're left out, not called idle
-  night: { label: string; games: NightGame[]; idle: string[]; scratched: string[] } | null;
+  night: { label: string; games: NightGame[]; idle: string[]; scratched: string[]; summary: string } | null;
   goals: Moment[];
   skaters: PlayerRowData[];
   goalies: PlayerRowData[];
   notPlayed: string[];
+  league: { leader: { name: string; heat: number } | null; medianHeat: number | null; skaters: number; goalieAvg: number | null };
   tonight: { label: string; games: TonightGame[] } | null;
 };
 
 const MAX_GOALS = 9;
+
+// Season totals for the whole league (NHL stats API): where each of them
+// stands among everyone, not just among themselves.
+type SeasonSkater = { playerId: number; points: number };
+type SeasonGoalie = { playerId: number; gamesPlayed: number; saves: number; shotsAgainst: number; savePct: number };
+async function seasonTable<T>(kind: 'skater' | 'goalie', season: string): Promise<T[]> {
+  try {
+    const url = `https://api.nhle.com/stats/rest/en/${kind}/summary?limit=-1&cayenneExp=seasonId=${season}%20and%20gameTypeId=2`;
+    const res = await fetch(url, { next: { revalidate: 1800 }, signal: AbortSignal.timeout(8_000) });
+    return res.ok ? ((await res.json()) as { data?: T[] }).data ?? [] : [];
+  } catch {
+    return [];
+  }
+}
 
 export async function fetchNationData(n: Nation): Promise<NationData> {
   // Rosters change by trades and call-ups: a day's cache.
@@ -71,9 +86,11 @@ export async function fetchNationData(n: Nation): Promise<NationData> {
   const players = nationPlayers(rosters, n);
   const hrefOf = (p: NationPlayer) => playerUrl(p.id, p.slugFirst, p.slugLast);
 
-  const [fetched, rankings] = await Promise.all([
+  const [fetched, rankings, seasonSkaters, seasonGoalies] = await Promise.all([
     pool(players, 4, p => nhl<{ gameLog?: LogGame[] }>(`/player/${p.id}/game-log/${season}/2`, 1800).then(r => r ? r.gameLog ?? [] : null)),
     fetchRankings().catch(() => null),
+    seasonTable<SeasonSkater>('skater', season),
+    seasonTable<SeasonGoalie>('goalie', season),
   ]);
   const partial = fetched.some(l => l == null) || rosters.some(r => r.roster == null);
   // Players whose log didn't load are left out of everything below.
@@ -83,11 +100,24 @@ export async function fetchNationData(n: Nation): Promise<NationData> {
   const byId = new Map(players.map(p => [p.id, p]));
   const heatBy = rankings?.heatByPlayer ?? {};
 
-  // Last night: the latest date any of them played.
   const dates = [...new Set(logs.flatMap(l => l.map(g => g.gameDate)))].sort().reverse();
   const latest = dates[0] ?? null;
   // Past nights' feeds don't change: an hour's cache; the latest one refreshes like the homepage's.
   const feeds = await Promise.all(dates.slice(0, 3).map((d, i) => getScore(d, i === 0 ? 1800 : 3600).catch(() => ({ games: [] }))));
+
+  // Their goals over the last few nights, newest first, each with its clip —
+  // shown as a strip and beside the scorer's line in last night's results.
+  const found: Moment[] = [];
+  for (const feed of feeds) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const g of (feed.games ?? []) as any[]) {
+      for (const m of gameGoals(feed, g.id, heatBy)) {
+        const p = byId.get(m.playerId);
+        if (p) found.push(czechGoal(m, p.name));
+      }
+    }
+  }
+  const goals = await withClips(found);
 
   let night: NationData['night'] = null;
   if (latest) {
@@ -99,9 +129,10 @@ export async function fetchNationData(n: Nation): Promise<NationData> {
     for (const p of known) {
       const g = logOf.get(p.id)?.[0];
       if (!g || g.gameDate !== latest) { (played.has(p.team) ? scratched : idle).push(p.name); continue; }
+      const mine = goals.filter(m => m.playerId === p.id && m.gameId === g.gameId);
       const row: NightPlayer = p.goalie
-        ? { name: p.name, href: hrefOf(p), phrase: '', line: goalieLine(g), points: -1 }
-        : { name: p.name, href: hrefOf(p), phrase: pointsPhrase(g.goals, g.assists), line: skaterLine(g), points: g.goals * 10 + g.assists };
+        ? { name: p.name, href: hrefOf(p), phrase: '', line: goalieLine(g), points: -1, goals: [] }
+        : { name: p.name, href: hrefOf(p), phrase: pointsPhrase(g.goals, g.assists), line: skaterLine(g), points: g.goals * 10 + g.assists, goals: mine };
       byGame.set(g.gameId, [...(byGame.get(g.gameId) ?? []), row]);
     }
     const games: NightGame[] = [...byGame].map(([id, rows]) => {
@@ -115,20 +146,18 @@ export async function fetchNationData(n: Nation): Promise<NationData> {
         players: rows.sort((a, b) => b.points - a.points),
       };
     }).sort((a, b) => Math.max(...b.players.map(p => p.points)) - Math.max(...a.players.map(p => p.points)));
-    night = { label: nightLabel(latest), games, idle, scratched };
+    night = { label: nightLabel(latest), games, idle, scratched, summary: nightSummary(nightLabel(latest), games.flatMap(g => g.players)) };
   }
 
-  // Their goals over the last few nights, newest first, each with its clip.
-  const goals: Moment[] = [];
-  for (const feed of feeds) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const g of (feed.games ?? []) as any[]) {
-      for (const m of gameGoals(feed, g.id, heatBy)) {
-        const p = byId.get(m.playerId);
-        if (p && goals.length < MAX_GOALS) goals.push(czechGoal(m, p.name));
-      }
-    }
-  }
+  // The league around them: Heat rank among every skater, season points rank,
+  // and goalies' season save % among those with enough games to count.
+  const heats = Object.values(heatBy);
+  const points = seasonSkaters.map(s => s.points);
+  const pointsBy = new Map(seasonSkaters.map(s => [s.playerId, s.points]));
+  const qualified = seasonGoalies.filter(g => g.gamesPlayed >= GOALIE_MIN_GP);
+  const goalieBy = new Map(seasonGoalies.map(g => [g.playerId, g]));
+  const shots = seasonGoalies.reduce((s, g) => s + g.shotsAgainst, 0);
+  const top = rankings?.momentumLeaders?.skaters?.[0];
 
   // Form: every skater by Heat; goalies by save % over their last five starts.
   const formed = known.filter(p => !p.goalie && (logOf.get(p.id)?.length ?? 0) > 0)
@@ -143,10 +172,25 @@ export async function fetchNationData(n: Nation): Promise<NationData> {
     count: players.length,
     partial,
     night,
-    goals: await withClips(goals),
-    skaters: formed.map(({ p, f }, i) => skaterRow(p, hrefOf(p), f, i + 1)),
-    goalies: goalieForms.map(({ p, f }, i) => goalieRow(p, hrefOf(p), f, i + 1)),
+    goals: goals.slice(0, MAX_GOALS),
+    skaters: formed.map(({ p, f }, i) => skaterRow(p, hrefOf(p), f, i + 1, skaterLeague(
+      heatBy[p.id] != null ? { rank: rankOf(heats, heatBy[p.id]), of: heats.length } : null,
+      pointsBy.has(p.id) ? { points: pointsBy.get(p.id)!, rank: rankOf(points, pointsBy.get(p.id)!) } : null,
+    ))),
+    goalies: goalieForms.map(({ p, f }, i) => {
+      const s = goalieBy.get(p.id);
+      return goalieRow(p, hrefOf(p), f, i + 1, goalieLeague(s ? {
+        svPct: s.savePct, games: s.gamesPlayed,
+        rank: s.gamesPlayed >= GOALIE_MIN_GP ? rankOf(qualified.map(g => g.savePct), s.savePct) : null, of: qualified.length,
+      } : null));
+    }),
     notPlayed,
+    league: {
+      leader: top ? { name: `${top.players?.first_name ?? ''} ${top.players?.last_name ?? ''}`.trim(), heat: heatBy[top.player_id] ?? 0 } : null,
+      medianHeat: median(heats),
+      skaters: heats.length,
+      goalieAvg: shots > 0 ? seasonGoalies.reduce((s, g) => s + g.saves, 0) / shots : null,
+    },
     tonight: await tonightGames(n, players),
   };
 }

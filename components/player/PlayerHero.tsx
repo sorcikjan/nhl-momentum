@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { TeamChip, energyColor, energyLabel } from '@/components/ds';
 import { img } from '@/lib/img';
 import { heatColor } from '@/lib/heat';
@@ -9,6 +10,8 @@ export type HeroProps = {
   first: string; last: string; team: string; teamName: string; number: number | null; position: string; age: number | null;
   shoots: string | null; height: string | null; weight: string | null;
   birthPlace: string | null; flag: string | null; drafted: string | null;
+  // His nation's page, when it has one ("Češi v NHL").
+  nation?: { href: string; label: string } | null;
   photo: string | null;
   archetype: { name: string; basis: string | null } | null;
   // "11 points in 11 games — 23rd of 346 forwards. The average forward has 5."
@@ -103,6 +106,7 @@ export function PlayerHero(p: HeroProps) {
               <TeamChip abbrev={p.team} size={22} /><span>{meta}</span>
             </div>
             {origin && <div className="text-xs" style={{ color: 'var(--text-muted)' }}>{origin}</div>}
+            {p.nation && <Link href={p.nation.href} className="text-xs font-semibold hover:underline" style={{ color: 'var(--heat)' }}>{p.flag ? `${p.flag} ` : ''}{p.nation.label} →</Link>}
           </div>
         </div>
         {p.archetype && (

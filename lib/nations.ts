@@ -13,14 +13,18 @@ export type Nation = {
   lang: string;            // NHL name locale and <html lang>: 'cs'
   locale: string;          // 'cs-CZ'
   timeZone: string;        // the fans' clock: 'Europe/Prague'
+  label: string;           // the page's name, for links to it: 'Češi v NHL'
   // Names the NHL API leaves without their accents, by player id.
   lastNames: Record<number, string>;
 };
 
 export const CZE: Nation = {
-  code: 'CZE', path: '/cesi-v-nhl', lang: 'cs', locale: 'cs-CZ', timeZone: 'Europe/Prague',
+  code: 'CZE', path: '/cesi-v-nhl', lang: 'cs', locale: 'cs-CZ', timeZone: 'Europe/Prague', label: 'Češi v NHL',
   lastNames: { 8482487: 'Dobeš', 8484790: 'Jiříček', 8482877: 'Chmelař' },
 };
+
+// Nation pages by NHL birthCountry — player profiles link to theirs.
+export const NATIONS: Record<string, Nation> = { CZE };
 
 // A roster entry from /v1/roster/{team}/current.
 export type NationPlayer = {
@@ -165,24 +169,69 @@ export function czechGoal(m: Moment, name: string): Moment {
   };
 }
 
+// ─── The league around them ───────────────────────────────────────────────────
+
+// Fewer games than this and a season save % says little: no league rank.
+export const GOALIE_MIN_GP = 5;
+
+// 1 + how many are better; ties share a place.
+export const rankOf = (all: number[], mine: number) => 1 + all.filter(v => v > mine).length;
+
+export function median(xs: number[]): number | null {
+  if (!xs.length) return null;
+  const s = [...xs].sort((a, b) => a - b), m = s.length >> 1;
+  return Math.round(s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2);
+}
+
+// "NHL: forma 12. z 546 · 14 bodů v sezoně, 35. místo"
+export function skaterLeague(heat: { rank: number; of: number } | null, season: { points: number; rank: number } | null): string | null {
+  const parts = [
+    heat ? `forma ${heat.rank}. z ${heat.of}` : null,
+    season ? `${season.points} ${plural(season.points, 'bod', 'body', 'bodů')} v sezoně, ${season.rank}. místo` : null,
+  ].filter(Boolean);
+  return parts.length ? `NHL: ${parts.join(' · ')}` : null;
+}
+
+// "NHL: sezona 91,2 %, 8. z 41 brankářů" — or why there is no rank yet.
+export function goalieLeague(s: { svPct: number; games: number; rank: number | null; of: number } | null): string | null {
+  if (!s) return null;
+  return s.rank != null
+    ? `NHL: sezona ${pct(s.svPct)}, ${s.rank}. z ${s.of} brankářů`
+    : `NHL: sezona ${pct(s.svPct)} · na pořadí chybí zápasy (${s.games}/${GOALIE_MIN_GP})`;
+}
+
+// One sentence on the night, different every day — the page's lead and its
+// search snippet. "V noci na úterý 3. 11. nastoupilo 8 Čechů a nasbírali
+// 5 bodů. Nejlépe: Adam Klapka (gól a asistence), Martin Nečas (2 asistence)."
+export function nightSummary(label: string, rows: { name: string; phrase: string; points: number }[]): string {
+  const skaters = rows.filter(r => r.points >= 0);
+  if (!rows.length) return '';
+  const total = skaters.reduce((s, r) => s + Math.floor(r.points / 10) + (r.points % 10), 0);
+  const best = skaters.filter(r => r.points > 0).sort((a, b) => b.points - a.points).slice(0, 3);
+  const head = `V ${label.replace(/^noc /, 'noci ')} ${plural(rows.length, 'nastoupil', 'nastoupili', 'nastoupilo')} ${rows.length} ${plural(rows.length, 'Čech', 'Češi', 'Čechů')}`;
+  return best.length
+    ? `${head} a ${plural(rows.length, 'nasbíral', 'nasbírali', 'nasbíralo')} ${total} ${plural(total, 'bod', 'body', 'bodů')}. Nejlépe: ${best.map(r => `${r.name} (${r.phrase})`).join(', ')}.`
+    : `${head}, bodově se ale neprosadil nikdo.`;
+}
+
 // ─── Rows ─────────────────────────────────────────────────────────────────────
 
-export function skaterRow(p: NationPlayer, href: string, f: ReturnType<typeof skaterForm>, rank: number): PlayerRowData {
+export function skaterRow(p: NationPlayer, href: string, f: ReturnType<typeof skaterForm>, rank: number, league: string | null = null): PlayerRowData {
   return {
     playerId: p.id, href, name: p.name, photo: p.photo, team: p.team,
     mark: String(rank), markTone: null, pos: p.pos,
     l5: `${f.games} ${plural(f.games, 'zápas', 'zápasy', 'zápasů')} ${f.goals}+${f.assists}`,
     chip: f.pace == null ? null : { text: `${f.pace > 0 ? '+' : f.pace < 0 ? '−' : ''}${Math.abs(f.pace)} %`, tone: f.pace > 0 ? 'rise' : f.pace < 0 ? 'cold' : 'muted' },
-    value: String(f.heat), valueHeat: f.heat,
+    value: String(f.heat), valueHeat: f.heat, league,
   };
 }
 
-export function goalieRow(p: NationPlayer, href: string, f: ReturnType<typeof goalieForm>, rank: number): PlayerRowData {
+export function goalieRow(p: NationPlayer, href: string, f: ReturnType<typeof goalieForm>, rank: number, league: string | null = null): PlayerRowData {
   return {
     playerId: p.id, href, name: p.name, photo: p.photo, team: p.team,
     mark: String(rank), markTone: null, pos: 'G',
     l5: `${f.starts} ${plural(f.starts, 'start', 'starty', 'startů')} ${f.record}`,
     chip: f.gaa == null ? null : { text: `${num(f.gaa, 2)} GAA`, tone: 'muted' },
-    value: f.svPct == null ? '–' : num(f.svPct * 100, 1), valueHeat: null,
+    value: f.svPct == null ? '–' : num(f.svPct * 100, 1), valueHeat: null, league,
   };
 }

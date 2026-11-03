@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { PlayerList, SectionHeading, SectionLink, TeamChip } from '@/components/ds';
-import { GoalStrip } from '@/components/home/BestGoals';
+import { GoalButtons, GoalStrip } from '@/components/home/BestGoals';
 import type { NationData, NightGame, TonightGame } from '@/lib/nation-data';
-import { plural } from '@/lib/nations';
+import { pct, plural } from '@/lib/nations';
 
 const MONO = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' } as const;
 const CARD = { background: 'var(--bg-card)', borderColor: 'var(--border-soft)' } as const;
@@ -37,6 +37,7 @@ function NightCard({ g }: { g: NightGame }) {
             <Link href={p.href} className="font-bold hover:underline" style={{ color: 'var(--text-bright)' }}>{p.name}</Link>
             {p.phrase && <span style={{ color: p.points > 0 ? 'var(--heat)' : 'var(--text)' }}>{p.phrase}</span>}
             <span className="text-xs" style={{ ...MONO, color: 'var(--text-muted)' }}>{p.line}</span>
+            {p.goals.length > 0 && <span className="flex flex-wrap gap-1.5"><GoalButtons moments={p.goals} labels={GOAL_LABELS} /></span>}
           </li>
         ))}
       </ul>
@@ -66,7 +67,15 @@ const Note = ({ children }: { children: React.ReactNode }) =>
 // "Czechs in the NHL": the homepage's morning — results, goals, form, tonight —
 // for one nation's players, in Czech.
 export function NationBody({ data, updated }: { data: NationData; updated: string }) {
-  const { night, goals, skaters, goalies, tonight } = data;
+  const { night, goals, skaters, goalies, tonight, league } = data;
+  // The league around them, so a Czech number reads against the whole NHL.
+  const vsLeague = [
+    league.leader ? `nejlepší formu má ${league.leader.name} (Heat ${league.leader.heat})` : null,
+    league.medianHeat != null ? `polovina hráčů ligy má Heat pod ${league.medianHeat}` : null,
+  ].filter(Boolean);
+  const skaterSub = 'Heat = body za minutu na ledě v posledních 5 zápasech, procento je rozdíl proti jeho tempu v celé sezoně.'
+    + (vsLeague.length ? ` Pro srovnání v NHL: ${vsLeague.join(' a ')}.` : '');
+  const goalieSub = `Úspěšnost zákroků v posledních pěti startech, bilance výher, proher a proher po prodloužení.${league.goalieAvg != null ? ` Průměr NHL v sezoně: ${pct(league.goalieAvg)}.` : ''}`;
   return (
     <div lang="cs" className="flex flex-col gap-12 pb-20 lg:pb-0">
       <SectionHeading as="h1" size="page" kicker={`🇨🇿 ČEŠI V NHL · ${updated}`} title="Češi v NHL."
@@ -75,7 +84,8 @@ export function NationBody({ data, updated }: { data: NationData; updated: strin
 
       {night && night.games.length > 0 && (
         <section data-section="nation-night">
-          <SectionHeading kicker={`VÝSLEDKY · ${night.label.toUpperCase()}`} title="Jak hráli v noci." size="feature" />
+          <SectionHeading kicker={`VÝSLEDKY · ${night.label.toUpperCase()}`} title="Jak hráli v noci." size="feature"
+            sub={night.summary || undefined} />
           <div className="grid gap-3 lg:grid-cols-2">
             {night.games.map(g => <NightCard key={g.href} g={g} />)}
           </div>
@@ -105,14 +115,14 @@ export function NationBody({ data, updated }: { data: NationData; updated: strin
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-8">
         <section data-section="nation-heat">
           <SectionHeading kicker="FORMA · HEAT 0–100" title="Kdo je ve formě."
-            sub="Heat = body za minutu na ledě v posledních 5 zápasech. Procento je rozdíl proti jeho tempu v celé sezoně."
+            sub={skaterSub}
             right={<SectionLink href="/about#heat">Jak funguje Heat</SectionLink>} />
           <PlayerList rows={skaters} empty="Zatím žádné zápasy." />
           {data.notPlayed.length > 0 && <div className="mt-3"><Note>V sezoně zatím nehráli: {data.notPlayed.join(', ')}.</Note></div>}
         </section>
         <section data-section="nation-goalies">
           <SectionHeading kicker="BRANKÁŘI · POSLEDNÍCH 5 STARTŮ" title="Čeští gólmani."
-            sub="Úspěšnost zákroků v posledních pěti startech, bilance výher, proher a proher po prodloužení." />
+            sub={goalieSub} />
           <PlayerList rows={goalies} empty="Zatím žádné starty." />
         </section>
       </div>

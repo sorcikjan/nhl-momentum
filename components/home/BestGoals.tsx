@@ -92,6 +92,23 @@ export function GoalStrip({ moments, cols, labels: t = EN }: { moments: Moment[]
   );
 }
 
+// Small ▶ buttons, one per goal, beside a player's line (nation pages):
+// the same popup as a goal card.
+export function GoalButtons({ moments, labels: t = EN }: { moments: Moment[]; labels?: GoalLabels }) {
+  const [open, setOpen] = useState<Moment | null>(null);
+  if (!moments.length) return null;
+  const cls = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold transition-opacity hover:opacity-80';
+  const style = { ...MONO, background: 'color-mix(in srgb, var(--heat) 16%, transparent)', color: 'var(--heat)' };
+  return (
+    <>
+      {moments.map(m => m.embed
+        ? <button key={m.href} type="button" onClick={() => setOpen(m)} className={cls} style={style} aria-label={`${m.scorer}, ${m.when} — ${t.watch}`}>▶ {m.when}</button>
+        : <a key={m.href} href={m.href} target="_blank" rel="noopener noreferrer" className={cls} style={style} aria-label={`${m.scorer}, ${m.when} — ${t.watch}`}>▶ {m.when}</a>)}
+      {open && <ClipModal m={open} onClose={() => setOpen(null)} t={t} />}
+    </>
+  );
+}
+
 // The night's best goals: the homepage's stories section and the night recap.
 export function BestGoals({ moments, heading = 'BEST GOALS LAST NIGHT', cols }: { moments: Moment[]; heading?: string; cols?: number }) {
   if (moments.length < 2) return null;

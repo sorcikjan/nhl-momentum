@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { NATIONS } from '@/lib/nations';
 import { cache, Suspense } from 'react';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { ProfileBody } from '@/components/player/ProfileBody';
@@ -198,6 +199,7 @@ export default async function PlayerPage({ params }: { params: Promise<{ id: str
       weight: player.weight_pounds ? `${player.weight_pounds} lb` : null,
       birthPlace: [player.birth_city, player.birth_state_province ?? player.birth_country].filter(Boolean).join(', ') || null,
       flag: player.birth_country ? COUNTRY_FLAG[player.birth_country] ?? null : null,
+      nation: player.birth_country && NATIONS[player.birth_country] ? { href: NATIONS[player.birth_country].path, label: NATIONS[player.birth_country].label } : null,
       drafted: player.draft_year ? `${player.draft_year} · Rd ${player.draft_round} #${player.draft_pick}` : 'Undrafted',
       photo: player.headshot_url ?? null,
       archetype: archetype ? { name: archetype.label, basis: archetype.basis } : null,
