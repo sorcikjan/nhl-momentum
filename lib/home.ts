@@ -168,7 +168,7 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
   const missedPicks = new Set((recent.games as StoryGame[])
     .filter(g => recent.predMap.get(g.id)?.prediction_outcomes?.[0]?.correct_winner === false).map(g => g.id));
   const { night, games: gameStories } = nightStories(latest, recent.games as StoryGame[], storyTexts, missedPicks);
-  if (night && latest?.date === resultsDate) for (const r of results) r.recapHref = night.href;
+  if (night && latest?.date === resultsDate) for (const r of results) r.recapHref = `${r.href}#story`;
   // Best goals of that night: one NHL call, cached; nothing on failure.
   const momentsDate = latest?.date ?? resultsDate;
   const moments = momentsDate ? await withClips(bestGoals(await safe(getScore(momentsDate), {}), rankings?.heatByPlayer)) : [];

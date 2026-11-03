@@ -6,7 +6,7 @@ import { gameView } from '@/lib/game-state';
 import { ppmToHeat } from '@/lib/heat';
 import type { KeyPlayer } from '@/lib/key-players';
 import { teamColor } from '@/lib/team-colors';
-import { gameUrl, recapUrl } from '@/lib/urls';
+import { gameUrl } from '@/lib/urls';
 import { calcWatchability } from '@/lib/watchability';
 
 export type GameDay = { date: string; cards: GameCardData[] };
@@ -67,7 +67,8 @@ export async function fetchDayCards(dates: string[]): Promise<GameDay[]> {
           homeWinProbability: homeProb,
           isPlayoff: false,
         }),
-        recapHref: view === 'final' && recap ? recapUrl(date, recap.title) : null,
+        // The game's own story, on its page (the night recap is one click on from there).
+        recapHref: view === 'final' && recap ? `${gameUrl(g.id, g.awayTeam.abbrev, g.homeTeam.abbrev, date)}#story` : null,
         marquee: false,
       };
     });

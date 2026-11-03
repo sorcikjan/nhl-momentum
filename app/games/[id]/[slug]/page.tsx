@@ -554,7 +554,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
       <div className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-8" data-column="main">
           {plan.main.map(k => (
-            <section key={k} data-section={k}>
+            <section key={k} id={k} data-section={k} className="scroll-mt-20">
               <SectionHeading kicker={SECTION_META[k].kicker} title={titleFor(k)} />
               {nodes[k]}
             </section>
@@ -562,7 +562,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
         </div>
         <div className="min-w-0 space-y-4" data-column="side">
           {plan.side.map(k => (
-            <section key={k} data-section={k}>
+            <section key={k} id={k} data-section={k} className="scroll-mt-20">
               {SECTION_META[k].title && <SectionHeading kicker={SECTION_META[k].kicker} title={SECTION_META[k].title} />}
               {nodes[k]}
             </section>
