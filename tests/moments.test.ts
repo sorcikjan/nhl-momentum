@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
-import { bestGoals, parseClipPage } from '@/lib/moments';
+import { bestGoals, gameGoals, parseClipPage } from '@/lib/moments';
 import { BestGoals } from '@/components/home/BestGoals';
 
 type G = { team: string; period?: number; time: string; h: number; a: number; ot?: boolean; mod?: string; str?: string; pid?: number };
@@ -48,6 +48,14 @@ describe('bestGoals', () => {
     const withPlayer = renderToStaticMarkup(createElement(BestGoals, { moments: picks.map(p => ({ ...p, embed: 'https://players.example/x?videoId=1', thumb: 'https://img/x.jpg' })) }));
     expect(withPlayer).not.toContain('target="_blank"');
     expect(withPlayer).toContain('https://img/x.jpg');
+  });
+  it('a game page gets every goal in order, garbage included, with the score after it', () => {
+    const g = gameGoals(feed, 2);
+    expect(g).toHaveLength(6);
+    expect(g.map(m => m.kicker)).toEqual(['GAME WINNER', 'GOAL', 'GOAL', 'GOAL', 'SHORTHANDED', 'EMPTY NET']);
+    expect(g[2].score).toBe('BOS 3–0 TOR');
+    expect(gameGoals(feed, 1).map(m => m.score)).toEqual(['CHI 1–0 FLA', 'FLA 1–1 CHI', 'CHI 2–1 FLA', 'FLA 2–2 CHI', 'FLA 3–2 CHI']);
+    expect(gameGoals(feed, 99)).toEqual([]);
   });
   it('reads a clip page: still, title without the site name, the clip\'s own player', () => {
     const html = '<meta property="og:image" content="https://media.d3.nhle.com/a.jpg" /><meta property="og:title" content="Jones&#x27; shot goes in off M. Tkachuk for PPG | NHL.com" />'

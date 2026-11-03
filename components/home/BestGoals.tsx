@@ -44,15 +44,14 @@ function ClipModal({ m, onClose }: { m: Moment; onClose: () => void }) {
   );
 }
 
-// The night's best goals: each card shows the clip's still and opens it in a
-// popup (or on NHL.com when we have no player for it). Scrolls sideways on phones.
-export function BestGoals({ moments }: { moments: Moment[] }) {
+// Goal cards: each shows the clip's still and opens it in a popup (or on
+// NHL.com when we have no player for it). Scroll sideways on phones; on
+// wide screens one row (`cols` unset) or a grid of `cols` columns.
+export function GoalStrip({ moments, cols }: { moments: Moment[]; cols?: number }) {
   const [open, setOpen] = useState<Moment | null>(null);
-  if (moments.length < 2) return null;
   return (
-    <div data-section="best-goals" className="flex flex-col gap-2.5">
-      <span className="text-[11px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.4 }}>BEST GOALS LAST NIGHT</span>
-      <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 lg:mx-0 lg:grid lg:px-0" style={{ gridTemplateColumns: `repeat(${moments.length}, minmax(0, 1fr))` }}>
+    <>
+      <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 lg:mx-0 lg:grid lg:px-0" style={{ gridTemplateColumns: `repeat(${cols ?? moments.length}, minmax(0, 1fr))` }}>
         {moments.map(m => {
           const still = (
             <span className="relative block aspect-video overflow-hidden" style={{ background: `linear-gradient(140deg, ${teamColor(m.team).bg} 0%, var(--bg-raised) 85%)` }}>
@@ -84,6 +83,17 @@ export function BestGoals({ moments }: { moments: Moment[] }) {
         })}
       </div>
       {open && <ClipModal m={open} onClose={() => setOpen(null)} />}
+    </>
+  );
+}
+
+// The night's best goals, on the homepage's stories section.
+export function BestGoals({ moments }: { moments: Moment[] }) {
+  if (moments.length < 2) return null;
+  return (
+    <div data-section="best-goals" className="flex flex-col gap-2.5">
+      <span className="text-[11px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.4 }}>BEST GOALS LAST NIGHT</span>
+      <GoalStrip moments={moments} />
     </div>
   );
 }

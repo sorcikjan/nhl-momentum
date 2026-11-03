@@ -33,6 +33,9 @@ import { GameStory } from '@/components/games/GameStory';
 import { BoxScore } from '@/components/games/BoxScore';
 import { boxFromDb, boxFromNhl } from '@/lib/box-score';
 import HighlightsCard from '@/components/games/HighlightsCard';
+import { GoalStrip } from '@/components/home/BestGoals';
+import { gameGoals, withClips, type Moment } from '@/lib/moments';
+import { getScore } from '@/lib/nhl-api';
 import GoalieMatchupCard from '@/components/games/GoalieMatchupCard';
 import { KeyPlayers } from '@/components/game/KeyPlayers';
 import { pregameKeyPlayers, type SnapSkater } from '@/lib/key-players';
@@ -310,7 +313,12 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   let recapHref: string | null = null;
   let nightTitle: string | null = null;
   let story: Awaited<ReturnType<typeof fetchGameStory>> = null;
+  let goals: Moment[] = [];
   if (isFinal) {
+    // Every goal with its NHL.com clip. Best effort: no feed, no section.
+    goals = gameDate
+      ? await withClips(gameGoals(await getScore(gameDate).catch(() => ({})), Number(id), Object.fromEntries(pregameHeat)))
+      : [];
     const winnerAbbrev = (homeScore ?? 0) > (awayScore ?? 0) ? homeAbbrev : awayAbbrev;
     const loserAbbrev = winnerAbbrev === homeAbbrev ? awayAbbrev : homeAbbrev;
     const topStar = threeStars[0];
@@ -501,6 +509,7 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     // The game's own story leads; without one, the templated box-score recap stays in the side column.
     if (story) nodes.story = <GameStory dek={story.dek} body={story.body} nightHref={recapHref} nightTitle={nightTitle} />;
     else if (recapHeadline || recapBody) nodes.recap = <RecapCard headline={recapHeadline} body={recapBody} recapHref={recapHref} />;
+    if (goals.length) nodes.goals = <GoalStrip moments={goals} cols={3} />;
     nodes.highlights = <HighlightsCard youtubeId={youtubeId} nhlUrl={nhlUrl} awayAbbrev={awayAbbrev} homeAbbrev={homeAbbrev} />;
   }
   const plan = sectionPlan(view, new Set(Object.keys(nodes)));

@@ -28,6 +28,7 @@ export const SECTION_META = {
   pick: { kicker: 'OUR PICK · HOW IT PLAYED', title: '' }, // title from pickHeadline()
   heatImpact: { kicker: 'HEAT IMPACT', title: 'Who moved up. Who moved down.' },
   story: { kicker: 'GAME STORY', title: '' }, // title is the story's headline
+  goals: { kicker: 'EVERY GOAL · WATCH', title: 'How the goals went in.' },
   recap: { kicker: 'AI RECAP', title: '' },
   highlights: { kicker: 'IF YOU MISSED IT', title: '' },
 } as const;
@@ -37,7 +38,7 @@ export type SectionKey = keyof typeof SECTION_META;
 const PLAN: Record<GameView, { main: SectionKey[]; side: SectionKey[] }> = {
   upcoming: { main: ['prediction', 'goalies', 'watch', 'specialTeams'], side: ['h2h', 'lineup'] },
   live: { main: ['momentum', 'playByPlay'], side: ['winProb', 'liveStats', 'topPerformers'] },
-  final: { main: ['story', 'threeStars', 'keyPlayers', 'pick', 'heatImpact'], side: ['recap', 'highlights'] },
+  final: { main: ['story', 'goals', 'threeStars', 'keyPlayers', 'pick', 'heatImpact'], side: ['recap', 'highlights'] },
 };
 
 // Design order for the view, keeping only sections that have data.
