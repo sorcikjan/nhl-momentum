@@ -87,13 +87,13 @@ export function GoalStrip({ moments, cols }: { moments: Moment[]; cols?: number 
   );
 }
 
-// The night's best goals, on the homepage's stories section.
-export function BestGoals({ moments }: { moments: Moment[] }) {
+// The night's best goals: the homepage's stories section and the night recap.
+export function BestGoals({ moments, heading = 'BEST GOALS LAST NIGHT', cols }: { moments: Moment[]; heading?: string; cols?: number }) {
   if (moments.length < 2) return null;
   return (
     <div data-section="best-goals" className="flex flex-col gap-2.5">
-      <span className="text-[11px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.4 }}>BEST GOALS LAST NIGHT</span>
-      <GoalStrip moments={moments} />
+      <span className="text-[11px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.4 }}>{heading}</span>
+      <GoalStrip moments={moments} cols={cols} />
     </div>
   );
 }

@@ -1,43 +1,20 @@
+// The night recap's shape while it loads: header, then the 16:9 cover and article beside the scoreboard.
 export default function Loading() {
+  const bar = (w: string, h = 'h-4', bg = 'var(--border)') => <div className={`${h} animate-pulse rounded`} style={{ background: bg, width: w }} />;
   return (
-    <div className="max-w-3xl mx-auto pb-20 md:pb-0">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 mb-6">
-        <div className="h-3 w-12 rounded animate-pulse" style={{ background: 'var(--border)' }} />
-        <div className="h-3 w-2 rounded animate-pulse" style={{ background: 'var(--border)' }} />
-        <div className="h-3 w-32 rounded animate-pulse" style={{ background: 'var(--border)' }} />
+    <div className="flex flex-col gap-8 pb-20 lg:pb-0">
+      <div className="flex max-w-[860px] flex-col gap-3">
+        {bar('220px', 'h-3')}
+        {bar('85%', 'h-10', 'var(--bg-card)')}
+        {bar('60%', 'h-10', 'var(--bg-card)')}
+        {bar('180px', 'h-3')}
       </div>
-
-      {/* Article header */}
-      <div className="mb-6">
-        <div className="h-3 w-36 rounded animate-pulse mb-2" style={{ background: 'var(--border)' }} />
-        <div className="h-8 w-4/5 rounded animate-pulse mb-2" style={{ background: 'var(--bg-card)' }} />
-        <div className="h-7 w-3/5 rounded animate-pulse mb-3" style={{ background: 'var(--bg-card)' }} />
-        <div className="h-3 w-48 rounded animate-pulse" style={{ background: 'var(--border)' }} />
-      </div>
-
-      {/* Hero image */}
-      <div className="w-full rounded-xl animate-pulse mb-8"
-        style={{ aspectRatio: '12/5', background: 'var(--bg-card)' }} />
-
-      {/* Article paragraphs */}
-      <div className="flex flex-col gap-3 mb-10">
-        {[100, 100, 82, 100, 67].map((w, i) => (
-          <div key={i} className="h-4 rounded animate-pulse"
-            style={{ background: 'var(--border)', width: `${w}%` }} />
-        ))}
-      </div>
-
-      {/* Game card */}
-      <div className="rounded-2xl animate-pulse mb-6"
-        style={{ height: 200, background: 'var(--bg-card)', border: '1px solid var(--border)' }} />
-
-      {/* More paragraphs */}
-      <div className="flex flex-col gap-3 mb-10">
-        {[100, 100, 75].map((w, i) => (
-          <div key={i} className="h-4 rounded animate-pulse"
-            style={{ background: 'var(--border)', width: `${w}%` }} />
-        ))}
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="flex flex-col gap-3">
+          <div className="mb-4 w-full animate-pulse rounded-[18px]" style={{ aspectRatio: '16/9', background: 'var(--bg-card)' }} />
+          {['100%', '100%', '82%', '100%', '67%'].map((w, i) => <div key={i}>{bar(w)}</div>)}
+        </div>
+        <div className="flex flex-col gap-2">{[0, 1, 2, 3].map(i => <div key={i} className="h-10 animate-pulse rounded-lg" style={{ background: 'var(--bg-card)' }} />)}</div>
       </div>
     </div>
   );
