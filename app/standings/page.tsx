@@ -26,8 +26,10 @@ export function generateMetadata(): Metadata {
 export default async function StandingsPage() {
   const rankings = await fetchRankings().catch(() => null);
   const rows = await fetchStandings(rankings?.teamHeat, rankings?.teams).catch(() => []);
-  // Throw rather than cache an empty page: ISR keeps the last good one.
-  if (!rows.length) throw new Error('NHL standings unavailable');
+  // Throw rather than cache an empty page: ISR keeps the last good one. Never
+  // during a deploy: the NHL API rate-limits the build (429, 5 Nov) and a
+  // deploy must not depend on it; the first visit after 10 min refills it.
+  if (!rows.length && process.env.NEXT_PHASE !== 'phase-production-build') throw new Error('NHL standings unavailable');
   return (
     <div className="flex flex-col gap-10 pb-20 lg:pb-0">
       <SectionHeading

@@ -28,7 +28,8 @@ export default async function StatsPage() {
     fetchLeaders(SKATER_BOARDS, 'skater', 10, rankings?.heatByPlayer).catch(() => []),
     fetchLeaders(GOALIE_BOARDS, 'goalie', 10).catch(() => []),
   ]);
-  if (!skaters.length && !goalies.length) throw new Error('NHL stat leaders unavailable');
+  // As on /standings: ISR keeps the last good page, but a deploy never fails on the NHL API.
+  if (!skaters.length && !goalies.length && process.env.NEXT_PHASE !== 'phase-production-build') throw new Error('NHL stat leaders unavailable');
   return (
     <div className="flex flex-col gap-10 pb-20 lg:pb-0">
       <SectionHeading
