@@ -6,7 +6,8 @@
 import { posLabel, type PlayerRowData } from '@/lib/player-row';
 import { toiToSeconds } from '@/lib/nhl-api';
 import type { Moment } from '@/lib/moments';
-import { CH, CS, DA, DE, FI, LV, SK, SV, decimal, type Decision, type NationText } from '@/lib/nation-text';
+import { ENGLISH } from '@/lib/cheer';
+import { CH, CS, DA, DE, FI, LV, SK, SV, decimal, english, type Decision, type NationText } from '@/lib/nation-text';
 
 export type Nation = {
   code: string;            // NHL birthCountry: 'CZE'
@@ -37,6 +38,9 @@ export const DNK = nation({ code: 'DNK', path: '/danskere-i-nhl', lang: 'da', lo
 
 // Nation pages by NHL birthCountry — player profiles link to theirs.
 export const NATIONS: Record<string, Nation> = { CZE, SVK, SWE, FIN, DEU, CHE, LVA, DNK };
+
+// A nation told in English, on the fans' clock, names still in their spelling.
+export const inEnglish = (n: Nation): Nation => ({ ...n, locale: 'en-GB', t: english(ENGLISH[n.code]) });
 
 // A roster entry from /v1/roster/{team}/{season}.
 export type NationPlayer = {
@@ -100,7 +104,7 @@ export function goalieForm(log: LogGame[]) {
 
 // ─── Words ────────────────────────────────────────────────────────────────────
 
-export const pct = (sv: number) => `${decimal(sv * 100, 1)} %`;
+export const pct = (sv: number, n?: Nation) => n?.t.pct ? n.t.pct(sv) : `${decimal(sv * 100, 1)} %`;
 
 // "0+1 · 7 střel · 21:31 na ledě · −2"
 export function skaterLine(n: Nation, g: SkaterGame): string {
@@ -119,7 +123,7 @@ export function goalieLine(n: Nation, g: GoalieGame): string {
   return [
     g.decision ? n.t.decision[g.decision] : g.started ? null : n.t.decision.relief,
     n.t.saves(saves, g.shotsAgainst),
-    g.shotsAgainst > 0 ? pct(saves / g.shotsAgainst) : null,
+    g.shotsAgainst > 0 ? pct(saves / g.shotsAgainst, n) : null,
   ].filter(Boolean).join(' · ');
 }
 
@@ -159,7 +163,7 @@ export function median(xs: number[]): number | null {
 }
 
 export function goalieLeague(n: Nation, s: { svPct: number; games: number; rank: number | null; of: number } | null): string | null {
-  return s ? n.t.goalieLeague(pct(s.svPct), s.rank, s.of, s.games, GOALIE_MIN_GP) : null;
+  return s ? n.t.goalieLeague(pct(s.svPct, n), s.rank, s.of, s.games, GOALIE_MIN_GP) : null;
 }
 
 // One sentence on the night, different every day — the page's lead and its

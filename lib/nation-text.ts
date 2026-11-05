@@ -25,6 +25,7 @@ export type NationText = {
   seasonGoal: (n: number) => string;        // "12. gól v sezoně"
   skaterLeague: (heat: { rank: number; of: number } | null, season: { points: number; rank: number } | null) => string | null;
   goalieLeague: (svPct: string, rank: number | null, of: number, games: number, min: number) => string;
+  pct?: (share: number) => string;          // "90.3%"; the default is "90,3 %"
   ui: {
     name: string;              // "Češi v NHL"
     sub: (count: number) => string;
@@ -454,3 +455,61 @@ export const DA: NationText = {
   },
 };
 
+
+// ─── English ──────────────────────────────────────────────────────────────────
+// The homepage's "your country" section: the site is English, the players are
+// still theirs — "6 Czechs played".
+
+const EN_DAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const EN_MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const enOrd = (n: number) => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
+const enCount = counter(two, {
+  goal: ['goal', 'goals'], assist: ['assist', 'assists'], point: ['point', 'points'], shot: ['shot', 'shots'],
+  save: ['save', 'saves'], game: ['game', 'games'], start: ['start', 'starts'], goalie: ['goalie', 'goalies'], player: ['player', 'players'],
+});
+
+export function english(o: { people: [string, string]; adj: string }): NationText {
+  return {
+    count: enCount,
+    phrase: phraseOf({ none: 'no points', and: 'and', hattrick: 'a hat trick', goal: n => n === 1 ? 'a goal' : enCount(n, 'goal'), assist: n => n === 1 ? 'an assist' : enCount(n, 'assist') }),
+    toi: t => `${t} TOI`,
+    decision: { W: 'win', L: 'loss', O: 'OT loss', relief: 'in relief' },
+    saves: (s, sa) => `${s} saves on ${sa}`,
+    // The fans' night: Monday's games are their Tuesday morning.
+    night: (w, d, m) => `overnight into ${EN_DAY[w]} ${d} ${EN_MONTH[m - 1]}`,
+    summary: (_night, played, points, best) => {
+      const head = `${played} ${two(played, o.people)} played`;
+      return best.length ? `${head}, ${enCount(points, 'point')} between them. Best: ${best.join(', ')}.` : `${head} — no points between them.`;
+    },
+    kicker: kickers(['OT WINNER', 'LATE WINNER', 'LATE EQUALIZER', 'GAME WINNER', 'LATE GO-AHEAD', 'PENALTY SHOT', 'SHORTHANDED', 'HAT TRICK', 'EMPTY NET', 'OWN GOAL', 'POWER PLAY', 'GOAL']),
+    period: n => enOrd(n).toUpperCase(), overtime: 'OT',
+    seasonGoal: n => `${enOrd(n)} goal of the season`,
+    skaterLeague: (heat, season) => {
+      const parts = [heat ? `form ${enOrd(heat.rank)} of ${heat.of}` : null, season ? `${enCount(season.points, 'point')} this season, ${enOrd(season.rank)}` : null].filter(Boolean);
+      return parts.length ? `NHL: ${parts.join(' · ')}` : null;
+    },
+    goalieLeague: (sv, rank, of, games, min) => rank != null ? `NHL: ${sv} this season, ${enOrd(rank)} of ${of}` : `NHL: ${sv} this season · not enough games to rank (${games}/${min})`,
+    pct: s => `${(s * 100).toFixed(1)}%`,
+    ui: {
+      name: `${o.people[1]} in the NHL`,
+      sub: c => `How they did last night, their goals, form and who plays tonight. ${enCount(c, 'player')} on NHL rosters.`,
+      partial: 'Some NHL data did not load — the missing players fill in on the next update.',
+      results: 'RESULTS', nightTitle: 'How they did last night.', final: 'FINAL', ot: 'OT', so: 'SO',
+      scratched: 'Scratched', idle: 'Team off',
+      goalsKicker: n => `GOALS · ${enCount(n, 'goal').toUpperCase()} WITH VIDEO`, goalsTitle: `${o.adj} goals, last few nights.`,
+      watch: 'watch the goal', onNhl: 'WATCH ON NHL.COM', close: 'Close',
+      schedule: 'SCHEDULE', localTime: 'YOUR TIME', nextTitle: 'Who plays next.', derby: `${o.adj.toUpperCase()} DERBY`, tonight: 'tonight',
+      formKicker: 'FORM · HEAT 0–100', formTitle: 'Who is hot.',
+      heatSub: 'Heat = points per minute on ice over the last 5 games; the % is the change against his pace for the whole season.',
+      vsLeague: 'Across the NHL:', leader: (n, h) => `${n} has the best form (Heat ${h})`, median: m => `half the league is below Heat ${m}`, and: 'and',
+      howHeat: 'How Heat works', empty: 'No games yet.', notPlayed: 'No games this season yet',
+      goalieKicker: 'GOALIES · LAST 5 STARTS', goalieTitle: `${o.adj} goalies.`,
+      goalieSub: 'Save % over the last five starts, wins, losses and OT losses.',
+      goalieAvg: p => `NHL average this season: ${p}.`, goalieEmpty: 'No starts yet.',
+      bestInNhl: 'Best form in the whole NHL', allResults: 'All results',
+      title: `${o.people[1]} in the NHL – results, goals and form`,
+      description: `How the ${o.people[1]} in the NHL did last night: points, ice time, goals with video, form by Heat and who plays tonight.`,
+      snippetTail: ' Goals with video, form by Heat and who plays tonight.',
+    },
+  };
+}

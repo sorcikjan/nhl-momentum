@@ -3,6 +3,8 @@ import { HeatPulseMark } from '@/components/ds';
 import { DesktopNav, MobileTabBar } from './NavLinks';
 import { TonightStatus } from './TonightStatus';
 import { SearchPalette, SearchTrigger } from '@/components/search/SearchPalette';
+import { CheerButton } from '@/components/cheer/CheerButton';
+import { CheerPicker } from '@/components/cheer/CheerPicker';
 
 // Design BrandedHeaderDesktop / BrandedHeaderMobile.
 export const NAV_ITEMS = [
@@ -56,6 +58,7 @@ export default function BrandHeader() {
         <DesktopNav items={NAV_ITEMS} />
         <div className="flex items-center gap-3">
           <TonightStatus />
+          <CheerButton />
           <SearchTrigger variant="pill" />
         </div>
       </header>
@@ -69,11 +72,13 @@ export default function BrandHeader() {
         </Link>
         <div className="flex items-center gap-2">
           <TonightStatus compact />
+          <CheerButton compact />
           <SearchTrigger variant="icon" />
         </div>
       </header>
       <MobileTabBar items={MOBILE_NAV_ITEMS} />
       <SearchPalette />
+      <CheerPicker />
     </>
   );
 }

@@ -45,7 +45,7 @@ async function pool<T, R>(items: T[], size: number, fn: (x: T) => Promise<R>): P
   return out;
 }
 
-export type NightPlayer = { name: string; href: string; phrase: string; line: string; points: number; goals: Moment[] };
+export type NightPlayer = { name: string; href: string; team: string; phrase: string; line: string; points: number; goals: Moment[] };
 export type NightGame = {
   href: string; away: string; home: string; awayScore: number; homeScore: number; suffix: string;
   players: NightPlayer[];
@@ -159,11 +159,11 @@ export async function fetchNationData(n: Nation): Promise<NationData> {
           if (!r || !played(r.toi)) { scratched.push(p.name); continue; }
           if (p.goalie) {
             const decision: Decision | null = r.starter ? (won ? 'W' : last === 'OT' || last === 'SO' ? 'O' : 'L') : null;
-            rows.push({ name: p.name, href: hrefOf(p), phrase: '', line: goalieLine(n, { decision, started: !!r.starter, shotsAgainst: r.shotsAgainst ?? 0, goalsAgainst: r.goalsAgainst ?? 0 }), points: -1, goals: [] });
+            rows.push({ name: p.name, href: hrefOf(p), team, phrase: '', line: goalieLine(n, { decision, started: !!r.starter, shotsAgainst: r.shotsAgainst ?? 0, goalsAgainst: r.goalsAgainst ?? 0 }), points: -1, goals: [] });
           } else {
             const ga = { goals: r.goals ?? 0, assists: r.assists ?? 0 };
             rows.push({
-              name: p.name, href: hrefOf(p), phrase: n.t.phrase(ga.goals, ga.assists),
+              name: p.name, href: hrefOf(p), team, phrase: n.t.phrase(ga.goals, ga.assists),
               line: skaterLine(n, { ...ga, shots: r.sog, toi: (r.toi ?? '0:00').replace(/^0(?=\d:)/, ''), plusMinus: r.plusMinus }),
               points: ga.goals * 10 + ga.assists,
               goals: goals.filter(m => m.playerId === p.id && m.gameId === g.id),

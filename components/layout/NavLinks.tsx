@@ -22,7 +22,7 @@ export function DesktopNav({ items }: { items: { href: string; label: string }[]
             key={i.href}
             href={i.href}
             aria-current={active ? 'page' : undefined}
-            className="rounded-md px-3.5 py-2 text-[13px] font-semibold transition-colors hover:text-[var(--text-bright)]"
+            className="whitespace-nowrap rounded-md px-3.5 py-2 text-[13px] font-semibold transition-colors hover:text-[var(--text-bright)]"
             style={{ color: active ? 'var(--text-bright)' : 'var(--text)', background: active ? 'var(--bg-card)' : 'transparent' }}
           >
             {i.label}

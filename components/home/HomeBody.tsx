@@ -1,3 +1,4 @@
+import { CheerSection } from '@/components/cheer/CheerSection';
 import type { HomeData } from '@/lib/home';
 import { ArticleGrid } from './ArticleGrid';
 import { HeatHero } from './HeatHero';
@@ -15,6 +16,7 @@ export const HOME_SECTIONS = ['results', 'heat', 'tonight', 'rankings', 'stories
 export function HomeBody({ data }: { data: HomeData }) {
   return (
     <div className="flex flex-col gap-12 lg:gap-16">
+      <CheerSection />
       <ResultsSection date={data.resultsDate} results={data.results} />
       <HeatHero leader={data.leader} leaders={data.leaders} heatingUp={data.heatingUp} coolingOff={data.coolingOff} />
       <TonightSlate games={data.tonight} nextGameDate={data.nextGameDate} />

@@ -194,11 +194,12 @@ export function SearchTrigger({ variant }: { variant: 'pill' | 'icon' }) {
   return (
     <button
       onClick={openSearch}
-      className="flex w-[260px] items-center gap-2 rounded-full px-3.5 py-1.5 text-left text-[13px] transition-colors hover:border-[var(--text-muted)]"
+      aria-label="Search players & teams"
+      className="flex w-[150px] items-center gap-2 rounded-full 2xl:w-[260px] px-3.5 py-1.5 text-left text-[13px] transition-colors hover:border-[var(--text-muted)]"
       style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
     >
       {icon(14)}
-      <span className="flex-1">Search players &amp; teams</span>
+      <span className="flex-1"><span className="2xl:hidden">Search</span><span className="hidden 2xl:inline">Search players &amp; teams</span></span>
       <kbd className="rounded border px-1.5 text-[10px]" style={{ ...MONO, borderColor: 'var(--border)' }}>⌘K</kbd>
     </button>
   );

@@ -27,7 +27,7 @@ let _leagueAveragesCache: { data: any; ts: number } | null = null;
 
 // Returns the active model version string.
 // Module-level cache avoids a DB round trip on every request that touches predictions.
-async function latestModelVersion(): Promise<string> {
+export async function latestModelVersion(): Promise<string> {
   const now = Date.now();
   if (_modelVersionCache && now - _modelVersionCache.ts < 5 * 60_000) {
     return _modelVersionCache.version;
