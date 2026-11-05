@@ -10,8 +10,10 @@ describe('game page', () => {
     expect(game.match(/cachedFetchMatch\(id\)/g)).toHaveLength(2);
   });
   it('a finished game reads the database from the pipeline-tagged cache', () => {
-    expect(game).toMatch(/tags: \['pipeline'\]/);
-    expect(readFileSync('app/api/revalidate/route.ts', 'utf8')).toContain("revalidateTag('pipeline'");
+    expect(game).toContain("tags: ['pipeline', `game:${id}`]");
+    const route = readFileSync('app/api/revalidate/route.ts', 'utf8');
+    expect(route).toContain("revalidateTag('pipeline'");
+    expect(route).toContain('revalidateTag(`game:${id}`');
   });
   it('uses the search title and SportsEvent structured data', () => {
     expect(game).toContain('gameTitle(');

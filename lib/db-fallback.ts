@@ -9,12 +9,19 @@ import { SITE_URL } from './site';
 // it, so a deploy followed by a database outage (2026-10-23) left nothing to
 // serve and the whole site returned 500. Blobs survive deploys.
 //
+// The saved answer is also the first choice while it's fresh: saved after the
+// pipeline's last write (the generation /api/revalidate stamps) and under
+// FRESH_MS old. The free-tier instance runs at its memory limit with ~400 MB
+// in swap (Nov 2026) and fell over daily under page renders and crawlers, so a
+// query reaches the database about once per pipeline run, not once per render.
+//
 // Page renders only. Pipeline routes (/api/*) and writes always talk to the
 // database directly: stale input to a write would corrupt data.
 
 const STORE = 'db-last-good';
-// Re-save a query's answer at most this often per server instance.
-const SAVE_EVERY_MS = 10 * 60_000;
+// Writers that don't call /api/revalidate show up within this long.
+export const FRESH_MS = 30 * 60_000;
+const GENERATION_KEY = 'meta/generation';
 // After a failed read, skip the database for this long: pages render from
 // saved answers in milliseconds instead of waiting out a timeout per query.
 const DOWN_FOR_MS = 30_000;
@@ -22,7 +29,6 @@ const DOWN_FOR_MS = 30_000;
 export const BYPASS_HEADER = 'x-db-direct';
 
 let downUntil = 0;
-const savedAt = new Map<string, number>();
 let store: Store | null | undefined;
 let blobsOffUntil = 0;
 // No store call may hold up a render: a slow or hanging Blobs call counts as
@@ -73,6 +79,38 @@ function inPageRender(): boolean {
   }
 }
 
+// When the pipeline last wrote: read once per render, strongly consistent, so a
+// page re-rendered right after /api/revalidate never caches answers from before.
+const renderGeneration = new WeakMap<object, Promise<number>>();
+function generation(): Promise<number> {
+  const read = async () => {
+    const s = blobs();
+    const at = s ? await timed(s.get(GENERATION_KEY, { type: 'text', consistency: 'strong' })) : null;
+    return at ? Date.parse(at) : 0;
+  };
+  let work: object | undefined;
+  try { work = workAsyncStorage.getStore(); } catch { /* outside a request */ }
+  if (!work) return read();
+  let g = renderGeneration.get(work);
+  if (!g) renderGeneration.set(work, g = read());
+  return g;
+}
+
+// /api/revalidate: the pipeline wrote, every saved answer is now stale.
+export async function bumpGeneration(): Promise<void> {
+  const s = blobs();
+  if (s) await timed(s.set(GENERATION_KEY, new Date().toISOString()));
+}
+
+async function isFresh(saved: Saved | null): Promise<boolean> {
+  if (!saved?.at || Date.now() - saved.at >= FRESH_MS) return false;
+  try {
+    return saved.at > await generation();
+  } catch {
+    return false; // can't tell: ask the database
+  }
+}
+
 // Exact timestamps (e.g. "since now − 3 days") change on every call; one key
 // per query shape keeps the last good answer findable. Dates stay as they are.
 const ISO_TIME = /\d{4}-\d{2}-\d{2}T\d{2}(%3A|:)\d{2}(%3A|:)\d{2}(\.\d+)?(Z|%2B00(%3A|:)?00|\+00:?00)?/g;
@@ -85,29 +123,32 @@ export function fallbackKey(url: string, headers?: HeadersInit, method = 'GET'):
   return `${table}/${createHash('sha256').update(shape).digest('hex').slice(0, 32)}`;
 }
 
-type Saved = { body: string; headers: Record<string, string> };
+// `at`: when it was read from the database (copies saved before Nov 2026 lack it).
+type Saved = { body: string; headers: Record<string, string>; at?: number };
 
-async function load(key: string): Promise<Response | null> {
+async function load(key: string): Promise<Saved | null> {
   try {
     const s = blobs();
-    const saved = s ? (await timed(s.get(key, { type: 'json' }))) as Saved | null : null;
-    return saved ? new Response(saved.body, { status: 200, headers: { ...saved.headers, 'x-db-fallback': '1' } }) : null;
+    return s ? (await timed(s.get(key, { type: 'json' }))) as Saved | null : null;
   } catch {
     return null;
   }
 }
 
+const answer = (saved: Saved | null, header: string): Response | null =>
+  saved ? new Response(saved.body, { status: 200, headers: { ...saved.headers, [header]: '1' } }) : null;
+
 function save(key: string, res: Response): void {
   const s = blobs();
-  if (!s || Date.now() - (savedAt.get(key) ?? 0) < SAVE_EVERY_MS) return;
-  savedAt.set(key, Date.now());
+  if (!s) return;
+  const at = Date.now();
   const headers: Record<string, string> = {};
   for (const name of ['content-type', 'content-range']) {
     const v = res.headers.get(name);
     if (v) headers[name] = v;
   }
   const job = res.text()
-    .then(body => timed(s.setJSON(key, { body, headers } satisfies Saved)))
+    .then(body => timed(s.setJSON(key, { body, headers, at } satisfies Saved)))
     .then(() => { if (!markedReady) return timed(s.set(READY_KEY, new Date().toISOString())).then(() => { markedReady = true; }); })
     .catch(() => {});
   try { after(job); } catch { /* outside a request: let it run */ }
@@ -154,8 +195,9 @@ const unavailable = () => new Response(JSON.stringify({ message: 'Database unava
   status: 503, headers: { 'content-type': 'application/json' },
 });
 
-// Wraps the Supabase client's fetch. Reads during a page render are saved when
-// they succeed and answered from the saved copy when the database fails.
+// Wraps the Supabase client's fetch. Reads during a page render are answered
+// from the saved copy while it's fresh, saved when the database answers, and
+// answered from the saved copy, however old, when the database fails.
 export async function fetchWithFallback(
   input: RequestInfo | URL,
   init: RequestInit,
@@ -171,10 +213,12 @@ export async function fetchWithFallback(
   // HEAD: row counts (`{ count: 'exact', head: true }`), answered by Content-Range.
   if ((method !== 'GET' && method !== 'HEAD') || !url.includes('/rest/v1/') || !inPageRender()) return doFetch(input, init);
   const key = fallbackKey(url, init.headers, method);
+  const saved = await load(key);
   if (databaseDown()) {
     noteDegraded();
-    return (await load(key)) ?? unavailable();
+    return answer(saved, 'x-db-fallback') ?? unavailable();
   }
+  if (await isFresh(saved)) return answer(saved, 'x-db-cache')!;
   try {
     const res = await doFetch(input, init);
     // Gateway errors mean the database is unreachable: stop asking for a while.
@@ -182,19 +226,19 @@ export async function fetchWithFallback(
     if (res.status >= 502) {
       markDatabaseDown();
       noteDegraded();
-      return (await load(key)) ?? res;
+      return answer(saved, 'x-db-fallback') ?? res;
     }
     if (res.status === 500) {
       noteDegraded();
-      return (await load(key)) ?? res;
+      return answer(saved, 'x-db-fallback') ?? res;
     }
     if (res.ok) save(key, res.clone());
     return res;
   } catch (err) {
     markDatabaseDown();
     noteDegraded();
-    const saved = await load(key);
-    if (saved) return saved;
+    const fallback = answer(saved, 'x-db-fallback');
+    if (fallback) return fallback;
     throw err;
   }
 }

@@ -22,10 +22,11 @@ const flush = () => new Promise(r => setTimeout(r, 0));
 describe('fetchWithFallback', () => {
   beforeEach(() => { vi.resetModules(); blobs.clear(); route = '/players/[id]/[slug]'; });
 
-  it('saves a good answer and serves it when the database fails', async () => {
-    const { fetchWithFallback, databaseDown } = await import('@/lib/db-fallback');
+  it('saves a good answer and serves it, however old, when the database fails', async () => {
+    const { fetchWithFallback, databaseDown, bumpGeneration } = await import('@/lib/db-fallback');
     await fetchWithFallback(URL_, {}, async () => ok('[{"id":1}]'));
     await flush();
+    await bumpGeneration();
     const res = await fetchWithFallback(URL_, {}, async () => { throw new Error('timeout'); });
     expect(await res.json()).toEqual([{ id: 1 }]);
     expect(res.headers.get('x-db-fallback')).toBe('1');
@@ -42,9 +43,10 @@ describe('fetchWithFallback', () => {
   });
 
   it('serves the saved answer on a 5xx from the gateway', async () => {
-    const { fetchWithFallback } = await import('@/lib/db-fallback');
+    const { fetchWithFallback, bumpGeneration } = await import('@/lib/db-fallback');
     await fetchWithFallback(URL_, {}, async () => ok('[{"id":2}]'));
     await flush();
+    await bumpGeneration();
     const res = await fetchWithFallback(URL_, {}, async () => new Response('', { status: 503 }));
     expect(await res.json()).toEqual([{ id: 2 }]);
   });
@@ -69,6 +71,55 @@ describe('fetchWithFallback', () => {
     expect(fallbackKey('https://x.supabase.co/rest/v1/games?game_date=eq.2026-10-22'))
       .not.toBe(fallbackKey('https://x.supabase.co/rest/v1/games?game_date=eq.2026-10-23'));
     expect(at('2026-10-23T10:01:56Z').startsWith('soft_signals/')).toBe(true);
+  });
+});
+
+describe('fresh saved answers spare the database', () => {
+  beforeEach(() => { vi.resetModules(); blobs.clear(); route = '/players/[id]/[slug]'; });
+
+  it('answers from the saved copy while it is fresh, without asking the database', async () => {
+    const { fetchWithFallback } = await import('@/lib/db-fallback');
+    await fetchWithFallback(URL_, {}, async () => ok('[{"id":4}]'));
+    await flush();
+    const doFetch = vi.fn(async () => ok('[{"id":5}]'));
+    const res = await fetchWithFallback(URL_, {}, doFetch);
+    expect(doFetch).not.toHaveBeenCalled();
+    expect(await res.json()).toEqual([{ id: 4 }]);
+    expect(res.headers.get('x-db-cache')).toBe('1');
+  });
+
+  it('asks the database again once the pipeline wrote (new generation)', async () => {
+    const { fetchWithFallback, bumpGeneration } = await import('@/lib/db-fallback');
+    await fetchWithFallback(URL_, {}, async () => ok('[{"id":4}]'));
+    await flush();
+    await new Promise(r => setTimeout(r, 2));
+    await bumpGeneration();
+    const res = await fetchWithFallback(URL_, {}, async () => ok('[{"id":5}]'));
+    expect(await res.json()).toEqual([{ id: 5 }]);
+  });
+
+  it('asks the database again after FRESH_MS, and for copies saved without a time', async () => {
+    const { fetchWithFallback, fallbackKey, FRESH_MS } = await import('@/lib/db-fallback');
+    await fetchWithFallback(URL_, {}, async () => ok('[{"id":4}]'));
+    await flush();
+    const key = fallbackKey(URL_);
+    const saved = blobs.get(key) as { at: number };
+    blobs.set(key, { ...saved, at: Date.now() - FRESH_MS - 1 });
+    const doFetch = vi.fn(async () => ok('[{"id":6}]'));
+    expect(await (await fetchWithFallback(URL_, {}, doFetch)).json()).toEqual([{ id: 6 }]);
+    await flush();
+    blobs.set(key, { ...saved, at: undefined });
+    await fetchWithFallback(URL_, {}, doFetch);
+    expect(doFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('pipeline routes never read the saved copy, fresh or not', async () => {
+    const { fetchWithFallback } = await import('@/lib/db-fallback');
+    await fetchWithFallback(URL_, {}, async () => ok('[{"id":4}]'));
+    await flush();
+    route = '/api/ingest/metrics';
+    const doFetch = vi.fn(async () => ok('[{"id":7}]'));
+    expect(await (await fetchWithFallback(URL_, {}, doFetch)).json()).toEqual([{ id: 7 }]);
   });
 });
 

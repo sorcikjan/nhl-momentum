@@ -128,10 +128,11 @@ const handler: BackgroundHandler = async (event) => {
     log.push(`extras: ${r.data?.updated ?? 0} games updated, ${r.data?.youtubeFound ?? 0} YouTube highlights${r.error ? ` err: ${r.error}` : ''}`);
   }
 
-  // Bust the ISR cache so the homepage shows fresh data immediately.
+  // Bust the ISR cache so the homepage shows fresh data immediately — only the
+  // pages these games touched (the daily run sweeps everything at 08:00 UTC).
   {
-    const r = await call(`${base}/api/revalidate`, h, { method: 'POST', body: {} });
-    log.push(r.revalidated ? 'revalidate: ok' : `revalidate err: ${r.error}`);
+    const r = await call(`${base}/api/revalidate`, h, { method: 'POST', body: { gameIds, teamIds } });
+    log.push(r.revalidated ? `revalidate: ok (${r.targeted ?? 0} pages)` : `revalidate err: ${r.error}`);
   }
 
   console.log('[game-finish-worker] complete:', log.join(' | '));

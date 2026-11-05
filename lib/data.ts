@@ -262,11 +262,17 @@ async function buildRankings() {
   const lastGameIdByPlayer = new Map<number, number>();
   const STAT_CHUNK = 50;
 
-  const chunkPromises = [];
+  const chunks: number[][] = [];
   for (let ci = 0; Number.isFinite(windowStartGid) && ci < allSkaterIds.length; ci += STAT_CHUNK) {
-    const chunk = allSkaterIds.slice(ci, ci + STAT_CHUNK);
-    chunkPromises.push(
-      (async () => {
+    chunks.push(allSkaterIds.slice(ci, ci + STAT_CHUNK));
+  }
+  // At most STAT_PARALLEL at once: all ~22 together held as many connections on
+  // the free-tier instance, which runs at its memory limit (Nov 2026 outages).
+  const STAT_PARALLEL = 4;
+  const loadChunks = async () => {
+    const out: { player_id: number; game_id: number }[][] = [];
+    for (let i = 0; i < chunks.length; i += STAT_PARALLEL) {
+      out.push(...await Promise.all(chunks.slice(i, i + STAT_PARALLEL).map(async chunk => {
         const { data } = await supabaseAdmin
           .from('game_player_stats')
           .select('player_id, game_id')
@@ -275,12 +281,13 @@ async function buildRankings() {
           .order('game_id', { ascending: false })
           .limit(1000);
         return data ?? [];
-      })()
-    );
-  }
+      })));
+    }
+    return out;
+  };
 
   const [allChunkData, { data: rawSparklines }] = await Promise.all([
-    Promise.all(chunkPromises),
+    loadChunks(),
     supabaseAdmin
       .from('player_metric_snapshots')
       .select('player_id, calculated_at, momentum_ppm')
