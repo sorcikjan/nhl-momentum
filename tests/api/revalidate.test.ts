@@ -44,7 +44,7 @@ describe('/api/revalidate', () => {
     const res = await POST(post({ gameIds: [2026020150], teamIds: [6, 10] }));
     expect(bump).toHaveBeenCalledOnce();
     expect(paths).toEqual(expect.arrayContaining([
-      '/', '/hot', '/cesi-v-nhl',
+      '/', '/hot', '/cesi-v-nhl', '/svenskar-i-nhl',
       '/teams/6/boston-bruins', '/players/8477956/david-pastrnak', '/games/2026020150/bos-at-tor-1103',
     ]));
     expect(paths).not.toContain('/players/[id]/[slug] (page)');

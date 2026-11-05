@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { bumpGeneration } from '@/lib/db-fallback';
 import { supabaseAdmin } from '@/lib/supabase';
 import { gameUrl, playerUrl, teamUrl } from '@/lib/urls';
+import { NATIONS } from '@/lib/nations';
 
 // Called by pipeline workers (game-finish-worker, daily-worker) after writing
 // to Supabase so the ISR cache is invalidated right away — no stale data
@@ -13,7 +14,7 @@ import { gameUrl, playerUrl, teamUrl } from '@/lib/urls';
 // games, their teams and their players. A full sweep after every finished game
 // had crawlers re-render ~2,500 pages from the database up to 10 times a night.
 
-const SUMMARY_PATHS = ['/', '/games', '/rankings', '/standings', '/stats', '/hot', '/playoffs', '/accuracy', '/cesi-v-nhl'];
+const SUMMARY_PATHS = ['/', '/games', '/rankings', '/standings', '/stats', '/hot', '/playoffs', '/accuracy', ...Object.values(NATIONS).map(n => n.path)];
 
 type Targets = { gameIds: number[]; teamIds: number[] };
 

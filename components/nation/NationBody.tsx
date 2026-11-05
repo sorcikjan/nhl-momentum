@@ -1,12 +1,14 @@
 import Link from 'next/link';
 import { PlayerList, SectionHeading, SectionLink, TeamChip } from '@/components/ds';
 import { GoalButtons, GoalStrip } from '@/components/home/BestGoals';
+import { Flag } from '@/components/nation/Flag';
 import type { NationData, NightGame, TonightGame } from '@/lib/nation-data';
-import { pct, plural } from '@/lib/nations';
+import { pct, type Nation } from '@/lib/nations';
 
 const MONO = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' } as const;
 const CARD = { background: 'var(--bg-card)', borderColor: 'var(--border-soft)' } as const;
-const GOAL_LABELS = { watch: 'přehrát gól', onNhl: 'PŘEHRÁT NA NHL.COM', close: 'Zavřít' };
+// Only strings cross to the client goal player.
+const goalLabels = ({ t: { ui } }: Nation) => ({ watch: ui.watch, onNhl: ui.onNhl, close: ui.close });
 
 function Teams({ away, home, awayScore, homeScore, right }: { away: string; home: string; awayScore?: number; homeScore?: number; right: string }) {
   const score = { ...MONO, color: 'var(--text-bright)' } as const;
@@ -25,11 +27,12 @@ function Teams({ away, home, awayScore, homeScore, right }: { away: string; home
   );
 }
 
-function NightCard({ g }: { g: NightGame }) {
+function NightCard({ g, n }: { g: NightGame; n: Nation }) {
+  const ui = n.t.ui;
   return (
     <div className="flex flex-col gap-3 rounded-xl border px-4 py-3.5" style={CARD}>
       <Link href={g.href} className="hover:opacity-80">
-        <Teams away={g.away} home={g.home} awayScore={g.awayScore} homeScore={g.homeScore} right={g.suffix ? `KONEC · ${g.suffix}` : 'KONEC'} />
+        <Teams away={g.away} home={g.home} awayScore={g.awayScore} homeScore={g.homeScore} right={g.suffix ? `${ui.final} · ${g.suffix}` : ui.final} />
       </Link>
       <ul className="flex flex-col gap-2 border-t pt-3" style={{ borderColor: 'var(--border-soft)' }}>
         {g.players.map(p => (
@@ -37,7 +40,7 @@ function NightCard({ g }: { g: NightGame }) {
             <Link href={p.href} className="font-bold hover:underline" style={{ color: 'var(--text-bright)' }}>{p.name}</Link>
             {p.phrase && <span style={{ color: p.points > 0 ? 'var(--heat)' : 'var(--text)' }}>{p.phrase}</span>}
             <span className="text-xs" style={{ ...MONO, color: 'var(--text-muted)' }}>{p.line}</span>
-            {p.goals.length > 0 && <span className="flex flex-wrap gap-1.5"><GoalButtons moments={p.goals} labels={GOAL_LABELS} /></span>}
+            {p.goals.length > 0 && <span className="flex flex-wrap gap-1.5"><GoalButtons moments={p.goals} labels={goalLabels(n)} /></span>}
           </li>
         ))}
       </ul>
@@ -45,12 +48,12 @@ function NightCard({ g }: { g: NightGame }) {
   );
 }
 
-function TonightCard({ g }: { g: TonightGame }) {
+function TonightCard({ g, n }: { g: TonightGame; n: Nation }) {
   const names = (list: string[]) => list.length ? list.join(', ') : '—';
   return (
     <Link href={g.href} className="flex flex-col gap-2.5 rounded-xl border px-4 py-3.5 transition-colors hover:bg-[var(--bg-hover)]"
       style={{ ...CARD, borderColor: g.derby ? 'var(--heat)' : CARD.borderColor }}>
-      {g.derby && <span className="text-[10px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.1 }}>ČESKÉ DERBY</span>}
+      {g.derby && <span className="text-[10px] font-bold" style={{ ...MONO, color: 'var(--heat)', letterSpacing: 1.1 }}>{n.t.ui.derby}</span>}
       <Teams away={g.away} home={g.home} right={g.time ?? ''} />
       <span className="text-xs" style={{ color: 'var(--text)' }}>
         {g.awayPlayers.length > 0 && <>{g.away}: <b style={{ color: 'var(--text-bright)' }}>{names(g.awayPlayers)}</b></>}
@@ -64,72 +67,74 @@ function TonightCard({ g }: { g: TonightGame }) {
 const Note = ({ children }: { children: React.ReactNode }) =>
   <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{children}</p>;
 
-// "Czechs in the NHL": the homepage's morning — results, goals, form, tonight —
-// for one nation's players, in Czech.
-export function NationBody({ data, updated }: { data: NationData; updated: string }) {
+// A nation's page body ("Češi v NHL", "Svenskar i NHL"): the homepage's
+// morning — results, goals, form, tonight — for one nation's players, in
+// their language.
+export function NationBody({ n, data, updated }: { n: Nation; data: NationData; updated: string }) {
   const { night, goals, skaters, goalies, tonight, league } = data;
-  // The league around them, so a Czech number reads against the whole NHL.
+  const ui = n.t.ui;
+  // The league around them, so their numbers read against the whole NHL.
   const vsLeague = [
-    league.leader ? `nejlepší formu má ${league.leader.name} (Heat ${league.leader.heat})` : null,
-    league.medianHeat != null ? `polovina hráčů ligy má Heat pod ${league.medianHeat}` : null,
+    league.leader ? ui.leader(league.leader.name, league.leader.heat) : null,
+    league.medianHeat != null ? ui.median(league.medianHeat) : null,
   ].filter(Boolean);
-  const skaterSub = 'Heat = body za minutu na ledě v posledních 5 zápasech, procento je rozdíl proti jeho tempu v celé sezoně.'
-    + (vsLeague.length ? ` Pro srovnání v NHL: ${vsLeague.join(' a ')}.` : '');
-  const goalieSub = `Úspěšnost zákroků v posledních pěti startech, bilance výher, proher a proher po prodloužení.${league.goalieAvg != null ? ` Průměr NHL v sezoně: ${pct(league.goalieAvg)}.` : ''}`;
+  const skaterSub = ui.heatSub + (vsLeague.length ? ` ${ui.vsLeague} ${vsLeague.join(` ${ui.and} `)}.` : '');
+  const goalieSub = ui.goalieSub + (league.goalieAvg != null ? ` ${ui.goalieAvg(pct(league.goalieAvg))}` : '');
   return (
-    <div lang="cs" className="flex flex-col gap-12 pb-20 lg:pb-0">
-      <SectionHeading as="h1" size="page" kicker={`🇨🇿 ČEŠI V NHL · ${updated}`} title="Češi v NHL."
-        sub={`Jak hráli v noci, jejich góly, forma a kdo hraje dnes. ${data.count} ${plural(data.count, 'hráč', 'hráči', 'hráčů')} na soupiskách NHL, aktualizováno po každém zápase.`} />
-      {data.partial && <Note>Část dat z NHL se teď nepodařilo načíst — chybějící hráči se doplní při další aktualizaci za pár minut.</Note>}
+    <div lang={n.lang} className="flex flex-col gap-12 pb-20 lg:pb-0">
+      <SectionHeading as="h1" size="page"
+        kicker={<span className="inline-flex items-center gap-2"><Flag code={n.code} width={18} />{ui.name.toUpperCase()} · {updated}</span>}
+        title={`${ui.name}.`} sub={ui.sub(data.count)} />
+      {data.partial && <Note>{ui.partial}</Note>}
 
       {night && night.games.length > 0 && (
         <section data-section="nation-night">
-          <SectionHeading kicker={`VÝSLEDKY · ${night.label.toUpperCase()}`} title="Jak hráli v noci." size="feature"
+          <SectionHeading kicker={`${ui.results} · ${night.label.toUpperCase()}`} title={ui.nightTitle} size="feature"
             sub={night.summary || undefined} />
           <div className="grid gap-3 lg:grid-cols-2">
-            {night.games.map(g => <NightCard key={g.href} g={g} />)}
+            {night.games.map(g => <NightCard key={g.href} g={g} n={n} />)}
           </div>
           <div className="mt-3 flex flex-col gap-1">
-            {night.scratched.length > 0 && <Note>Nenastoupili: {night.scratched.join(', ')}.</Note>}
-            {night.idle.length > 0 && <Note>Jejich tým nehrál: {night.idle.join(', ')}.</Note>}
+            {night.scratched.length > 0 && <Note>{ui.scratched}: {night.scratched.join(', ')}.</Note>}
+            {night.idle.length > 0 && <Note>{ui.idle}: {night.idle.join(', ')}.</Note>}
           </div>
         </section>
       )}
 
       {goals.length > 0 && (
         <section data-section="nation-goals">
-          <SectionHeading kicker={`GÓLY · ${goals.length} ${plural(goals.length, 'GÓL', 'GÓLY', 'GÓLŮ').toUpperCase()} S VIDEEM`} title="České góly posledních dnů." size="feature" />
-          <GoalStrip moments={goals} cols={3} labels={GOAL_LABELS} />
+          <SectionHeading kicker={ui.goalsKicker(goals.length)} title={ui.goalsTitle} size="feature" />
+          <GoalStrip moments={goals} cols={3} labels={goalLabels(n)} />
         </section>
       )}
 
       {tonight && (
         <section data-section="nation-tonight">
-          <SectionHeading kicker={`PROGRAM · ${tonight.label.toUpperCase()} · ČAS V PRAZE`} title="Kdo hraje příště." size="feature" />
+          <SectionHeading kicker={`${ui.schedule} · ${tonight.label.toUpperCase()} · ${ui.localTime}`} title={ui.nextTitle} size="feature" />
           <div className="grid gap-3 lg:grid-cols-2">
-            {tonight.games.map(g => <TonightCard key={g.href} g={g} />)}
+            {tonight.games.map(g => <TonightCard key={g.href} g={g} n={n} />)}
           </div>
         </section>
       )}
 
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-8">
         <section data-section="nation-heat">
-          <SectionHeading kicker="FORMA · HEAT 0–100" title="Kdo je ve formě."
+          <SectionHeading kicker={ui.formKicker} title={ui.formTitle}
             sub={skaterSub}
-            right={<SectionLink href="/about#heat">Jak funguje Heat</SectionLink>} />
-          <PlayerList rows={skaters} empty="Zatím žádné zápasy." />
-          {data.notPlayed.length > 0 && <div className="mt-3"><Note>V sezoně zatím nehráli: {data.notPlayed.join(', ')}.</Note></div>}
+            right={<SectionLink href="/about#heat">{ui.howHeat}</SectionLink>} />
+          <PlayerList rows={skaters} empty={ui.empty} />
+          {data.notPlayed.length > 0 && <div className="mt-3"><Note>{ui.notPlayed}: {data.notPlayed.join(', ')}.</Note></div>}
         </section>
         <section data-section="nation-goalies">
-          <SectionHeading kicker="BRANKÁŘI · POSLEDNÍCH 5 STARTŮ" title="Čeští gólmani."
+          <SectionHeading kicker={ui.goalieKicker} title={ui.goalieTitle}
             sub={goalieSub} />
-          <PlayerList rows={goalies} empty="Zatím žádné starty." />
+          <PlayerList rows={goalies} empty={ui.goalieEmpty} />
         </section>
       </div>
 
       <div className="flex flex-wrap gap-5 border-t pt-5" style={{ borderColor: 'var(--border-soft)' }}>
-        <SectionLink href="/hot">Nejlepší forma v celé NHL</SectionLink>
-        <SectionLink href="/">Všechny výsledky</SectionLink>
+        <SectionLink href="/hot">{ui.bestInNhl}</SectionLink>
+        <SectionLink href="/">{ui.allResults}</SectionLink>
       </div>
     </div>
   );

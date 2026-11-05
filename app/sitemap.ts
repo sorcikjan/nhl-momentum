@@ -5,6 +5,7 @@ import { pageAll, regularSeasonGameIdRange } from '@/lib/data';
 import { SITE_URL } from '@/lib/site';
 import { todayET } from '@/lib/home';
 import { predictionSitemapDates } from '@/lib/seo';
+import { NATIONS } from '@/lib/nations';
 
 const base = SITE_URL;
 
@@ -27,7 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/games`,        lastModified: now, changeFrequency: 'hourly',  priority: 0.9 },
     { url: `${base}/predictions`,  lastModified: now, changeFrequency: 'hourly',  priority: 0.9 },
     { url: `${base}/recaps`,       lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
-    { url: `${base}/cesi-v-nhl`,   lastModified: now, changeFrequency: 'hourly',  priority: 0.8 },
+    ...Object.values(NATIONS).map(n => ({ url: `${base}${n.path}`, lastModified: now, changeFrequency: 'hourly' as const, priority: 0.8 })),
     { url: `${base}/welcome`,      changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/about`,        changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/accuracy`,     lastModified: now, changeFrequency: 'daily',   priority: 0.5 },

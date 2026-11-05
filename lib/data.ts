@@ -11,6 +11,7 @@ import { currentSeason, getGamesByDate, getGameBoxscore, getGamePlayByPlay, getS
 export { deriveOutStatus, daysAgo } from '@/lib/player-status';
 import { processPlayByPlay } from '@/lib/play-by-play';
 import { ppmToHeat } from '@/lib/heat';
+import { pacePct } from '@/lib/player-row';
 import { teamHeatByTeam } from '@/lib/team-heat';
 import { peerFromSnapshot, type Peer } from '@/lib/profile-context';
 
@@ -354,6 +355,16 @@ async function buildRankings() {
       .filter((r: any) => r.players?.position_code !== 'G' && (r.momentum_games ?? 0) > 0)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .map((r: any) => [r.player_id as number, ppmToHeat(r.momentum_ppm)])) as Record<number, number>,
+    // Every active skater's last five games (goals, assists, pace vs his
+    // season), for pages that show form without reading each game log.
+    formByPlayer: Object.fromEntries(latest
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .filter((r: any) => r.players?.position_code !== 'G' && (r.momentum_games ?? 0) > 0)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((r: any) => [r.player_id as number, {
+        games: r.momentum_games as number, goals: (r.momentum_goals ?? 0) as number, assists: (r.momentum_assists ?? 0) as number,
+        pace: pacePct(r.momentum_ppm, r.season_ppm),
+      }])) as Record<number, { games: number; goals: number; assists: number; pace: number | null }>,
     momentumLeaders: { skaters: momentumLeaderSkaters, goalies: momentumLeaderGoalies },
     hottestByTeam,
     sparklineSnapshots: (rawSparklines ?? []) as { player_id: number; calculated_at: string; momentum_ppm: number }[],
