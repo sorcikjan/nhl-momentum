@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { calculatePlayerEnergy, GOALIE_DRAIN_PER_MIN, type GameRecord } from '@/lib/energy';
 import { requireIngestAuth } from '@/lib/ingest-auth';
+import { latestSnapshots } from '@/lib/latest-snapshots';
 
 // GET /api/ingest/energy?offset=0&limit=100
 //
@@ -89,19 +90,9 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // 5. Get latest snapshot ID per player — limit to 3× player count so each
-    // player's latest row is always included (Supabase default cap is 1000)
-    const { data: latestSnaps } = await supabaseAdmin
-      .from('player_metric_snapshots')
-      .select('id, player_id')
-      .in('player_id', playerIds)
-      .order('calculated_at', { ascending: false })
-      .limit(playerIds.length * 3);
-
-    const latestIdByPlayer = new Map<number, string>();
-    for (const snap of latestSnaps ?? []) {
-      if (!latestIdByPlayer.has(snap.player_id)) latestIdByPlayer.set(snap.player_id, snap.id);
-    }
+    // 5. Latest snapshot per player (lib/latest-snapshots.ts: the old single
+    // query hit the 1,000-row cap and inserted blank rows).
+    const latestByPlayer = await latestSnapshots(playerIds);
 
     // 6. Compute energy and split into updates vs inserts
     const updates: { id: string; energy_bar: number }[] = [];
@@ -111,7 +102,7 @@ export async function GET(req: NextRequest) {
       const drainRate = player.position_code === 'G' ? GOALIE_DRAIN_PER_MIN : undefined;
       const records   = recordsByPlayer.get(player.id) ?? [];
       const energy    = calculatePlayerEnergy(records, now, drainRate);
-      const snapId    = latestIdByPlayer.get(player.id);
+      const snapId    = latestByPlayer.get(player.id)?.id;
 
       if (snapId) {
         updates.push({ id: snapId, energy_bar: energy });

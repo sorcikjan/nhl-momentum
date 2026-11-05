@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getGamesByDate, getGameLanding, getGameRightRail, seasonForDate, seasonFromGameId, firstRegularSeasonGameId } from '@/lib/nhl-api';
 import { requireIngestAuth } from '@/lib/ingest-auth';
+import { latestSnapshots } from '@/lib/latest-snapshots';
 import { calculatePlayerEnergy, GOALIE_DRAIN_PER_MIN, type GameRecord } from '@/lib/energy';
 import { MODEL_REGISTRY } from '@/lib/prediction-models';
 import type { NHLScheduledGame } from '@/types';
@@ -507,19 +508,9 @@ export async function GET(req: NextRequest) {
           recordsByPlayer.get(row.player_id)!.push({ game_end_utc: gameEnd, toi_seconds: row.toi_seconds ?? 0 });
         }
 
-        // Fetch latest snapshot ID + current energy per player.
-        // Limit to 2× player count — rows are newest-first so first occurrence per player is latest.
-        const { data: latestSnaps } = await supabaseAdmin
-          .from('player_metric_snapshots')
-          .select('id, player_id, energy_bar')
-          .in('player_id', ePlayerIds)
-          .order('calculated_at', { ascending: false })
-          .limit(ePlayerIds.length * 2);
-
-        const latestSnapByPlayer = new Map<number, { id: string; energy_bar: number }>();
-        for (const snap of latestSnaps ?? []) {
-          if (!latestSnapByPlayer.has(snap.player_id)) latestSnapByPlayer.set(snap.player_id, { id: snap.id, energy_bar: snap.energy_bar ?? 100 });
-        }
+        // Latest snapshot ID + current energy per player (lib/latest-snapshots.ts:
+        // the old single query hit the 1,000-row cap and inserted blank rows).
+        const latestSnapByPlayer = await latestSnapshots(ePlayerIds);
 
         const eUpdates: { id: string; energy_bar: number }[] = [];
         const eInserts: { player_id: number; energy_bar: number; momentum_rank: number }[] = [];
@@ -529,7 +520,7 @@ export async function GET(req: NextRequest) {
           const existing  = latestSnapByPlayer.get(player.id);
           if (existing) {
             // Skip if value unchanged — avoids unnecessary DB writes for recovered players
-            if (existing.energy_bar !== energy) eUpdates.push({ id: existing.id, energy_bar: energy });
+            if ((existing.energy_bar ?? 100) !== energy) eUpdates.push({ id: existing.id, energy_bar: energy });
           } else {
             eInserts.push({ player_id: player.id, energy_bar: energy, momentum_rank: 0 });
           }
