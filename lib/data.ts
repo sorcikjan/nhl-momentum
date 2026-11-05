@@ -1086,11 +1086,12 @@ export async function fetchGameShareCard(id: number): Promise<GameCardData | nul
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const home = (g.home_team as any)?.abbrev ?? '?', away = (g.away_team as any)?.abbrev ?? '?';
   const final = ['FINAL', 'OFF'].includes(g.game_state ?? '');
-  const [{ data: pred }, keys, stats] = await Promise.all([
+  const [{ data: pred }, keys, stats, rankings] = await Promise.all([
     supabaseAdmin.from('predictions').select('home_win_probability, prediction_outcomes(correct_winner)')
       .eq('game_id', id).eq('model_version', model).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     fetchPregameKeyPlayers([{ id, home, away }]),
     final ? fetchStatLines([id]) : Promise.resolve(new Map<number, Map<number, { goals: number; assists: number }>>()),
+    fetchRankings().catch(() => null),
   ]);
   const ids = [...(keys.get(`${id}-false`) ?? []), ...(keys.get(`${id}-true`) ?? [])].map(k => k.playerId);
   const photos = ids.length ? await fetchPlayerPhotos(ids) : new Map<number, string>();
@@ -1101,9 +1102,9 @@ export async function fetchGameShareCard(id: number): Promise<GameCardData | nul
   return {
     id, href: '', state: g.game_state ?? 'FUT', startTimeUTC: g.start_time_utc ?? null,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    away: { abbrev: away, name: (g.away_team as any)?.name ?? away, score: g.away_score, pct: homePct == null ? null : 100 - homePct, players: cardPlayers(keys.get(`${id}-false`), photos, st) },
+    away: { abbrev: away, name: (g.away_team as any)?.name ?? away, score: g.away_score, pct: homePct == null ? null : 100 - homePct, players: cardPlayers(keys.get(`${id}-false`), photos, st, rankings?.heatByPlayer) },
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    home: { abbrev: home, name: (g.home_team as any)?.name ?? home, score: g.home_score, pct: homePct, players: cardPlayers(keys.get(`${id}-true`), photos, st) },
+    home: { abbrev: home, name: (g.home_team as any)?.name ?? home, score: g.home_score, pct: homePct, players: cardPlayers(keys.get(`${id}-true`), photos, st, rankings?.heatByPlayer) },
     pick: homePct == null ? null : homePct >= 50 ? { abbrev: home, pct: homePct } : { abbrev: away, pct: 100 - homePct },
     pickResult: !final || outcome == null ? null : outcome ? 'hit' : 'miss',
   };

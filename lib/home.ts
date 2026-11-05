@@ -158,8 +158,8 @@ export async function fetchHomeData(today: string): Promise<HomeData> {
   for (const c of cards) {
     // A started game without box-score rows yet shows Heat only (not "DNP" for everyone).
     const stats = statsBy.get(c.id)?.size ? statsBy.get(c.id)! : null;
-    c.away.players = cardPlayers(keyOf(c.id, false), photos, stats);
-    c.home.players = cardPlayers(keyOf(c.id, true), photos, stats);
+    c.away.players = cardPlayers(keyOf(c.id, false), photos, stats, rankings?.heatByPlayer);
+    c.home.players = cardPlayers(keyOf(c.id, true), photos, stats, rankings?.heatByPlayer);
   }
 
   // Stories: the latest night with a recap, its games as story cards.

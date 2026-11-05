@@ -26,6 +26,11 @@ describe('cardPlayers', () => {
     expect(r.map(p => p.playerId)).toEqual([1, 3, 4]);
     expect(r.map(p => p.stat)).toEqual(['2G 1A', '–', '1A']);
   });
+  it('picked by pre-game Heat, shown with today’s — what the profile says', () => {
+    // Batherson went in at 99, scored nothing, and his five-game window lost a hat trick.
+    const r = cardPlayers([kp(1, 'Drake Batherson', 99, 'OTT'), kp(2, 'P 2', 70, 'OTT')], new Map(), null, { 1: 56 });
+    expect(r.map(p => p.heat)).toEqual([56, 70]);
+  });
 });
 
 describe('lastName', () => {

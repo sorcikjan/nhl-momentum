@@ -5,7 +5,7 @@ import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
 import {
   fetchGameStory, fetchMatch, fetchRecap, fetchSeasonPickAccuracy, fetchTeamSpecialTeams,
-  fetchKeyPlayerForm, fetchPostGameHeat, teamLogoUrl,
+  fetchKeyPlayerForm, fetchPostGameHeat, fetchRankings, teamLogoUrl,
 } from '@/lib/data';
 import { gameUrl, teamUrl, playerUrl, recapUrl } from '@/lib/urls';
 import { decimalToNormProb, formatBookmaker } from '@/lib/odds-api';
@@ -311,7 +311,11 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   // Finished games pick from a deeper pool (skipping late scratches); upcoming show the top 3.
   const pool = isFinal ? 8 : 3;
   const keyCandidates = (sk: SnapSkater[]) => pregameKeyPlayers(sk, new Map(), '', pool).map(p => p.playerId);
-  const keyForm = await fetchKeyPlayerForm([...keyCandidates(awaySkaters), ...keyCandidates(homeSkaters)]).catch(() => new Map());
+  const [keyForm, rankings] = await Promise.all([
+    fetchKeyPlayerForm([...keyCandidates(awaySkaters), ...keyCandidates(homeSkaters)]).catch(() => new Map()),
+    fetchRankings().catch(() => null),
+  ]);
+  const heatNow = rankings?.heatByPlayer;
   const awayKeys = pregameKeyPlayers(awaySkaters, keyForm, awayAbbrev, pool);
   const homeKeys = pregameKeyPlayers(homeSkaters, keyForm, homeAbbrev, pool);
   const gameStats = new Map<number, { goals: number; assists: number }>();
@@ -321,8 +325,8 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
   }
   const statsOrNull = isFinal && gameStats.size ? gameStats : null;
   const toRows = (keys: typeof awayKeys) => isFinal
-    ? cardPlayers(keys, new Map(), statsOrNull)
-    : keys.map(k => ({ playerId: k.playerId, name: k.name, href: k.href, photo: k.photo, heat: k.heat, stat: k.line }));
+    ? cardPlayers(keys, new Map(), statsOrNull, heatNow)
+    : keys.map(k => ({ playerId: k.playerId, name: k.name, href: k.href, photo: k.photo, heat: heatNow?.[k.playerId] ?? k.heat, stat: k.line }));
   const keyPlayersNode = (awayKeys.length || homeKeys.length)
     ? <KeyPlayers away={{ abbrev: awayAbbrev, name: awayName, players: toRows(awayKeys) }} home={{ abbrev: homeAbbrev, name: homeName, players: toRows(homeKeys) }} />
     : null;

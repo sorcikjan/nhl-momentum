@@ -54,9 +54,9 @@ export async function fetchDayCards(dates: string[]): Promise<GameDay[]> {
         state: g.gameState,
         startTimeUTC: g.startTimeUTC ?? null,
         away: { abbrev: g.awayTeam.abbrev, name: teamColor(g.awayTeam.abbrev).name, score: g.awayTeam.score ?? null, pct: homePct == null ? null : 100 - homePct,
-          players: cardPlayers(keyPlayersByGameTeam.get(`${g.id}-false`), photos, stats) },
+          players: cardPlayers(keyPlayersByGameTeam.get(`${g.id}-false`), photos, stats, rankings?.heatByPlayer) },
         home: { abbrev: g.homeTeam.abbrev, name: teamColor(g.homeTeam.abbrev).name, score: g.homeTeam.score ?? null, pct: homePct,
-          players: cardPlayers(keyPlayersByGameTeam.get(`${g.id}-true`), photos, stats) },
+          players: cardPlayers(keyPlayersByGameTeam.get(`${g.id}-true`), photos, stats, rankings?.heatByPlayer) },
         pick: homePct == null ? null : homePct >= 50
           ? { abbrev: g.homeTeam.abbrev, pct: homePct }
           : { abbrev: g.awayTeam.abbrev, pct: 100 - homePct },

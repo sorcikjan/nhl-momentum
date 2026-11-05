@@ -54,10 +54,13 @@ export function shortNames(names: string[]): string[] {
 // Three per team from a Heat-ordered pool. `stats` is null before the game;
 // afterwards only players with a box-score row (who actually played) qualify —
 // the pre-game snapshot can't know late scratches.
+// Picked by pre-game Heat, shown with today's (`heatNow`, the rankings' map) —
+// the number their profile shows; after a game the pre-game one is stale.
 export function cardPlayers(
   keys: KeyPlayer[] | undefined,
   photos: Map<number, string>,
   stats: Map<number, { goals: number; assists: number }> | null,
+  heatNow?: Record<number, number>,
 ): CardPlayer[] {
   return (keys ?? [])
     .filter(k => !stats || stats.has(k.playerId))
@@ -65,6 +68,6 @@ export function cardPlayers(
     .map(k => {
       const s = stats?.get(k.playerId);
       const line = s ? [s.goals ? `${s.goals}G` : '', s.assists ? `${s.assists}A` : ''].filter(Boolean).join(' ') || '–' : null;
-      return { playerId: k.playerId, name: k.name, href: k.href, photo: k.photo ?? photos.get(k.playerId) ?? null, heat: k.heat, stat: line };
+      return { playerId: k.playerId, name: k.name, href: k.href, photo: k.photo ?? photos.get(k.playerId) ?? null, heat: heatNow?.[k.playerId] ?? k.heat, stat: line };
     });
 }
