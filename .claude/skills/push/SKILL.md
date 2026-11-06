@@ -54,8 +54,10 @@ Also hold while a pipeline run you started by hand is still going (worker, backf
 Count today's pushes from the remote-tracking reflog:
 
 ```bash
-git reflog show origin/main --date=iso | grep "update by push" | grep "$(date -u +%Y-%m-%d)"
+git reflog show origin/main --date=iso | grep "update by push" | grep "$(date +%Y-%m-%d)"
 ```
+
+The reflog shows local time (Prague), so count by the local date.
 
 With 3 already today, normal commits wait for tomorrow. Two is comfortable, three is the
 ceiling.
