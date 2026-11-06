@@ -119,6 +119,15 @@ export async function GET(req: NextRequest) {
       g => g.home_score == null || g.away_score == null
     );
 
+    // Games from earlier days our DB still thinks are unplayed: the post-game
+    // worker never recorded them (6 Nov: all 11 of the night stayed FUT).
+    const { data: unrecorded } = await supabaseAdmin
+      .from('games')
+      .select('id, game_date, game_state')
+      .gte('game_date', since3d)
+      .lt('game_date', today)
+      .not('game_state', 'in', '(FINAL,OFF)');
+
     checks.games = {
       finalLast3Days: recentFinal?.length ?? 0,
       todayInDB: todayGames?.length ?? 0,
@@ -126,7 +135,12 @@ export async function GET(req: NextRequest) {
       missingScores: missingScores.map(g => ({
         game_id: g.id, date: g.game_date, state: g.game_state,
       })),
+      notRecorded: (unrecorded ?? []).map(g => ({ game_id: g.id, date: g.game_date, state: g.game_state })),
     };
+
+    if (unrecorded?.length) {
+      issues.push(`GAMES NOT RECORDED: ${unrecorded.length} game(s) from before today are still ${[...new Set(unrecorded.map(g => g.game_state))].join('/')} in the DB (IDs: ${unrecorded.map(g => g.id).join(', ')}) — post-game worker didn't run`);
+    }
 
     if (missingScores.length > 0) {
       issues.push(`GAMES: ${missingScores.length} FINAL/OFF game(s) have null scores (IDs: ${missingScores.map(g => g.id).join(', ')})`);

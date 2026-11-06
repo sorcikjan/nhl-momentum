@@ -63,9 +63,11 @@ export default async function handler() {
   if (issues.some(i => i.startsWith('ENERGY'))) heal.add('energy');
   if (issues.some(i => i.startsWith('PREDICTIONS'))) heal.add('snapshots');
   if (issues.some(i => i.startsWith('OUTCOMES'))) heal.add('outcomes-backfill');
+  // Last night's games never recorded: record them, then everything built on them.
+  if (issues.some(i => i.startsWith('GAMES NOT RECORDED'))) ['outcomes', 'outcomes-backfill', 'gamelogs', 'metrics', 'snapshots', 'energy', 'extras', 'recap'].forEach(p => heal.add(p));
   if (issues.some(i => i.startsWith('RECAPS: no recap for yesterday'))) heal.add('recap');
 
-  const order = ['rosters', 'outcomes-backfill', 'gamelogs', 'metrics', 'snapshots', 'energy', 'recap'];
+  const order = ['rosters', 'outcomes', 'outcomes-backfill', 'gamelogs', 'metrics', 'snapshots', 'energy', 'extras', 'recap'];
   const phases = order.filter(p => heal.has(p));
   if (phases.length) {
     console.log('[pipeline-health-cron] auto-fix: running phases', phases.join(','));

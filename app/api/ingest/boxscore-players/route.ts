@@ -13,7 +13,7 @@ import { requireIngestAuth } from '@/lib/ingest-auth';
 // (gamelogs only fetches players we already know about).
 //
 // ?ids=2026020088,2026020089  — specific games (post-game worker)
-// ?since=YYYY-MM-DD           — all FINAL/OFF games since date (daily worker)
+// ?since=YYYY-MM-DD           — every game since date that is over (daily worker)
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type BoxPlayer = any;
@@ -29,10 +29,14 @@ export async function GET(req: NextRequest) {
   if (idsParam) {
     gameIds = idsParam.split(',').map(Number).filter(Boolean);
   } else if (since) {
+    // Earlier days count whatever our row says: when the post-game worker never
+    // ran, last night's games are still FUT here, and this sweep is what catches
+    // them (an unplayed game's box score has no players, so it costs nothing).
+    const etToday = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
     const { data, error } = await supabaseAdmin
       .from('games')
       .select('id')
-      .in('game_state', ['FINAL', 'OFF'])
+      .or(`game_state.in.(FINAL,OFF),game_date.lt.${etToday}`)
       .gte('game_date', since)
       .limit(200);
     if (error) return NextResponse.json({ data: null, error: error.message }, { status: 500 });
