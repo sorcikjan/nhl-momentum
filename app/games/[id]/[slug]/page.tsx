@@ -14,7 +14,7 @@ import { periodScoresFromMomentum } from '@/lib/play-by-play';
 
 import ShareButton from '@/components/ui/ShareButton';
 import { JsonLd } from '@/components/seo/JsonLd';
-import { gameTitle, sportsEventLd } from '@/lib/seo';
+import { gameDescription, gameTitle, sportsEventLd } from '@/lib/seo';
 import { gameShareText } from '@/lib/share';
 import { SITE_URL } from '@/lib/site';
 import { SectionHeading } from '@/components/ds';
@@ -89,15 +89,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const awayName = (game?.away_team as any)?.name ?? away;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const homeName = (game?.home_team as any)?.name ?? home;
-  const dateLabel = game?.game_date
-    ? new Date(game.game_date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : '';
   const isFinalGame = ['FINAL', 'OFF'].includes(game?.game_state ?? '');
   const story = isFinalGame && game ? await cachedFetchStory(game.id) : null;
   const title = gameTitle({ awayName, homeName, date: game?.game_date ?? null, state: game?.game_state ?? null, awayScore: game?.away_score ?? null, homeScore: game?.home_score ?? null });
-  const desc = story?.dek ? story.dek : isFinalGame
-    ? `${awayName} vs ${homeName} recap${dateLabel ? ' — ' + dateLabel : ''}: final score, whether our pick held, and how each team's three hottest players did.`
-    : `${awayName} vs ${homeName} prediction${dateLabel ? ' — ' + dateLabel : ''}: our pick and win probability, plus each team's three hottest players by Heat.`;
+  const desc = gameDescription({ awayName, homeName, date: game?.game_date ?? null, final: isFinalGame, dek: story?.dek });
   return {
     title,
     description: desc,
@@ -549,15 +544,21 @@ export default async function MatchPage({ params }: { params: Promise<{ id: stri
     k === 'prediction' ? `${teamColor(favoredAbbrev).name} win.` : k === 'pick' ? pickHeadline(outcome?.correct_winner ?? null)
       : k === 'story' ? story?.headline ?? '' : SECTION_META[k].title;
 
+  const pageUrl = `${SITE_URL}${gameUrl(Number(id), awayAbbrev, homeAbbrev, gameDate)}`;
   return (
     <div className="pb-20 lg:pb-0">
       <JsonLd data={sportsEventLd({
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         name: `${(game?.away_team as any)?.name ?? awayName} vs ${(game?.home_team as any)?.name ?? homeName}`,
-        url: `${SITE_URL}${gameUrl(Number(id), awayAbbrev, homeAbbrev, gameDate)}`,
+        url: pageUrl,
         startDate: startUtc, venue: game?.venue ?? null,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         home: (game?.home_team as any)?.name ?? homeName, away: (game?.away_team as any)?.name ?? awayName, state: gameState,
+        homeAbbrev,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        description: gameDescription({ awayName: (game?.away_team as any)?.name ?? awayName, homeName: (game?.home_team as any)?.name ?? homeName, date: game?.game_date ?? null, final: view === 'final', dek: story?.dek }),
+        // The page's share card (./opengraph-image).
+        image: `${pageUrl}/opengraph-image`,
       })} />
 
       <GameHero

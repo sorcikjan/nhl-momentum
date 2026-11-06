@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gameTitle, playerTitle, predictionsTitle, predictionSentence, sportsEventLd, personLd, itemListLd, parsePredictionDate } from '@/lib/seo';
+import { gameDescription, gameTitle, playerTitle, predictionsTitle, predictionSentence, sportsEventLd, personLd, itemListLd, parsePredictionDate } from '@/lib/seo';
 import type { GameCardData } from '@/lib/game-card';
 
 describe('titles people actually search', () => {
@@ -48,6 +48,17 @@ describe('structured data', () => {
     const ld = sportsEventLd({ name: 'Philadelphia Flyers vs Buffalo Sabres', url: 'https://x/g', startDate: '2026-10-22T23:30:00Z', venue: 'KeyBank Center', home: 'Buffalo Sabres', away: 'Philadelphia Flyers', state: 'FUT' });
     expect(ld).toMatchObject({ '@context': 'https://schema.org', '@type': 'SportsEvent', sport: 'Ice Hockey', eventStatus: 'https://schema.org/EventScheduled',
       homeTeam: { '@type': 'SportsTeam', name: 'Buffalo Sabres' }, location: { '@type': 'Place', name: 'KeyBank Center' } });
+  });
+  it('SportsEvent carries what Search Console asks for: description, image, organizer, address', () => {
+    const ld = sportsEventLd({ name: 'Ottawa Senators vs Buffalo Sabres', url: 'https://x/g', startDate: null, venue: 'KeyBank Center', home: 'Buffalo Sabres', away: 'Ottawa Senators', state: 'OFF',
+      homeAbbrev: 'BUF', description: 'Recap.', image: 'https://x/g/opengraph-image' });
+    expect(ld).toMatchObject({ description: 'Recap.', image: 'https://x/g/opengraph-image', organizer: { name: 'National Hockey League' },
+      location: { address: { '@type': 'PostalAddress', addressLocality: 'Buffalo', addressRegion: 'NY', addressCountry: 'US' } } });
+  });
+  it('the game snippet', () => {
+    expect(gameDescription({ awayName: 'Ottawa Senators', homeName: 'Buffalo Sabres', date: '2026-11-04', final: true }))
+      .toBe("Ottawa Senators vs Buffalo Sabres recap — Nov 4, 2026: final score, whether our pick held, and how each team's three hottest players did.");
+    expect(gameDescription({ awayName: 'A', homeName: 'B', date: null, final: true, dek: 'Story dek.' })).toBe('Story dek.');
   });
   it('Person for a player', () => {
     expect(personLd({ name: 'Jack Quinn', url: 'https://x/p', image: 'q.png', team: 'Buffalo Sabres' }))

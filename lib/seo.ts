@@ -46,20 +46,50 @@ export function predictionSentence(c: GameCardData): string {
     : `${c.away.name} are ${c.pick.pct}% favourites on the road at ${c.home.name}${watch}.`;
 }
 
-export function sportsEventLd(g: { name: string; url: string; startDate: string | null; venue: string | null; home: string; away: string; state: string | null }) {
+// The game's search snippet (meta description and the SportsEvent's description).
+export function gameDescription(g: { awayName: string; homeName: string; date: string | null; final: boolean; dek?: string | null }): string {
+  if (g.dek) return g.dek;
+  const when = g.date ? ` — ${dayFmt(g.date, { month: 'short', day: 'numeric', year: 'numeric' })}` : '';
+  return g.final
+    ? `${g.awayName} vs ${g.homeName} recap${when}: final score, whether our pick held, and how each team's three hottest players did.`
+    : `${g.awayName} vs ${g.homeName} prediction${when}: our pick and win probability, plus each team's three hottest players by Heat.`;
+}
+
+// Where each team plays at home, for the SportsEvent's address (the NHL feed
+// names the arena only). A neutral-site game would get the home team's city.
+const HOME_CITY: Record<string, [locality: string, region: string, country: 'US' | 'CA']> = {
+  ANA: ['Anaheim', 'CA', 'US'], BOS: ['Boston', 'MA', 'US'], BUF: ['Buffalo', 'NY', 'US'], CAR: ['Raleigh', 'NC', 'US'],
+  CBJ: ['Columbus', 'OH', 'US'], CGY: ['Calgary', 'AB', 'CA'], CHI: ['Chicago', 'IL', 'US'], COL: ['Denver', 'CO', 'US'],
+  DAL: ['Dallas', 'TX', 'US'], DET: ['Detroit', 'MI', 'US'], EDM: ['Edmonton', 'AB', 'CA'], FLA: ['Sunrise', 'FL', 'US'],
+  LAK: ['Los Angeles', 'CA', 'US'], MIN: ['Saint Paul', 'MN', 'US'], MTL: ['Montreal', 'QC', 'CA'], NJD: ['Newark', 'NJ', 'US'],
+  NSH: ['Nashville', 'TN', 'US'], NYI: ['Elmont', 'NY', 'US'], NYR: ['New York', 'NY', 'US'], OTT: ['Ottawa', 'ON', 'CA'],
+  PHI: ['Philadelphia', 'PA', 'US'], PIT: ['Pittsburgh', 'PA', 'US'], SEA: ['Seattle', 'WA', 'US'], SJS: ['San Jose', 'CA', 'US'],
+  STL: ['St. Louis', 'MO', 'US'], TBL: ['Tampa', 'FL', 'US'], TOR: ['Toronto', 'ON', 'CA'], UTA: ['Salt Lake City', 'UT', 'US'],
+  VAN: ['Vancouver', 'BC', 'CA'], VGK: ['Las Vegas', 'NV', 'US'], WPG: ['Winnipeg', 'MB', 'CA'], WSH: ['Washington', 'DC', 'US'],
+};
+
+export function sportsEventLd(g: {
+  name: string; url: string; startDate: string | null; venue: string | null; home: string; away: string; state: string | null;
+  homeAbbrev?: string; description?: string; image?: string;
+}) {
   const view = gameView(g.state);
+  const city = g.homeAbbrev ? HOME_CITY[g.homeAbbrev] : undefined;
   return {
     '@context': 'https://schema.org',
     '@type': 'SportsEvent',
     name: g.name,
     url: g.url,
     sport: 'Ice Hockey',
+    ...(g.description && { description: g.description }),
+    ...(g.image && { image: g.image }),
+    organizer: { '@type': 'SportsOrganization', name: 'National Hockey League', url: 'https://www.nhl.com' },
     ...(g.startDate && { startDate: g.startDate }),
     eventStatus: view === 'upcoming' ? 'https://schema.org/EventScheduled' : view === 'live' ? 'https://schema.org/EventInProgress' : 'https://schema.org/EventCompleted',
     homeTeam: { '@type': 'SportsTeam', name: g.home },
     awayTeam: { '@type': 'SportsTeam', name: g.away },
     competitor: [{ '@type': 'SportsTeam', name: g.away }, { '@type': 'SportsTeam', name: g.home }],
-    ...(g.venue && { location: { '@type': 'Place', name: g.venue } }),
+    ...(g.venue && { location: { '@type': 'Place', name: g.venue,
+      ...(city && { address: { '@type': 'PostalAddress', addressLocality: city[0], addressRegion: city[1], addressCountry: city[2] } }) } }),
   };
 }
 
