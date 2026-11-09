@@ -15,7 +15,7 @@ export type ShareData = {
   top: PlayerRowData[];         // #2–#5
   heatingUp: PlayerRowData[];
   coolingOff: PlayerRowData[];
-  night: { dateLabel: string; games: NightGame[]; goals: Moment[] } | null;
+  night: { date?: string; dateLabel: string; games: NightGame[]; goals: Moment[] } | null; // date: YYYY-MM-DD (ET)
 };
 
 export type Post = { channel: string; title?: string; body: string; comment?: string };
@@ -56,11 +56,14 @@ function trendPosts(d: ShareData): Post[] {
   ];
 }
 
+// "OT WINNER · HAT TRICK" → "OT winner · hat trick"
+const lowerKicker = (k: string) => k.toLowerCase().replace(/\bot\b/g, 'OT');
+
 function nightPosts(d: ShareData): Post[] {
   const n = d.night;
   if (!n?.games.length) return [];
   const best = n.goals[0];
-  const goal = best ? `\nGoal of the night: ${best.scorer}, ${best.kicker.toLowerCase()} (${best.score}, ${best.when})` : '';
+  const goal = best ? `\nGoal of the night: ${best.scorer}, ${lowerKicker(best.kicker)} (${best.score}, ${best.when})` : '';
   return [
     { channel: 'Bluesky / X', body: `Last night in the NHL: ${n.games.length} game${n.games.length === 1 ? '' : 's'}.${goal}\n\nEvery score and the best goals → ${shareLink('/recaps', 'bluesky')}` },
   ];
@@ -75,3 +78,16 @@ export const SHARE_TITLES: Record<ShareKind, string> = {
   trends: 'Heating up · cooling off',
   night: 'Last night',
 };
+
+// The daily Bluesky post: the card's text plus a description of the card for
+// screen readers (Bluesky shows alt text, and the card is mostly numbers).
+export function blueskyPost(kind: ShareKind, d: ShareData): { text: string; alt: string } | null {
+  const text = sharePosts(kind, d).find(p => p.channel.startsWith('Bluesky'))?.body;
+  if (!text) return null;
+  const rows = (rs: PlayerRowData[]) => rs.map(r => `${r.name} (${r.team}) Heat ${r.value}, ${l5(r)}`).join('; ');
+  const alt =
+    kind === 'heat' && d.leader ? `Heat Index, ${d.dateLabel}. #1 ${d.leader.first} ${d.leader.last} (${d.leader.team}) Heat ${d.leader.heat}, ${d.leader.goals}G ${d.leader.assists}A in ${d.leader.games} games. Then ${rows(d.top.slice(0, 4))}.`
+    : kind === 'trends' ? `Heating up, ${d.dateLabel}: ${rows(d.heatingUp.slice(0, 5))}. Cooling off: ${rows(d.coolingOff.slice(0, 3))}.`
+    : `Last night in the NHL, ${d.night?.dateLabel}: ${d.night?.games.map(g => `${g.away} ${g.awayScore}, ${g.home} ${g.homeScore}`).join('; ')}.`;
+  return { text, alt };
+}

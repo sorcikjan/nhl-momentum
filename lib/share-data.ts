@@ -26,6 +26,6 @@ export async function fetchShareData(): Promise<ShareData> {
   return {
     dateLabel: label(todayET()),
     leader: hv.leader, top: hv.top.slice(0, 4), heatingUp: hv.heatingUp.slice(0, 5), coolingOff: hv.coolingOff.slice(0, 5),
-    night: date ? { dateLabel: label(date), games, goals } : null,
+    night: date ? { date, dateLabel: label(date), games, goals } : null,
   };
 }

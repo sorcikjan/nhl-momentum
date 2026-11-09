@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sharePosts, shareLink, type ShareData } from '@/lib/share-cards';
+import { blueskyPost, sharePosts, shareLink, type ShareData } from '@/lib/share-cards';
 import type { PlayerRowData } from '@/lib/player-row';
 
 const row = (name: string, value: string, chip: string | null = '+40%'): PlayerRowData => ({
@@ -33,5 +33,28 @@ describe('share posts', () => {
   it('a card without data has nothing to post', () => {
     expect(sharePosts('heat', { ...d, leader: null })).toEqual([]);
     expect(sharePosts('night', { ...d, night: null })).toEqual([]);
+  });
+  it('keeps OT upper-case when the goal kicker goes into a sentence', () => {
+    const goal = { scorer: 'Cole Caufield', kicker: 'OT WINNER', score: 'MTL 5–4 UTA', when: 'OT 0:30' };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [post] = sharePosts('night', { ...d, night: { ...d.night!, goals: [goal as any] } });
+    expect(post.body).toContain('Cole Caufield, OT winner (MTL 5–4 UTA, OT 0:30)');
+  });
+});
+
+describe('bluesky post', () => {
+  it('uses the short social text and describes the card in the alt text', () => {
+    const p = blueskyPost('heat', d)!;
+    expect(p.text).toContain('Hottest in the NHL right now');
+    expect(p.text).toContain('utm_source=bluesky');
+    expect(p.alt).toContain('#1 David Pastrnak (BOS) Heat 97, 5G 4A in 5 games');
+    expect(p.alt).toContain('Jack Eichel (BOS) Heat 90, 3G 4A');
+    expect([...p.text].length).toBeLessThanOrEqual(300);
+  });
+  it('lists last night\'s scores in the night alt text', () => {
+    expect(blueskyPost('night', d)!.alt).toContain('VGK 2, BOS 3');
+  });
+  it('nothing to post without data', () => {
+    expect(blueskyPost('heat', { ...d, leader: null })).toBeNull();
   });
 });
