@@ -47,8 +47,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [{ data: teams }, players, games, { data: recaps }] = await Promise.all([
     supabaseAdmin.from('teams').select('id, name'),
     // Every active player — each profile is a landing page for "[name] stats".
-    orEmpty(pageAll<{ id: number; first_name: string | null; last_name: string | null }>((f, t) => supabaseAdmin
-      .from('players').select('id, first_name, last_name').eq('is_active', true).order('id').range(f, t))),
+    orEmpty(pageAll<{ id: number; first_name: string | null; last_name: string | null; team_id: number | null }>((f, t) => supabaseAdmin
+      .from('players').select('id, first_name, last_name, team_id').eq('is_active', true).order('id').range(f, t))),
     // This regular season up to a week ahead (further-out games have nothing to show yet).
     orEmpty(pageAll<{ id: number; game_date: string; away_team_id: number; home_team_id: number; away_team: unknown; home_team: unknown }>((f, t) => supabaseAdmin
       .from('games')
@@ -64,9 +64,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // The teams table also holds defunct franchises (Nordiques, Seals…) and placeholders.
   const seasonTeams = new Set(games.flatMap(g => [g.away_team_id, g.home_team_id]));
+  // A team's and its players' pages change when the team plays, so that is their
+  // lastmod. Stamping every page "now" each hour taught Google to ignore our
+  // lastmod (939 of 1,300 URLs said "today" on 9 Nov).
+  const lastPlayed = new Map<number, string>();
+  for (const g of games) {
+    if (g.game_date >= today) continue;
+    for (const t of [g.away_team_id, g.home_team_id]) if ((lastPlayed.get(t) ?? '') < g.game_date) lastPlayed.set(t, g.game_date);
+  }
+  const playedOn = (teamId: number | null) => {
+    const d = teamId == null ? undefined : lastPlayed.get(teamId);
+    return d ? dateOnly(`${d}T12:00:00Z`) : undefined;
+  };
   const teamEntries: MetadataRoute.Sitemap = (teams ?? []).filter(t => seasonTeams.has(t.id)).map(t => ({
     url: `${base}${teamUrl(t.id, t.name)}`,
-    lastModified: now,
+    lastModified: playedOn(t.id),
     changeFrequency: 'daily',
     priority: 0.8,
   }));
@@ -75,7 +87,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .filter(p => p.first_name && p.last_name)
     .map(p => ({
       url: `${base}${playerUrl(p.id, p.first_name!, p.last_name!)}`,
-      lastModified: now,
+      lastModified: playedOn(p.team_id),
       changeFrequency: 'daily',
       priority: 0.7,
     }));
