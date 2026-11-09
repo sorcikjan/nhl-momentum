@@ -6,7 +6,9 @@ import { SHARE_KINDS, SHARE_TITLES, sharePosts } from '@/lib/share-cards';
 
 // Not for search: this is the posting desk.
 export const metadata: Metadata = { title: 'Share cards', robots: { index: false, follow: false } };
-export const revalidate = 1800;
+// Rendered on every visit: only we open it, sometimes days apart, and a cached copy
+// would hand out last week's numbers for a post. Rankings are cached a level below.
+export const dynamic = 'force-dynamic';
 
 const MONO = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' } as const;
 
