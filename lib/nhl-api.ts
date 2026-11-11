@@ -41,10 +41,11 @@ export async function getSeasonDates(date: string) {
 
 // ─── Player Game Logs ─────────────────────────────────────────────────────────
 
-export async function getSkaterGameLog(playerId: number, season: string) {
+export async function getSkaterGameLog(playerId: number, season: string, revalidate = 300) {
   // season: "20252026"
   return get<{ gameLog: unknown[] }>(
-    `/player/${playerId}/game-log/${season}/2` // 2 = regular season
+    `/player/${playerId}/game-log/${season}/2`, // 2 = regular season
+    revalidate,
   );
 }
 
