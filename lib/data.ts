@@ -1150,15 +1150,20 @@ export async function pageAll<T>(fetchPage: (from: number, to: number) => Promis
   }
 }
 
-// Every player's latest rows (newest snapshot − 8 days), all pages. A plain
-// "newest first" .limit(N) only reaches the players of the last few ingest
-// batches — 606 of 817 on 2026-10-22, so 211 players (both Tkachuks among them)
-// were missing from every ranking. The window must outlast a team's longest
-// normal gap between games: the metrics run only writes players whose numbers
-// changed, so a team that hasn't played since the day before yesterday has no
-// row in the last 30 h. With a 30 h window 510 of 877 players (the whole Ducks
-// line leading the Heat board) dropped out on 2026-11-11. Callers dedupe to the
-// latest row per player. `filter` adds joins' conditions to the query.
+// Every player's latest snapshot row (one per player, from the last 8 days).
+// A plain "newest first" .limit(N) only reaches the players of the last few
+// ingest batches — 606 of 817 on 2026-10-22, so 211 players (both Tkachuks
+// among them) were missing from every ranking. The window must outlast a team's
+// longest normal gap between games: the metrics run only writes players whose
+// numbers changed, so with a 30 h window 510 of 877 players (the whole Ducks
+// line leading the Heat board) dropped out on 2026-11-11.
+//
+// Two steps, because 8 days is ~4,000 rows: reading them whole with the joins
+// was ~4 MB per build and helped take the memory-bound database down the same
+// day. Step 1 reads only ids (narrow), step 2 the full rows of each player's
+// newest one. `filter` adds joins' conditions to step 2.
+const LATEST_WINDOW_MS = 8 * 86_400_000;
+const ID_CHUNK = 150;
 export async function latestSnapshotRows<T>(
   select: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1169,12 +1174,23 @@ export async function latestSnapshotRows<T>(
     .order('calculated_at', { ascending: false }).limit(1);
   if (error) throw error;
   if (!newest?.length) return [];
-  const since = new Date(new Date(newest[0].calculated_at).getTime() - 8 * 86_400_000).toISOString();
-  return pageAll<T>((from, to) => filter(supabaseAdmin.from('player_metric_snapshots').select(select))
+  const since = new Date(new Date(newest[0].calculated_at).getTime() - LATEST_WINDOW_MS).toISOString();
+  const keys = await pageAll<{ id: string; player_id: number }>((from, to) => supabaseAdmin
+    .from('player_metric_snapshots').select('id, player_id')
     .gte('calculated_at', since)
     .order('calculated_at', { ascending: false })
     .order('player_id')
     .range(from, to));
+  const seen = new Set<number>();
+  const ids = keys.filter(k => !seen.has(k.player_id) && !!seen.add(k.player_id)).map(k => k.id);
+  const out: T[] = [];
+  for (let i = 0; i < ids.length; i += ID_CHUNK) {
+    const { data, error: e } = await filter(supabaseAdmin.from('player_metric_snapshots').select(select))
+      .in('id', ids.slice(i, i + ID_CHUNK));
+    if (e) throw e;
+    out.push(...(data ?? []));
+  }
+  return out;
 }
 
 type OutcomeRow = { correct_winner: boolean | null; home_score_error: number | null; away_score_error: number | null; predictions: unknown };
