@@ -1150,10 +1150,14 @@ export async function pageAll<T>(fetchPage: (from: number, to: number) => Promis
   }
 }
 
-// Every player's rows from the latest metrics run (newest snapshot − 30 h),
-// all pages. A plain "newest first" .limit(N) only reaches the players of the
-// last few ingest batches — 606 of 817 on 2026-10-22, so 211 players (both
-// Tkachuks among them) were missing from every ranking. Callers dedupe to the
+// Every player's latest rows (newest snapshot − 8 days), all pages. A plain
+// "newest first" .limit(N) only reaches the players of the last few ingest
+// batches — 606 of 817 on 2026-10-22, so 211 players (both Tkachuks among them)
+// were missing from every ranking. The window must outlast a team's longest
+// normal gap between games: the metrics run only writes players whose numbers
+// changed, so a team that hasn't played since the day before yesterday has no
+// row in the last 30 h. With a 30 h window 510 of 877 players (the whole Ducks
+// line leading the Heat board) dropped out on 2026-11-11. Callers dedupe to the
 // latest row per player. `filter` adds joins' conditions to the query.
 export async function latestSnapshotRows<T>(
   select: string,
@@ -1165,7 +1169,7 @@ export async function latestSnapshotRows<T>(
     .order('calculated_at', { ascending: false }).limit(1);
   if (error) throw error;
   if (!newest?.length) return [];
-  const since = new Date(new Date(newest[0].calculated_at).getTime() - 30 * 3_600_000).toISOString();
+  const since = new Date(new Date(newest[0].calculated_at).getTime() - 8 * 86_400_000).toISOString();
   return pageAll<T>((from, to) => filter(supabaseAdmin.from('player_metric_snapshots').select(select))
     .gte('calculated_at', since)
     .order('calculated_at', { ascending: false })
