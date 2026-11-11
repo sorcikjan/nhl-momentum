@@ -47,6 +47,7 @@ describe('bluesky post', () => {
     const p = blueskyPost('heat', d)!;
     expect(p.text).toContain('Hottest in the NHL right now');
     expect(p.text).toContain('utm_source=bluesky');
+    expect(p.text.endsWith('#NHL #hockey')).toBe(true);
     expect(p.alt).toContain('#1 David Pastrnak (BOS) Heat 97, 5G 4A in 5 games');
     expect(p.alt).toContain('Jack Eichel (BOS) Heat 90, 3G 4A');
     expect([...p.text].length).toBeLessThanOrEqual(300);

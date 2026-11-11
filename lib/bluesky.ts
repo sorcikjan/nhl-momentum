@@ -5,19 +5,24 @@ import type { ShareKind } from '@/lib/share-cards';
 const PDS = 'https://bsky.social/xrpc';
 const APPVIEW = 'https://public.api.bsky.app/xrpc';
 
-type Facet = { index: { byteStart: number; byteEnd: number }; features: { $type: 'app.bsky.richtext.facet#link'; uri: string }[] };
+type Feature = { $type: 'app.bsky.richtext.facet#link'; uri: string } | { $type: 'app.bsky.richtext.facet#tag'; tag: string };
+type Facet = { index: { byteStart: number; byteEnd: number }; features: Feature[] };
 
-// Links in a Bluesky post are only clickable with a facet, and its offsets count
-// UTF-8 bytes, not characters (the 🔥 before a link is 4 bytes).
-export function linkFacets(text: string): Facet[] {
+// Links and hashtags in a Bluesky post only work with a facet, and its offsets
+// count UTF-8 bytes, not characters (the 🔥 before a link is 4 bytes). Hashtags
+// are how hockey feeds on Bluesky find the post.
+export function richFacets(text: string): Facet[] {
   const enc = new TextEncoder();
+  const at = (i: number, s: string) => {
+    const byteStart = enc.encode(text.slice(0, i)).length;
+    return { byteStart, byteEnd: byteStart + enc.encode(s).length };
+  };
   const facets: Facet[] = [];
   for (const m of text.matchAll(/https?:\/\/[^\s)]+/g)) {
-    const byteStart = enc.encode(text.slice(0, m.index)).length;
-    facets.push({
-      index: { byteStart, byteEnd: byteStart + enc.encode(m[0]).length },
-      features: [{ $type: 'app.bsky.richtext.facet#link', uri: m[0] }],
-    });
+    facets.push({ index: at(m.index, m[0]), features: [{ $type: 'app.bsky.richtext.facet#link', uri: m[0] }] });
+  }
+  for (const m of text.matchAll(/(?<=^|\s)#([A-Za-z][A-Za-z0-9]*)/g)) {
+    facets.push({ index: at(m.index, m[0]), features: [{ $type: 'app.bsky.richtext.facet#tag', tag: m[1] }] });
   }
   return facets;
 }
@@ -62,7 +67,7 @@ export async function postWithImage(opts: {
   const record = {
     $type: 'app.bsky.feed.post',
     text: opts.text,
-    facets: linkFacets(opts.text),
+    facets: richFacets(opts.text),
     createdAt: new Date().toISOString(),
     langs: ['en'],
     embed: {

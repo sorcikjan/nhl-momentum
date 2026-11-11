@@ -79,6 +79,10 @@ export const SHARE_TITLES: Record<ShareKind, string> = {
   night: 'Last night',
 };
 
+// Hashtags put the post into Bluesky's hockey feeds; with no followers yet,
+// that's the only way anyone sees it.
+const BLUESKY_TAGS = '#NHL #hockey';
+
 // The daily Bluesky post: the card's text plus a description of the card for
 // screen readers (Bluesky shows alt text, and the card is mostly numbers).
 export function blueskyPost(kind: ShareKind, d: ShareData): { text: string; alt: string } | null {
@@ -89,5 +93,5 @@ export function blueskyPost(kind: ShareKind, d: ShareData): { text: string; alt:
     kind === 'heat' && d.leader ? `Heat Index, ${d.dateLabel}. #1 ${d.leader.first} ${d.leader.last} (${d.leader.team}) Heat ${d.leader.heat}, ${d.leader.goals}G ${d.leader.assists}A in ${d.leader.games} games. Then ${rows(d.top.slice(0, 4))}.`
     : kind === 'trends' ? `Heating up, ${d.dateLabel}: ${rows(d.heatingUp.slice(0, 5))}. Cooling off: ${rows(d.coolingOff.slice(0, 3))}.`
     : `Last night in the NHL, ${d.night?.dateLabel}: ${d.night?.games.map(g => `${g.away} ${g.awayScore}, ${g.home} ${g.homeScore}`).join('; ')}.`;
-  return { text, alt };
+  return { text: `${text}\n\n${BLUESKY_TAGS}`, alt };
 }
