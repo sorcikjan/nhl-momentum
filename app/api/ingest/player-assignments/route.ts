@@ -2,156 +2,81 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 import { currentSeason } from '@/lib/nhl-api';
+import { pageAll } from '@/lib/data';
+import { inMinors, type SeasonTotal } from '@/lib/player-assignment';
 
-// NHL teams — used to distinguish NHL from AHL/minor league entries in seasonTotals
-const NHL_LEAGUES = new Set(['NHL', 'AHL', 'ECHL', 'OHL', 'WHL', 'QMJHL', 'SHL', 'KHL', 'Liiga', 'DEL', 'NLA', 'Extraliga']);
-const MINOR_LEAGUES = new Set(['AHL', 'ECHL', 'OHL', 'WHL', 'QMJHL', 'AHL ', 'SPHL']);
+const SEASON = currentSeason(); // e.g. 20262027
+const NHL = 'https://api-web.nhle.com/v1';
 
-const CURRENT_SEASON = currentSeason(); // e.g. 20252026
-const NHL_SEASON_ID = parseInt(CURRENT_SEASON);
-
-// How many days without an NHL game before a player is considered "inactive" (candidate for in_minors check)
-const INACTIVE_DAYS = 14;
-
-interface SeasonTotal {
-  season: number;
-  leagueAbbrev: string;
-  gameTypeId: number;
-  gamesPlayed: number;
-}
-
-async function fetchPlayerAssignment(playerId: number): Promise<{ inMinors: boolean }> {
+async function nhl<T>(path: string): Promise<T | null> {
   try {
-    const res = await fetch(
-      `https://api-web.nhle.com/v1/player/${playerId}/landing`,
-      { cache: 'no-store', signal: AbortSignal.timeout(10_000) }
-    );
-    if (!res.ok) return { inMinors: false };
-    const data = await res.json();
-    const seasonTotals: SeasonTotal[] = data.seasonTotals ?? [];
-
-    // Check if player has minor league entries in the current season
-    const hasMinorLeagueGames = seasonTotals.some(
-      s => s.season === NHL_SEASON_ID && s.gameTypeId === 2 && MINOR_LEAGUES.has(s.leagueAbbrev)
-    );
-
-    // Also confirm they have no more recent NHL games than AHL games (i.e., not recalled)
-    // We use the sequence field — higher sequence = recorded later in the season
-    if (hasMinorLeagueGames) {
-      const nhlEntries = seasonTotals.filter(s => s.season === NHL_SEASON_ID && s.leagueAbbrev === 'NHL' && s.gameTypeId === 2);
-      const minorEntries = seasonTotals.filter(s => s.season === NHL_SEASON_ID && MINOR_LEAGUES.has(s.leagueAbbrev) && s.gameTypeId === 2);
-      // If their highest NHL sequence > their highest minor sequence, they were recalled — not currently in minors
-      const maxNhlSeq = Math.max(...nhlEntries.map((s: SeasonTotal & { sequence?: number }) => (s as SeasonTotal & { sequence?: number }).sequence ?? 0), 0);
-      const maxMinorSeq = Math.max(...minorEntries.map((s: SeasonTotal & { sequence?: number }) => (s as SeasonTotal & { sequence?: number }).sequence ?? 0), 0);
-      if (maxNhlSeq > maxMinorSeq) {
-        // NHL sequence is higher — player was recalled after AHL stint, currently in NHL
-        return { inMinors: false };
-      }
-      return { inMinors: true };
-    }
-
-    return { inMinors: false };
+    const res = await fetch(`${NHL}${path}`, { cache: 'no-store', signal: AbortSignal.timeout(10_000) });
+    return res.ok ? ((await res.json()) as T) : null;
   } catch {
-    return { inMinors: false };
+    return null;
   }
 }
 
+async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = [];
+  for (let i = 0; i < items.length; i += size) out.push(...(await Promise.all(items.slice(i, i + size).map(fn))));
+  return out;
+}
+
+type Roster = { forwards?: { id: number }[]; defensemen?: { id: number }[]; goalies?: { id: number }[] };
+
+// Minors = off his team's current NHL roster with games this season in a
+// minor or European league (lib/player-assignment.ts). 32 roster calls find
+// the few players off a roster; only those get a landing call. Flags are
+// written per batch so a timeout keeps the work already done.
 export async function GET(req: NextRequest) {
   const authError = requireIngestAuth(req);
   if (authError) return authError;
 
-  const sinceDate = new Date(Date.now() - INACTIVE_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const { data: teams, error: tErr } = await supabaseAdmin.from('teams').select('id, abbrev');
+  if (tErr) return NextResponse.json({ error: tErr.message }, { status: 500 });
 
-  // Get all active players
-  const { data: players, error: pErr } = await supabaseAdmin
-    .from('players')
-    .select('id')
-    .eq('is_active', true)
-    .not('team_id', 'is', null);
+  const rosters = await pool(teams ?? [], 4, async t => ({ id: t.id as number, roster: await nhl<Roster>(`/roster/${t.abbrev}/${SEASON}`) }));
+  // A team whose roster didn't load can't tell us anything: leave its players alone.
+  const loadedTeams = new Set(rosters.filter(r => r.roster).map(r => r.id));
+  const onRoster = new Set(rosters.flatMap(r => [...(r.roster?.forwards ?? []), ...(r.roster?.defensemen ?? []), ...(r.roster?.goalies ?? [])].map(p => p.id)));
 
-  if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });
-
-  const allPlayerIds = (players ?? []).map(p => p.id);
-
-  // Find players who have had a game in the last INACTIVE_DAYS days
-  const { data: recentGames } = await supabaseAdmin
-    .from('games')
-    .select('id, home_team_id, away_team_id')
-    .in('game_state', ['FINAL', 'OFF'])
-    .gte('game_date', sinceDate)
-    .limit(5000);
-
-  const recentGameIds = (recentGames ?? []).map(g => g.id);
-
-  const { data: recentStats } = await supabaseAdmin
-    .from('game_player_stats')
-    .select('player_id')
-    .in('game_id', recentGameIds)
-    .in('player_id', allPlayerIds)
-    .limit(50000);
-
-  const recentlyActivePids = new Set((recentStats ?? []).map(s => s.player_id));
-
-  // Players with no recent game = candidates for in_minors check
-  const inactivePids = allPlayerIds.filter(id => !recentlyActivePids.has(id));
-
-  // Also get players currently flagged in_minors who have recent games (to un-flag them)
-  const { data: currentMinors } = await supabaseAdmin
-    .from('players')
-    .select('id')
-    .eq('in_minors', true);
-  const currentMinorIds = new Set((currentMinors ?? []).map(p => p.id));
-
-  // Un-flag players who are currently in_minors but played recently
-  const toUnflag = [...currentMinorIds].filter(id => recentlyActivePids.has(id));
-
-  let unflagged = 0;
-  if (toUnflag.length > 0) {
-    await supabaseAdmin.from('players').update({ in_minors: false }).in('id', toUnflag);
-    unflagged = toUnflag.length;
+  let players: { id: number; team_id: number; in_minors: boolean | null }[];
+  try {
+    players = await pageAll((from, to) => supabaseAdmin.from('players').select('id, team_id, in_minors').eq('is_active', true).not('team_id', 'is', null).order('id').range(from, to));
+  } catch (e) {
+    return NextResponse.json({ error: String(e) }, { status: 500 });
   }
+  const known = players.filter(p => loadedTeams.has(p.team_id));
 
-  // Check inactive players via NHL API — batch with delay to avoid rate limits
-  const BATCH = 5;
-  const DELAY_MS = 200;
-  let flagged = 0;
-  let checked = 0;
-  const nowMinors: number[] = [];
+  // Back on a roster → not in the minors.
+  const recalled = known.filter(p => p.in_minors && onRoster.has(p.id)).map(p => p.id);
+  if (recalled.length) await supabaseAdmin.from('players').update({ in_minors: false }).in('id', recalled);
 
-  for (let i = 0; i < inactivePids.length; i += BATCH) {
-    const batch = inactivePids.slice(i, i + BATCH);
-    const results = await Promise.all(batch.map(id => fetchPlayerAssignment(id)));
-    for (let j = 0; j < batch.length; j++) {
-      checked++;
-      if (results[j].inMinors) {
-        nowMinors.push(batch[j]);
-      }
-    }
-    if (i + BATCH < inactivePids.length) {
-      await new Promise(r => setTimeout(r, DELAY_MS));
-    }
-  }
-
-  // Update in_minors flag for newly detected minor league players
-  if (nowMinors.length > 0) {
-    await supabaseAdmin.from('players').update({ in_minors: true }).in('id', nowMinors);
-    flagged = nowMinors.length;
-  }
-
-  // Un-flag inactive players not detected as in minors (reset false negatives from prior runs)
-  const toResetFalse = inactivePids.filter(id => !nowMinors.includes(id) && currentMinorIds.has(id));
-  if (toResetFalse.length > 0) {
-    await supabaseAdmin.from('players').update({ in_minors: false }).in('id', toResetFalse);
+  const candidates = known.filter(p => !onRoster.has(p.id));
+  let flagged = 0, cleared = 0;
+  const minorIds: number[] = [];
+  for (let i = 0; i < candidates.length; i += 10) {
+    const batch = candidates.slice(i, i + 10);
+    const results = await pool(batch, 5, async p => {
+      const landing = await nhl<{ seasonTotals?: SeasonTotal[] }>(`/player/${p.id}/landing`);
+      return landing ? inMinors(false, landing.seasonTotals ?? [], Number(SEASON)) : null;
+    });
+    const toFlag = batch.filter((p, j) => results[j] === true && !p.in_minors).map(p => p.id);
+    const toClear = batch.filter((p, j) => results[j] === false && p.in_minors).map(p => p.id);
+    batch.forEach((p, j) => { if (results[j]) minorIds.push(p.id); });
+    if (toFlag.length) { await supabaseAdmin.from('players').update({ in_minors: true }).in('id', toFlag); flagged += toFlag.length; }
+    if (toClear.length) { await supabaseAdmin.from('players').update({ in_minors: false }).in('id', toClear); cleared += toClear.length; }
   }
 
   return NextResponse.json({
     data: {
-      active_players: allPlayerIds.length,
-      inactive_candidates: inactivePids.length,
-      checked,
+      active_players: players.length,
+      teams_loaded: loadedTeams.size,
+      checked: candidates.length,
       flagged_in_minors: flagged,
-      unflagged: unflagged,
-      minor_league_player_ids: nowMinors,
+      unflagged: recalled.length + cleared,
+      minor_league_player_ids: minorIds,
     },
   });
 }
