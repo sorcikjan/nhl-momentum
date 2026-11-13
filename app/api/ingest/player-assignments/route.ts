@@ -43,18 +43,21 @@ export async function GET(req: NextRequest) {
   const recalled = known.filter(p => p.in_minors && onRoster.has(p.id)).map(p => p.id);
   if (recalled.length) await supabaseAdmin.from('players').update({ in_minors: false }).in('id', recalled);
 
-  const candidates = known.filter(p => !onRoster.has(p.id));
-  let flagged = 0, cleared = 0;
+  // Random order + a time budget: the function has ~60 s and api-web rate-limits
+  // landings, so each run checks a different share and none is always starved.
+  const candidates = known.filter(p => !onRoster.has(p.id)).sort(() => Math.random() - 0.5);
+  const deadline = Date.now() + 45_000;
+  let flagged = 0, cleared = 0, failed = 0;
   const minorIds: number[] = [];
-  for (let i = 0; i < candidates.length; i += 10) {
+  for (let i = 0; i < candidates.length && Date.now() < deadline; i += 10) {
     const batch = candidates.slice(i, i + 10);
-    const results = await pool(batch, 5, async p => {
+    const results = await pool(batch, 2, async p => { // api-web 429s past ~2 concurrent landings
       const landing = await nhl<{ seasonTotals?: SeasonTotal[] }>(`/player/${p.id}/landing`);
       return landing ? inMinors(false, landing.seasonTotals ?? [], Number(SEASON)) : null;
     });
     const toFlag = batch.filter((p, j) => results[j] === true && !p.in_minors).map(p => p.id);
     const toClear = batch.filter((p, j) => results[j] === false && p.in_minors).map(p => p.id);
-    batch.forEach((p, j) => { if (results[j]) minorIds.push(p.id); });
+    batch.forEach((p, j) => { if (results[j]) minorIds.push(p.id); if (results[j] === null) failed++; });
     if (toFlag.length) { await supabaseAdmin.from('players').update({ in_minors: true }).in('id', toFlag); flagged += toFlag.length; }
     if (toClear.length) { await supabaseAdmin.from('players').update({ in_minors: false }).in('id', toClear); cleared += toClear.length; }
   }
@@ -64,6 +67,7 @@ export async function GET(req: NextRequest) {
       active_players: players.length,
       teams_loaded: loadedTeams.size,
       checked: candidates.length,
+      lookups_failed: failed, // landing didn't load: checked again on the next run
       flagged_in_minors: flagged,
       unflagged: recalled.length + cleared,
       minor_league_player_ids: minorIds,
