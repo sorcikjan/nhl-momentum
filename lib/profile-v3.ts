@@ -336,3 +336,10 @@ export function rising(columns: Column[]): boolean {
   const vs = columns.filter(c => !c.thin).slice(-3).map(c => c.value);
   return vs.length === 3 && vs[0] < vs[1] && vs[1] < vs[2];
 }
+
+// Axis names, drawn greyed before a player has enough games.
+export const AXIS_LABELS = {
+  F: F_AXES.map(a => a.label),
+  D: D_AXES.map(a => a.label),
+  G: ['Save %', 'Even strength', 'Shorthanded', 'Goals against', 'Quality starts', 'Workload'],
+} as const;
