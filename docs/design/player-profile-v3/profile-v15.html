@@ -1,0 +1,209 @@
+<h2>v15 · každá otázka ve vlastní kartě, nic nesplývá</h2>
+<p class="subtitle">Tři otázky = tři samostatné karty s mezerou mezi sebou. Pod grafem Heat mají poslední zápasy vlastní nadpis a dělicí čáru, aby nevypadaly jako ovládání grafu. Obsah je stejný jako ve v14.</p>
+
+<style>
+  .pv{background:#0d0f14;color:#e8ecf2;border-radius:22px;overflow:hidden;font-family:Inter,system-ui,sans-serif;max-width:350px;margin:0 auto;line-height:1.35}
+  .pv .hero{position:relative;height:160px;overflow:hidden}
+  .pv .hero .num{position:absolute;right:-4px;top:-22px;font-size:160px;font-weight:900;line-height:1;color:rgba(255,255,255,.08)}
+  .pv .hero img.ph{position:absolute;right:4px;bottom:0;height:156px}
+  .pv .hero img.logo{position:absolute;left:14px;top:12px;height:52px}
+  .pv .hero .nm{position:absolute;left:16px;bottom:12px}
+  .pv .hero .f{font-size:14px;font-weight:600;color:rgba(255,255,255,.85)}
+  .pv .hero .l{font-size:30px;font-weight:900;line-height:1;letter-spacing:-.5px}
+  .pv .hero .pos{font-size:11px;color:rgba(255,255,255,.75);margin-top:4px}
+  .pv .bio{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid #1e232e}
+  .pv .bio div{padding:10px 8px;text-align:center;border-right:1px solid #1e232e}
+  .pv .bio div:last-child{border-right:0}
+  .pv .bio b{display:block;font-size:14px;font-weight:800}
+  .pv .bio span{display:block;font-size:9px;color:#8a94a6;margin-top:2px;line-height:1.2}
+  .pv .body{padding:14px 10px 6px}
+  .pv .verdict{padding:0 6px}
+  .pv .verdict{font-size:15px;font-weight:700;line-height:1.35}
+  .pv .blk{margin-top:10px;background:#141821;border-radius:14px;padding:12px 12px 12px}
+  .pv .blk:first-of-type{margin-top:14px}
+  .pv .sub2{font:700 9px/1 ui-monospace,monospace;letter-spacing:1px;color:#5c6577;text-transform:uppercase;margin:12px 0 0;padding-top:10px;border-top:1px solid #222836}
+  .pv .bh .q{font-size:14px}
+  .pv .bh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+  .pv .bh .q{font-size:13px;font-weight:800}
+  .pv .bh .w{font:600 9px/1.2 ui-monospace,monospace;color:#5c6577;letter-spacing:.5px;text-transform:uppercase}
+  .pv .heatrow{display:flex;align-items:flex-end;gap:8px}
+  .pv .hv{font-size:52px;font-weight:900;line-height:.8;color:#ff3d00;letter-spacing:-1.5px}
+  .pv .hv.na{color:#2e3442}
+  .pv .dl{font-size:12px;font-weight:800;color:#3a88ff;padding-bottom:2px}
+  .pv .dl small{display:block;font-size:10px;font-weight:600;color:#5c6577}
+  .pv .side{margin-left:auto;text-align:right;font-size:11px;color:#8a94a6;padding-bottom:2px}
+  .pv .side b{color:#e8ecf2}
+  .pv .tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:4px;margin-left:auto;width:98px}
+  .pv .gl{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:6px}
+  .pv .gl div{border-radius:6px;background:#1c212c;text-align:center;padding:5px 0 4px;border-top:3px solid #232835}
+  .pv .gl div.w{border-top-color:#00e5a0}.pv .gl div.l{border-top-color:#ff4d6a}
+  .pv .gl b{display:block;font-size:12px;font-weight:800}
+  .pv .gl span{display:block;font-size:9px;color:#8a94a6}
+  .pv .lad{display:flex;align-items:flex-end;gap:3px;height:58px;margin-top:16px}
+  .pv .lad i{flex:1;background:#2a303d;border-radius:2px 2px 0 0;display:block}
+  .pv .lad i.me{background:#ff5a1f}
+  .pv .ladl{display:flex;justify-content:space-between;font-size:9px;color:#5c6577;margin-top:3px}
+  .pv .fact{font-size:12px;color:#c5ccd8;margin-top:6px}
+  .pv .fact b{color:#fff}
+  .pv .arc{display:flex;align-items:flex-end;gap:10px;height:70px;position:relative}
+  .pv .arc div{flex:1;text-align:center}
+  .pv .arc i{display:block;background:#ff7a3a;border-radius:3px 3px 0 0;margin:0 auto;width:70%}
+  .pv .arc b{display:block;font-size:12px;font-weight:800;margin-bottom:3px}
+  .pv .arc span{display:block;font-size:9px;color:#8a94a6;margin-top:3px}
+  .pv .path{display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:11px}
+  .pv .path span{background:#151922;border-radius:6px;padding:5px 7px}
+  .pv .path span.now{background:#3a1d0c;color:#ff8a4c;font-weight:700}
+  .pv .path em{color:#5c6577;font-style:normal}
+  .pv .strip{display:flex;align-items:center;gap:12px;background:#151922;border-radius:12px;padding:10px 12px;margin:18px 0 10px}
+  .pv .strip .nx{flex:1;font-size:13px}
+  .pv .strip .nx b{font-weight:800}
+  .pv .strip .nx span{display:block;font-size:11px;color:#8a94a6}
+  .pv .en{width:96px;font-size:11px;color:#8a94a6}
+  .pv .en .bar{height:6px;border-radius:3px;background:#232835;margin:4px 0 3px;overflow:hidden}
+  .pv .en .bar i{display:block;height:6px;background:#00e5a0}
+  .pv .en b{color:#e8ecf2}
+  .pv .strip.am{background:#241c08;border:1px solid #4a3a10}
+  .pv .strip.am .nx b{color:#ffb000}
+  .pv .tabs{display:flex;border-top:1px solid #1e232e;padding:0 8px}
+  .pv .tabs span{flex:1;text-align:center;font-size:12px;font-weight:700;padding:12px 0;color:#5c6577}
+  .pv .tabs span.on{color:#fff;box-shadow:inset 0 2px 0 #ff5a1f}
+</style>
+
+<div class="cards">
+  <!-- ================= GAUTHIER ================= -->
+  <div class="card" data-choice="v13-gauthier" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#1a1d24">
+      <div class="pv">
+        <div class="hero" style="background:linear-gradient(135deg,#F47A38 0%,#8a4018 50%,#1a0f08 100%)">
+          <div class="num">61</div>
+          <img class="ph" src="https://assets.nhle.com/mugs/nhl/20262027/ANA/8483445.png" alt="">
+          <img class="logo" src="https://assets.nhle.com/logos/nhl/svg/ANA_dark.svg" alt="">
+          <div class="nm"><div class="f">Cutter</div><div class="l">GAUTHIER</div><div class="pos">#61 · Left wing · Anaheim Ducks</div></div>
+        </div>
+        <div class="bio">
+          <div><b>🇺🇸</b><span>USA<br>born in Sweden</span></div>
+          <div><b>22</b><span>years old</span></div>
+          <div><b>3rd</b><span>NHL season</span></div>
+          <div><b>#5</b><span>draft pick<br>2022</span></div>
+        </div>
+
+        <div class="body">
+          <div class="verdict">The hottest forward in the NHL, and his goals per game have gone up every season.</div>
+
+          <!-- NOW vs NORMAL -->
+          <div class="blk">
+            <div class="bh"><span class="q">How he's doing</span><span class="w">Heat after each game · 18 games</span></div>
+            <div class="heatrow"><span class="hv">95</span><span class="dl">▼ 5<small>after Nov 11</small></span></div>
+            <svg viewBox="0 0 320 84" width="100%" height="84" style="margin-top:6px">
+              <line x1="0" y1="61" x2="320" y2="61" stroke="#5c6577" stroke-dasharray="3 3"/>
+              <rect x="214" y="0" width="106" height="84" fill="#ff5a1f" opacity=".07"/>
+              <polyline fill="none" stroke="#ff5a1f" stroke-width="2.5" stroke-linejoin="round" points="6,37 24,20 42,44 60,56 78,51 97,53 115,73 133,72 151,72 169,67 187,66 205,54 223,36 242,17 260,10 278,14 296,8 314,12"/>
+              <circle cx="115" cy="73" r="3" fill="#8a94a6"/><text x="104" y="83" fill="#8a94a6" font-size="9">10</text>
+              <circle cx="314" cy="12" r="4" fill="#ff3d00"/>
+              <text x="2" y="80" fill="#5c6577" font-size="9">Oct 2</text><text x="2" y="58" fill="#8a94a6" font-size="9">avg forward 26</text>
+            </svg>
+            <div class="sub2">Last 5 games · result and his points</div>
+            <div class="gl">
+              <div class="w"><b>3G</b><span>@VAN</span></div>
+              <div class="w"><b>1G 1A</b><span>@EDM</span></div>
+              <div class="w"><b>1G</b><span>@CGY</span></div>
+              <div class="w"><b>3G 1A</b><span>PIT</span></div>
+              <div class="l"><b>1G</b><span>NSH</span></div>
+            </div>
+          </div>
+
+          <!-- ROLE -->
+          <div class="blk">
+            <div class="bh"><span class="q">His role</span><span class="w">ice time a game · 13 Ducks forwards</span></div>
+            <div class="lad">
+              <i style="height:100%"></i><i style="height:99%"></i><i style="height:98%"></i><i class="me" style="height:89%;position:relative"><em style="position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font:800 10px/1.4 Inter,sans-serif;font-style:normal;color:#ff8a4c;white-space:nowrap">4th · 18:24</em></i><i style="height:80%"></i><i style="height:74%"></i><i style="height:66%"></i><i style="height:60%"></i><i style="height:57%"></i><i style="height:56%"></i><i style="height:52%"></i><i style="height:51%"></i><i style="height:49%"></i>
+            </div>
+            <div class="ladl"><span>most · 20:36</span><span>fewest · 10:00</span></div>
+          </div>
+
+          <!-- CAREER ARC -->
+          <div class="blk">
+            <div class="bh"><span class="q">Where he's heading</span><span class="w">goals a game · NHL seasons</span></div>
+            <div class="arc">
+              <div><b>0.24</b><i style="height:14px"></i><span>2024–25</span></div>
+              <div><b>0.54</b><i style="height:30px"></i><span>2025–26</span></div>
+              <div><b>0.89</b><i style="height:50px;background:#ff3d00"></i><span>now</span></div>
+              <div style="opacity:.6"><b style="color:#8a94a6">0.2</b><i style="height:11px;background:#3a4150"></i><span>avg forward</span></div>
+            </div>
+          </div>
+
+          <div class="strip">
+            <div class="nx"><b>Sat vs NYI</b><span>next game</span></div>
+            <div class="en">Energy <b>71</b><div class="bar"><i style="width:71%"></i></div>2 days rest</div>
+          </div>
+        </div>
+        <div class="tabs"><span class="on">Now</span><span>Games</span><span>Player</span><span>Career</span></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Gauthier</h3>
+      <p>Karta „How he\'s doing“ obsahuje graf Heat a pod oddělovačem „Last 5 games“. Role a kariéra mají každá svou kartu.</p>
+    </div>
+  </div>
+
+  <!-- ================= POSTAVA ================= -->
+  <div class="card" data-choice="v13-postava" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#1a1d24">
+      <div class="pv">
+        <div class="hero" style="background:linear-gradient(135deg,#CE1126 0%,#700a14 50%,#140406 100%)">
+          <div class="num">35</div>
+          <img class="ph" src="https://assets.nhle.com/mugs/nhl/20262027/DET/8485545.png" alt="">
+          <img class="logo" src="https://assets.nhle.com/logos/nhl/svg/DET_dark.svg" alt="">
+          <div class="nm"><div class="f">Michal</div><div class="l">POSTAVA</div><div class="pos">#35 · Goalie · Detroit Red Wings</div></div>
+        </div>
+        <div class="bio">
+          <div><b>🇨🇿</b><span>Czechia</span></div>
+          <div><b>24</b><span>years old</span></div>
+          <div><b>1st</b><span>NHL season</span></div>
+          <div><b>–</b><span>undrafted</span></div>
+        </div>
+
+        <div class="body">
+          <div class="verdict">Called up for 2 games in October, about average numbers, now back in the AHL.</div>
+
+          <div class="blk">
+            <div class="bh"><span class="q">How he's doing</span><span class="w">save % · avg NHL goalie .900</span></div>
+            <div class="heatrow"><span class="hv na">–</span><span class="dl" style="color:#5c6577">not rated<small>2 of 5 games</small></span></div>
+            <div class="sub2" style="border-top:0;padding-top:0;margin-top:6px">His NHL games</div>
+            <div class="gl">
+              <div class="w"><b>.889</b><span>@EDM</span></div>
+              <div><b>.875</b><span>@VAN</span></div>
+              <div style="opacity:.3"><b>&nbsp;</b><span>&nbsp;</span></div>
+              <div style="opacity:.3"><b>&nbsp;</b><span>&nbsp;</span></div>
+              <div style="opacity:.3"><b>&nbsp;</b><span>&nbsp;</span></div>
+            </div>
+          </div>
+
+          <div class="blk">
+            <div class="bh"><span class="q">His role</span><span class="w">starts · Detroit goalies</span></div>
+            <div class="lad" style="height:40px">
+              <i style="height:100%"></i><i style="height:46%"></i><i class="me" style="height:8%;position:relative"><em style="position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font:800 10px/1.4 Inter,sans-serif;font-style:normal;color:#ff8a4c;white-space:nowrap">3rd</em></i>
+            </div>
+            <div class="ladl"><span>Gibson 13</span><span>Tarasov 6 · Postava 1</span></div>
+          </div>
+
+          <div class="blk">
+            <div class="bh"><span class="q">Where he came from</span><span class="w">save % by season</span></div>
+            <div class="path">
+              <span>Přerov <em>CZ2</em> .943</span><em>›</em><span>Kometa <em>CZ</em> .921</span><em>›</em><span>Grand Rapids <em>AHL</em> .937</span><em>›</em><span class="now">Detroit · 2 games</span>
+            </div>
+          </div>
+
+          <div class="strip am">
+            <div class="nx"><b>In the AHL now</b><span>Grand Rapids · 6–0, .944 this season</span></div>
+          </div>
+        </div>
+        <div class="tabs"><span class="on">Now</span><span>Games</span><span>Player</span><span>Career</span></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Postava</h3>
+      <p>Průměr brankáře je v záhlaví grafu, „3rd“ přímo na sloupci. Jediný text je verdikt nahoře a pruh „In the AHL“.</p>
+    </div>
+  </div>
+</div>

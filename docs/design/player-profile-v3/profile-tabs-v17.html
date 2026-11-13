@@ -1,0 +1,253 @@
+<h2>v17 · každá záložka = hloubka jedné karty z úvodu</h2>
+<p class="subtitle">Now → <b>Games</b> (co udělal ve kterém zápase) · Role → <b>Player</b> (jaký je to hráč a jak ho trenér používá) · Kam míří → <b>Career</b> (odkud přišel, kam roste, vůči lize). „Last 5 vs normal“ je pryč. Gauthier: reálná data NHL k 13. 11.; Postava ukazuje kariéru přes víc týmů a lig.</p>
+
+<style>
+  .pv{background:#0d0f14;color:#e8ecf2;border-radius:22px;overflow:hidden;font-family:Inter,system-ui,sans-serif;max-width:350px;margin:0 auto;line-height:1.35}
+  .pv .mini{display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(135deg,#F47A38 0%,#8a4018 60%,#1a0f08 100%)}
+  .pv .mini.det{background:linear-gradient(135deg,#CE1126 0%,#700a14 60%,#140406 100%)}
+  .pv .mini img{height:44px;border-radius:50%;background:rgba(0,0,0,.25)}
+  .pv .mini b{font-size:16px;font-weight:900;display:block;line-height:1.1}
+  .pv .mini span{font-size:11px;color:rgba(255,255,255,.8)}
+  .pv .mini .h{margin-left:auto;text-align:right;font-size:22px;font-weight:900;color:#fff;line-height:1}
+  .pv .mini .h small{display:block;font:700 8px/1 ui-monospace,monospace;letter-spacing:1px;color:rgba(255,255,255,.75)}
+  .pv .mini .h.na{color:rgba(255,255,255,.45)}
+  .pv .tabs{display:flex;border-bottom:1px solid #1e232e;padding:0 8px}
+  .pv .tabs span{flex:1;text-align:center;font-size:12px;font-weight:700;padding:11px 0;color:#5c6577}
+  .pv .tabs span.on{color:#fff;box-shadow:inset 0 -2px 0 #ff5a1f}
+  .pv .body{padding:10px 10px 12px}
+  .pv .blk{margin-top:10px;background:#141821;border-radius:14px;padding:12px}
+  .pv .bh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;gap:8px}
+  .pv .bh .q{font-size:14px;font-weight:800}
+  .pv .bh .w{font:600 9px/1.2 ui-monospace,monospace;color:#5c6577;letter-spacing:.5px;text-transform:uppercase;text-align:right}
+
+  /* season totals strip */
+  .pv .tot{display:flex;gap:6px}
+  .pv .tot div{flex:1;background:#0d0f14;border-radius:10px;padding:8px 0 7px;text-align:center}
+  .pv .tot b{display:block;font-size:20px;font-weight:900;line-height:1}
+  .pv .tot span{font:700 8px/1 ui-monospace,monospace;letter-spacing:1px;color:#5c6577}
+  /* game log, airier */
+  .pv .mo{font:700 9px/1 ui-monospace,monospace;letter-spacing:1.2px;color:#5c6577;text-transform:uppercase;margin:12px 0 2px}
+  .pv .mo:first-of-type{margin-top:0}
+  .pv .gl{display:grid;grid-template-columns:44px 1fr 22px 22px 30px 40px;align-items:center;gap:4px;padding:8px 0;border-top:1px solid #1c212c;font-size:13px}
+  .pv .gl.hd{border:0;padding:0 0 2px;font:700 8px/1 ui-monospace,monospace;color:#5c6577;letter-spacing:.8px}
+  .pv .gl > :nth-child(n+3){text-align:right}
+  .pv .gl .d{color:#8a94a6;font-size:11px}
+  .pv .gl .o{font-weight:700;display:flex;align-items:center;gap:6px}
+  .pv .gl .z{color:#333a48}
+  .pv .gl .gg{color:#ff7a3a;font-weight:900}
+  .pv .gl .t{color:#8a94a6;font-size:11px}
+  .pv .gl .ht{font-weight:800}
+  .pv .r{display:inline-block;width:15px;height:15px;border-radius:3px;font-size:9px;font-weight:800;line-height:15px;text-align:center;color:#0d0f14}
+  .pv .r.w{background:#00e5a0}.pv .r.l{background:#ff4d6a}
+  .pv .more{font-size:11px;color:#8a94a6;text-align:center;margin-top:10px;padding:8px;border-radius:8px;background:#0d0f14}
+
+  /* team ladder */
+  .pv .lad{display:flex;align-items:flex-end;gap:3px;height:58px;margin-top:16px}
+  .pv .lad i{flex:1;background:#2a303d;border-radius:2px 2px 0 0;display:block}
+  .pv .lad i.me{background:#ff5a1f;position:relative}
+  .pv .lad i.me em{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font:800 10px/1.4 Inter,sans-serif;font-style:normal;color:#ff8a4c;white-space:nowrap}
+  .pv .ladl{display:flex;justify-content:space-between;font-size:9px;color:#5c6577;margin-top:3px}
+
+  /* meters */
+  .pv .tg{display:flex;background:#0d0f14;border-radius:8px;padding:2px;margin-bottom:4px;cursor:pointer}
+  .pv .tg span{flex:1;text-align:center;font-size:11px;font-weight:700;padding:6px 0;border-radius:6px;color:#8a94a6}
+  .pv .tg span.on{background:#ff5a1f;color:#000}
+  .pv .gr{font:700 9px/1 ui-monospace,monospace;letter-spacing:1px;color:#5c6577;text-transform:uppercase;margin:12px 0 2px}
+  .pv .mr{display:grid;grid-template-columns:1fr 92px 54px;align-items:center;gap:8px;padding:5px 0}
+  .pv .mr .n{font-size:12px;font-weight:600}
+  .pv .mr .bar{position:relative;height:6px;border-radius:3px;background:#232835}
+  .pv .mr .bar i{position:absolute;left:0;top:0;height:6px;border-radius:3px;transition:width .35s}
+  .pv .mr .bar:after{content:"";position:absolute;left:50%;top:-3px;width:1px;height:12px;background:#5c6577}
+  .pv .mr .p{font-size:11px;font-weight:800;text-align:right}
+  .pv .mr .na{grid-column:2/4;font-size:11px;color:#5c6577;font-style:italic;text-align:right}
+  .pv .scale{display:flex;justify-content:space-between;font-size:9px;color:#5c6577;margin:4px 0 0 calc(100% - 154px);width:92px}
+
+  /* career path */
+  .pv .path{display:flex;flex-direction:column;margin-left:6px;border-left:2px solid #232835}
+  .pv .st{position:relative;padding:4px 0 8px 14px;font-size:12px}
+  .pv .st:before{content:"";position:absolute;left:-6px;top:7px;width:10px;height:10px;border-radius:50%;background:#2a303d;border:2px solid #141821}
+  .pv .st.now:before{background:#ff5a1f}
+  .pv .st b{font-weight:800}
+  .pv .st span{color:#8a94a6;font-size:11px}
+  .pv .st em{font-style:normal;color:#ff8a4c;font-weight:700;font-size:11px}
+  /* season rows: team chip + league-rank meter */
+  .pv .sr{display:grid;grid-template-columns:44px 46px 1fr 50px;align-items:center;gap:8px;padding:7px 0;border-top:1px solid #1c212c}
+  .pv .sr:first-of-type{border:0}
+  .pv .sr .y{font-size:11px;color:#8a94a6}
+  .pv .sr .tm{font:800 10px/1 Inter,sans-serif;padding:4px 0;border-radius:5px;text-align:center;color:#fff}
+  .pv .sr .m{position:relative;height:18px}
+  .pv .sr .m .bar{position:absolute;left:0;right:0;bottom:2px;height:6px;border-radius:3px;background:#232835}
+  .pv .sr .m .bar:after{content:"";position:absolute;left:50%;top:-3px;width:1px;height:12px;background:#5c6577}
+  .pv .sr .m .bar i{position:absolute;left:0;top:0;height:6px;border-radius:3px}
+  .pv .sr .m .v{position:absolute;left:0;top:-3px;font-size:10px;font-weight:700;color:#c5ccd8}
+  .pv .sr .p{font-size:11px;font-weight:800;text-align:right}
+  .pv .sr .nl{font-size:10px;color:#5c6577;font-style:italic;position:absolute;right:0;top:-3px}
+  .pv .sr.dim .y,.pv .sr.dim .m .v{opacity:.75}
+  .pv .flags{display:flex;gap:6px;flex-wrap:wrap}
+  .pv .flags span{background:#1c212c;border-radius:8px;padding:6px 8px;font-size:11px}
+  .pv .flags b{font-weight:800}
+</style>
+
+<div class="cards">
+  <!-- ================= GAMES ================= -->
+  <div class="card" data-choice="v17-games" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#1a1d24">
+      <div class="pv">
+        <div class="mini"><img src="https://assets.nhle.com/mugs/nhl/20262027/ANA/8483445.png" alt=""><div><b>Cutter Gauthier</b><span>#61 · LW · Anaheim</span></div><div class="h">95<small>HEAT</small></div></div>
+        <div class="tabs"><span>Now</span><span class="on">Games</span><span>Player</span><span>Career</span></div>
+        <div class="body">
+          <div class="blk">
+            <div class="bh"><span class="q">This season</span><span class="w">2026–27 · NHL</span></div>
+            <div class="tot"><div><b>18</b><span>GAMES</span></div><div><b style="color:#ff7a3a">16</b><span>GOALS</span></div><div><b>7</b><span>ASSISTS</span></div><div><b>23</b><span>POINTS</span></div></div>
+          </div>
+
+          <div class="blk">
+            <div class="bh"><span class="q">Every game</span><span class="w">newest first</span></div>
+            <div class="gl hd"><span></span><span></span><span>G</span><span>A</span><span>SOG</span><span>HEAT</span></div>
+            <div class="mo">November</div>
+            <div class="gl"><span class="d">Wed 11</span><span class="o"><span class="r l">L</span>NSH</span><span class="gg">1</span><span class="z">0</span><span>7</span><span class="ht" style="color:#ff3d00">95</span></div>
+            <div class="gl"><span class="d">Sun 8</span><span class="o"><span class="r w">W</span>PIT</span><span class="gg">3</span><span>1</span><span>6</span><span class="ht" style="color:#ff3d00">100</span></div>
+            <div class="gl"><span class="d">Fri 6</span><span class="o"><span class="r w">W</span>@CGY</span><span class="gg">1</span><span class="z">0</span><span>4</span><span class="ht" style="color:#ff3d00">92</span></div>
+            <div class="gl"><span class="d">Thu 5</span><span class="o"><span class="r w">W</span>@EDM</span><span class="gg">1</span><span>1</span><span>3</span><span class="ht" style="color:#ff3d00">97</span></div>
+            <div class="gl"><span class="d">Tue 3</span><span class="o"><span class="r w">W</span>@VAN</span><span class="gg">3</span><span class="z">0</span><span>6</span><span class="ht" style="color:#ff5a1f">88</span></div>
+            <div class="gl"><span class="d">Sun 1</span><span class="o"><span class="r w">W</span>OTT</span><span class="gg">3</span><span class="z">0</span><span>5</span><span class="ht" style="color:#ff7a3a">61</span></div>
+            <div class="mo">October</div>
+            <div class="gl"><span class="d">Thu 29</span><span class="o"><span class="r l">L</span>BUF</span><span class="gg">2</span><span class="z">0</span><span>10</span><span class="ht" style="color:#a07a68">36</span></div>
+            <div class="gl"><span class="d">Mon 27</span><span class="o"><span class="r l">L</span>VAN</span><span class="z">0</span><span>1</span><span>4</span><span class="ht" style="color:#7a8396">19</span></div>
+            <div class="more">10 more October games ▾</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Games: jen log k dohledání</h3>
+      <p>Otázka „co udělal včera / v tom zápase“. Nahoře čtyři součty sezony, pod tím zápasy po měsících. Řádek je vyšší, ze sloupců zmizel čas na ledě (patří do Player). Nuly jsou ztlumené a góly oranžové, takže gólové zápasy jdou vidět bez čtení. Heat je číslo v barvě, ne další pruh.</p>
+    </div>
+  </div>
+
+  <!-- ================= PLAYER ================= -->
+  <div class="card" data-choice="v17-player" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#1a1d24">
+      <div class="pv">
+        <div class="mini"><img src="https://assets.nhle.com/mugs/nhl/20262027/ANA/8483445.png" alt=""><div><b>Cutter Gauthier</b><span>#61 · LW · Anaheim</span></div><div class="h">95<small>HEAT</small></div></div>
+        <div class="tabs"><span>Now</span><span>Games</span><span class="on">Player</span><span>Career</span></div>
+        <div class="body">
+          <div class="blk">
+            <div class="bh"><span class="q">His role in Anaheim</span><span class="w">ice time a game · 13 forwards</span></div>
+            <div class="lad">
+              <i style="height:100%"></i><i style="height:99%"></i><i style="height:98%"></i><i class="me" style="height:89%"><em>4th · 18:24</em></i><i style="height:80%"></i><i style="height:74%"></i><i style="height:66%"></i><i style="height:60%"></i><i style="height:57%"></i><i style="height:56%"></i><i style="height:52%"></i><i style="height:51%"></i><i style="height:49%"></i>
+            </div>
+            <div class="ladl"><span>most · 20:36</span><span>fewest · 10:00</span></div>
+          </div>
+
+          <div class="blk" id="v17char">
+            <div class="bh"><span class="q">What kind of player</span><span class="w">vs 401 NHL forwards</span></div>
+            <div class="tg" onclick="event.stopPropagation();var b=this.closest('.blk'),s=b.dataset.m==='r'?'s':'r';b.dataset.m=s;this.children[0].className=s==='r'?'on':'';this.children[1].className=s==='s'?'on':'';b.querySelectorAll('[data-s]').forEach(function(e){var v=(e.dataset[s]).split('|');if(e.tagName==='I'){e.style.width=v[0]+'%';e.style.background=v[1];}else{e.textContent=v[0];e.style.color=v[1];}})"><span>Last 3 weeks</span><span class="on">Season</span></div>
+
+            <div class="gr">Scoring · per minute on ice</div>
+            <div class="mr"><span class="n">Goals</span><span class="bar"><i data-s="100|#ff3d00" data-r="100|#ff3d00" style="width:100%;background:#ff3d00"></i></span><span class="p" data-s="#1|#ff3d00" data-r="#1|#ff3d00" style="color:#ff3d00">#1</span></div>
+            <div class="mr"><span class="n">Shots</span><span class="bar"><i data-s="100|#ff3d00" data-r="96|#ff3d00" style="width:100%;background:#ff3d00"></i></span><span class="p" data-s="#1|#ff3d00" data-r="top 4%|#ff3d00" style="color:#ff3d00">#1</span></div>
+            <div class="mr"><span class="n">Assists</span><span class="bar"><i data-s="64|#ffb27a" data-r="38|#5c6577" style="width:64%;background:#ffb27a"></i></span><span class="p" data-s="top 36%|#ffb27a" data-r="bottom 38%|#7a8396" style="color:#ffb27a">top 36%</span></div>
+
+            <div class="gr">How the coach uses him</div>
+            <div class="mr"><span class="n">Power play</span><span class="bar"><i data-s="99|#ff3d00" data-r="99|#ff3d00" style="width:99%;background:#ff3d00"></i></span><span class="p" data-s="#4|#ff3d00" data-r="#3|#ff3d00" style="color:#ff3d00">#4</span></div>
+            <div class="mr"><span class="n">Ice time</span><span class="bar"><i data-s="81|#ff7a3a" data-r="84|#ff7a3a" style="width:81%;background:#ff7a3a"></i></span><span class="p" data-s="top 19%|#ff7a3a" data-r="top 16%|#ff7a3a" style="color:#ff7a3a">top 19%</span></div>
+            <div class="mr"><span class="n">Penalty kill</span><span class="na">not used</span></div>
+            <div class="mr"><span class="n">Faceoffs</span><span class="na">not used</span></div>
+
+            <div class="gr">Without the puck</div>
+            <div class="mr"><span class="n">Team shots when on ice</span><span class="bar"><i data-s="50|#8a94a6" data-r="58|#8a94a6" style="width:50%;background:#8a94a6"></i></span><span class="p" data-s="middle|#a0a8b8" data-r="middle|#a0a8b8" style="color:#a0a8b8">middle</span></div>
+            <div class="mr"><span class="n">Penalties drawn vs taken</span><span class="bar"><i data-s="23|#5c6577" data-r="30|#5c6577" style="width:23%;background:#5c6577"></i></span><span class="p" data-s="bottom 23%|#7a8396" data-r="bottom 30%|#7a8396" style="color:#7a8396">bottom 23%</span></div>
+            <div class="mr"><span class="n">Hits + blocks</span><span class="bar"><i data-s="25|#5c6577" data-r="22|#5c6577" style="width:25%;background:#5c6577"></i></span><span class="p" data-s="bottom 25%|#7a8396" data-r="bottom 22%|#7a8396" style="color:#7a8396">bottom 25%</span></div>
+            <div class="mr"><span class="n">Takeaways vs giveaways</span><span class="bar"><i data-s="21|#5c6577" data-r="27|#5c6577" style="width:21%;background:#5c6577"></i></span><span class="p" data-s="bottom 21%|#7a8396" data-r="bottom 27%|#7a8396" style="color:#7a8396">bottom 21%</span></div>
+            <div class="scale"><span>worst</span><span>avg</span><span>best</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Player: role a charakter</h3>
+      <p>Nahoře role v týmu (žebříček času na ledě, přesunutý z úvodu), pod tím charakter. <b>Přepínač funguje, klikni na „Last 3 weeks“.</b> Pruhy se přelijí na místě, takže je vidět, co se změnilo. Tady: góly a střely drží, asistence spadly, což odpovídá na otázku z Pastrňáka. Sezonní hodnoty jsou z dřívějšího výpočtu, hodnoty za 3 týdny jsou ilustrační.</p>
+    </div>
+  </div>
+
+  <!-- ================= CAREER (Gauthier) ================= -->
+  <div class="card" data-choice="v17-career" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#1a1d24">
+      <div class="pv">
+        <div class="mini"><img src="https://assets.nhle.com/mugs/nhl/20262027/ANA/8483445.png" alt=""><div><b>Cutter Gauthier</b><span>#61 · LW · Anaheim</span></div><div class="h">95<small>HEAT</small></div></div>
+        <div class="tabs"><span>Now</span><span>Games</span><span>Player</span><span class="on">Career</span></div>
+        <div class="body">
+          <div class="blk">
+            <div class="bh"><span class="q">How he got here</span><span class="w">source NHL.com</span></div>
+            <div class="path">
+              <div class="st"><b>U.S. National Team Program</b><br><span>2020–22 · 65 points in 54 games at U18</span></div>
+              <div class="st"><b>Drafted #5 by Philadelphia</b><br><span>2022</span></div>
+              <div class="st"><b>Boston College</b><br><span>2022–24 · <em>38 goals in 41 games</em> in his last year</span></div>
+              <div class="st"><b>Traded to Anaheim</b><br><span>2024</span></div>
+              <div class="st now"><b>Anaheim Ducks</b><br><span>3rd NHL season</span></div>
+            </div>
+          </div>
+
+          <div class="blk">
+            <div class="bh"><span class="q">Season by season</span><span class="w">points a game · rank in league</span></div>
+            <div class="sr dim"><span class="y">2022–23</span><span class="tm" style="background:#8C2232">BC</span><span class="m"><span class="v">1.16</span><span class="nl">college</span></span><span class="p" style="color:#5c6577">–</span></div>
+            <div class="sr dim"><span class="y">2023–24</span><span class="tm" style="background:#8C2232">BC</span><span class="m"><span class="v">1.59</span><span class="nl">college</span></span><span class="p" style="color:#5c6577">–</span></div>
+            <div class="sr"><span class="y">2024–25</span><span class="tm" style="background:#F47A38;color:#000">ANA</span><span class="m"><span class="v">0.54</span><span class="bar"><i style="width:63%;background:#ffb27a"></i></span></span><span class="p" style="color:#ffb27a">top 37%</span></div>
+            <div class="sr"><span class="y">2025–26</span><span class="tm" style="background:#F47A38;color:#000">ANA</span><span class="m"><span class="v">0.91</span><span class="bar"><i style="width:90%;background:#ff7a3a"></i></span></span><span class="p" style="color:#ff7a3a">top 10%</span></div>
+            <div class="sr"><span class="y">2026–27</span><span class="tm" style="background:#F47A38;color:#000">ANA</span><span class="m"><span class="v">1.28</span><span class="bar"><i style="width:97%;background:#ff3d00"></i></span></span><span class="p" style="color:#ff3d00">top 3%</span></div>
+          </div>
+
+          <div class="blk">
+            <div class="bh"><span class="q">For his country</span><span class="w">🇺🇸 USA</span></div>
+            <div class="flags"><span><b>World Juniors</b> 2023, 2024</span><span><b>World Championship</b> 2023, 2025</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Career: odkud a kam, vůči lize</h3>
+      <p>Každá sezona je jeden řádek: tým barevným štítkem, body na zápas a pruh pořadí mezi útočníky NHL (čárka = průměr). Růst 0.54 → 0.91 → 1.28 tak dostane měřítko: ze 37 % nejlepších přes 10 % až do 3 %. Pořadí jsou reálná, spočítaná z NHL statistik. Univerzitní sezony mají jen hodnotu, s NHL je nesrovnávám.</p>
+    </div>
+  </div>
+
+  <!-- ================= CAREER (Postava) ================= -->
+  <div class="card" data-choice="v17-career-postava" onclick="toggleSelect(this)">
+    <div class="card-image" style="padding:16px;background:#1a1d24">
+      <div class="pv">
+        <div class="mini det"><img src="https://assets.nhle.com/mugs/nhl/20262027/DET/8485545.png" alt=""><div><b>Michal Postava</b><span>#35 · G · Detroit</span></div><div class="h na">–<small>HEAT</small></div></div>
+        <div class="tabs"><span>Now</span><span>Games</span><span>Player</span><span class="on">Career</span></div>
+        <div class="body">
+          <div class="blk">
+            <div class="bh"><span class="q">How he got here</span><span class="w">source NHL.com</span></div>
+            <div class="path">
+              <div class="st"><b>HC Přerov</b><br><span>youth → Chance liga · 2017–24 · <em>.943</em> in his last season</span></div>
+              <div class="st"><b>HC Kometa Brno</b><br><span>Extraliga · 2024–25</span></div>
+              <div class="st"><b>Signed by Detroit</b><br><span>undrafted</span></div>
+              <div class="st now"><b>Grand Rapids Griffins</b><br><span>AHL · 2 games in the NHL this season</span></div>
+            </div>
+          </div>
+
+          <div class="blk">
+            <div class="bh"><span class="q">Season by season</span><span class="w">save % · games</span></div>
+            <div class="sr"><span class="y">2022–23</span><span class="tm" style="background:#1f5fa8">PŘE</span><span class="m"><span class="v">.932 · 39 gp</span><span class="nl">Chance liga</span></span><span class="p" style="color:#5c6577">–</span></div>
+            <div class="sr"><span class="y">2023–24</span><span class="tm" style="background:#1f5fa8">PŘE</span><span class="m"><span class="v">.943 · 44 gp</span><span class="nl">Chance liga</span></span><span class="p" style="color:#5c6577">–</span></div>
+            <div class="sr"><span class="y">2024–25</span><span class="tm" style="background:#0a3a7a">KOM</span><span class="m"><span class="v">.921 · 42 gp</span><span class="nl">Extraliga</span></span><span class="p" style="color:#5c6577">–</span></div>
+            <div class="sr"><span class="y">2025–26</span><span class="tm" style="background:#8a1220">GRG</span><span class="m"><span class="v">.937 · 25 gp</span><span class="nl">AHL</span></span><span class="p" style="color:#5c6577">–</span></div>
+            <div class="sr"><span class="y">2026–27</span><span class="tm" style="background:#8a1220">GRG</span><span class="m"><span class="v">.944 · 6 gp</span><span class="nl">AHL</span></span><span class="p" style="color:#5c6577">–</span></div>
+            <div class="sr"><span class="y">2026–27</span><span class="tm" style="background:#CE1126">DET</span><span class="m"><span class="v">.886 · 2 gp</span><span class="nl">NHL · too few</span></span><span class="p" style="color:#5c6577">–</span></div>
+          </div>
+
+          <div class="blk">
+            <div class="bh"><span class="q">For his country</span><span class="w">🇨🇿 Czechia</span></div>
+            <div class="flags"><span style="color:#8a94a6">No national team games on NHL.com</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Career: kariéra přes víc lig</h3>
+      <p>Tady jsou barevné týmy vidět pořádně: Přerov → Kometa → Grand Rapids → Detroit. U evropských lig a AHL nemáme ligové srovnání, takže řádek ukáže jen hodnotu a ligu. Pruh pořadí se objeví jen tam, kde ho umíme spočítat (NHL od 5 zápasů). Čísla jsou reálná z NHL.com.</p>
+    </div>
+  </div>
+</div>

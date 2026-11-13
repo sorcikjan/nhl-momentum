@@ -1,0 +1,385 @@
+<h2>v19 · celý profil, finální prototyp</h2>
+<p class="subtitle">Dva skutečné telefony, klikej na záložky a scrolluj. Na Now se kompaktní hlavička objeví po odscrollování fotky, na ostatních záložkách je vidět rovnou. Šipky „Games ›“ atd. v kartách vedou do záložky, která danou otázku rozvádí. Gauthier = bruslař s daty, Postava = gólman s málo daty (úspěšnost zákroků místo Heat, prázdné stavy drží místo).</p>
+<style>
+  .pv{position:relative;background:#0d0f14;color:#e8ecf2;border-radius:26px;overflow:hidden;font-family:Inter,system-ui,sans-serif;width:360px;max-width:100%;margin:0 auto;line-height:1.35;border:6px solid #000;box-shadow:0 10px 40px rgba(0,0,0,.4)}
+  .pv .scr{height:740px;overflow-y:auto;scrollbar-width:none}
+  .pv .scr::-webkit-scrollbar{display:none}
+  .pv:not([data-tab="now"]) .scr{padding-top:64px}
+  .pv:not([data-tab="now"]) .heroP{display:none}
+  .pv .panel{display:none}
+  .pv[data-tab="now"] [data-p="now"],.pv[data-tab="games"] [data-p="games"],.pv[data-tab="player"] [data-p="player"],.pv[data-tab="career"] [data-p="career"]{display:block}
+  .pv[data-tab="now"] .tabs [data-t="now"],.pv[data-tab="games"] .tabs [data-t="games"],.pv[data-tab="player"] .tabs [data-t="player"],.pv[data-tab="career"] .tabs [data-t="career"]{color:#fff;box-shadow:inset 0 -2px 0 #ff5a1f}
+  /* sticky mini header */
+  .pv .mini{position:absolute;left:0;right:0;top:0;z-index:6;height:64px;box-sizing:border-box;display:flex;align-items:center;gap:10px;padding:10px 14px;background:linear-gradient(135deg,#F47A38 0%,#8a4018 60%,#1a0f08 100%);transform:translateY(-100%);transition:transform .2s}
+  .pv.stuck .mini,.pv:not([data-tab="now"]) .mini{transform:none}
+  .pv .mini.det{background:linear-gradient(135deg,#CE1126 0%,#700a14 60%,#140406 100%)}
+  .pv .mini img{height:44px;border-radius:50%;background:rgba(0,0,0,.25)}
+  .pv .mini b{font-size:16px;font-weight:900;display:block;line-height:1.1}
+  .pv .mini span{font-size:11px;color:rgba(255,255,255,.85)}
+  .pv .mini u{text-decoration:none;font-weight:800;color:#fff}
+  .pv .mini u.am{color:#ffd060}
+  .pv .mini .h{margin-left:auto;text-align:right;font-size:22px;font-weight:900;color:#fff;line-height:1}
+  .pv .mini .h small{display:block;font:700 8px/1 ui-monospace,monospace;letter-spacing:1px;color:rgba(255,255,255,.75)}
+  .pv .mini .h.na{color:rgba(255,255,255,.45)}
+  .pv .tabwrap{position:sticky;top:0;z-index:5;background:#0d0f14}
+  .pv.stuck[data-tab="now"] .tabwrap{top:64px}
+  .pv .tabs{display:flex;border-bottom:1px solid #1e232e;padding:0 8px}
+  .pv .tabs span{flex:1;text-align:center;font-size:12px;font-weight:700;padding:12px 0;color:#5c6577;cursor:pointer}
+  /* hero */
+  .pv .hero{position:relative;height:178px;overflow:hidden}
+  .pv .hero .num{position:absolute;right:-4px;top:-22px;font-size:160px;font-weight:900;line-height:1;color:rgba(255,255,255,.08)}
+  .pv .hero img.ph{position:absolute;right:0;bottom:0;height:168px}
+  .pv .hero img.logo{position:absolute;left:14px;top:12px;height:54px}
+  .pv .hero .nm{position:absolute;left:16px;bottom:12px}
+  .pv .hero .f{font-size:15px;font-weight:600;color:rgba(255,255,255,.85)}
+  .pv .hero .l{font-size:32px;font-weight:900;line-height:1;letter-spacing:-.5px}
+  .pv .hero .pos{font-size:11px;color:rgba(255,255,255,.75);margin-top:4px}
+  .pv .body{padding:4px 10px 14px}
+  .pv .bio{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+  .pv .bio div{background:#141821;border-radius:10px;padding:8px 6px;text-align:center}
+  .pv .bio b{display:block;font-size:13px;font-weight:900;white-space:nowrap}
+  .pv .bio span{display:block;font-size:9px;color:#8a94a6;margin-top:2px;line-height:1.15}
+  .pv .say{font-size:15px;font-weight:800;margin:14px 4px 4px;line-height:1.3}
+  .pv .blk{margin-top:10px;background:#141821;border-radius:14px;padding:12px}
+  .pv .bh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;gap:8px}
+  .pv .bh .q{font-size:14px;font-weight:800}
+  .pv .bh .w{font:600 9px/1.2 ui-monospace,monospace;color:#5c6577;letter-spacing:.5px;text-transform:uppercase;text-align:right}
+  .pv .go{font-size:11px;font-weight:700;color:#ff8a4c;cursor:pointer;padding:2px 0}
+  .pv .hrow{display:flex;align-items:flex-end;gap:10px;margin-bottom:6px}
+  .pv .hv{font-size:56px;font-weight:900;line-height:.8;color:#ff3d00;letter-spacing:-2px}
+  .pv .hv.na{color:#2e3442}
+  .pv .dl{font-size:13px;font-weight:800;padding-bottom:2px}
+  .pv .dl.dn{color:#3a88ff}
+  .pv .dl small{display:block;font-size:10px;font-weight:600;color:#5c6577}
+  .pv .hk{margin-left:auto;text-align:right;font:700 8px/1.3 ui-monospace,monospace;letter-spacing:1px;color:#5c6577}
+  .pv .sub2{font:700 9px/1 ui-monospace,monospace;letter-spacing:1.2px;color:#5c6577;text-transform:uppercase;border-top:1px solid #232835;padding-top:10px;margin-top:10px}
+  .pv .games{display:flex;gap:5px;margin-top:8px}
+  .pv .gm{flex:1;border-radius:8px;padding:7px 0 6px;text-align:center;background:#0d0f14;min-height:38px}
+  .pv .gm b{display:block;font-size:12px;font-weight:900;line-height:1.1;color:#ff8a4c}
+  .pv .gm span{display:flex;align-items:center;justify-content:center;gap:3px;font-size:9px;color:#8a94a6;margin-top:5px}
+  .pv .gm.last{outline:1.5px solid #ff5a1f;outline-offset:-1.5px}
+  .pv .gm.off{border:1px dashed #262c38;background:none}
+  .pv .r{display:inline-block;width:15px;height:15px;border-radius:3px;font-size:9px;font-weight:800;line-height:15px;text-align:center;color:#0d0f14;font-style:normal}
+  .pv .gm .r{width:11px;height:11px;line-height:11px;font-size:7px}
+  .pv .r.w{background:#00e5a0}.pv .r.l{background:#ff4d6a}
+  .pv .lad{display:flex;align-items:flex-end;gap:3px;height:58px;margin-top:18px}
+  .pv .lad i{flex:1;background:#2a303d;border-radius:2px 2px 0 0;display:block}
+  .pv .lad i.me{background:#ff5a1f;position:relative}
+  .pv .lad i.me em{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);font:800 10px/1.4 Inter,sans-serif;font-style:normal;color:#ff8a4c;white-space:nowrap}
+  .pv .ladl{display:flex;justify-content:space-between;font-size:9px;color:#5c6577;margin-top:4px}
+  .pv .gstarts div{display:grid;grid-template-columns:1fr 60px 22px;align-items:center;gap:8px;padding:4px 0;font-size:12px}
+  .pv .gstarts div i{grid-column:1;grid-row:1;height:14px;border-radius:3px;background:#2a303d;display:block}
+  .pv .gstarts div span{grid-column:2;grid-row:1;color:#8a94a6}
+  .pv .gstarts div b{grid-column:3;grid-row:1;text-align:right;font-weight:900}
+  .pv .gstarts div.me i{background:#ff5a1f}.pv .gstarts div.me span{color:#fff;font-weight:700}
+  .pv .strip{display:flex;align-items:center;gap:12px;background:#141821;border-radius:14px;padding:12px;margin-top:10px}
+  .pv .strip .nx{flex:1;font-size:14px}
+  .pv .strip .nx b{font-weight:800}
+  .pv .strip .nx span{display:block;font-size:11px;color:#8a94a6}
+  .pv .strip.am{background:#241c08;border:1px solid #4a3a10}
+  .pv .strip.am .nx b{color:#ffb000}
+  .pv .en{width:110px}
+  .pv .en .k{font:700 8px/1 ui-monospace,monospace;letter-spacing:1px;color:#5c6577}
+  .pv .en .bar{height:6px;border-radius:3px;background:#232835;margin-top:5px;overflow:hidden}
+  .pv .en .bar i{display:block;height:6px;border-radius:3px;background:#00e5a0}
+  .pv .en .v{display:flex;justify-content:space-between;font-size:11px;margin-top:3px;color:#8a94a6}
+  .pv .en .v b{color:#e8ecf2}
+  .pv .tot{display:flex;gap:6px}
+  .pv .tot div{flex:1;background:#0d0f14;border-radius:10px;padding:8px 0 7px;text-align:center}
+  .pv .tot b{display:block;font-size:20px;font-weight:900;line-height:1}
+  .pv .tot span{display:block;font:700 8px/1 ui-monospace,monospace;letter-spacing:1px;color:#5c6577;margin-top:3px}
+  .pv .tot em{display:block;font-style:normal;font-size:10px;font-weight:800;color:#8a94a6;margin-top:5px}
+  .pv .mo{font:700 9px/1 ui-monospace,monospace;letter-spacing:1.2px;color:#5c6577;text-transform:uppercase;margin:12px 0 2px}
+  .pv .gl{display:grid;grid-template-columns:48px 1fr 24px 24px 32px 40px;align-items:center;gap:4px;padding:8px 0;border-top:1px solid #1c212c;font-size:13px}
+  .pv .gl.g{grid-template-columns:48px 1fr 48px 40px 42px}
+  .pv .gl.hd{border:0;padding:0 0 2px;font:700 8px/1 ui-monospace,monospace;color:#5c6577;letter-spacing:.8px}
+  .pv .gl > :nth-child(n+3){text-align:right}
+  .pv .gl .d{color:#8a94a6;font-size:11px}
+  .pv .gl .o{font-weight:700;display:flex;align-items:center;gap:6px}
+  .pv .gl .z{color:#333a48}
+  .pv .gl .gg{color:#ff7a3a;font-weight:900}
+  .pv .gl .ht{font-weight:800}
+  .pv .more{font-size:11px;color:#8a94a6;text-align:center;margin-top:10px;padding:8px;border-radius:8px;background:#0d0f14}
+  .pv .leg2{display:flex;gap:14px;font-size:11px;color:#c5ccd8;margin:-2px 0 2px}
+  .pv .leg2 i{display:inline-block;width:14px;height:8px;border-radius:2px;margin-right:5px}
+  .pv .nu{display:flex;gap:6px;justify-content:center;margin-top:4px}
+  .pv .nu span{font-size:10px;color:#5c6577;border:1px dashed #2a303d;border-radius:6px;padding:4px 7px}
+  .pv .cc{position:relative;display:flex;gap:8px;padding:0 4px 0 30px;margin-top:40px}
+  .pv .cc.mini{margin-top:30px}
+  .pv .cc .ax{position:absolute;left:0;right:0;font:700 8px/1 ui-monospace,monospace;color:#5c6577;border-top:1px solid #1e232e}
+  .pv .cc .ax span{position:absolute;left:0;top:-4px;background:#141821;padding-right:3px}
+  .pv .cc .ax.avg{border-top:1px dashed #5c6577}
+  .pv .cc .ax.avg span{color:#8a94a6}
+  .pv .cc .c{flex:1;position:relative;z-index:1}
+  .pv .cc .c i{position:absolute;bottom:0;left:12%;right:12%;border-radius:4px 4px 0 0;display:block}
+  .pv .cc .c .lb{position:absolute;left:-6px;right:-6px;text-align:center;line-height:1.1}
+  .pv .cc .c .lb b{display:block;font-size:13px;font-weight:900}
+  .pv .cc.mini .c .lb b{font-size:11px}
+  .pv .cc .c .lb small{font-size:9px;font-weight:700;color:#8a94a6}
+  .pv .cb{display:flex;gap:8px;padding:6px 4px 0 30px;border-top:1px solid #2a303d}
+  .pv .cb div{flex:1;text-align:center;font-size:9px;color:#8a94a6;line-height:1.2}
+  .pv .cb img{height:22px;display:block;margin:0 auto 2px}
+  .pv .cb b{display:block;color:#e8ecf2;font-size:9.5px;font-weight:700}
+  .pv .cb .dot{display:block;width:10px;height:10px;border-radius:50%;margin:2px auto 4px}
+  .pv .cap{font-size:9px;color:#5c6577;text-align:center;margin-top:6px}
+  .pv .hatch{background:repeating-linear-gradient(135deg,#CE1126 0 3px,#5a0a12 3px 6px)!important}
+  .pv .path{display:flex;flex-direction:column;margin-left:6px;border-left:2px solid #232835}
+  .pv .st{position:relative;padding:4px 0 8px 14px;font-size:12px}
+  .pv .st:before{content:"";position:absolute;left:-6px;top:7px;width:10px;height:10px;border-radius:50%;background:#2a303d;border:2px solid #141821}
+  .pv .st.now:before{background:#ff5a1f}
+  .pv .st b{font-weight:800}
+  .pv .st span{color:#8a94a6;font-size:11px}
+  .pv .st em{font-style:normal;color:#ff8a4c;font-weight:700;font-size:11px}
+  .pv .flags{display:flex;gap:6px;flex-wrap:wrap}
+  .pv .flags span{background:#1c212c;border-radius:8px;padding:6px 8px;font-size:11px}
+  .pv .flags span.mute{color:#5c6577;background:none;border:1px dashed #262c38}
+  .pv .flags b{font-weight:800}
+</style>
+
+<script>
+function pvTab(el){var pv=el.closest('.pv'),t=el.dataset.t;pv.dataset.tab=t;var s=pv.querySelector('.scr');s.scrollTop=0;pvScroll(s);if(event)event.stopPropagation();}
+function pvScroll(s){var pv=s.closest('.pv');pv.classList.toggle('stuck',pv.dataset.tab!=='now'||s.scrollTop>150);}
+</script>
+<div class="cards">
+  <div class="card" data-choice="v19-gauthier" onclick="toggleSelect(this)"><div class="card-image" style="padding:16px;background:#1a1d24"><div class="pv" data-tab="now">
+  <div class="mini "><img src="https://assets.nhle.com/mugs/nhl/20262027/ANA/8483445.png" alt=""><div><b>Cutter Gauthier</b><span>#61 · LW · Anaheim · <u>Sat vs NYI</u></span></div><div class="h">95<small>HEAT</small></div></div>
+  <div class="scr" onscroll="pvScroll(this)">
+    <div class="heroP">
+<div class="hero" style="background:linear-gradient(135deg,#F47A38 0%,#8a4018 50%,#1a0f08 100%)">
+  <div class="num">61</div><img class="ph" src="https://assets.nhle.com/mugs/nhl/20262027/ANA/8483445.png" alt="">
+  <img class="logo" src="https://assets.nhle.com/logos/nhl/svg/ANA_dark.svg" alt="">
+  <div class="nm"><div class="f">Cutter</div><div class="l">GAUTHIER</div><div class="pos">#61 · Left wing · Anaheim Ducks</div></div>
+</div>
+</div>
+    <div class="tabwrap"><div class="tabs"><span data-t="now" onclick="pvTab(this)">Now</span><span data-t="games" onclick="pvTab(this)">Games</span><span data-t="player" onclick="pvTab(this)">Player</span><span data-t="career" onclick="pvTab(this)">Career</span></div></div>
+    <div class="panel" data-p="now"><div class="body">
+  <div class="bio"><div><b>🇺🇸 USA</b><span>born in Sweden</span></div><div><b>22</b><span>years old</span></div><div><b>3rd</b><span>NHL season</span></div><div><b>#5</b><span>pick 2022</span></div></div>
+  <div class="say">The hottest forward in the NHL, and his points a game have gone up every season.</div>
+
+  <div class="blk">
+    <div class="bh"><span class="q">How he's doing</span><span class="go" data-t="games" onclick="pvTab(this)">Games ›</span></div>
+    <div class="hrow"><span class="hv">95</span><span class="dl dn">▼ 5<small>after Nov 11</small></span><span class="hk">HEAT<br>after each game</span></div>
+    <svg viewBox="0 0 300 96" width="100%" style="display:block;overflow:visible">
+<line x1="4" x2="270" y1="64.8" y2="64.8" stroke="#5c6577" stroke-dasharray="3 3"/>
+<text x="274" y="67.8" font-size="9" fill="#8a94a6" font-family="Inter,sans-serif">avg 26</text>
+<polygon points="4.0,82 4.0,42.4 19.6,26.6 35.3,49.0 50.9,59.6 66.6,55.6 82.2,56.9 97.9,75.4 113.5,74.7 129.2,74.7 144.8,70.1 160.5,69.5 176.1,58.2 191.8,41.7 207.4,23.9 223.1,18.0 238.7,21.3 254.4,16.0 270.0,19.3 270.0,82" fill="#ff3d00" opacity=".12"/>
+<polyline points="4.0,42.4 19.6,26.6 35.3,49.0 50.9,59.6 66.6,55.6 82.2,56.9 97.9,75.4 113.5,74.7 129.2,74.7 144.8,70.1 160.5,69.5 176.1,58.2 191.8,41.7 207.4,23.9 223.1,18.0 238.7,21.3 254.4,16.0 270.0,19.3" fill="none" stroke="#ff3d00" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="4.0" cy="42.4" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>60</title></circle>
+<circle cx="19.6" cy="26.6" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>84</title></circle>
+<circle cx="35.3" cy="49.0" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>50</title></circle>
+<circle cx="50.9" cy="59.6" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>34</title></circle>
+<circle cx="66.6" cy="55.6" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>40</title></circle>
+<circle cx="82.2" cy="56.9" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>38</title></circle>
+<circle cx="97.9" cy="75.4" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>10</title></circle>
+<circle cx="113.5" cy="74.7" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>11</title></circle>
+<circle cx="129.2" cy="74.7" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>11</title></circle>
+<circle cx="144.8" cy="70.1" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>18</title></circle>
+<circle cx="160.5" cy="69.5" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>19</title></circle>
+<circle cx="176.1" cy="58.2" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>36</title></circle>
+<circle cx="191.8" cy="41.7" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>61</title></circle>
+<circle cx="207.4" cy="23.9" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>88</title></circle>
+<circle cx="223.1" cy="18.0" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>97</title></circle>
+<circle cx="238.7" cy="21.3" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>92</title></circle>
+<circle cx="254.4" cy="16.0" r="2.5" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>100</title></circle>
+<circle cx="270.0" cy="19.3" r="4" fill="#ff3d00" stroke="#141821" stroke-width="2"><title>95</title></circle>
+<text x="270.0" y="11.3" text-anchor="middle" font-size="11" font-weight="900" fill="#ff3d00" font-family="Inter,sans-serif">95</text>
+<line x1="4" x2="270" y1="82" y2="82" stroke="#232835"/>
+<text x="4" y="94" font-size="9" fill="#5c6577" font-family="Inter,sans-serif">Oct 2</text>
+<text x="270.0" y="94" text-anchor="end" font-size="9" fill="#5c6577" font-family="Inter,sans-serif">last game</text>
+</svg>
+    <div class="sub2">Last 5 games</div>
+    <div class="games">
+      <div class="gm"><b>3G</b><span><i class="r w">W</i>@VAN</span></div>
+      <div class="gm"><b>1G 1A</b><span><i class="r w">W</i>@EDM</span></div>
+      <div class="gm"><b>1G</b><span><i class="r w">W</i>@CGY</span></div>
+      <div class="gm"><b>3G 1A</b><span><i class="r w">W</i>PIT</span></div>
+      <div class="gm last"><b>1G</b><span><i class="r l">L</i>NSH</span></div>
+    </div>
+  </div>
+
+  <div class="blk">
+    <div class="bh"><span class="q">His role</span><span class="go" data-t="player" onclick="pvTab(this)">Player ›</span></div>
+    <div class="lad"><i style="height:100%"></i><i style="height:99%"></i><i style="height:98%"></i><i class="me" style="height:89%"><em>4th · 18:24</em></i><i style="height:80%"></i><i style="height:74%"></i><i style="height:66%"></i><i style="height:60%"></i><i style="height:57%"></i><i style="height:56%"></i><i style="height:52%"></i><i style="height:51%"></i><i style="height:49%"></i></div>
+    <div class="ladl"><span>most ice time · 20:36</span><span>13 Ducks forwards</span><span>fewest · 10:00</span></div>
+  </div>
+
+  <div class="blk">
+    <div class="bh"><span class="q">Where he's heading</span><span class="go" data-t="career" onclick="pvTab(this)">Career ›</span></div>
+    <div class="cc mini" style="height:84px"><div class="ax" style="top:0"><span>BEST</span></div><div class="ax avg" style="top:50%"><span>AVG</span></div><div class="c"><i class="" style="height:63%;background:#ffb27a"></i><div class="lb" style="bottom:calc(63% + 4px)"><b>0.54</b><small>top 37%</small></div></div><div class="c"><i class="" style="height:90%;background:#ff7a3a"></i><div class="lb" style="bottom:calc(90% + 4px)"><b>0.91</b><small>top 10%</small></div></div><div class="c"><i class="" style="height:97%;background:#ff3d00"></i><div class="lb" style="bottom:calc(97% + 4px)"><b>1.28</b><small>top 3%</small></div></div></div><div class="cb"><div>24–25</div><div>25–26</div><div>26–27</div></div>
+    <div class="cap">points a game · rank among NHL forwards</div>
+  </div>
+
+  <div class="strip"><div class="nx"><b>Sat vs NYI</b><span>next game</span></div><div class="en"><div class="k">ENERGY</div><div class="bar"><i style="width:71%"></i></div><div class="v"><b>71</b><span>2 days rest</span></div></div></div>
+</div></div>
+    <div class="panel" data-p="games"><div class="body">
+  <div class="blk"><div class="bh"><span class="q">This season</span><span class="w">rank among 438 forwards</span></div>
+    <div class="tot"><div><b>18</b><span>GAMES</span><em>&nbsp;</em></div><div><b style="color:#ff7a3a">16</b><span>GOALS</span><em style="color:#ff3d00">#3</em></div><div><b>7</b><span>ASSISTS</span><em>top 23%</em></div><div><b>23</b><span>POINTS</span><em style="color:#ff5a1f">#22</em></div></div></div>
+  <div class="blk"><div class="bh"><span class="q">Every game</span><span class="w">newest first</span></div>
+    <div class="gl hd"><span></span><span></span><span>G</span><span>A</span><span>SOG</span><span>HEAT</span></div><div class="mo">November</div><div class="gl"><span class="d">Wed 11</span><span class="o"><span class="r l">L</span>NSH</span><span class="gg">1</span><span class="z">0</span><span>7</span><span class="ht" style="color:#ff3d00">95</span></div><div class="gl"><span class="d">Sun 8</span><span class="o"><span class="r w">W</span>PIT</span><span class="gg">3</span><span class="">1</span><span>6</span><span class="ht" style="color:#ff3d00">100</span></div><div class="gl"><span class="d">Fri 6</span><span class="o"><span class="r w">W</span>@CGY</span><span class="gg">1</span><span class="z">0</span><span>4</span><span class="ht" style="color:#ff3d00">92</span></div><div class="gl"><span class="d">Thu 5</span><span class="o"><span class="r w">W</span>@EDM</span><span class="gg">1</span><span class="">1</span><span>3</span><span class="ht" style="color:#ff3d00">97</span></div><div class="gl"><span class="d">Tue 3</span><span class="o"><span class="r w">W</span>@VAN</span><span class="gg">3</span><span class="z">0</span><span>6</span><span class="ht" style="color:#ff5a1f">88</span></div><div class="gl"><span class="d">Sun 1</span><span class="o"><span class="r w">W</span>OTT</span><span class="gg">3</span><span class="z">0</span><span>5</span><span class="ht" style="color:#ff7a3a">61</span></div><div class="mo">October</div><div class="gl"><span class="d">Thu 29</span><span class="o"><span class="r l">L</span>BUF</span><span class="gg">2</span><span class="z">0</span><span>10</span><span class="ht" style="color:#a07a68">36</span></div><div class="gl"><span class="d">Mon 27</span><span class="o"><span class="r l">L</span>VAN</span><span class="z">0</span><span class="">1</span><span>4</span><span class="ht" style="color:#7a8396">19</span></div>
+    <div class="more">10 more October games ▾</div></div>
+</div></div>
+    <div class="panel" data-p="player"><div class="body">
+  <div class="blk"><div class="bh"><span class="q">His role in Anaheim</span><span class="w">ice time a game · 13 forwards</span></div>
+    <div class="lad"><i style="height:100%"></i><i style="height:99%"></i><i style="height:98%"></i><i class="me" style="height:89%"><em>4th · 18:24</em></i><i style="height:80%"></i><i style="height:74%"></i><i style="height:66%"></i><i style="height:60%"></i><i style="height:57%"></i><i style="height:56%"></i><i style="height:52%"></i><i style="height:51%"></i><i style="height:49%"></i></div>
+    <div class="ladl"><span>most · 20:36</span><span>fewest · 10:00</span></div></div>
+  <div class="blk"><div class="bh"><span class="q">What kind of player</span><span class="w">percentile · NHL forwards</span></div>
+    <div class="leg2"><span><i style="background:rgba(255,255,255,.1);border:2px dashed #fff"></i>Season</span><span><i style="background:rgba(255,61,0,.2);border:2px solid #ff3d00"></i>Last 3 weeks</span></div>
+    <svg viewBox="0 0 310 290" width="100%" style="display:block;overflow:visible">
+<polygon points="155.0,125.0 169.8,130.4 177.7,144.0 174.9,159.5 162.9,169.6 147.1,169.6 135.1,159.5 132.3,144.0 140.2,130.4" fill="none" stroke="#1e232e"/>
+<polygon points="155.0,79.0 199.4,95.1 223.0,136.0 214.8,182.5 178.6,212.8 131.4,212.8 95.2,182.5 87.0,136.0 110.6,95.1" fill="none" stroke="#1e232e"/>
+<polygon points="155.0,56.0 214.1,77.5 245.6,132.0 234.7,194.0 186.5,234.5 123.5,234.5 75.3,194.0 64.4,132.0 95.9,77.5" fill="none" stroke="#262c38"/>
+<polygon points="155.0,102.0 184.6,112.8 200.3,140.0 194.8,171.0 170.7,191.2 139.3,191.2 115.2,171.0 109.7,140.0 125.4,112.8" fill="none" stroke="#5c6577" stroke-dasharray="3 3"/>
+<line x1="155" y1="148" x2="155.0" y2="56.0" stroke="#1e232e"/>
+<line x1="155" y1="148" x2="214.1" y2="77.5" stroke="#1e232e"/>
+<line x1="155" y1="148" x2="245.6" y2="132.0" stroke="#1e232e"/>
+<line x1="155" y1="148" x2="234.7" y2="194.0" stroke="#1e232e"/>
+<line x1="155" y1="148" x2="186.5" y2="234.5" stroke="#1e232e"/>
+<line x1="155" y1="148" x2="123.5" y2="234.5" stroke="#1e232e"/>
+<line x1="155" y1="148" x2="75.3" y2="194.0" stroke="#1e232e"/>
+<line x1="155" y1="148" x2="64.4" y2="132.0" stroke="#1e232e"/>
+<line x1="155" y1="148" x2="95.9" y2="77.5" stroke="#1e232e"/>
+<text x="159.0" y="105.0" font-size="8" fill="#8a94a6" font-family="ui-monospace,monospace">AVG</text>
+<polygon points="155.0,56.0 214.1,77.5 213.0,137.8 233.9,193.5 180.5,218.0 139.3,191.2 138.3,157.7 132.3,144.0 141.4,131.8" fill="rgba(255,255,255,.07)" stroke="#fff" stroke-width="2" stroke-dasharray="5 3" stroke-linejoin="round"/>
+<polygon points="155.0,56.0 211.8,80.3 189.4,141.9 233.9,193.5 181.4,220.6 136.7,198.1 133.5,160.4 135.1,144.5 137.3,126.9" fill="rgba(255,61,0,.10)" stroke="#ff3d00" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="155.0" cy="56.0" r="3.5" fill="#ff3d00" stroke="#141821" stroke-width="2"/>
+<circle cx="211.8" cy="80.3" r="3.5" fill="#ff3d00" stroke="#141821" stroke-width="2"/>
+<circle cx="189.4" cy="141.9" r="3.5" fill="#ff3d00" stroke="#141821" stroke-width="2"/>
+<circle cx="233.9" cy="193.5" r="3.5" fill="#ff3d00" stroke="#141821" stroke-width="2"/>
+<circle cx="181.4" cy="220.6" r="3.5" fill="#ff3d00" stroke="#141821" stroke-width="2"/>
+<circle cx="136.7" cy="198.1" r="3.5" fill="#ff3d00" stroke="#141821" stroke-width="2"/>
+<circle cx="133.5" cy="160.4" r="3.5" fill="#ff3d00" stroke="#141821" stroke-width="2"/>
+<circle cx="135.1" cy="144.5" r="3.5" fill="#ff3d00" stroke="#141821" stroke-width="2"/>
+<circle cx="137.3" cy="126.9" r="3.5" fill="#ff3d00" stroke="#141821" stroke-width="2"/>
+<g><title>Goals: season 100, last 3 weeks 100</title><text x="155.0" y="36.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#c5ccd8" font-family="Inter,sans-serif">Goals</text><text x="155.0" y="48.0" text-anchor="middle" font-size="10" font-weight="800" fill="#ff7a3a" font-family="Inter,sans-serif">100</text></g>
+<g><title>Shots: season 100, last 3 weeks 96</title><text x="224.4" y="61.3" text-anchor="start" font-size="10.5" font-weight="600" fill="#c5ccd8" font-family="Inter,sans-serif">Shots</text><text x="224.4" y="73.3" text-anchor="start" font-size="10" font-weight="800" fill="#ff7a3a" font-family="Inter,sans-serif">96</text></g>
+<g><title>Assists: season 64, last 3 weeks 38</title><text x="261.4" y="129.2" text-anchor="start" font-size="10.5" font-weight="600" fill="#c5ccd8" font-family="Inter,sans-serif">Assists</text><text x="261.4" y="141.2" text-anchor="start" font-size="10" font-weight="800" fill="#ff7a3a" font-family="Inter,sans-serif">38<tspan fill="#ff4d6a" font-size="8" dx="3">▼26</tspan></text></g>
+<g><title>Power play: season 99, last 3 weeks 99</title><text x="248.5" y="208.0" text-anchor="start" font-size="10.5" font-weight="600" fill="#c5ccd8" font-family="Inter,sans-serif">Power play</text><text x="248.5" y="220.0" text-anchor="start" font-size="10" font-weight="800" fill="#ff7a3a" font-family="Inter,sans-serif">99</text></g>
+<g><title>Ice time: season 81, last 3 weeks 84</title><text x="191.9" y="255.5" text-anchor="start" font-size="10.5" font-weight="600" fill="#c5ccd8" font-family="Inter,sans-serif">Ice time</text><text x="191.9" y="267.5" text-anchor="start" font-size="10" font-weight="800" fill="#ff7a3a" font-family="Inter,sans-serif">84</text></g>
+<g><title>Team shots on ice: season 50, last 3 weeks 58</title><text x="118.1" y="255.5" text-anchor="end" font-size="10.5" font-weight="600" fill="#c5ccd8" font-family="Inter,sans-serif">Team shots on ice</text><text x="118.1" y="267.5" text-anchor="end" font-size="10" font-weight="800" fill="#ff7a3a" font-family="Inter,sans-serif">58<tspan fill="#00e5a0" font-size="8" dx="3">▲8</tspan></text></g>
+<g><title>Takeaways: season 21, last 3 weeks 27</title><text x="61.5" y="208.0" text-anchor="end" font-size="10.5" font-weight="600" fill="#c5ccd8" font-family="Inter,sans-serif">Takeaways</text><text x="61.5" y="220.0" text-anchor="end" font-size="10" font-weight="800" fill="#ff7a3a" font-family="Inter,sans-serif">27<tspan fill="#00e5a0" font-size="8" dx="3">▲6</tspan></text></g>
+<g><title>Hits + blocks: season 25, last 3 weeks 22</title><text x="48.6" y="129.2" text-anchor="end" font-size="10.5" font-weight="600" fill="#c5ccd8" font-family="Inter,sans-serif">Hits + blocks</text><text x="48.6" y="141.2" text-anchor="end" font-size="10" font-weight="800" fill="#ff7a3a" font-family="Inter,sans-serif">22</text></g>
+<g><title>Penalties drawn: season 23, last 3 weeks 30</title><text x="85.6" y="61.3" text-anchor="end" font-size="10.5" font-weight="600" fill="#c5ccd8" font-family="Inter,sans-serif">Penalties drawn</text><text x="85.6" y="73.3" text-anchor="end" font-size="10" font-weight="800" fill="#ff7a3a" font-family="Inter,sans-serif">30<tspan fill="#00e5a0" font-size="8" dx="3">▲7</tspan></text></g>
+</svg>
+    <div class="nu"><span>Penalty kill · not used</span><span>Faceoffs · not used</span></div></div>
+</div></div>
+    <div class="panel" data-p="career"><div class="body">
+  <div class="blk"><div class="bh"><span class="q">Season by season</span><span class="w">points a game · vs NHL forwards</span></div><div class="cc" style="height:140px"><div class="ax" style="top:0"><span>BEST</span></div><div class="ax avg" style="top:50%"><span>AVG</span></div><div class="c"><i class="" style="height:63%;background:#ffb27a"></i><div class="lb" style="bottom:calc(63% + 4px)"><b>0.54</b><small>top 37%</small></div></div><div class="c"><i class="" style="height:90%;background:#ff7a3a"></i><div class="lb" style="bottom:calc(90% + 4px)"><b>0.91</b><small>top 10%</small></div></div><div class="c"><i class="" style="height:97%;background:#ff3d00"></i><div class="lb" style="bottom:calc(97% + 4px)"><b>1.28</b><small>top 3%</small></div></div></div><div class="cb"><div><img src="https://assets.nhle.com/logos/nhl/svg/ANA_dark.svg" alt=""><b>Anaheim</b>2024–25</div><div><img src="https://assets.nhle.com/logos/nhl/svg/ANA_dark.svg" alt=""><b>Anaheim</b>2025–26</div><div><img src="https://assets.nhle.com/logos/nhl/svg/ANA_dark.svg" alt=""><b>Anaheim</b>2026–27</div></div></div>
+  <div class="blk"><div class="bh"><span class="q">How he got here</span><span class="w">source NHL.com</span></div>
+    <div class="path">
+      <div class="st"><b>U.S. National Team Program</b><br><span>2020–22 · 65 points in 54 games at U18</span></div>
+      <div class="st"><b>Drafted #5 by Philadelphia</b><br><span>2022</span></div>
+      <div class="st"><b>Boston College</b><br><span>2022–24 · <em>38 goals in 41 games</em> in his last year</span></div>
+      <div class="st"><b>Traded to Anaheim</b><br><span>2024</span></div>
+      <div class="st now"><b>Anaheim Ducks</b><br><span>3rd NHL season</span></div>
+    </div></div>
+  <div class="blk"><div class="bh"><span class="q">For his country</span><span class="w">🇺🇸 USA</span></div>
+    <div class="flags"><span><b>World Juniors</b> 2023 · 2024</span><span><b>World Championship</b> 2023 · 2025</span></div></div>
+</div></div>
+  </div>
+</div></div>
+    <div class="card-body"><h3>Gauthier</h3><p>Reálná data NHL k 13. 11. Ilustrační jsou jen hodnoty radaru za poslední 3 týdny.</p></div></div>
+  <div class="card" data-choice="v19-postava" onclick="toggleSelect(this)"><div class="card-image" style="padding:16px;background:#1a1d24"><div class="pv" data-tab="now">
+  <div class="mini det"><img src="https://assets.nhle.com/mugs/nhl/20262027/DET/8485545.png" alt=""><div><b>Michal Postava</b><span>#35 · G · <u class="am">In the AHL · Grand Rapids</u></span></div><div class="h na">–<small>SAVE %</small></div></div>
+  <div class="scr" onscroll="pvScroll(this)">
+    <div class="heroP">
+<div class="hero" style="background:linear-gradient(135deg,#CE1126 0%,#700a14 50%,#140406 100%)">
+  <div class="num">35</div><img class="ph" src="https://assets.nhle.com/mugs/nhl/20262027/DET/8485545.png" alt="">
+  <img class="logo" src="https://assets.nhle.com/logos/nhl/svg/DET_dark.svg" alt="">
+  <div class="nm"><div class="f">Michal</div><div class="l">POSTAVA</div><div class="pos">#35 · Goalie · Detroit Red Wings</div></div>
+</div>
+</div>
+    <div class="tabwrap"><div class="tabs"><span data-t="now" onclick="pvTab(this)">Now</span><span data-t="games" onclick="pvTab(this)">Games</span><span data-t="player" onclick="pvTab(this)">Player</span><span data-t="career" onclick="pvTab(this)">Career</span></div></div>
+    <div class="panel" data-p="now"><div class="body">
+  <div class="bio"><div><b>🇨🇿 Czechia</b><span>Valašské Meziříčí</span></div><div><b>24</b><span>years old</span></div><div><b>1st</b><span>NHL season</span></div><div><b>Undrafted</b><span>signed by DET</span></div></div>
+  <div class="say">2 NHL games this season, now back in the AHL.</div>
+
+  <div class="strip am"><div class="nx"><b>In the AHL</b><span>Grand Rapids Griffins · 6–0 · .944 this season</span></div></div>
+
+  <div class="blk">
+    <div class="bh"><span class="q">How he's doing</span><span class="go" data-t="games" onclick="pvTab(this)">Games ›</span></div>
+    <div class="hrow"><span class="hv na">–</span><span class="dl" style="color:#8a94a6">2 of 5<small>NHL games to rate</small></span><span class="hk">SAVE %<br>after each game</span></div>
+    <svg viewBox="0 0 300 96" width="100%" style="display:block;overflow:visible">
+<line x1="4" x2="270" y1="48.2" y2="48.2" stroke="#5c6577" stroke-dasharray="3 3"/>
+<text x="274" y="51.2" font-size="9" fill="#8a94a6" font-family="Inter,sans-serif">avg .891</text>
+<polyline points="4.0,61.4 70.5,49.8" fill="none" stroke="#e8ecf2" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="4.0" cy="61.4" r="2.5" fill="#e8ecf2" stroke="#141821" stroke-width="2"><title>0.875</title></circle>
+<circle cx="70.5" cy="49.8" r="4" fill="#e8ecf2" stroke="#141821" stroke-width="2"><title>0.889</title></circle>
+<circle cx="137.0" cy="48.2" r="4" fill="none" stroke="#3a4150" stroke-dasharray="2 2"/>
+<circle cx="203.5" cy="48.2" r="4" fill="none" stroke="#3a4150" stroke-dasharray="2 2"/>
+<circle cx="270.0" cy="48.2" r="4" fill="none" stroke="#3a4150" stroke-dasharray="2 2"/>
+<text x="70.5" y="41.8" text-anchor="middle" font-size="11" font-weight="900" fill="#e8ecf2" font-family="Inter,sans-serif">.889</text>
+<line x1="4" x2="270" y1="82" y2="82" stroke="#232835"/>
+<text x="4" y="94" font-size="9" fill="#5c6577" font-family="Inter,sans-serif">Oct 22</text>
+</svg>
+    <div class="sub2">NHL games</div>
+    <div class="games">
+      <div class="gm"><b>7/8</b><span><i class="r w">W</i>@VAN</span></div>
+      <div class="gm last"><b>24/27</b><span><i class="r w">W</i>@EDM</span></div>
+      <div class="gm off"></div><div class="gm off"></div><div class="gm off"></div>
+    </div>
+  </div>
+
+  <div class="blk">
+    <div class="bh"><span class="q">His role</span><span class="go" data-t="player" onclick="pvTab(this)">Player ›</span></div>
+    <div class="gstarts"><div><i style="width:100%"></i><span>Gibson</span><b>13</b></div><div><i style="width:46%"></i><span>Tarasov</span><b>6</b></div><div class="me"><i style="width:8%"></i><span>Postava</span><b>1</b></div></div>
+    <div class="ladl"><span>starts · Detroit goalies</span></div>
+  </div>
+
+  <div class="blk">
+    <div class="bh"><span class="q">Where he's heading</span><span class="go" data-t="career" onclick="pvTab(this)">Career ›</span></div>
+    <div class="cc mini" style="height:84px"><div class="ax" style="top:0"><span>.950</span></div><div class="ax" style="top:57.1%"><span>.910</span></div><div class="c"><i class="" style="height:74%;background:#1f5fa8"></i><div class="lb" style="bottom:calc(74% + 4px)"><b>.932</b><small></small></div></div><div class="c"><i class="" style="height:90%;background:#1f5fa8"></i><div class="lb" style="bottom:calc(90% + 4px)"><b>.943</b><small></small></div></div><div class="c"><i class="" style="height:59%;background:#0a3a7a"></i><div class="lb" style="bottom:calc(59% + 4px)"><b>.921</b><small></small></div></div><div class="c"><i class="" style="height:81%;background:#9c1b2a"></i><div class="lb" style="bottom:calc(81% + 4px)"><b>.937</b><small></small></div></div><div class="c"><i class="" style="height:91%;background:#9c1b2a"></i><div class="lb" style="bottom:calc(91% + 4px)"><b>.944</b><small></small></div></div><div class="c"><i class="hatch" style="height:9%;background:#CE1126"></i><div class="lb" style="bottom:calc(9% + 4px)"><b>.886</b><small></small></div></div></div><div class="cb"><div><span class=dot style=background:#1f5fa8></span>22–23</div><div><span class=dot style=background:#1f5fa8></span>23–24</div><div><span class=dot style=background:#0a3a7a></span>24–25</div><div><span class=dot style=background:#9c1b2a></span>25–26</div><div><span class=dot style=background:#9c1b2a></span>26–27</div><div><span class=dot style=background:#CE1126></span>26–27</div></div>
+    <div class="cap">save % · each season, every league</div>
+  </div>
+</div></div>
+    <div class="panel" data-p="games"><div class="body">
+  <div class="blk"><div class="bh"><span class="q">This season · NHL</span><span class="w">too few games to rank</span></div>
+    <div class="tot"><div><b>2</b><span>GAMES</span><em>1 start</em></div><div><b>1</b><span>WINS</span><em>&nbsp;</em></div><div><b>.886</b><span>SAVE %</span><em>avg .891</em></div><div><b>2.89</b><span>GAA</span><em>&nbsp;</em></div></div></div>
+  <div class="blk"><div class="bh"><span class="q">Every game</span><span class="w">newest first</span></div>
+    <div class="gl g hd"><span></span><span></span><span>SAVES</span><span>SV%</span><span>DEC</span></div>
+    <div class="mo">October</div>
+    <div class="gl g"><span class="d">Mon 26</span><span class="o"><span class="r w">W</span>@EDM</span><span>24/27</span><span>.889</span><span class="gg">W</span></div>
+    <div class="gl g"><span class="d">Thu 22</span><span class="o"><span class="r w">W</span>@VAN</span><span>7/8</span><span>.875</span><span class="z">relief</span></div>
+  </div>
+</div></div>
+    <div class="panel" data-p="player"><div class="body">
+  <div class="blk"><div class="bh"><span class="q">His role in Detroit</span><span class="w">starts · 3 goalies</span></div>
+    <div class="gstarts"><div><i style="width:100%"></i><span>Gibson</span><b>13</b></div><div><i style="width:46%"></i><span>Tarasov</span><b>6</b></div><div class="me"><i style="width:8%"></i><span>Postava</span><b>1</b></div></div></div>
+  <div class="blk"><div class="bh"><span class="q">What kind of goalie</span><span class="w">percentile · NHL goalies</span></div>
+    <svg viewBox="0 0 310 290" width="100%" style="display:block;overflow:visible">
+<polygon points="155.0,125.0 174.9,136.5 174.9,159.5 155.0,171.0 135.1,159.5 135.1,136.5" fill="none" stroke="#1e232e"/>
+<polygon points="155.0,79.0 214.8,113.5 214.8,182.5 155.0,217.0 95.2,182.5 95.2,113.5" fill="none" stroke="#1e232e"/>
+<polygon points="155.0,56.0 234.7,102.0 234.7,194.0 155.0,240.0 75.3,194.0 75.3,102.0" fill="none" stroke="#262c38"/>
+<polygon points="155.0,102.0 194.8,125.0 194.8,171.0 155.0,194.0 115.2,171.0 115.2,125.0" fill="none" stroke="#5c6577" stroke-dasharray="3 3"/>
+<line x1="155" y1="148" x2="155.0" y2="56.0" stroke="#1e232e"/>
+<line x1="155" y1="148" x2="234.7" y2="102.0" stroke="#1e232e"/>
+<line x1="155" y1="148" x2="234.7" y2="194.0" stroke="#1e232e"/>
+<line x1="155" y1="148" x2="155.0" y2="240.0" stroke="#1e232e"/>
+<line x1="155" y1="148" x2="75.3" y2="194.0" stroke="#1e232e"/>
+<line x1="155" y1="148" x2="75.3" y2="102.0" stroke="#1e232e"/>
+<g><title>Save %: season 0, last 3 weeks 0</title><text x="155.0" y="36.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#3a4150" font-family="Inter,sans-serif">Save %</text></g>
+<g><title>Even strength: season 0, last 3 weeks 0</title><text x="248.5" y="90.0" text-anchor="start" font-size="10.5" font-weight="600" fill="#3a4150" font-family="Inter,sans-serif">Even strength</text></g>
+<g><title>Shorthanded: season 0, last 3 weeks 0</title><text x="248.5" y="208.0" text-anchor="start" font-size="10.5" font-weight="600" fill="#3a4150" font-family="Inter,sans-serif">Shorthanded</text></g>
+<g><title>Goals against: season 0, last 3 weeks 0</title><text x="155.0" y="262.0" text-anchor="middle" font-size="10.5" font-weight="600" fill="#3a4150" font-family="Inter,sans-serif">Goals against</text></g>
+<g><title>Quality starts: season 0, last 3 weeks 0</title><text x="61.5" y="208.0" text-anchor="end" font-size="10.5" font-weight="600" fill="#3a4150" font-family="Inter,sans-serif">Quality starts</text></g>
+<g><title>Workload: season 0, last 3 weeks 0</title><text x="61.5" y="90.0" text-anchor="end" font-size="10.5" font-weight="600" fill="#3a4150" font-family="Inter,sans-serif">Workload</text></g>
+<text x="155" y="144" text-anchor="middle" font-size="20" font-weight="900" fill="#e8ecf2" font-family="Inter,sans-serif">2 of 5</text>
+<text x="155" y="160" text-anchor="middle" font-size="9" font-weight="700" fill="#5c6577" font-family="ui-monospace,monospace" letter-spacing="1">NHL GAMES</text>
+</svg>
+  </div>
+</div></div>
+    <div class="panel" data-p="career"><div class="body">
+  <div class="blk"><div class="bh"><span class="q">Season by season</span><span class="w">save % · games</span></div><div class="cc" style="height:140px"><div class="ax" style="top:0"><span>.950</span></div><div class="ax" style="top:28.6%"><span>.930</span></div><div class="ax" style="top:57.1%"><span>.910</span></div><div class="ax" style="top:85.7%"><span>.890</span></div><div class="c"><i class="" style="height:74%;background:#1f5fa8"></i><div class="lb" style="bottom:calc(74% + 4px)"><b>.932</b><small>39 gp</small></div></div><div class="c"><i class="" style="height:90%;background:#1f5fa8"></i><div class="lb" style="bottom:calc(90% + 4px)"><b>.943</b><small>44 gp</small></div></div><div class="c"><i class="" style="height:59%;background:#0a3a7a"></i><div class="lb" style="bottom:calc(59% + 4px)"><b>.921</b><small>42 gp</small></div></div><div class="c"><i class="" style="height:81%;background:#9c1b2a"></i><div class="lb" style="bottom:calc(81% + 4px)"><b>.937</b><small>25 gp</small></div></div><div class="c"><i class="" style="height:91%;background:#9c1b2a"></i><div class="lb" style="bottom:calc(91% + 4px)"><b>.944</b><small>6 gp</small></div></div><div class="c"><i class="hatch" style="height:9%;background:#CE1126"></i><div class="lb" style="bottom:calc(9% + 4px)"><b>.886</b><small>2 gp</small></div></div></div><div class="cb"><div><span class=dot style=background:#1f5fa8></span><b>Přerov</b>Chance liga<br>22–23</div><div><span class=dot style=background:#1f5fa8></span><b>Přerov</b>Chance liga<br>23–24</div><div><span class=dot style=background:#0a3a7a></span><b>Kometa Brno</b>Extraliga<br>24–25</div><div><span class=dot style=background:#9c1b2a></span><b>Grand Rapids</b>AHL<br>25–26</div><div><span class=dot style=background:#9c1b2a></span><b>Grand Rapids</b>AHL<br>26–27</div><div><img src="https://assets.nhle.com/logos/nhl/svg/DET_dark.svg" alt=""><b>Detroit</b>NHL<br>26–27</div></div></div>
+  <div class="blk"><div class="bh"><span class="q">How he got here</span><span class="w">source NHL.com</span></div>
+    <div class="path">
+      <div class="st"><b>HC Přerov</b><br><span>youth → Chance liga · 2017–24 · <em>.943</em> in his last season</span></div>
+      <div class="st"><b>HC Kometa Brno</b><br><span>Extraliga · 2024–25</span></div>
+      <div class="st"><b>Signed by Detroit</b><br><span>undrafted</span></div>
+      <div class="st now"><b>Grand Rapids Griffins</b><br><span>AHL · 2 NHL games this season</span></div>
+    </div></div>
+  <div class="blk"><div class="bh"><span class="q">For his country</span><span class="w">🇨🇿 Czechia</span></div>
+    <div class="flags"><span class="mute">No national team games yet</span></div></div>
+</div></div>
+  </div>
+</div></div>
+    <div class="card-body"><h3>Postava</h3><p>Stejné rozložení, žádná sekce nezmizí. Kde chybí zápasy, je místo vidět a ukazuje, kolik jich zbývá (2 z 5). Stav „In the AHL“ je nahoře na Now i v kompaktní hlavičce.</p></div></div>
+</div>
