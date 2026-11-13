@@ -6,7 +6,7 @@ import { ordinal } from '@/lib/profile-context';
 const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
 
 export function TeamLadder({ bars, myRank, max, min, teamName }: Ladder & { teamName: string }) {
-  if (!bars.length) return <div className="py-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>No ice time yet</div>;
+  if (!bars.length) return <div className="py-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>Ice time not available</div>;
   return (
     <div>
       <div className="mt-[18px] flex h-[58px] items-end gap-[3px]" role="img" aria-label={myRank ? `${ordinal(myRank)} of ${bars.length} ${teamName} by ice time` : `${teamName} by ice time`}>

@@ -3,7 +3,7 @@
 import type { ProfileV3View, Result } from '@/components/player/v3/types';
 import { deriveOutStatus, daysAgo, fetchPeers, fetchPlayer, fetchSeasonPhase } from '@/lib/data';
 import { ppmToHeat } from '@/lib/heat';
-import { goalieTable, leagueSavePct, skaterTable, skaterWindow, type GoalieRow, type SkaterRow } from '@/lib/league-stats';
+import { goalieTable, leagueSavePct, skaterSummary, skaterTable, skaterWindow, type GoalieRow, type SkaterRow } from '@/lib/league-stats';
 import { nextGame } from '@/lib/next-game';
 import { currentSeason, getPlayerLanding } from '@/lib/nhl-api';
 import { heatSeries } from '@/lib/player-profile';
@@ -67,7 +67,7 @@ export async function buildPlayerView(id: string): Promise<PlayerPageData | null
   const meS = table.find(r => r.id === player.id) ?? null;
   const pos: 'F' | 'D' = player.position_code === 'D' ? 'D' : 'F';
   await Promise.all(nhlSeasons.map(async s => {
-    const t = s === season ? table : await skaterTable(s);
+    const t = s === season ? table : await skaterSummary(s);
     ranks[s] = seasonRank(t, player.id, pos, s === season ? NEED : 20);
   }));
 
@@ -215,7 +215,7 @@ export async function buildPlayerView(id: string): Promise<PlayerPageData | null
       : { kind: 'ladder', ladder: teamLadder(table, player.id, team), teamName: `${teamShort} ${words.many}` },
     character,
     axisLabels: [...AXIS_LABELS[isGoalie ? 'G' : group]],
-    emptyNote: character.axes.length ? null : { have: gp, need: NEED },
+    emptyNote: character.axes.length || gp >= NEED ? null : { have: gp, need: NEED }, // 5+ games and no axes = stats API down
     career: { columns, timeline: timeline(landing, draft), events: countryEvents(landing), country },
     games: {
       totals,

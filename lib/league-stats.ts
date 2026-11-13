@@ -82,7 +82,8 @@ const windowQuery = (from: string, to: string) =>
 async function skaters(query: string, revalidate: number): Promise<SkaterRow[]> {
   const names = ['summary', 'realtime', 'timeonice', 'penalties', 'percentages', 'faceoffwins'];
   const [summary, ...rest] = await Promise.all(names.map(n => report('skater', n, query, revalidate)));
-  return summary.length ? mergeSkaters(summary, rest[0], rest[1], rest[2], rest[3], rest[4]) : [];
+  // A report that failed would merge as zeros for everyone — use no table instead.
+  return summary.length && rest.every(r => r.length) ? mergeSkaters(summary, rest[0], rest[1], rest[2], rest[3], rest[4]) : [];
 }
 
 // A finished season never changes; the current one changes nightly.
@@ -106,6 +107,15 @@ export function skaterTable(season: string): Promise<SkaterRow[]> {
   return shared(`league/skaters/${season}`, past ? 7 * 24 * HOUR : 6 * HOUR, () => skaters(seasonQuery(season), past ? 604_800 : 21_600));
 }
 
+// Points, games and position only — enough to rank a past season.
+export function skaterSummary(season: string): Promise<SkaterRow[]> {
+  const past = isPast(season);
+  return shared(`league/skater-summary/${season}`, past ? 7 * 24 * HOUR : 6 * HOUR, async () => {
+    const summary = await report('skater', 'summary', seasonQuery(season), past ? 604_800 : 21_600);
+    return mergeSkaters(summary, [], [], [], [], []);
+  });
+}
+
 export function skaterWindow(from: string, to: string): Promise<SkaterRow[]> {
   return shared(`league/skaters/${from}_${to}`, 6 * HOUR, () => skaters(windowQuery(from, to), 21_600));
 }
@@ -116,6 +126,6 @@ export function goalieTable(season: string): Promise<GoalieRow[]> {
   return shared(`league/goalies/${season}`, ttl * 1000, async () => {
     const q = seasonQuery(season);
     const [summary, advanced, byStrength] = await Promise.all(['summary', 'advanced', 'savesByStrength'].map(n => report('goalie', n, q, ttl)));
-    return summary.length ? mergeGoalies(summary, advanced, byStrength) : [];
+    return summary.length && advanced.length && byStrength.length ? mergeGoalies(summary, advanced, byStrength) : [];
   });
 }

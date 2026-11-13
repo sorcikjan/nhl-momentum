@@ -38,6 +38,10 @@ describe('Radar', () => {
     expect(out).toContain('2 of 5');
     expect(out).not.toContain('NaN');
   });
+  it('no axes and no game shortfall: says the data is unavailable, never "30 of 5"', () => {
+    const out = html(<Radar axes={[]} unused={[]} labels={['Goals', 'Shots']} />);
+    expect(out).toContain('Not available right now');
+  });
 });
 
 const col = (o: Partial<Column>): Column => ({ season: '2026–27', team: 'ANA', teamName: 'Anaheim Ducks', league: 'NHL', value: 1.28, pct: 97, top: 3, gp: 18, thin: false, ...o });
@@ -53,6 +57,10 @@ describe('SeasonColumns', () => {
     const out = html(<SeasonColumns columns={[col({ season: '2023–24', value: 1, pct: null, top: null, gp: 1, thin: true })]} goalie={false} />);
     expect(out).toMatch(/data-thin="true"[^>]*height:12%/);
     expect(out).toContain('1 gp');
+  });
+  it('skaters: any season without a rank is a stub, not a zero bar', () => {
+    const out = html(<SeasonColumns columns={[col({ season: '2019–20', value: 0.6, pct: null, top: null, gp: 12, thin: false })]} goalie={false} />);
+    expect(out).toMatch(/data-thin="true"[^>]*height:12%/);
   });
   it('goalies: full club names, no codes, thin seasons hatched', () => {
     const out = html(<SeasonColumns goalie columns={[

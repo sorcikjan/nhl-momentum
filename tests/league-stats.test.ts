@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { leagueSavePct, mergeGoalies, mergeSkaters, skaterTable } from '@/lib/league-stats';
+import { leagueSavePct, mergeGoalies, mergeSkaters, skaterSummary, skaterTable } from '@/lib/league-stats';
 
 const summary = [
   { playerId: 1, lastName: 'Gauthier', positionCode: 'L', teamAbbrevs: 'PHI,ANA', gamesPlayed: 18, goals: 16, assists: 7, points: 23, shots: 79, timeOnIcePerGame: 1104 },
@@ -49,5 +49,22 @@ describe('fetchers', () => {
   it('an unreachable stats API gives an empty table, not an error', async () => {
     vi.stubGlobal('fetch', () => Promise.reject(new Error('down')));
     await expect(skaterTable('20262027')).resolves.toEqual([]);
+  });
+  const reply = (name: string) => ({ summary, realtime, timeonice: toi, penalties, percentages, faceoffwins: faceoffs } as Record<string, unknown[]>)[name];
+  const api = (fail: string | null, seen: string[] = []) => (url: string) => {
+    const name = url.split('/skater/')[1].split('?')[0];
+    seen.push(name);
+    return Promise.resolve(name === fail ? new Response('', { status: 429 }) : new Response(JSON.stringify({ data: reply(name) })));
+  };
+  it('a table with one report missing is not used (zeros would poison every profile)', async () => {
+    vi.stubGlobal('fetch', api('timeonice'));
+    await expect(skaterTable('20202021')).resolves.toEqual([]);
+  });
+  it('a past season for ranking reads only the summary report', async () => {
+    const seen: string[] = [];
+    vi.stubGlobal('fetch', api(null, seen));
+    const rows = await skaterSummary('20192020');
+    expect(seen).toEqual(['summary']);
+    expect(rows.find(r => r.id === 1)).toMatchObject({ pts: 23, gp: 18, pos: 'F' });
   });
 });

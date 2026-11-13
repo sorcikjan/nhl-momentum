@@ -14,7 +14,7 @@ export function SeasonColumns({ columns, goalie, mini = false }: { columns: Colu
   }
   const height = (c: Column) => goalie
     ? Math.round(Math.max(0, Math.min(1, (c.value - SV_LO) / (SV_HI - SV_LO))) * 100)
-    : c.pct ?? (c.thin ? 12 : 0); // too few games to rank: a short hatched stub
+    : c.pct ?? 12; // no rank (too few games, or stats unavailable): a short hatched stub
   const color = (c: Column) => goalie
     ? (c.team ? TEAMS[c.team]?.bg ?? 'var(--text-muted)' : 'var(--text-muted)')
     : (c.pct ?? 0) >= 95 ? 'var(--heat)' : (c.pct ?? 0) >= 80 ? '#ff7a3a' : (c.pct ?? 0) >= 50 ? '#ffb27a' : '#5a6378';
@@ -31,11 +31,12 @@ export function SeasonColumns({ columns, goalie, mini = false }: { columns: Colu
         ))}
         {columns.map((c, i) => {
           const h = height(c);
+          const stub = c.thin || (!goalie && c.pct == null);
           return (
             <div key={i} className="relative z-[1] flex-1">
-              <i data-thin={c.thin ? 'true' : undefined} className="absolute bottom-0 left-[12%] right-[12%] block rounded-t" style={{
+              <i data-thin={stub ? 'true' : undefined} className="absolute bottom-0 left-[12%] right-[12%] block rounded-t" style={{
                 height: `${h}%`,
-                background: c.thin ? `repeating-linear-gradient(135deg, ${color(c)} 0 3px, transparent 3px 6px)` : color(c),
+                background: stub ? `repeating-linear-gradient(135deg, ${color(c)} 0 3px, transparent 3px 6px)` : color(c),
               }} />
               <div className="absolute -inset-x-1.5 text-center leading-tight" style={{ bottom: `calc(${h}% + 4px)` }}>
                 <b className={`block font-black ${mini ? 'text-[11px]' : 'text-[13px]'}`} style={{ color: 'var(--text-bright)' }}>{goalie ? fmtSv(c.value) : c.value.toFixed(2)}</b>

@@ -56,6 +56,9 @@ export function Radar({ axes, unused, emptyNote, labels }: Props) {
             </g>
           );
         })}
+        {!axes.length && !emptyNote && (
+          <text x={CX} y={CY + 4} textAnchor="middle" fontSize="11" fontWeight="700" fill="var(--text-muted)">Not available right now</text>
+        )}
         {!axes.length && emptyNote && <>
           <text x={CX} y={CY - 4} textAnchor="middle" fontSize="20" fontWeight="900" fill="var(--text-bright)">{emptyNote.have} of {emptyNote.need}</text>
           <text x={CX} y={CY + 12} textAnchor="middle" fontSize="9" fontWeight="700" fill="var(--text-muted)" fontFamily="ui-monospace,monospace" letterSpacing="1">NHL GAMES</text>
