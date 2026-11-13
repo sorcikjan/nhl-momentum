@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchNhl, inMinors } from '@/lib/player-assignment';
+import { fetchNhl, inMinors, rosterTeams } from '@/lib/player-assignment';
 
 const S = 20262027;
 const nhl = { season: S, leagueAbbrev: 'NHL', gameTypeId: 2, gamesPlayed: 2 };
@@ -30,5 +30,12 @@ describe('fetchNhl', () => {
     expect(fetch).toHaveBeenCalledTimes(3);
     vi.stubGlobal('fetch', () => Promise.resolve(new Response('', { status: 404 })));
     await expect(fetchNhl('/x', 0)).resolves.toBeNull();
+  });
+});
+
+describe('rosterTeams', () => {
+  it('only clubs with active players — historical teams would burn the rate limit', () => {
+    const teams = [{ id: 17, abbrev: 'DET' }, { id: 32, abbrev: 'QUE' }, { id: 24, abbrev: 'ANA' }];
+    expect(rosterTeams(teams, [{ team_id: 17 }, { team_id: 17 }, { team_id: 24 }])).toEqual([{ id: 17, abbrev: 'DET' }, { id: 24, abbrev: 'ANA' }]);
   });
 });

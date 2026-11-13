@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 import { currentSeason } from '@/lib/nhl-api';
 import { pageAll } from '@/lib/data';
-import { fetchNhl as nhl, inMinors, type SeasonTotal } from '@/lib/player-assignment';
+import { fetchNhl as nhl, inMinors, rosterTeams, type SeasonTotal } from '@/lib/player-assignment';
 
 const SEASON = currentSeason(); // e.g. 20262027
 
@@ -26,17 +26,17 @@ export async function GET(req: NextRequest) {
   const { data: teams, error: tErr } = await supabaseAdmin.from('teams').select('id, abbrev');
   if (tErr) return NextResponse.json({ error: tErr.message }, { status: 500 });
 
-  const rosters = await pool(teams ?? [], 4, async t => ({ id: t.id as number, roster: await nhl<Roster>(`/roster/${t.abbrev}/${SEASON}`) }));
-  // A team whose roster didn't load can't tell us anything: leave its players alone.
-  const loadedTeams = new Set(rosters.filter(r => r.roster).map(r => r.id));
-  const onRoster = new Set(rosters.flatMap(r => [...(r.roster?.forwards ?? []), ...(r.roster?.defensemen ?? []), ...(r.roster?.goalies ?? [])].map(p => p.id)));
-
   let players: { id: number; team_id: number; in_minors: boolean | null }[];
   try {
     players = await pageAll((from, to) => supabaseAdmin.from('players').select('id, team_id, in_minors').eq('is_active', true).not('team_id', 'is', null).order('id').range(from, to));
   } catch (e) {
     return NextResponse.json({ error: String(e) }, { status: 500 });
   }
+  const rosters = await pool(rosterTeams(teams ?? [], players), 4, async t => ({ id: t.id as number, roster: await nhl<Roster>(`/roster/${t.abbrev}/${SEASON}`) }));
+  // A team whose roster didn't load can't tell us anything: leave its players alone.
+  const loadedTeams = new Set(rosters.filter(r => r.roster).map(r => r.id));
+  const onRoster = new Set(rosters.flatMap(r => [...(r.roster?.forwards ?? []), ...(r.roster?.defensemen ?? []), ...(r.roster?.goalies ?? [])].map(p => p.id)));
+
   const known = players.filter(p => loadedTeams.has(p.team_id));
 
   // Back on a roster → not in the minors.

@@ -30,3 +30,10 @@ export async function fetchNhl<T>(path: string, waitMs = 1_000): Promise<T | nul
   }
   return null;
 }
+
+// The teams table also holds ~30 defunct clubs; asking for their rosters only
+// burns the rate limit. Ask only for clubs that have active players.
+export function rosterTeams<T extends { id: number }>(teams: T[], players: { team_id: number }[]): T[] {
+  const ids = new Set(players.map(p => p.team_id));
+  return teams.filter(t => ids.has(t.id));
+}
