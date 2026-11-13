@@ -3,19 +3,9 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { requireIngestAuth } from '@/lib/ingest-auth';
 import { currentSeason } from '@/lib/nhl-api';
 import { pageAll } from '@/lib/data';
-import { inMinors, type SeasonTotal } from '@/lib/player-assignment';
+import { fetchNhl as nhl, inMinors, type SeasonTotal } from '@/lib/player-assignment';
 
 const SEASON = currentSeason(); // e.g. 20262027
-const NHL = 'https://api-web.nhle.com/v1';
-
-async function nhl<T>(path: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${NHL}${path}`, { cache: 'no-store', signal: AbortSignal.timeout(10_000) });
-    return res.ok ? ((await res.json()) as T) : null;
-  } catch {
-    return null;
-  }
-}
 
 async function pool<T, R>(items: T[], size: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = [];
