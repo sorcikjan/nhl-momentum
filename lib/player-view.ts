@@ -172,7 +172,7 @@ export async function buildPlayerView(id: string): Promise<PlayerPageData | null
   const draft = draftD?.year ? { year: draftD.year, pick: draftD.overallPick, team: draftD.teamAbbrev } : null;
   const country = nationality(landing, player.birth_country ?? (landing as any)?.birthCountry ?? null);
   const nhlN = nhlSeasonOrdinal(landing);
-  const age = ageOf(player.birth_date);
+  const age = ageOf(player.birth_date ?? (landing as any)?.birthDate);
   const pointsRank = meS && meS.gp >= NEED ? 1 + table.filter(r => r.pos === meS.pos && r.gp >= NEED && r.pts > meS.pts).length : null;
 
   const sentence = verdict({

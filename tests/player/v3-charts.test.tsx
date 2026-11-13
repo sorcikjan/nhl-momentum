@@ -49,6 +49,11 @@ describe('SeasonColumns', () => {
     expect(out).toContain('top 3%');
     expect(out).toContain('1.28');
   });
+  it('skaters: an unranked thin season is a visible hatched stub, not an empty slot', () => {
+    const out = html(<SeasonColumns columns={[col({ season: '2023–24', value: 1, pct: null, top: null, gp: 1, thin: true })]} goalie={false} />);
+    expect(out).toMatch(/data-thin="true"[^>]*height:12%/);
+    expect(out).toContain('1 gp');
+  });
   it('goalies: full club names, no codes, thin seasons hatched', () => {
     const out = html(<SeasonColumns goalie columns={[
       col({ team: null, teamName: 'HC Přerov', league: 'Chance liga', value: 0.943, pct: null, top: null, gp: 44 }),

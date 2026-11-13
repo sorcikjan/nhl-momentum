@@ -14,7 +14,7 @@ export function SeasonColumns({ columns, goalie, mini = false }: { columns: Colu
   }
   const height = (c: Column) => goalie
     ? Math.round(Math.max(0, Math.min(1, (c.value - SV_LO) / (SV_HI - SV_LO))) * 100)
-    : c.pct ?? 0;
+    : c.pct ?? (c.thin ? 12 : 0); // too few games to rank: a short hatched stub
   const color = (c: Column) => goalie
     ? (c.team ? TEAMS[c.team]?.bg ?? 'var(--text-muted)' : 'var(--text-muted)')
     : (c.pct ?? 0) >= 95 ? 'var(--heat)' : (c.pct ?? 0) >= 80 ? '#ff7a3a' : (c.pct ?? 0) >= 50 ? '#ffb27a' : '#5a6378';
