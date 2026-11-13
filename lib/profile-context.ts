@@ -40,7 +40,7 @@ export function peersOf(me: Peer, all: Peer[]): Peer[] {
 const mean = (xs: number[]) => (xs.length ? xs.reduce((s, v) => s + v, 0) / xs.length : 0);
 // Share of the field strictly below him, 0–99 (he is in the field, so never
 // "hotter than 100%").
-const percentile = (xs: number[], v: number) => (xs.length ? Math.min(99, Math.round((100 * xs.filter(x => x < v).length) / xs.length)) : 0);
+export const percentile = (xs: number[], v: number) => (xs.length ? Math.min(99, Math.round((100 * xs.filter(x => x < v).length) / xs.length)) : 0);
 const rankOf = (xs: number[], v: number) => 1 + xs.filter(x => x > v).length;
 const p95 = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return s.length ? s[Math.min(s.length - 1, Math.floor(s.length * 0.95))] : 0; };
 
