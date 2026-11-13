@@ -29,7 +29,7 @@ const DOWN_FOR_MS = 30_000;
 export const BYPASS_HEADER = 'x-db-direct';
 
 let downUntil = 0;
-let store: Store | null | undefined;
+let store: null | undefined; // null = not on Netlify
 let blobsOffUntil = 0;
 // No store call may hold up a render: a slow or hanging Blobs call counts as
 // "no saved copy", and this instance stops using the store for 5 minutes.
@@ -59,15 +59,18 @@ function timed<T>(op: Promise<T>): Promise<T> {
   ]).finally(() => clearTimeout(timer));
 }
 
+// A store carries the access token of the request that created it, and that
+// token expires while a warm instance lives on ("Failed to decode token: Token
+// expired"), so every call gets a fresh one. Only "not on Netlify" is remembered.
 function blobs(): Store | null {
   if (Date.now() < blobsOffUntil) return null;
-  if (store !== undefined) return store;
+  if (store === null) return null;
   try {
-    store = getStore({ name: STORE, consistency: 'eventual' });
+    return getStore({ name: STORE, consistency: 'eventual' });
   } catch {
     store = null; // not on Netlify (local dev, tests)
+    return null;
   }
-  return store;
 }
 
 function inPageRender(): boolean {
