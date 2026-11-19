@@ -123,4 +123,5 @@ export const submitUrl = (p: RedditPlan) =>
 // send the same subreddit two weeks running.
 export const PAST_POSTS: { date: string; subreddit: string }[] = [
   { date: '2026-11-09', subreddit: 'AnaheimDucks' },
+  { date: '2026-11-19', subreddit: 'NewYorkIslanders' },
 ];
