@@ -8,6 +8,7 @@ import { fetchRankings } from '@/lib/data';
 import { todayET } from '@/lib/home';
 import { gameGoals, withClips, type Moment } from '@/lib/moments';
 import { currentSeason, getScore, getSchedule } from '@/lib/nhl-api';
+import { statsRows } from '@/lib/nhl-stats-api';
 import { TEAMS } from '@/lib/team-colors';
 import { gameUrl, playerUrl } from '@/lib/urls';
 import type { PlayerRowData } from '@/lib/player-row';
@@ -73,13 +74,7 @@ const MAX_GOALS = 9;
 type SeasonSkater = { playerId: number; points: number; gamesPlayed: number };
 type SeasonGoalie = { playerId: number; gamesPlayed: number; saves: number; shotsAgainst: number; savePct: number };
 async function seasonTable<T>(kind: 'skater' | 'goalie', season: string): Promise<T[]> {
-  try {
-    const url = `https://api.nhle.com/stats/rest/en/${kind}/summary?limit=-1&cayenneExp=seasonId=${season}%20and%20gameTypeId=2`;
-    const res = await fetch(url, { next: { revalidate: 1800 }, signal: AbortSignal.timeout(8_000) });
-    return res.ok ? ((await res.json()) as { data?: T[] }).data ?? [] : [];
-  } catch {
-    return [];
-  }
+  return statsRows<T>(`https://api.nhle.com/stats/rest/en/${kind}/summary?cayenneExp=seasonId=${season}%20and%20gameTypeId=2`, { revalidate: 1800 });
 }
 
 /* eslint-disable @typescript-eslint/no-explicit-any */

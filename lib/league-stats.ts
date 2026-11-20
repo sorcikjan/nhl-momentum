@@ -3,6 +3,7 @@
 // The profile compares a player with these — no database involved. Each
 // table is cached by Next's fetch cache and shared across instances.
 import { sharedResult } from '@/lib/db-fallback';
+import { statsRows } from '@/lib/nhl-stats-api';
 
 export type SkaterRow = {
   id: number; last: string; pos: 'F' | 'D'; team: string; // team = last of teamAbbrevs ("PHI,ANA" → "ANA")
@@ -22,16 +23,7 @@ const HOUR = 3_600_000;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 async function report(kind: 'skater' | 'goalie', name: string, query: string, revalidate: number): Promise<any[]> {
-  try {
-    const res = await fetch(`${BASE}/${kind}/${name}?limit=-1&${query}`, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (hockeymomentum.com)' },
-      next: { revalidate },
-      signal: AbortSignal.timeout(8_000),
-    });
-    return res.ok ? ((await res.json()) as { data?: any[] }).data ?? [] : [];
-  } catch {
-    return [];
-  }
+  return statsRows(`${BASE}/${kind}/${name}?${query}`, { revalidate, headers: { 'User-Agent': 'Mozilla/5.0 (hockeymomentum.com)' } });
 }
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
