@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v20 · Player profile — desktop</title>
+<!--
+  Desktop layout prototype for the player profile (v3 content, real data for
+  Cutter Gauthier as of 2026-11-20). Mobile stays as shipped; this is lg and up.
+  Same frame as the game page: full content width, 48px gutters, main column +
+  360px side column. The side column holds what must always be visible (who he
+  is, this season, next game) and stays put while tabs change.
+-->
+<style>
+  :root{--bg:#0a0b0f;--bg-card:#13151c;--bg-raised:#1a1d26;--border:#252a38;--border-soft:#1c2030;--text-bright:#f4f5f8;--text:#8a94a6;--text-muted:#5a6378;--text-dim:#6b7388;--heat:#ff5a24;--cold:#3a88ff;--rise:#00e5a0;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,sans-serif;line-height:1.4;min-width:1100px}
+  b{font-weight:800}
+  /* site header (as on every page) */
+  .site{position:fixed;inset:0 0 auto 0;height:72px;z-index:50;display:flex;align-items:center;gap:40px;padding:0 48px;border-bottom:1px solid var(--border-soft);background:rgba(10,11,15,.92);backdrop-filter:blur(8px)}
+  .site .brand{font-size:22px;font-weight:900;color:var(--text-bright);letter-spacing:-.5px}
+  .site .brand i{color:var(--heat);font-style:normal}
+  .site nav{display:flex;gap:28px;font-size:14px;font-weight:600}
+  .site nav span{color:var(--text)}
+  .site .search{margin-left:auto;width:260px;height:36px;border-radius:10px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-muted);font-size:13px;display:flex;align-items:center;padding:0 12px}
+  main{padding:104px 48px 64px}
+  .proto-note{font:600 11px/1.4 var(--mono);letter-spacing:.6px;color:var(--text-muted);margin-bottom:14px}
+  .proto-note b{color:var(--heat)}
+
+  /* hero */
+  .hero{position:relative;height:280px;border-radius:20px;overflow:hidden;background:linear-gradient(120deg,#F47A38 0%,color-mix(in srgb,#F47A38 45%,#000) 45%,#0d0f14 100%)}
+  .hero .num{position:absolute;left:46%;top:-60px;font-size:340px;font-weight:900;line-height:1;color:rgba(255,255,255,.06);letter-spacing:-12px}
+  .hero .photo{position:absolute;left:34%;bottom:0;height:270px}
+  .hero .logo{position:absolute;left:36px;top:30px;height:64px}
+  .hero .who{position:absolute;left:36px;bottom:32px}
+  .hero .first{font-size:22px;font-weight:600;color:rgba(255,255,255,.85)}
+  .hero h1{font-size:64px;font-weight:900;text-transform:uppercase;letter-spacing:-1.5px;line-height:.95;color:#fff}
+  .hero .meta{margin-top:10px;font-size:14px;color:rgba(255,255,255,.8)}
+  .hero .now{position:absolute;right:40px;top:50%;transform:translateY(-50%);width:330px;text-align:right}
+  .hero .now .k{font:700 11px/1 var(--mono);letter-spacing:1.4px;color:rgba(255,255,255,.6)}
+  .hero .now .v{display:flex;justify-content:flex-end;align-items:flex-end;gap:14px;margin-top:8px}
+  .hero .now .v strong{font-size:110px;font-weight:900;line-height:.8;letter-spacing:-5px;color:#ffb07a}
+  .hero .now .v span{font-size:18px;font-weight:800;color:#6fb0ff;padding-bottom:6px}
+  .hero .now .v span small{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.55)}
+  .hero .now p{margin-top:16px;font-size:20px;font-weight:800;line-height:1.25;color:#fff}
+
+  /* tabs */
+  .tabs{display:flex;gap:36px;margin:22px 0 28px;border-bottom:1px solid var(--border-soft)}
+  .tabs button{background:none;border:0;cursor:pointer;font:700 15px/1 Inter,system-ui,sans-serif;color:var(--text-muted);padding:14px 0}
+  .tabs button[aria-selected=true]{color:#fff;box-shadow:inset 0 -2px 0 var(--heat)}
+
+  /* frame: main + side, like the game page */
+  .frame{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:32px;align-items:start}
+  .side{position:sticky;top:96px;display:flex;flex-direction:column;gap:16px}
+  .panel{display:none}.panel.on{display:block}
+  .card{background:var(--bg-card);border-radius:16px;padding:22px 24px}
+  .kick{font:700 11px/1 var(--mono);letter-spacing:1.4px;color:var(--heat);margin-bottom:6px}
+  .h2{font-size:24px;font-weight:800;letter-spacing:-.6px;color:var(--text-bright);line-height:1.05}
+  .head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:18px;gap:16px}
+  .head a{font-size:13px;font-weight:700;color:#ff8a4c;text-decoration:none;white-space:nowrap}
+  .head .note{font:600 11px/1.3 var(--mono);color:var(--text-muted);text-align:right}
+  .stack{display:flex;flex-direction:column;gap:32px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+
+  /* side cards */
+  .tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .tile{background:var(--bg-raised);border-radius:12px;padding:12px 14px}
+  .tile b{display:block;font-size:20px;font-weight:900;color:var(--text-bright)}
+  .tile span{display:block;margin-top:2px;font-size:12px;color:var(--text-dim)}
+  .tile em{font-style:normal;font-weight:800;color:#ff8a4c}
+  .side .lab{font:700 11px/1 var(--mono);letter-spacing:1.4px;color:var(--text-muted);margin-bottom:12px}
+  .next b{font-size:22px;font-weight:900;color:var(--text-bright)}
+  .next .sub{font-size:13px;color:var(--text-dim)}
+  .energy{margin-top:16px}
+  .bar{height:8px;border-radius:4px;background:var(--border);overflow:hidden}
+  .bar i{display:block;height:8px;border-radius:4px;background:var(--rise)}
+  .energy .row{display:flex;justify-content:space-between;margin-top:6px;font-size:13px;color:var(--text-dim)}
+  .energy .row b{color:var(--text-bright);font-size:15px}
+
+  /* heat line */
+  .chart{position:relative}
+  .chart svg{display:block;width:100%;height:auto;overflow:visible}
+  .axis{display:flex;justify-content:space-between;margin-top:8px;font:600 11px/1 var(--mono);color:var(--text-muted)}
+  .last5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:22px}
+  .g5{background:var(--bg);border-radius:12px;padding:12px 0;text-align:center}
+  .g5.last{outline:2px solid var(--heat);outline-offset:-2px}
+  .g5 b{display:block;font-size:20px;font-weight:900;color:#ff8a4c}
+  .g5 span{display:flex;justify-content:center;align-items:center;gap:6px;margin-top:6px;font-size:13px;color:var(--text-dim)}
+  .r{display:inline-block;width:18px;height:18px;border-radius:4px;font:800 11px/18px Inter,sans-serif;text-align:center;color:#0d0f14}
+  .r.W{background:var(--rise)}.r.L{background:#ff4d6a}
+
+  /* ladder */
+  .ladder{display:flex;align-items:flex-end;gap:5px;height:120px;margin-top:8px}
+  .ladder i{flex:1;border-radius:4px 4px 0 0;background:var(--border);position:relative}
+  .ladder i.me{background:var(--heat)}
+  .ladder i.me::after{content:attr(data-l);position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);white-space:nowrap;font-size:13px;font-weight:800;color:var(--text-bright)}
+  .ladnames{display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:var(--text-muted)}
+  .ladnames b{color:var(--text-dim);font-weight:700}
+
+  /* season columns */
+  .cols{display:flex;align-items:flex-end;gap:16px;height:170px}
+  .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+  .col .v{font-size:18px;font-weight:900;color:var(--text-bright)}
+  .col .p{font-size:11px;color:var(--text-dim);margin-bottom:6px}
+  .col i{display:block;width:100%;border-radius:8px 8px 0 0;background:linear-gradient(#ff5a24,#7a2a10)}
+  .col i.ghost{background:none;border:1.5px dashed var(--border);border-bottom:0}
+  .col i.dim{background:linear-gradient(#a8492a,#4a1e10)}
+  .colsx{display:flex;gap:16px;margin-top:10px}
+  .colsx div{flex:1;text-align:center;font-size:12px;color:var(--text-dim)}
+  .colsx div b{display:block;color:var(--text);font-weight:700}
+  .cols.big{height:260px}
+
+  /* games table */
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{font:700 11px/1 var(--mono);letter-spacing:1px;color:var(--text-muted);text-align:right;padding:0 10px 12px;border-bottom:1px solid var(--border)}
+  th:first-child,th:nth-child(2),td:first-child,td:nth-child(2){text-align:left}
+  td{padding:11px 10px;border-bottom:1px solid var(--border-soft);text-align:right;color:var(--text);font-variant-numeric:tabular-nums}
+  td.pts{color:var(--text-bright);font-weight:800}
+  td .opp{display:inline-flex;align-items:center;gap:8px;color:var(--text-bright);font-weight:700}
+  td .hb{display:inline-flex;align-items:center;gap:10px;justify-content:flex-end}
+  td .hb i{display:block;height:8px;border-radius:4px;background:var(--heat)}
+  td .hb b{width:28px;text-align:right}
+  tr.month td{color:var(--text-muted);font:700 11px/1 var(--mono);letter-spacing:1px;padding-top:20px;border-bottom:0}
+
+  /* radar */
+  .radar svg{display:block;width:100%;height:auto}
+  .legend{display:flex;gap:20px;font-size:13px;color:var(--text-dim);margin-top:8px}
+  .legend i{display:inline-block;width:18px;height:0;border-top:2px dashed #e8ecf2;vertical-align:middle;margin-right:6px}
+  .legend i.o{border-top:3px solid var(--heat)}
+  .tag{display:inline-block;margin-top:14px;padding:5px 10px;border-radius:999px;border:1px solid var(--border);font-size:12px;color:var(--text-muted)}
+  .pct{display:flex;flex-direction:column;gap:10px}
+  .pct .row{display:grid;grid-template-columns:140px 1fr 46px;align-items:center;gap:12px;font-size:13px}
+  .pct .row span{color:var(--text)}
+  .pct .track{position:relative;height:10px;border-radius:5px;background:var(--bg-raised)}
+  .pct .track i{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--heat)}
+  .pct .track u{position:absolute;top:-3px;bottom:-3px;width:2px;background:#e8ecf2}
+  .pct .row b{text-align:right;color:var(--text-bright)}
+  .pct .row b small{font-size:11px;font-weight:700}
+
+  /* timeline */
+  .tl{display:flex;flex-direction:column;gap:0}
+  .tl .st{display:grid;grid-template-columns:22px 1fr;gap:14px;padding-bottom:22px;position:relative}
+  .tl .st::before{content:"";position:absolute;left:10px;top:18px;bottom:0;width:2px;background:var(--border)}
+  .tl .st:last-child::before{display:none}
+  .tl .dot{width:22px;height:22px;border-radius:50%;background:var(--bg-raised);border:2px solid var(--border)}
+  .tl .st.cur .dot{border-color:var(--heat);background:var(--heat)}
+  .tl b{display:block;color:var(--text-bright);font-size:15px}
+  .tl span{font-size:13px;color:var(--text-dim)}
+  .intl{display:flex;flex-direction:column;gap:12px;font-size:14px}
+  .intl b{color:var(--text-bright)}
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="brand">momentum<i>.</i></div>
+  <nav><span>Tonight</span><span>Games</span><span>Heat map</span><span>Rankings</span><span>Standings</span><span>Stories</span></nav>
+  <div class="search">Search players, teams…</div>
+</header>
+
+<main>
+  <div class="proto-note"><b>v20 · DESKTOP PROTOTYPE</b> · real data, Cutter Gauthier, Nov 20 2026 · click the tabs · mobile stays as it is</div>
+
+  <!-- HERO: who he is (left) + how he's doing in one number and one sentence (right) -->
+  <section class="hero">
+    <div class="num">61</div>
+    <img class="photo" src="https://assets.nhle.com/mugs/nhl/20262027/ANA/8483445.png" alt="">
+    <img class="logo" src="https://assets.nhle.com/logos/nhl/svg/ANA_dark.svg" alt="">
+    <div class="who">
+      <div class="first">Cutter</div>
+      <h1>Gauthier</h1>
+      <div class="meta">#61 · Left wing · Anaheim Ducks</div>
+    </div>
+    <div class="now">
+      <div class="k">HEAT · AFTER NOV 19</div>
+      <div class="v"><span>▼ 35<small>from the game before</small></span><strong>57</strong></div>
+      <p>8th in points among NHL forwards.</p>
+    </div>
+  </section>
+
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="true" data-t="now">Now</button>
+    <button role="tab" aria-selected="false" data-t="games">Games</button>
+    <button role="tab" aria-selected="false" data-t="player">Player</button>
+    <button role="tab" aria-selected="false" data-t="career">Career</button>
+  </div>
+
+  <div class="frame">
+    <!-- MAIN COLUMN: the active tab -->
+    <div>
+
+      <!-- NOW -->
+      <section class="panel on" data-p="now">
+        <div class="stack">
+          <div>
+            <div class="head">
+              <div><div class="kick">HOW HE'S DOING</div><div class="h2">Heat after each game</div></div>
+              <a href="#" data-goto="games">All games ›</a>
+            </div>
+            <div class="card">
+              <div class="chart" id="heatline"></div>
+              <div class="axis"><span>Oct 2</span><span>Oct 20</span><span>Nov 3</span><span>last game · Nov 19</span></div>
+              <div class="last5">
+                <div class="g5"><b>1G</b><span><i class="r L">L</i>NSH</span></div>
+                <div class="g5"><b>1G</b><span><i class="r L">L</i>NYI</span></div>
+                <div class="g5"><b>1G</b><span><i class="r W">W</i>CGY</span></div>
+                <div class="g5"><b>3G 1A</b><span><i class="r L">L</i>@STL</span></div>
+                <div class="g5 last"><b>–</b><span><i class="r L">L</i>@COL</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="two">
+            <div>
+              <div class="head"><div><div class="kick">HIS ROLE</div><div class="h2">Ice time in Anaheim</div></div><a href="#" data-goto="player">Player ›</a></div>
+              <div class="card">
+                <div class="ladder" id="ladder-s"></div>
+                <div class="ladnames"><span><b>most</b> · 20:36</span><span>17 Anaheim forwards</span><span><b>fewest</b> · 9:52</span></div>
+              </div>
+            </div>
+            <div>
+              <div class="head"><div><div class="kick">WHERE HE'S HEADING</div><div class="h2">Season by season</div></div><a href="#" data-goto="career">Career ›</a></div>
+              <div class="card">
+                <div class="cols" id="cols-s"></div>
+                <div class="colsx" id="colsx-s"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- GAMES -->
+      <section class="panel" data-p="games">
+        <div class="head"><div><div class="kick">EVERY GAME</div><div class="h2">Game log, newest first</div></div><div class="note">22 games · 2026–27</div></div>
+        <div class="card"><table id="log"></table></div>
+      </section>
+
+      <!-- PLAYER -->
+      <section class="panel" data-p="player">
+        <div class="stack">
+          <div>
+            <div class="head"><div><div class="kick">HIS ROLE</div><div class="h2">Ice time a game, Anaheim forwards</div></div><div class="note">4th of 17 · 18:47</div></div>
+            <div class="card">
+              <div class="ladder" id="ladder-b" style="height:180px"></div>
+              <div class="ladnames" id="ladnames-b"></div>
+            </div>
+          </div>
+          <div>
+            <div class="head"><div><div class="kick">WHAT KIND OF PLAYER</div><div class="h2">Percentile among NHL forwards</div></div></div>
+            <div class="two">
+              <div class="card radar">
+                <div id="radar"></div>
+                <div class="legend"><span><i></i>season</span><span><i class="o"></i>last 3 weeks</span></div>
+              </div>
+              <div class="card">
+                <div class="pct" id="pct"></div>
+                <span class="tag">Penalty kill · not used</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CAREER -->
+      <section class="panel" data-p="career">
+        <div class="stack">
+          <div>
+            <div class="head"><div><div class="kick">SEASON BY SEASON</div><div class="h2">Points a game vs NHL players at his position</div></div><div class="note">column height = league percentile</div></div>
+            <div class="card"><div class="cols big" id="cols-b"></div><div class="colsx" id="colsx-b"></div></div>
+          </div>
+          <div class="two">
+            <div>
+              <div class="head"><div><div class="kick">HOW HE GOT HERE</div><div class="h2">Path to the NHL</div></div><div class="note">source NHL.com</div></div>
+              <div class="card tl">
+                <div class="st"><i class="dot"></i><div><b>USNTDP Juniors</b><span>USHL · 2020–22 · 19 goals in 22 games</span></div></div>
+                <div class="st"><i class="dot"></i><div><b>Drafted #5 by Philadelphia Flyers</b><span>2022</span></div></div>
+                <div class="st"><i class="dot"></i><div><b>Boston College</b><span>NCAA · 2022–24 · 38 goals in 41 games</span></div></div>
+                <div class="st cur"><i class="dot"></i><div><b>Anaheim Ducks</b><span>2024–27 · 41 goals in 76 games</span></div></div>
+              </div>
+            </div>
+            <div>
+              <div class="head"><div><div class="kick">FOR HIS COUNTRY</div><div class="h2">🇺🇸 USA</div></div></div>
+              <div class="card intl">
+                <div><b>World Juniors</b> · 2023 · 2024</div>
+                <div><b>World Championship</b> · 2023 · 2025</div>
+                <div><b>International</b> · 2025</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- SIDE COLUMN: always visible, same on every tab -->
+    <aside class="side">
+      <div class="card next">
+        <div class="lab">NEXT GAME</div>
+        <b>Sat @ UTA</b>
+        <div class="energy">
+          <div class="lab" style="margin-bottom:8px">ENERGY</div>
+          <div class="bar"><i style="width:68%"></i></div>
+          <div class="row"><b>68</b><span>1 day rest</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="lab">WHO HE IS</div>
+        <div class="tiles">
+          <div class="tile"><b>🇺🇸 USA</b><span>born in Sweden</span></div>
+          <div class="tile"><b>22</b><span>years old</span></div>
+          <div class="tile"><b>4th</b><span>NHL season</span></div>
+          <div class="tile"><b>#5</b><span>pick 2022</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="lab">THIS SEASON · RANK AMONG NHL FORWARDS</div>
+        <div class="tiles">
+          <div class="tile"><b>22</b><span>games</span></div>
+          <div class="tile"><b>21</b><span>goals · <em>#1</em></span></div>
+          <div class="tile"><b>8</b><span>assists · <em>top 23%</em></span></div>
+          <div class="tile"><b>29</b><span>points · <em>#8</em></span></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<script>
+// ── real data (live site + NHL stats API, 2026-11-20) ─────────────────────────
+const games = [ // oldest → newest
+  ['Oct 2','@VGK','W',0,1,5,60],['Oct 4','FLA','W',2,1,4,84],['Oct 7','EDM','L',0,0,7,50],['Oct 9','@WPG','W',0,0,1,34],
+  ['Oct 10','@CGY','W',0,0,0,40],['Oct 16','BOS','L',0,1,4,38],['Oct 19','@NYR','L',0,0,5,10],['Oct 20','@NYI','L',0,0,2,11],
+  ['Oct 22','@NJD','L',0,0,2,11],['Oct 24','@PHI','W',0,1,4,18],['Oct 27','VAN','L',0,1,4,19],['Oct 29','BUF','L',2,0,10,36],
+  ['Nov 1','OTT','W',3,0,5,61],['Nov 3','@VAN','W',3,0,6,88],['Nov 5','@EDM','W',1,1,3,97],['Nov 6','@CGY','W',1,0,4,92],
+  ['Nov 8','PIT','W',3,1,6,100],['Nov 11','NSH','L',1,0,7,95],['Nov 14','NYI','L',1,0,3,78],['Nov 15','CGY','W',1,0,5,68],
+  ['Nov 17','@STL','L',3,1,8,92],['Nov 19','@COL','L',0,0,3,57],
+];
+const toi = [['Granlund',1236],['Carlsson',1225],['Sennecke',1216],['Gauthier',1127,1],['Killorn',975],['Washe',896],['Poehling',855],['Caulfield',850],['Terry',834],['Klepov',783],['Greer',746],['McQueen',716],['Vatrano',674],['Nesterenko',663],['Colangelo',638],['Malott',628],['Myatovic',592]];
+const seasons = [['2023–24','1.00',null,'1 game'],['2024–25','0.54',63,'top 37%'],['2025–26','0.91',90,'top 10%'],['2026–27','1.32',98,'top 2%']];
+const radar = [['Goals',99,99],['Shots',99,99],['Assists',60,45],['Power play',96,99],['Ice time',86,91],['Team shots on ice',58,89],['Takeaways',29,13],['Hits + blocks',23,14],['Penalties drawn',35,93]];
+const AVG = 25;
+const mmss = s => `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+
+// heat line
+(() => {
+  const W = 900, H = 220, pad = 10, n = games.length;
+  const x = i => pad + i * (W - 2*pad) / (n - 1), y = v => H - pad - v * (H - 2*pad) / 100;
+  const pts = games.map((g,i) => `${x(i)},${y(g[6])}`).join(' ');
+  const area = `${x(0)},${y(0)} ${pts} ${x(n-1)},${y(0)}`;
+  const dots = games.map((g,i) => `<circle cx="${x(i)}" cy="${y(g[6])}" r="${i===n-1?6:3.5}" fill="${i===n-1?'#ff5a24':'#0a0b0f'}" stroke="#ff5a24" stroke-width="2"/>`).join('');
+  const lbl = games.map((g,i) => (g[6]>=95||i===n-1) ? `<text x="${x(i)}" y="${y(g[6])-12}" fill="#f4f5f8" font-size="13" font-weight="800" text-anchor="middle">${g[6]}</text>` : '').join('');
+  document.getElementById('heatline').innerHTML = `<svg viewBox="0 0 ${W} ${H}">
+    <defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff5a24" stop-opacity=".28"/><stop offset="1" stop-color="#ff5a24" stop-opacity="0"/></linearGradient></defs>
+    ${[25,50,75,100].map(v=>`<line x1="0" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#1c2030"/>`).join('')}
+    <line x1="0" x2="${W}" y1="${y(AVG)}" y2="${y(AVG)}" stroke="#5a6378" stroke-dasharray="4 5"/>
+    <text x="4" y="${y(AVG)-6}" fill="#5a6378" font-size="12" font-family="ui-monospace,monospace">avg ${AVG}</text>
+    <polygon points="${area}" fill="url(#ga)"/>
+    <polyline points="${pts}" fill="none" stroke="#ff5a24" stroke-width="3" stroke-linejoin="round"/>
+    ${dots}${lbl}</svg>`;
+})();
+
+// ladders
+function ladder(el, labels) {
+  const max = toi[0][1];
+  document.getElementById(el).innerHTML = toi.map(([n,s,me]) =>
+    `<i class="${me?'me':''}" style="height:${Math.round(s/max*100)}%" ${me?`data-l="4th · ${mmss(s)}"`:''} title="${n} ${mmss(s)}"></i>`).join('');
+}
+ladder('ladder-s'); ladder('ladder-b');
+document.getElementById('ladnames-b').innerHTML = `<span><b>most</b> · Granlund 20:36</span><span>17 Anaheim forwards with 3+ games</span><span><b>fewest</b> · Myatovic 9:52</span>`;
+
+// season columns
+function cols(el, xel) {
+  document.getElementById(el).innerHTML = seasons.map(([s,v,p,t],i) =>
+    `<div class="col"><div class="v">${v}</div><div class="p">${t}</div><i class="${p==null?'ghost':(i===seasons.length-1?'':'dim')}" style="height:${p==null?14:p}%"></i></div>`).join('');
+  document.getElementById(xel).innerHTML = seasons.map(([s]) => `<div><b>${s}</b>Anaheim</div>`).join('');
+}
+cols('cols-s','colsx-s'); cols('cols-b','colsx-b');
+
+// game log
+(() => {
+  let html = '<tr><th>DATE</th><th>OPPONENT</th><th>G</th><th>A</th><th>PTS</th><th>SOG</th><th style="width:220px">HEAT</th></tr>';
+  let month = '';
+  [...games].reverse().forEach(([d,o,r,g,a,sog,h]) => {
+    const m = d.split(' ')[0];
+    if (m !== month) { month = m; html += `<tr class="month"><td colspan="7">${m === 'Nov' ? 'NOVEMBER' : 'OCTOBER'}</td></tr>`; }
+    html += `<tr><td>${d}</td><td><span class="opp"><i class="r ${r}">${r}</i>${o}</span></td><td>${g}</td><td>${a}</td><td class="pts">${g+a}</td><td>${sog}</td>
+      <td><span class="hb"><i style="width:${Math.round(h*1.6)}px;opacity:${0.35+h/150}"></i><b>${h}</b></span></td></tr>`;
+  });
+  document.getElementById('log').innerHTML = html;
+})();
+
+// radar + percentile bars
+(() => {
+  const S = 360, c = S/2, R = 130, n = radar.length;
+  const pt = (i, v) => { const a = -Math.PI/2 + i*2*Math.PI/n; return [c + Math.cos(a)*R*v/100, c + Math.sin(a)*R*v/100]; };
+  const ring = v => radar.map((_,i)=>pt(i,v).join(',')).join(' ');
+  const poly = k => radar.map((r,i)=>pt(i,r[k]).join(',')).join(' ');
+  const labels = radar.map((r,i) => { const [x,y] = pt(i,122); return `<text x="${x}" y="${y}" fill="#8a94a6" font-size="11" text-anchor="middle" dominant-baseline="middle">${r[0]}</text>`; }).join('');
+  document.getElementById('radar').innerHTML = `<svg viewBox="-30 -10 ${S+60} ${S+20}">
+    ${[25,50,75,100].map(v=>`<polygon points="${ring(v)}" fill="none" stroke="#1c2030"/>`).join('')}
+    <polygon points="${ring(50)}" fill="none" stroke="#5a6378" stroke-dasharray="3 4"/>
+    <polygon points="${poly(1)}" fill="none" stroke="#e8ecf2" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <polygon points="${poly(2)}" fill="rgba(255,90,36,.18)" stroke="#ff5a24" stroke-width="2.5"/>
+    ${labels}</svg>`;
+  document.getElementById('pct').innerHTML = radar.map(([n,s,l]) => {
+    const d = l - s;
+    const ch = Math.abs(d) >= 5 ? `<small style="color:${d>0?'var(--rise)':'var(--cold)'}"> ${d>0?'▲':'▼'}${Math.abs(d)}</small>` : '';
+    return `<div class="row"><span>${n}</span><div class="track"><i style="width:${l}%"></i><u style="left:${s}%"></u></div><b>${l}${ch}</b></div>`;
+  }).join('');
+})();
+
+// tabs
+function go(t) {
+  document.querySelectorAll('.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.t === t));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('on', p.dataset.p === t));
+  window.scrollTo({ top: 0 });
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => go(b.dataset.t));
+document.querySelectorAll('[data-goto]').forEach(a => a.onclick = e => { e.preventDefault(); go(a.dataset.goto); });
+if (location.hash) go(location.hash.slice(1));
+</script>
+</body>
+</html>
