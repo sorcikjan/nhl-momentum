@@ -96,20 +96,20 @@ async function shared<T>(key: string, ttl: number, build: () => Promise<T[]>): P
 
 export function skaterTable(season: string): Promise<SkaterRow[]> {
   const past = isPast(season);
-  return shared(`league/skaters/${season}`, past ? 7 * 24 * HOUR : 6 * HOUR, () => skaters(seasonQuery(season), past ? 604_800 : 21_600));
+  return shared(`league/skaters-all/${season}`, past ? 7 * 24 * HOUR : 6 * HOUR, () => skaters(seasonQuery(season), past ? 604_800 : 21_600));
 }
 
 // Points, games and position only — enough to rank a past season.
 export function skaterSummary(season: string): Promise<SkaterRow[]> {
   const past = isPast(season);
-  return shared(`league/skater-summary/${season}`, past ? 7 * 24 * HOUR : 6 * HOUR, async () => {
+  return shared(`league/skater-summary-all/${season}`, past ? 7 * 24 * HOUR : 6 * HOUR, async () => {
     const summary = await report('skater', 'summary', seasonQuery(season), past ? 604_800 : 21_600);
     return mergeSkaters(summary, [], [], [], [], []);
   });
 }
 
 export function skaterWindow(from: string, to: string): Promise<SkaterRow[]> {
-  return shared(`league/skaters/${from}_${to}`, 6 * HOUR, () => skaters(windowQuery(from, to), 21_600));
+  return shared(`league/skaters-all/${from}_${to}`, 6 * HOUR, () => skaters(windowQuery(from, to), 21_600));
 }
 
 export function goalieTable(season: string): Promise<GoalieRow[]> {
