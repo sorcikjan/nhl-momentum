@@ -52,7 +52,7 @@ export function ProfileTabs({ hero, mini, panels, initial }: Props) {
     <div role="tablist" aria-label="Player profile" className="flex border-b px-2" style={{ borderColor: 'var(--border-soft)', background: 'var(--bg)' }}>
       {TABS.map(t => (
         <button key={t} role="tab" type="button" aria-selected={tab === t} onClick={() => go(t)}
-          className="flex-1 py-3 text-xs font-bold"
+          className="flex-1 py-3 text-xs font-bold lg:w-[150px] lg:flex-none lg:py-3.5 lg:text-sm"
           style={{ color: tab === t ? '#fff' : 'var(--text-muted)', boxShadow: tab === t ? 'inset 0 -2px 0 var(--heat)' : undefined }}>
           {LABEL[t]}
         </button>
@@ -61,10 +61,10 @@ export function ProfileTabs({ hero, mini, panels, initial }: Props) {
   );
 
   return (
-    <div className="mx-auto w-full max-w-[960px]" onClick={onClick}>
+    <div className="mx-auto w-full max-w-[960px] lg:max-w-none" onClick={onClick}>
       <div aria-hidden={!pinned} className="fixed inset-x-0 top-12 z-40 transition-transform duration-200 lg:top-[72px]"
         style={{ transform: pinned ? 'none' : 'translateY(-150%)', visibility: pinned ? 'visible' : 'hidden' }}>
-        <div className="mx-auto max-w-[960px]">{mini}{bar}</div>
+        <div className="mx-auto max-w-[960px] lg:max-w-none lg:px-12">{mini}{bar}</div>
       </div>
       <div className="-mx-4 overflow-hidden sm:mx-0 sm:rounded-2xl">
         {tab === 'now' ? hero : mini}

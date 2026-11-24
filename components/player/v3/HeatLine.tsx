@@ -4,11 +4,13 @@
 type Props = {
   values: number[]; lo: number; hi: number; avg: number | null; avgLabel: string;
   format: (v: number) => string; slots?: number; firstLabel: string; color?: string;
+  // Desktop draws it wider and relatively flatter (1000×150), so it doesn't grow tall.
+  w?: number; h?: number;
 };
 
-const W = 300, H = 96, L = 4, R = 34, T = 16, B = 14;
+const L = 4, R = 34, T = 16, B = 14;
 
-export function HeatLine({ values, lo, hi, avg, avgLabel, format, slots, firstLabel, color = 'var(--heat)' }: Props) {
+export function HeatLine({ values, lo, hi, avg, avgLabel, format, slots, firstLabel, color = 'var(--heat)', w: W = 300, h: H = 96 }: Props) {
   const n = Math.max(slots ?? 0, values.length, 2);
   const x = (i: number) => L + ((W - L - R) * i) / (n - 1);
   const y = (v: number) => T + (H - T - B) * (1 - (Math.min(hi, Math.max(lo, v)) - lo) / (hi - lo));

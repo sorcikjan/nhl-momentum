@@ -9,18 +9,18 @@ export function TeamLadder({ bars, myRank, max, min, teamName }: Ladder & { team
   if (!bars.length) return <div className="py-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>Ice time not available</div>;
   return (
     <div>
-      <div className="mt-[18px] flex h-[58px] items-end gap-[3px]" role="img" aria-label={myRank ? `${ordinal(myRank)} of ${bars.length} ${teamName} by ice time` : `${teamName} by ice time`}>
+      <div className="mt-[18px] flex h-[58px] items-end gap-[3px] lg:h-[84px] lg:gap-1.5" role="img" aria-label={myRank ? `${ordinal(myRank)} of ${bars.length} ${teamName} by ice time` : `${teamName} by ice time`}>
         {bars.map(b => (
           <i key={b.id} className="relative block flex-1 rounded-t-sm" style={{ height: `${Math.round((b.toiPerGame / max) * 100)}%`, background: b.me ? 'var(--heat)' : 'var(--border)' }}>
             {b.me && myRank && (
-              <em className="absolute bottom-full left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-extrabold not-italic" style={{ color: '#ff8a4c' }}>
+              <em className="absolute bottom-full left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-extrabold not-italic lg:text-xs" style={{ color: '#ff8a4c' }}>
                 {ordinal(myRank)} · {mmss(b.toiPerGame)}
               </em>
             )}
           </i>
         ))}
       </div>
-      <div className="mt-1 flex justify-between text-[9px]" style={{ color: 'var(--text-muted)' }}>
+      <div className="mt-1 flex justify-between text-[9px] lg:mt-1.5 lg:text-xs" style={{ color: 'var(--text-muted)' }}>
         <span>most · {mmss(max)}</span><span>{bars.length} {teamName}</span><span>fewest · {mmss(min)}</span>
       </div>
     </div>
