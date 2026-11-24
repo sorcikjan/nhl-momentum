@@ -290,11 +290,34 @@ type Computed<T> = { at: number; value: T };
 const computedMem = new Map<string, { at: number; value: unknown; checked: number }>();
 const computedInFlight = new Map<string, Promise<unknown>>();
 
+// Not through blobs()/timed(): the store often answers slower than their 1.5 s
+// and is then switched off for 5 min, but one read a minute per instance can
+// wait a little longer, and the write in /api/revalidate is what matters most.
+const COMPUTED_READ_MS = 4_000;
+const COMPUTED_WRITE_MS = 10_000;
+
+function computedStore(): Store | null {
+  if (store === null) return null;
+  try {
+    return getStore({ name: STORE, consistency: 'strong' });
+  } catch {
+    return null;
+  }
+}
+
+function within<T>(op: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    op,
+    new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error(`Blobs took over ${ms} ms`)), ms); }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 async function readComputed<T>(k: string): Promise<Computed<T> | null | 'unreachable'> {
-  const s = blobs();
+  const s = computedStore();
   if (!s) return 'unreachable';
   try {
-    return ((await timed(s.get(k, { type: 'json' }))) as Computed<T> | null) ?? null;
+    return ((await within(s.get(k, { type: 'json' }), COMPUTED_READ_MS)) as Computed<T> | null) ?? null;
   } catch {
     return 'unreachable';
   }
@@ -303,9 +326,9 @@ async function readComputed<T>(k: string): Promise<Computed<T> | null | 'unreach
 export async function saveComputed<T>(key: string, value: T): Promise<void> {
   const at = Date.now();
   computedMem.set(key, { at, value, checked: at });
-  const s = blobs();
+  const s = computedStore();
   if (!s) throw new Error('Blobs store unavailable');
-  await timed(s.setJSON(`computed/${key}`, { at, value }));
+  await within(s.setJSON(`computed/${key}`, { at, value }), COMPUTED_WRITE_MS);
 }
 
 export function computedResult<T>(key: string, maxAgeMs: number, build: () => Promise<T>): Promise<T> {
