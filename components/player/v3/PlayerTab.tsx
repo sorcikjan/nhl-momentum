@@ -2,6 +2,7 @@
 import { TEAMS } from '@/lib/team-colors';
 import { Card } from './Card';
 import { Radar } from './Radar';
+import { RadarReadout } from './RadarReadout';
 import { TeamLadder } from './TeamLadder';
 import { GoalieStarts } from './GoalieStarts';
 import type { ProfileV3View } from './types';
@@ -15,7 +16,13 @@ export function PlayerTab({ v }: { v: ProfileV3View }) {
         </Card>
       </div>
       <Card kicker="PROFILE" title={v.goalie ? 'What kind of goalie' : 'What kind of player'} right={`percentile · NHL ${v.goalie ? 'goalies' : v.hero.position === 'Defenseman' ? 'defensemen' : 'forwards'}`}>
-        <Radar axes={v.character.axes} unused={v.character.unused} emptyNote={v.emptyNote ?? undefined} labels={v.axisLabels} />
+        {/* Desktop: the radar with what it says beside it. Phone: the radar alone. */}
+        <div className="lg:grid lg:grid-cols-[480px_1fr] lg:items-center lg:gap-12">
+          <Radar axes={v.character.axes} unused={v.character.unused} emptyNote={v.emptyNote ?? undefined} labels={v.axisLabels} />
+          <div className="hidden lg:block">
+            <RadarReadout axes={v.character.axes} of={v.goalie ? 'goalies' : v.hero.position === 'Defenseman' ? 'defensemen' : 'forwards'} />
+          </div>
+        </div>
       </Card>
     </div>
   );

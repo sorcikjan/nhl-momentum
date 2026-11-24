@@ -343,3 +343,31 @@ export const AXIS_LABELS = {
   D: D_AXES.map(a => a.label),
   G: ['Save %', 'Even strength', 'Shorthanded', 'Goals against', 'Quality starts', 'Workload'],
 } as const;
+
+// What the radar says, read out beside it on desktop: where he's at the top of
+// his position, where at the bottom, and what moved most from the season to
+// the last three weeks. Only axes that clear the bar make it; a group can be
+// empty. Uses the last three weeks when there are any, else the season.
+export type Readout = {
+  recent: boolean;
+  top: { label: string; pct: number }[];
+  bottom: { label: string; pct: number }[];
+  moved: { label: string; from: number; to: number }[];
+};
+export const READOUT = { top: 85, bottom: 30, moved: 15 } as const;
+
+export function radarReadout(axes: Axis[]): Readout {
+  const recent = axes.some(a => a.recent != null);
+  const now = (a: Axis) => (recent ? a.recent ?? a.season : a.season);
+  const rows = axes.map(a => ({ label: a.label, pct: now(a) }));
+  return {
+    recent,
+    top: rows.filter(r => r.pct >= READOUT.top).sort((a, b) => b.pct - a.pct).slice(0, 3),
+    bottom: rows.filter(r => r.pct <= READOUT.bottom).sort((a, b) => a.pct - b.pct).slice(0, 2),
+    moved: recent
+      ? axes.filter(a => a.recent != null && Math.abs(a.recent - a.season) >= READOUT.moved)
+          .sort((a, b) => Math.abs(b.recent! - b.season) - Math.abs(a.recent! - a.season))
+          .slice(0, 3).map(a => ({ label: a.label, from: a.season, to: a.recent! }))
+      : [],
+  };
+}
