@@ -3,6 +3,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase';
 import { computedResult, saveComputed, sharedResult } from '@/lib/db-fallback';
+import { recordEvent } from '@/lib/load-log';
 import { buildSearchIndex } from '@/lib/search';
 import { pregameKeyPlayers, type KeyPlayer } from '@/lib/key-players';
 import { cardPlayers, type GameCardData } from '@/lib/game-card';
@@ -159,7 +160,9 @@ export async function refreshRankings() {
 // stand until the next pipeline run. Fail instead, so the last good one stays.
 // (30, not more: in a playoff final only two teams' skaters are ranked.)
 async function checkedRankings() {
+  const t0 = Date.now();
   const value = await buildRankings();
+  recordEvent('rankings build', Date.now() - t0);
   if (value.totalSkaters < 30) throw new Error(`rankings look incomplete (${value.totalSkaters} skaters)`);
   return value;
 }

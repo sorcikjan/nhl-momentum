@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { recordDbRequest, recordEvent } from './load-log';
 import { BYPASS_HEADER, databaseDown, fallbackReady, fetchWithFallback, healDegradedPages, markDatabaseDown } from './db-fallback';
 
 export { databaseDown } from './db-fallback';
@@ -28,7 +29,26 @@ const timedFetch: typeof fetch = (input, init = {}) => {
   });
   return Promise.race([fetch(input, { ...init, signal }), timeout]).finally(() => clearTimeout(timer));
 };
-const fetchWithTimeout: typeof fetch = (input, init = {}) => fetchWithFallback(input, init, timedFetch);
+// Every request that reaches the database is counted per route and table
+// (lib/load-log.ts), so is every one answered from the saved copy instead.
+const urlOf = (input: RequestInfo | URL) => typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+const loggedFetch: typeof fetch = async (input, init = {}) => {
+  const t0 = Date.now();
+  try {
+    const res = await timedFetch(input, init);
+    recordDbRequest(urlOf(input), Date.now() - t0, res.status, Number(res.headers.get('content-length')) || 0);
+    return res;
+  } catch (err) {
+    recordDbRequest(urlOf(input), Date.now() - t0, 0, 0);
+    throw err;
+  }
+};
+const fetchWithTimeout: typeof fetch = async (input, init = {}) => {
+  const res = await fetchWithFallback(input, init, loggedFetch);
+  if (res.headers.get('x-db-cache')) recordEvent('db answered from saved copy');
+  else if (res.headers.get('x-db-fallback')) recordEvent('db down, served saved copy');
+  return res;
+};
 
 function getClient(): SupabaseClient {
   if (_anonClient) return _anonClient;

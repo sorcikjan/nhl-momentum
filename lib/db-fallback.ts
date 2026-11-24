@@ -3,6 +3,7 @@ import { getStore, type Store } from '@netlify/blobs';
 import { after } from 'next/server';
 import { workAsyncStorage } from 'next/dist/server/app-render/work-async-storage.external';
 import { SITE_URL } from './site';
+import { recordEvent } from './load-log';
 
 // The last good answer to every database read a page makes, kept in Netlify
 // Blobs. The ISR cache can't carry an outage on its own: every deploy empties
@@ -52,6 +53,7 @@ function timed<T>(op: Promise<T>): Promise<T> {
     op,
     new Promise<never>((_, reject) => {
       timer = setTimeout(() => {
+        recordEvent('blobs timeout, store off 5 min');
         blobsOffUntil = Date.now() + BLOBS_OFF_MS;
         reject(new Error('Blobs timed out'));
       }, BLOBS_TIMEOUT_MS);
