@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homepage v2 · sketch 1</title>
+<!--
+  Homepage v2, sketch 1 (2026-11-24), illustrative, made without further input.
+  Built on the player profile v3 precedents: one story in a fixed order (tonight
+  → what the numbers say → last night → who's hot), one objective sentence per
+  item, every number next to its comparison, visuals over text, no cryptic
+  abbreviations. Stories are found by rules over the box scores (a change
+  against the player's own normal). Heat stays the ranking's name and order;
+  the value shown next to it is points per 60 minutes, with the season beside it.
+  Real data up to Nov 23 2026 (our DB, checked against NHL.com game logs).
+-->
+<style>
+  :root{--bg:#0a0b0f;--card:#141821;--inset:#0d0f14;--line:#1c212c;--border:#252a38;--bright:#e8ecf2;--text:#8a94a6;--muted:#5c6577;--heat:#ff5a1f;--rise:#00e5a0;--cold:#3a88ff;--mono:ui-monospace,SFMono-Regular,Menlo,monospace}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--bright);font-family:Inter,system-ui,-apple-system,sans-serif;line-height:1.35}
+  .site{position:fixed;inset:0 0 auto 0;height:72px;z-index:50;display:flex;align-items:center;gap:40px;padding:0 48px;border-bottom:1px solid #1c2030;background:rgba(10,11,15,.92)}
+  .site .brand{font-size:22px;font-weight:900;letter-spacing:-.5px}.site .brand i{color:#ff5a24;font-style:normal}
+  .site nav{display:flex;gap:28px;font-size:14px;font-weight:600;color:var(--text)}.site nav .on{color:#fff}
+  .site .search{margin-left:auto;width:260px;height:36px;border-radius:10px;background:#13151c;border:1px solid var(--border);color:var(--muted);font-size:13px;display:flex;align-items:center;padding:0 12px}
+  main{padding:104px 48px 96px}
+  .note{font:600 11px/1.4 var(--mono);letter-spacing:.6px;color:var(--muted);margin-bottom:22px}.note b{color:#ff5a24}
+  .kick{font:700 11px/1 var(--mono);letter-spacing:1.4px;color:var(--heat);margin-bottom:8px}
+  h1{font-size:44px;font-weight:900;letter-spacing:-1.5px;line-height:1}
+  .lede{font-size:15px;color:var(--text);margin-top:10px}.lede b{color:var(--bright)}
+  .ch{margin-top:56px}
+  .ch h2{font-size:24px;font-weight:800;letter-spacing:-.6px;margin-bottom:16px;display:flex;align-items:baseline;justify-content:space-between;gap:16px}
+  .ch h2 span{font:600 11px/1 var(--mono);letter-spacing:.6px;color:var(--muted);text-transform:uppercase}
+  .blk{background:var(--card);border-radius:14px;padding:18px 20px}
+  .stack{display:flex;flex-direction:column;gap:12px}
+  .mug{width:56px;height:56px;border-radius:50%;object-fit:cover;object-position:top;flex:none}
+  a{color:inherit;text-decoration:none}
+  .more{font-size:13px;font-weight:700;color:#ff8a4c}
+
+  /* tonight */
+  .game{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:24px}
+  .tm{display:flex;align-items:center;gap:14px}.tm.h{justify-content:flex-end;text-align:right}
+  .tm img{width:64px;height:64px}
+  .tm b{display:block;font-size:22px;font-weight:900;letter-spacing:-.4px}.tm span{font-size:12px;color:var(--text)}
+  .mid{text-align:center}.mid b{display:block;font-size:20px;font-weight:900}.mid span{font:600 11px/1 var(--mono);color:var(--muted);letter-spacing:.8px}
+  .prob{margin-top:18px}
+  .prob .pb{display:flex;height:10px;border-radius:5px;overflow:hidden;background:#232835}
+  .prob .pb i{display:block}
+  .prob .pl{display:flex;justify-content:space-between;font-size:12px;color:var(--text);margin-top:6px}.prob .pl b{color:var(--bright)}
+  .watch{margin-top:18px;border-top:1px solid #232835;padding-top:14px}
+  .watch .t{font:700 10px/1 var(--mono);letter-spacing:1.2px;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
+  .wr{display:grid;grid-template-columns:40px 1fr 260px;gap:14px;align-items:center;padding:8px 0}
+  .wr img{width:40px;height:40px;border-radius:50%;object-fit:cover;object-position:top;background:#1c212c}
+  .wr p{font-size:15px}.wr p b{font-weight:800}
+  .next{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:14px 20px;background:var(--card);border-radius:14px;font-size:14px;color:var(--text)}
+  .next b{color:var(--bright)}
+  .logos{display:flex;gap:6px}.logos img{width:26px;height:26px}
+
+  /* stories */
+  .story{display:grid;grid-template-columns:56px 1fr 360px;gap:20px;align-items:center}
+  .story .who{font:700 10px/1 var(--mono);letter-spacing:1px;color:var(--muted);margin-bottom:6px;text-transform:uppercase}
+  .story .who em{font-style:normal;color:var(--heat)}
+  .story p{font-size:19px;font-weight:700;line-height:1.3;letter-spacing:-.2px}
+  .story p b{color:#ff8a4c;font-weight:900}
+  .story .go{margin-top:6px;display:inline-block}
+  svg{display:block;overflow:visible}
+  .leg{font-size:11px;color:var(--muted);margin-top:4px;text-align:right}
+
+  /* last night */
+  .res{display:grid;grid-template-columns:repeat(1,1fr)}
+  .rr{display:grid;grid-template-columns:220px 60px 1fr;gap:20px;align-items:center;padding:11px 0;border-top:1px solid var(--line)}
+  .rr:first-child{border:0}
+  .sc{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700}
+  .sc img{width:24px;height:24px}.sc .w{color:#fff;font-weight:900}.sc .l{color:var(--text)}
+  .sc .n{font-size:18px;font-weight:900;width:20px;text-align:center}
+  .rr .fin{font:600 10px/1 var(--mono);color:var(--muted);letter-spacing:.8px}
+  .rr .st{font-size:14px;color:var(--text)}.rr .st b{color:var(--bright)}
+
+  /* rankings */
+  .chips{display:flex;gap:8px;margin-bottom:14px}
+  .chips span{padding:8px 14px;border-radius:999px;background:var(--card);font-size:13px;font-weight:700;color:var(--text);cursor:pointer;border:1px solid transparent}
+  .chips span.on{color:#fff;border-color:var(--heat)}
+  .rk{display:grid;grid-template-columns:34px 44px 1fr 280px 170px 150px;gap:16px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+  .rk.hd{border:0;padding:0 0 6px;font:700 9px/1 var(--mono);letter-spacing:.9px;color:var(--muted);text-transform:uppercase}
+  .rk .n{font-size:15px;font-weight:900;color:var(--muted);text-align:right}
+  .rk img{width:44px;height:44px;border-radius:50%;object-fit:cover;object-position:top;background:#1c212c}
+  .rk .nm b{display:block;font-size:15px;font-weight:800}.rk .nm span{font-size:12px;color:var(--text)}
+  .hb{display:flex;align-items:center;gap:10px}
+  .hb .tr{flex:1;height:8px;border-radius:4px;background:#1c212c;overflow:hidden}.hb .tr i{display:block;height:8px;border-radius:4px}
+  .hb b{width:30px;text-align:right;font-size:16px;font-weight:900}
+  .p6 b{font-size:16px;font-weight:900}.p6 span{display:block;font-size:12px;color:var(--text)}.p6 em{font-style:normal;color:var(--rise);font-weight:800}
+  .tag{justify-self:start;font-size:12px;font-weight:800;padding:5px 10px;border-radius:999px}
+  .tag.fire{background:rgba(255,58,15,.16);color:#ff6a3a}.tag.hot{background:rgba(255,138,71,.13);color:#ff9a5c}
+  .dots{display:flex;gap:3px;align-items:flex-end;height:26px}
+  .dots i{width:9px;border-radius:2px;background:#2a303d;display:block}
+  .foot{margin-top:12px;font-size:12px;color:var(--muted)}
+  .pane{display:none}.pane.on{display:block}
+</style>
+</head>
+<body>
+<header class="site">
+  <div class="brand">momentum<i>.</i></div>
+  <nav><span class="on">Tonight</span><span>Games</span><span>Heat map</span><span>Rankings</span><span>Standings</span><span>Stories</span></nav>
+  <div class="search">Search players, teams…</div>
+</header>
+<main>
+  <div class="note"><b>HOMEPAGE v2 · SKETCH 1</b> · one story, top to bottom: tonight → what the numbers say → last night → who's hot · real data to Nov 23 2026</div>
+
+  <div class="kick">TUESDAY · NOVEMBER 24</div>
+  <h1>Tonight in the NHL</h1>
+  <p class="lede"><b>1 game</b> tonight · <b>14</b> tomorrow · Kirill Kaprizov's point streak reached <b>15 games</b> last night</p>
+
+  <!-- 1 TONIGHT -->
+  <section class="ch">
+    <h2>Tonight <span>8:00 PM ET · Rogers Place</span></h2>
+    <div class="blk">
+      <div class="game">
+        <div class="tm"><img src="https://assets.nhle.com/logos/nhl/svg/VGK_dark.svg" alt=""><div><b>Vegas</b><span>Golden Knights · away</span></div></div>
+        <div class="mid"><b>8:00 PM</b><span>ET</span></div>
+        <div class="tm h"><div><b>Edmonton</b><span>Oilers · home</span></div><img src="https://assets.nhle.com/logos/nhl/svg/EDM_dark.svg" alt=""></div>
+      </div>
+      <div class="prob">
+        <div class="pb"><i style="width:46%;background:#b4975a"></i><i style="width:54%;background:#ff4c00"></i></div>
+        <div class="pl"><span><b>46%</b> Vegas</span><span>our model · a close one</span><span>Edmonton <b>54%</b></span></div>
+      </div>
+      <div class="watch">
+        <div class="t">Worth watching</div>
+        <div class="wr" id="w1"></div>
+        <div class="wr" id="w2"></div>
+      </div>
+    </div>
+    <div class="next"><span>Tomorrow · <b>14 games</b> from 7:00 PM ET</span><span class="logos" id="tmrw"></span><a class="more">Full schedule ›</a></div>
+  </section>
+
+  <!-- 2 STORIES -->
+  <section class="ch">
+    <h2>What the numbers say <span>changes against each player's own normal · last 3–15 games</span></h2>
+    <div class="stack" id="stories"></div>
+  </section>
+
+  <!-- 3 LAST NIGHT -->
+  <section class="ch">
+    <h2>Last night <span>Monday · 7 games · first star</span></h2>
+    <div class="blk res" id="last"></div>
+  </section>
+
+  <!-- 4 WHO'S HOT -->
+  <section class="ch">
+    <h2>Who's hot <span>Heat ranking · last 5 games</span></h2>
+    <div class="chips"><span class="on" data-p="fwd">Forwards</span><span data-p="def">Defense</span><span data-p="g">Goalies</span></div>
+    <div class="blk">
+      <div class="pane on" data-p="fwd" id="fwd"></div>
+      <div class="pane" data-p="def" id="def"></div>
+      <div class="pane" data-p="g" id="g"></div>
+    </div>
+    <p class="foot">Heat = points per 60 minutes over the last 5 games, on a 0–100 scale (100 = 7.2 points per 60). The ranking goes by Heat; the plain number sits next to it. Defense and goalies are placeholders until their own formulas are decided.</p>
+  </section>
+</main>
+<script>
+const D = {"series": {"kulich": {"id": 8483468, "team": "BUF", "name": "Jiri Kulich", "pos": "C", "games": [{"d": "10-01", "toi": 8.8, "p": 0, "g": 0, "s": 1}, {"d": "10-03", "toi": 13.5, "p": 1, "g": 1, "s": 1}, {"d": "10-06", "toi": 13.9, "p": 1, "g": 0, "s": 2}, {"d": "10-08", "toi": 11.7, "p": 0, "g": 0, "s": 0}, {"d": "10-12", "toi": 13.9, "p": 0, "g": 0, "s": 2}, {"d": "10-13", "toi": 16.9, "p": 0, "g": 0, "s": 2}, {"d": "10-17", "toi": 13.0, "p": 1, "g": 0, "s": 0}, {"d": "10-21", "toi": 13.7, "p": 0, "g": 0, "s": 1}, {"d": "11-06", "toi": 13.0, "p": 0, "g": 0, "s": 4}, {"d": "11-08", "toi": 10.5, "p": 0, "g": 0, "s": 1}, {"d": "11-12", "toi": 14.3, "p": 0, "g": 0, "s": 1}, {"d": "11-14", "toi": 14.9, "p": 0, "g": 0, "s": 1}, {"d": "11-17", "toi": 14.9, "p": 1, "g": 1, "s": 1}, {"d": "11-19", "toi": 17.5, "p": 0, "g": 0, "s": 0}, {"d": "11-21", "toi": 21.6, "p": 1, "g": 1, "s": 6}, {"d": "11-22", "toi": 18.0, "p": 2, "g": 1, "s": 2}], "seasonToi": 14.4}, "rinzel": {"id": 8483506, "team": "CHI", "name": "Sam Rinzel", "pos": "D", "games": [{"d": "09-29", "toi": 18.3, "p": 0, "g": 0, "s": 2}, {"d": "10-01", "toi": 17.5, "p": 0, "g": 0, "s": 2}, {"d": "10-06", "toi": 17.8, "p": 1, "g": 1, "s": 2}, {"d": "10-08", "toi": 18.1, "p": 1, "g": 0, "s": 1}, {"d": "10-10", "toi": 18.7, "p": 0, "g": 0, "s": 0}, {"d": "10-13", "toi": 14.9, "p": 0, "g": 0, "s": 0}, {"d": "10-15", "toi": 19.7, "p": 0, "g": 0, "s": 3}, {"d": "10-17", "toi": 15.4, "p": 0, "g": 0, "s": 1}, {"d": "10-23", "toi": 17.3, "p": 0, "g": 0, "s": 0}, {"d": "10-25", "toi": 15.1, "p": 0, "g": 0, "s": 1}, {"d": "10-27", "toi": 16.0, "p": 0, "g": 0, "s": 0}, {"d": "10-29", "toi": 15.7, "p": 0, "g": 0, "s": 1}, {"d": "10-31", "toi": 11.7, "p": 1, "g": 0, "s": 1}, {"d": "11-02", "toi": 16.5, "p": 0, "g": 0, "s": 1}, {"d": "11-04", "toi": 18.6, "p": 1, "g": 0, "s": 2}, {"d": "11-05", "toi": 20.8, "p": 1, "g": 0, "s": 4}, {"d": "11-07", "toi": 21.4, "p": 0, "g": 0, "s": 1}, {"d": "11-12", "toi": 21.9, "p": 2, "g": 0, "s": 1}, {"d": "11-14", "toi": 21.3, "p": 2, "g": 0, "s": 2}, {"d": "11-17", "toi": 21.8, "p": 3, "g": 0, "s": 1}, {"d": "11-19", "toi": 24.0, "p": 2, "g": 0, "s": 2}, {"d": "11-21", "toi": 26.2, "p": 3, "g": 1, "s": 6}, {"d": "11-22", "toi": 20.6, "p": 0, "g": 0, "s": 2}], "seasonToi": 18.7}, "podkolzin": {"id": 8481617, "team": "EDM", "name": "Vasily Podkolzin", "pos": "R", "games": [{"d": "09-29", "toi": 18.3, "p": 2, "g": 2, "s": 7}, {"d": "10-01", "toi": 18.1, "p": 2, "g": 1, "s": 4}, {"d": "10-03", "toi": 20.4, "p": 1, "g": 0, "s": 2}, {"d": "10-07", "toi": 18.2, "p": 1, "g": 1, "s": 3}, {"d": "10-10", "toi": 20.8, "p": 1, "g": 1, "s": 1}, {"d": "10-13", "toi": 18.4, "p": 2, "g": 2, "s": 3}, {"d": "10-15", "toi": 22.2, "p": 0, "g": 0, "s": 2}, {"d": "10-17", "toi": 17.5, "p": 2, "g": 0, "s": 0}, {"d": "10-20", "toi": 19.3, "p": 1, "g": 0, "s": 0}, {"d": "10-22", "toi": 18.1, "p": 0, "g": 0, "s": 3}, {"d": "10-24", "toi": 16.6, "p": 0, "g": 0, "s": 1}, {"d": "10-26", "toi": 21.6, "p": 1, "g": 1, "s": 1}, {"d": "10-28", "toi": 16.1, "p": 0, "g": 0, "s": 2}, {"d": "10-31", "toi": 14.9, "p": 1, "g": 1, "s": 2}, {"d": "11-01", "toi": 16.2, "p": 0, "g": 0, "s": 1}, {"d": "11-03", "toi": 19.3, "p": 0, "g": 0, "s": 1}, {"d": "11-05", "toi": 2.6, "p": 0, "g": 0, "s": 2}, {"d": "11-07", "toi": 17.7, "p": 0, "g": 0, "s": 1}, {"d": "11-09", "toi": 15.8, "p": 1, "g": 0, "s": 1}, {"d": "11-11", "toi": 17.6, "p": 0, "g": 0, "s": 3}, {"d": "11-14", "toi": 19.1, "p": 0, "g": 0, "s": 2}, {"d": "11-15", "toi": 12.2, "p": 1, "g": 1, "s": 2}, {"d": "11-17", "toi": 18.8, "p": 3, "g": 2, "s": 2}, {"d": "11-19", "toi": 20.7, "p": 1, "g": 0, "s": 1}, {"d": "11-21", "toi": 21.8, "p": 1, "g": 1, "s": 3}, {"d": "11-22", "toi": 24.7, "p": 1, "g": 0, "s": 1}], "seasonToi": 18.0}, "kaprizov": {"id": 8478864, "team": "MIN", "name": "Kirill Kaprizov", "pos": "L", "games": [{"d": "10-01", "toi": 20.9, "p": 1, "g": 1, "s": 3}, {"d": "10-03", "toi": 18.8, "p": 2, "g": 2, "s": 3}, {"d": "10-06", "toi": 25.0, "p": 0, "g": 0, "s": 3}, {"d": "10-08", "toi": 23.1, "p": 1, "g": 0, "s": 0}, {"d": "10-10", "toi": 20.2, "p": 4, "g": 3, "s": 4}, {"d": "10-12", "toi": 19.7, "p": 1, "g": 0, "s": 4}, {"d": "10-13", "toi": 20.0, "p": 2, "g": 2, "s": 3}, {"d": "10-15", "toi": 22.9, "p": 3, "g": 1, "s": 6}, {"d": "10-18", "toi": 22.5, "p": 1, "g": 1, "s": 5}, {"d": "10-20", "toi": 21.8, "p": 2, "g": 1, "s": 3}, {"d": "10-22", "toi": 24.9, "p": 0, "g": 0, "s": 4}, {"d": "10-24", "toi": 17.9, "p": 2, "g": 1, "s": 4}, {"d": "10-25", "toi": 21.9, "p": 2, "g": 1, "s": 2}, {"d": "10-27", "toi": 24.6, "p": 2, "g": 1, "s": 4}, {"d": "10-29", "toi": 21.8, "p": 1, "g": 0, "s": 3}, {"d": "11-01", "toi": 21.7, "p": 1, "g": 1, "s": 2}, {"d": "11-03", "toi": 21.5, "p": 1, "g": 0, "s": 1}, {"d": "11-06", "toi": 19.5, "p": 4, "g": 1, "s": 2}, {"d": "11-07", "toi": 20.4, "p": 1, "g": 0, "s": 5}, {"d": "11-10", "toi": 20.7, "p": 1, "g": 1, "s": 1}, {"d": "11-12", "toi": 23.4, "p": 3, "g": 0, "s": 5}, {"d": "11-14", "toi": 19.5, "p": 2, "g": 0, "s": 3}, {"d": "11-17", "toi": 18.2, "p": 3, "g": 0, "s": 3}, {"d": "11-19", "toi": 22.1, "p": 3, "g": 1, "s": 1}, {"d": "11-21", "toi": 24.9, "p": 2, "g": 0, "s": 1}, {"d": "11-23", "toi": 19.1, "p": 4, "g": 1, "s": 1}], "seasonToi": 21.4}, "greig": {"id": 8482092, "team": "OTT", "name": "Ridly Greig", "pos": "C", "games": [{"d": "10-06", "toi": 13.2, "p": 1, "g": 0, "s": 2}, {"d": "10-08", "toi": 18.8, "p": 0, "g": 0, "s": 3}, {"d": "10-10", "toi": 20.2, "p": 0, "g": 0, "s": 0}, {"d": "10-12", "toi": 16.4, "p": 0, "g": 0, "s": 1}, {"d": "10-13", "toi": 14.1, "p": 0, "g": 0, "s": 1}, {"d": "10-15", "toi": 17.5, "p": 1, "g": 1, "s": 3}, {"d": "10-17", "toi": 15.6, "p": 0, "g": 0, "s": 0}, {"d": "10-21", "toi": 17.1, "p": 0, "g": 0, "s": 1}, {"d": "10-22", "toi": 19.1, "p": 0, "g": 0, "s": 2}, {"d": "10-24", "toi": 19.4, "p": 1, "g": 0, "s": 2}, {"d": "10-27", "toi": 15.9, "p": 0, "g": 0, "s": 1}, {"d": "10-29", "toi": 19.4, "p": 0, "g": 0, "s": 0}, {"d": "10-31", "toi": 18.7, "p": 1, "g": 1, "s": 3}, {"d": "11-01", "toi": 17.5, "p": 0, "g": 0, "s": 0}, {"d": "11-10", "toi": 17.0, "p": 1, "g": 1, "s": 2}, {"d": "11-12", "toi": 17.4, "p": 0, "g": 0, "s": 1}, {"d": "11-14", "toi": 19.5, "p": 0, "g": 0, "s": 5}, {"d": "11-17", "toi": 19.3, "p": 0, "g": 0, "s": 5}, {"d": "11-19", "toi": 17.4, "p": 1, "g": 0, "s": 1}, {"d": "11-21", "toi": 21.2, "p": 0, "g": 0, "s": 10}, {"d": "11-23", "toi": 20.0, "p": 0, "g": 0, "s": 2}], "seasonToi": 17.8}, "eichel": {"id": 8478403, "team": "VGK", "name": "Jack Eichel", "pos": "C", "games": [{"d": "09-29", "toi": 18.0, "p": 3, "g": 1, "s": 2}, {"d": "10-02", "toi": 22.1, "p": 2, "g": 0, "s": 2}, {"d": "10-04", "toi": 19.9, "p": 1, "g": 0, "s": 2}, {"d": "10-06", "toi": 18.3, "p": 4, "g": 1, "s": 2}, {"d": "10-08", "toi": 26.6, "p": 2, "g": 1, "s": 6}, {"d": "10-10", "toi": 23.0, "p": 0, "g": 0, "s": 4}, {"d": "10-12", "toi": 21.4, "p": 0, "g": 0, "s": 2}, {"d": "10-13", "toi": 17.9, "p": 1, "g": 1, "s": 4}, {"d": "10-15", "toi": 15.3, "p": 3, "g": 1, "s": 4}, {"d": "10-17", "toi": 16.8, "p": 2, "g": 0, "s": 0}, {"d": "10-20", "toi": 19.6, "p": 0, "g": 0, "s": 0}, {"d": "10-22", "toi": 16.8, "p": 1, "g": 1, "s": 3}, {"d": "10-24", "toi": 21.7, "p": 0, "g": 0, "s": 6}, {"d": "10-27", "toi": 21.3, "p": 1, "g": 1, "s": 1}, {"d": "10-30", "toi": 16.4, "p": 0, "g": 0, "s": 0}, {"d": "11-02", "toi": 24.9, "p": 0, "g": 0, "s": 1}, {"d": "11-03", "toi": 21.3, "p": 2, "g": 0, "s": 1}, {"d": "11-05", "toi": 21.8, "p": 1, "g": 0, "s": 4}, {"d": "11-08", "toi": 17.9, "p": 1, "g": 1, "s": 5}, {"d": "11-11", "toi": 21.4, "p": 2, "g": 1, "s": 1}, {"d": "11-13", "toi": 21.6, "p": 0, "g": 0, "s": 6}, {"d": "11-15", "toi": 21.0, "p": 1, "g": 0, "s": 5}, {"d": "11-17", "toi": 24.6, "p": 1, "g": 0, "s": 1}, {"d": "11-19", "toi": 24.7, "p": 1, "g": 0, "s": 2}, {"d": "11-21", "toi": 21.6, "p": 2, "g": 0, "s": 4}], "seasonToi": 20.6}, "rnh": {"id": 8476454, "team": "EDM", "name": "Ryan Nugent-Hopkins", "pos": "C", "games": [{"d": "10-22", "toi": 21.0, "p": 2, "g": 1, "s": 4}, {"d": "10-24", "toi": 18.9, "p": 0, "g": 0, "s": 1}, {"d": "10-26", "toi": 22.4, "p": 1, "g": 0, "s": 5}, {"d": "10-28", "toi": 18.4, "p": 2, "g": 0, "s": 2}, {"d": "10-31", "toi": 18.8, "p": 2, "g": 2, "s": 3}, {"d": "11-01", "toi": 20.2, "p": 0, "g": 0, "s": 0}, {"d": "11-03", "toi": 19.5, "p": 2, "g": 1, "s": 1}, {"d": "11-05", "toi": 19.5, "p": 2, "g": 0, "s": 1}, {"d": "11-07", "toi": 6.6, "p": 0, "g": 0, "s": 0}, {"d": "11-09", "toi": 18.0, "p": 0, "g": 0, "s": 1}, {"d": "11-11", "toi": 17.0, "p": 0, "g": 0, "s": 1}, {"d": "11-14", "toi": 17.9, "p": 0, "g": 0, "s": 1}], "seasonToi": 18.2}}, "last": [{"away": "ANA", "home": "SEA", "a": 2, "h": 3, "star": {"name": {"default": "K. Kakko"}, "star": 1, "goals": 1, "points": 1, "assists": 0, "headshot": "https://assets.nhle.com/mugs/nhl/20262027/SEA/8481554.png", "playerId": 8481554, "position": "R", "sweaterNo": 84, "teamAbbrev": "SEA"}}, {"away": "UTA", "home": "WPG", "a": 2, "h": 4, "star": {"name": {"default": "S. Skinner"}, "star": 1, "headshot": "https://assets.nhle.com/mugs/nhl/20262027/WPG/8479973.png", "playerId": 8479973, "position": "G", "savePctg": 0.944, "sweaterNo": 74, "teamAbbrev": "WPG", "goalsAgainstAverage": 2}}, {"away": "TOR", "home": "NYI", "a": 4, "h": 2, "star": {"name": {"default": "G. McKenna"}, "star": 1, "goals": 1, "points": 1, "assists": 0, "headshot": "https://assets.nhle.com/mugs/nhl/20262027/TOR/8486067.png", "playerId": 8486067, "position": "L", "sweaterNo": 92, "teamAbbrev": "TOR"}}, {"away": "LAK", "home": "MTL", "a": 2, "h": 1, "star": {"name": {"default": "D. Kuemper"}, "star": 1, "headshot": "https://assets.nhle.com/mugs/nhl/20262027/LAK/8475311.png", "playerId": 8475311, "position": "G", "savePctg": 0.967, "sweaterNo": 35, "teamAbbrev": "LAK", "goalsAgainstAverage": 1}}, {"away": "CGY", "home": "OTT", "a": 1, "h": 2, "star": {"name": {"default": "L. Ullmark"}, "star": 1, "headshot": "https://assets.nhle.com/mugs/nhl/20262027/OTT/8476999.png", "playerId": 8476999, "position": "G", "savePctg": 0.972, "sweaterNo": 35, "teamAbbrev": "OTT", "goalsAgainstAverage": 1}}, {"away": "CBJ", "home": "NJD", "a": 2, "h": 3, "star": {"name": {"default": "C. Brown"}, "star": 1, "goals": 1, "points": 2, "assists": 1, "headshot": "https://assets.nhle.com/mugs/nhl/20262027/NJD/8477015.png", "playerId": 8477015, "position": "R", "sweaterNo": 16, "teamAbbrev": "NJD"}}, {"away": "MIN", "home": "SJS", "a": 5, "h": 2, "star": {"name": {"default": "K. Kaprizov"}, "star": 1, "goals": 1, "points": 4, "assists": 3, "headshot": "https://assets.nhle.com/mugs/nhl/20262027/MIN/8478864.png", "playerId": 8478864, "position": "L", "sweaterNo": 97, "teamAbbrev": "MIN"}}], "heat": [{"id": 8478864, "name": "Kirill Kaprizov", "pos": "L", "team": "MIN", "p60": 8.1, "s60": 5.28, "heat": 100, "pts5": 14, "g5": 2, "spark": [1, 4, 1, 1, 3, 2, 3, 3, 2, 4], "toi5": 20.7, "toiS": 21.4, "gp": 26}, {"id": 8482089, "name": "Jake Neighbours", "pos": "L", "team": "STL", "p60": 6.87, "s60": 2.88, "heat": 95, "pts5": 9, "g5": 1, "spark": [0, 1, 0, 0, 0, 0, 2, 2, 5, 0], "toi5": 15.7, "toiS": 15.6, "gp": 24}, {"id": 8480023, "name": "Robert Thomas", "pos": "C", "team": "STL", "p60": 6.6, "s60": 2.99, "heat": 92, "pts5": 10, "g5": 2, "spark": [0, 1, 1, 2, 0, 0, 3, 3, 3, 1], "toi5": 18.2, "toiS": 20.0, "gp": 24}, {"id": 8481557, "name": "Matt Boldy", "pos": "L", "team": "MIN", "p60": 6.37, "s60": 3.46, "heat": 88, "pts5": 11, "g5": 4, "spark": [2, 1, 0, 1, 3, 0, 3, 3, 2, 3], "toi5": 20.7, "toiS": 21.4, "gp": 26}, {"id": 8477940, "name": "Nikolaj Ehlers", "pos": "L", "team": "CAR", "p60": 6.14, "s60": 3.57, "heat": 85, "pts5": 8, "g5": 2, "spark": [1, 1, 2, 0, 0, 1, 2, 3, 1, 1], "toi5": 15.6, "toiS": 16.1, "gp": 23}, {"id": 8477479, "name": "Tyler Bertuzzi", "pos": "L", "team": "CHI", "p60": 6.08, "s60": 2.07, "heat": 84, "pts5": 8, "g5": 4, "spark": [0, 0, 0, 0, 0, 1, 3, 0, 1, 3], "toi5": 15.8, "toiS": 16.9, "gp": 24}, {"id": 8480003, "name": "Jesper Boqvist", "pos": "C", "team": "NJD", "p60": 5.86, "s60": 2.86, "heat": 81, "pts5": 5, "g5": 2, "spark": [0, 1, 0, 0, 0, 0, 3, 0, 2, 0], "toi5": 10.2, "toiS": 11.4, "gp": 22}, {"id": 8478493, "name": "Joel Eriksson Ek", "pos": "C", "team": "MIN", "p60": 5.8, "s60": 3.12, "heat": 80, "pts5": 9, "g5": 4, "spark": [1, 1, 1, 0, 0, 0, 4, 2, 0, 3], "toi5": 18.6, "toiS": 19.2, "gp": 26}, {"id": 8478444, "name": "Brock Boeser", "pos": "R", "team": "VAN", "p60": 5.5, "s60": 3.28, "heat": 76, "pts5": 10, "g5": 1, "spark": [1, 1, 1, 1, 1, 2, 3, 1, 3, 1], "toi5": 21.8, "toiS": 19.7, "gp": 26}, {"id": 8474141, "name": "Patrick Kane", "pos": "R", "team": "CHI", "p60": 5.26, "s60": 2.69, "heat": 73, "pts5": 8, "g5": 1, "spark": [1, 0, 1, 0, 0, 1, 1, 1, 3, 2], "toi5": 18.2, "toiS": 18.1, "gp": 21}], "defn": [{"id": 8483506, "name": "Sam Rinzel", "pos": "D", "team": "CHI", "p60": 5.27, "s60": 2.38, "heat": 73, "pts5": 10, "g5": 1, "spark": [0, 1, 1, 0, 2, 2, 3, 2, 3, 0], "toi5": 22.8, "toiS": 18.7, "gp": 23}, {"id": 8475200, "name": "Dmitry Orlov", "pos": "D", "team": "SJS", "p60": 4.47, "s60": 2.24, "heat": 62, "pts5": 7, "g5": 1, "spark": [2, 1, 0, 1, 0, 4, 0, 0, 3, 0], "toi5": 18.8, "toiS": 17.5, "gp": 26}, {"id": 8480069, "name": "Cale Makar", "pos": "D", "team": "COL", "p60": 3.84, "s60": 3.24, "heat": 53, "pts5": 7, "g5": 2, "spark": [0, 0, 0, 4, 1, 2, 0, 3, 2, 0], "toi5": 21.9, "toiS": 22.4, "gp": 19}, {"id": 8485366, "name": "Matthew Schaefer", "pos": "D", "team": "NYI", "p60": 3.78, "s60": 2.54, "heat": 52, "pts5": 8, "g5": 3, "spark": [0, 1, 1, 1, 1, 3, 3, 0, 2, 0], "toi5": 25.4, "toiS": 26.7, "gp": 23}, {"id": 8476979, "name": "Erik Gustafsson", "pos": "D", "team": "LAK", "p60": 3.75, "s60": 1.71, "heat": 52, "pts5": 6, "g5": 1, "spark": [0, 1, 0, 0, 0, 2, 1, 2, 1, 0], "toi5": 19.2, "toiS": 19.7, "gp": 16}], "goal": [{"id": 8476999, "name": "Linus Ullmark", "team": "OTT", "sv": 0.935, "gp": 5, "ga": 8, "sa": 124}, {"id": 8478009, "name": "Ilya Sorokin", "team": "NYI", "sv": 0.927, "gp": 4, "ga": 8, "sa": 109}, {"id": 8475311, "name": "Darcy Kuemper", "team": "LAK", "sv": 0.925, "gp": 4, "ga": 8, "sa": 106}, {"id": 8482661, "name": "Jesper Wallstedt", "team": "MIN", "sv": 0.919, "gp": 5, "ga": 11, "sa": 136}, {"id": 8480981, "name": "Joel Hofer", "team": "STL", "sv": 0.917, "gp": 4, "ga": 10, "sa": 121}]};
+const mug = (team, id) => `https://assets.nhle.com/mugs/nhl/20262027/${team}/${id}.png`;
+const logo = t => `https://assets.nhle.com/logos/nhl/svg/${t}_dark.svg`;
+const mmss = m => `${Math.floor(m)}:${String(Math.round((m % 1) * 60)).padStart(2, '0')}`;
+const heatCol = h => h >= 85 ? '#ff3a0f' : h >= 70 ? '#ff5a24' : h >= 55 ? '#ff8a47' : '#c0603a';
+
+// mini chart: bars per game (minutes or shots), dashed line = his normal, orange dots = points/goals
+function bars(gs, { key, base, mark, hi = 3, unit }) {
+  const W = 360, H = 86, n = gs.length, bw = W / n - 4, max = Math.max(...gs.map(g => g[key]), base) * 1.1;
+  const y = v => H - v / max * H;
+  let s = `<svg width="${W}" height="${H + 18}" viewBox="0 0 ${W} ${H + 18}">`;
+  gs.forEach((g, i) => {
+    const x = i * (W / n) + 2, recent = i >= n - hi;
+    s += `<rect x="${x}" y="${y(g[key])}" width="${bw}" height="${H - y(g[key])}" rx="2" fill="${recent ? '#ff5a1f' : '#2a303d'}"/>`;
+    for (let k = 0; k < (g[mark] || 0); k++) s += `<circle cx="${x + bw / 2}" cy="${y(g[key]) - 6 - k * 8}" r="3" fill="#ffd2b8"/>`;
+  });
+  s += `<line x1="0" x2="${W}" y1="${y(base)}" y2="${y(base)}" stroke="#8a94a6" stroke-dasharray="3 4"/>`;
+  s += `<text x="${W}" y="${H + 14}" fill="#5c6577" font-size="10" text-anchor="end" font-family="ui-monospace,monospace">last game</text>`;
+  s += `<text x="0" y="${H + 14}" fill="#5c6577" font-size="10" font-family="ui-monospace,monospace">${gs[0].d.replace('-', '/')}</text></svg>`;
+  return s;
+}
+const S = D.series;
+const avg = (gs, k) => gs.reduce((a, g) => a + g[k], 0) / gs.length;
+const kul = S.kulich.games, rin = S.rinzel.games, kap = S.kaprizov.games, gre = S.greig.games, pod = S.podkolzin.games, eic = S.eichel.games;
+const before = gs => avg(gs.slice(0, -3), 'toi'), last3 = gs => avg(gs.slice(-3), 'toi'), sum = (gs, k) => gs.reduce((a, g) => a + g[k], 0);
+const stories = [
+  { p: S.kulich, tag: 'Bigger role', text: `Jiří Kulich played <b>${mmss(before(kul))}</b> a game before his last three. In them: <b>${mmss(last3(kul))}</b>, ${sum(kul.slice(-3), 'g')} goals, ${sum(kul.slice(-3), 'p')} points.`,
+    chart: bars(kul.slice(-10), { key: 'toi', base: before(kul), mark: 'p' }), leg: 'minutes a game · dots = points · dashed = his season before' },
+  { p: S.rinzel, tag: 'Bigger role', text: `Sam Rinzel's minutes went from <b>${mmss(before(rin))}</b> to <b>${mmss(last3(rin))}</b> a game, with ${sum(rin.slice(-3), 'p')} points in 3 games.`,
+    chart: bars(rin.slice(-10), { key: 'toi', base: before(rin), mark: 'p' }), leg: 'minutes a game · dots = points · dashed = his season before' },
+  { p: S.kaprizov, tag: 'Streak', text: `Kirill Kaprizov has a point in <b>15 straight games</b>: ${sum(kap.slice(-15), 'p')} points in that run, 4 of them last night in San Jose.`,
+    chart: bars(kap.slice(-15), { key: 'p', base: avg(kap, 'p'), mark: null, hi: 15 }), leg: 'points a game · dashed = his season average' },
+  { p: S.greig, tag: 'Due', text: `Ridly Greig has <b>${sum(gre.slice(-5), 's')} shots on goal</b> in his last five games and no goal yet. His normal: ${avg(gre.slice(0, -5), 's').toFixed(1)} shots a game.`,
+    chart: bars(gre.slice(-10), { key: 's', base: avg(gre.slice(0, -5), 's'), mark: 'g', hi: 5 }), leg: 'shots a game · dots = goals · dashed = his season before' },
+];
+document.getElementById('stories').innerHTML = stories.map(s => `<div class="blk story">
+  <img class="mug" src="${mug(s.p.team, s.p.id)}" alt="">
+  <div><div class="who"><em>${s.tag}</em> · ${s.p.name} · ${s.p.team}</div><p>${s.text}</p><a class="more go">Profile ›</a></div>
+  <div>${s.chart}<div class="leg">${s.leg}</div></div></div>`).join('');
+
+const watch = (el, p, html, chart) => document.getElementById(el).innerHTML = `<img src="${mug(p.team, p.id)}" alt=""><p>${html}</p><div>${chart}</div>`;
+watch('w1', S.podkolzin, `<b>Vasily Podkolzin</b> · EDM: up from ${mmss(before(pod))} to ${mmss(last3(pod))} a game, points in 5 straight`, bars(pod.slice(-8), { key: 'toi', base: before(pod), mark: 'p' }).replace('width="360"', 'width="260"'));
+watch('w2', S.eichel, `<b>Jack Eichel</b> · VGK: ${sum(eic.slice(-5), 's')} shots in 5 games, no goal, ${sum(eic.slice(-5), 'p')} assists`, bars(eic.slice(-8), { key: 's', base: avg(eic.slice(0, -5), 's'), mark: 'g', hi: 5 }).replace('width="360"', 'width="260"'));
+document.getElementById('tmrw').innerHTML = ['WPG','BOS','NYR','BUF','CAR','TBL','OTT','FLA','STL','NYI'].map(t => `<img src="${logo(t)}" alt="">`).join('') ;
+
+document.getElementById('last').innerHTML = D.last.map(g => {
+  const aw = g.a > g.h, st = g.star, nm = st.name?.default ?? '';
+  const line = st.savePctg ? `${(st.savePctg).toFixed(3).slice(1)} save %` : `${st.goals ?? 0} G · ${st.assists ?? 0} A`;
+  return `<div class="rr"><div class="sc"><img src="${logo(g.away)}"><span class="${aw ? 'w' : 'l'}">${g.away}</span><span class="n ${aw ? 'w' : 'l'}">${g.a}</span><span class="l">–</span><span class="n ${aw ? 'l' : 'w'}">${g.h}</span><span class="${aw ? 'l' : 'w'}">${g.home}</span><img src="${logo(g.home)}"></div>
+  <span class="fin">FINAL</span><span class="st">★ <b>${nm}</b> · ${st.teamAbbrev} · ${line}</span></div>`;
+}).join('');
+
+const spark = pts => `<div class="dots">${pts.map(p => `<i style="height:${4 + p * 7}px;${p ? 'background:#ff8a47' : ''}"></i>`).join('')}</div>`;
+const label = h => h >= 85 ? '<span class="tag fire">On fire</span>' : h >= 70 ? '<span class="tag hot">Hot</span>' : '<span></span>';
+const head = c => `<div class="rk hd"><span></span><span></span><span>Player</span><span>Heat</span><span>${c}</span><span>Last 10 games</span></div>`;
+const rows = list => list.map((r, i) => `<div class="rk"><span class="n">${i + 1}</span><img src="${mug(r.team, r.id)}" alt="">
+  <div class="nm"><b>${r.name}</b><span>${r.team} · ${{ C: 'Center', L: 'Left wing', R: 'Right wing', D: 'Defense' }[r.pos]} ${label(r.heat)}</span></div>
+  <div class="hb"><div class="tr"><i style="width:${r.heat}%;background:${heatCol(r.heat)}"></i></div><b style="color:${heatCol(r.heat)}">${r.heat}</b></div>
+  <div class="p6"><b>${r.p60.toFixed(1)}</b> pts / 60 min<span>season ${r.s60.toFixed(1)} · <em>+${Math.round((r.p60 / r.s60 - 1) * 100)}%</em></span></div>
+  ${spark(r.spark)}</div>`).join('');
+document.getElementById('fwd').innerHTML = head('Points per 60 min') + rows(D.heat);
+document.getElementById('def').innerHTML = head('Points per 60 min') + rows(D.defn);
+document.getElementById('g').innerHTML = `<div class="rk hd"><span></span><span></span><span>Goalie</span><span>Save % · last 5</span><span>Goals / shots</span><span></span></div>` + D.goal.map((r, i) => `<div class="rk"><span class="n">${i + 1}</span><img src="${mug(r.team, r.id)}" alt=""><div class="nm"><b>${r.name}</b><span>${r.team}</span></div>
+  <div class="hb"><div class="tr"><i style="width:${(r.sv - .85) / .1 * 100}%;background:#3a88ff"></i></div><b style="width:52px">${r.sv.toFixed(3).slice(1)}</b></div><div class="p6"><b>${r.ga}</b> on ${r.sa} shots<span>${r.gp} games</span></div><span></span></div>`).join('');
+document.querySelectorAll('.chips span').forEach(c => c.onclick = () => {
+  document.querySelectorAll('.chips span').forEach(x => x.classList.toggle('on', x === c));
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.dataset.p === c.dataset.p));
+});
+</script>
+</body>
+</html>
