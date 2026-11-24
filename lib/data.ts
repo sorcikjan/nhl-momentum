@@ -2,7 +2,7 @@
 // Pages should call these directly — never fetch their own API over HTTP.
 
 import { supabaseAdmin } from '@/lib/supabase';
-import { sharedResult } from '@/lib/db-fallback';
+import { computedResult, saveComputed, sharedResult } from '@/lib/db-fallback';
 import { buildSearchIndex } from '@/lib/search';
 import { pregameKeyPlayers, type KeyPlayer } from '@/lib/key-players';
 import { cardPlayers, type GameCardData } from '@/lib/game-card';
@@ -139,19 +139,29 @@ export async function fetchPeers(): Promise<Peer[]> {
 // ─── Rankings ─────────────────────────────────────────────────────────────────
 
 // Rankings are built from the same data for the homepage, /rankings, /hot,
-// /welcome and /api/rankings — share one build per server instance for 3 min
-// (and one in-flight build), instead of each page rebuilding it.
-let _rankingsCache: { value: Awaited<ReturnType<typeof buildRankings>>; ts: number } | null = null;
-let _rankingsInFlight: ReturnType<typeof buildRankings> | null = null;
+// /welcome, game pages and the share cards. They change only when the pipeline
+// or a finished game writes, so /api/revalidate rebuilds them (refreshRankings)
+// and pages read the saved result. A page builds only if nothing usable is
+// saved (see computedResult); 3 h covers the gap between game finishes.
+const RANKINGS_MAX_AGE_MS = 3 * 60 * 60_000;
 
-export async function fetchRankings() {
-  if (_rankingsCache && Date.now() - _rankingsCache.ts < 3 * 60_000) return _rankingsCache.value;
-  if (!_rankingsInFlight) {
-    _rankingsInFlight = sharedResult('rankings', 3 * 60_000, buildRankings)
-      .then(value => { _rankingsCache = { value, ts: Date.now() }; return value; })
-      .finally(() => { _rankingsInFlight = null; });
-  }
-  return _rankingsInFlight;
+export function fetchRankings() {
+  return computedResult('rankings', RANKINGS_MAX_AGE_MS, checkedRankings);
+}
+
+export async function refreshRankings() {
+  const value = await checkedRankings();
+  await saveComputed('rankings', value);
+  return { skaters: value.totalSkaters };
+}
+
+// A build during a database hiccup can come back nearly empty; saved, it would
+// stand until the next pipeline run. Fail instead, so the last good one stays.
+// (30, not more: in a playoff final only two teams' skaters are ranked.)
+async function checkedRankings() {
+  const value = await buildRankings();
+  if (value.totalSkaters < 30) throw new Error(`rankings look incomplete (${value.totalSkaters} skaters)`);
+  return value;
 }
 
 async function buildRankings() {

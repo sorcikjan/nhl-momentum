@@ -1,6 +1,7 @@
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { NextResponse } from 'next/server';
 import { bumpGeneration } from '@/lib/db-fallback';
+import { refreshRankings } from '@/lib/data';
 import { supabaseAdmin } from '@/lib/supabase';
 import { gameUrl, playerUrl, teamUrl } from '@/lib/urls';
 import { NATIONS } from '@/lib/nations';
@@ -15,6 +16,8 @@ import { NATIONS } from '@/lib/nations';
 // had crawlers re-render ~2,500 pages from the database up to 10 times a night.
 
 const SUMMARY_PATHS = ['/', '/games', '/rankings', '/standings', '/stats', '/hot', '/playoffs', '/accuracy', ...Object.values(NATIONS).map(n => n.path)];
+
+const RANKINGS_BUDGET_MS = 15_000;
 
 type Targets = { gameIds: number[]; teamIds: number[] };
 
@@ -56,6 +59,16 @@ export async function POST(request: Request) {
   // The answers pages saved from the database are stale from here on.
   const generation = await bumpGeneration().then(() => 'bumped', e => `failed: ${e}`);
 
+  // Pages only read rankings; this is where they're rebuilt (lib/data.ts).
+  // Before the paths below, so their next render reads the new ones. Capped so
+  // a slow database can't stop the revalidation itself: a page rebuilds stale
+  // rankings on its own after 3 h.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const rankings = await Promise.race([
+    refreshRankings().then(r => `rebuilt: ${r.skaters} skaters`, e => `failed: ${e}`),
+    new Promise<string>(resolve => { timer = setTimeout(() => resolve('timed out'), RANKINGS_BUDGET_MS); }),
+  ]).finally(() => clearTimeout(timer));
+
   const targets = parseTargets(await request.json().catch(() => null));
   for (const p of SUMMARY_PATHS) revalidatePath(p);
   revalidatePath('/recaps', 'layout');
@@ -65,7 +78,7 @@ export async function POST(request: Request) {
     for (const p of paths) revalidatePath(p);
     // A finished game's own data cache (game pages); other games keep theirs.
     for (const id of targets.gameIds) revalidateTag(`game:${id}`, { expire: 0 });
-    return NextResponse.json({ revalidated: true, targeted: paths.length, generation, ts: new Date().toISOString() });
+    return NextResponse.json({ revalidated: true, targeted: paths.length, generation, rankings, ts: new Date().toISOString() });
   }
 
   revalidatePath('/players/[id]/[slug]', 'page');
@@ -74,5 +87,5 @@ export async function POST(request: Request) {
   // Data cached across renders (finished game pages) — expire it now, not stale-while-revalidate.
   revalidateTag('pipeline', { expire: 0 });
 
-  return NextResponse.json({ revalidated: true, generation, ts: new Date().toISOString() });
+  return NextResponse.json({ revalidated: true, generation, rankings, ts: new Date().toISOString() });
 }

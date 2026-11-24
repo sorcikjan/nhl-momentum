@@ -272,6 +272,73 @@ export async function sharedResult<T>(key: string, ttlMs: number, build: () => P
   return value;
 }
 
+// Results computed when their data changes, not when a page asks.
+//
+// sharedResult() rebuilt rankings every 3 min whatever happened: ~2,300 builds
+// in the 4 days to 2026-11-24, while the data behind them changed ~60 times,
+// and those builds were 75% of the database's query time (pg_stat_statements).
+// The free instance ran out of Disk IO and fell over. Now /api/revalidate, which
+// every pipeline run and finished game calls, rebuilds and saves the result
+// (saveComputed), and pages only read it (computedResult).
+//
+// A page builds only when there's no saved result at all, or the saved one is
+// older than maxAgeMs (the writer failed): it builds once and saves it, so the
+// next instances read it again. If the store can't be reached, an instance keeps
+// serving what it last read, however old, rather than building.
+const COMPUTED_RECHECK_MS = 60_000;
+type Computed<T> = { at: number; value: T };
+const computedMem = new Map<string, { at: number; value: unknown; checked: number }>();
+const computedInFlight = new Map<string, Promise<unknown>>();
+
+async function readComputed<T>(k: string): Promise<Computed<T> | null | 'unreachable'> {
+  const s = blobs();
+  if (!s) return 'unreachable';
+  try {
+    return ((await timed(s.get(k, { type: 'json' }))) as Computed<T> | null) ?? null;
+  } catch {
+    return 'unreachable';
+  }
+}
+
+export async function saveComputed<T>(key: string, value: T): Promise<void> {
+  const at = Date.now();
+  computedMem.set(key, { at, value, checked: at });
+  const s = blobs();
+  if (!s) throw new Error('Blobs store unavailable');
+  await timed(s.setJSON(`computed/${key}`, { at, value }));
+}
+
+export function computedResult<T>(key: string, maxAgeMs: number, build: () => Promise<T>): Promise<T> {
+  const mem = computedMem.get(key);
+  if (mem && Date.now() - mem.checked < COMPUTED_RECHECK_MS) return Promise.resolve(mem.value as T);
+  const pending = computedInFlight.get(key);
+  if (pending) return pending as Promise<T>;
+  const job = (async () => {
+    const saved = await readComputed<T>(`computed/${key}`);
+    const now = Date.now();
+    if (saved !== 'unreachable' && saved && now - saved.at < maxAgeMs) {
+      computedMem.set(key, { at: saved.at, value: saved.value, checked: now });
+      return saved.value;
+    }
+    if (saved === 'unreachable' && mem) {
+      computedMem.set(key, { ...mem, checked: now });
+      return mem.value as T;
+    }
+    try {
+      const value = await build();
+      if (saved === 'unreachable') computedMem.set(key, { at: now, value, checked: now });
+      else await saveComputed(key, value).catch(() => {});
+      return value;
+    } catch (err) {
+      const old = saved !== 'unreachable' && saved ? saved.value : mem?.value;
+      if (old !== undefined) return old as T;
+      throw err;
+    }
+  })().finally(() => computedInFlight.delete(key));
+  computedInFlight.set(key, job);
+  return job;
+}
+
 // For /api/debug/blobs: is the store reachable from this function, and how fast?
 export async function blobsHealth() {
   const t0 = Date.now();
