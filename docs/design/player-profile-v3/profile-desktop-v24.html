@@ -172,7 +172,7 @@
   .gl{grid-template-columns:80px 1fr 60px 60px 70px 70px 220px}
   .more{margin-top:10px;width:100%;padding:11px 0;border-radius:10px;background:var(--inset);border:1px solid var(--line);color:#ff8a4c;font:700 13px Inter,sans-serif;cursor:pointer}
   .ladnames{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:6px}
-  .rad2{display:grid;grid-template-columns:380px 1fr;gap:32px;align-items:center}
+  .rad2{display:flex;justify-content:center}.rad2 .radar{width:520px}.rad2 .leg2{justify-content:center}
   .pl{display:flex;flex-direction:column;gap:9px}
   .pl .r2{display:grid;grid-template-columns:150px 1fr 60px;align-items:center;gap:12px;font-size:13px;color:var(--text)}
   .pl .tr{position:relative;height:8px;border-radius:4px;background:#1c212c}
@@ -308,7 +308,6 @@
       <div class="blk">
         <div class="rad2">
           <div class="radar"><div class="leg2"><span><i></i>Season</span><span><i class="o"></i>Last 3 weeks</span></div><div id="radar"></div></div>
-          <div class="pl" id="pl"></div>
         </div>
         <div class="nu"><span>Penalty kill · not used</span></div>
       </div></div>
@@ -399,9 +398,6 @@ cols('cc1','cb1',false); cols('cc2','cb2',true);
 
 
 // Heat line: wider and taller than mobile's, same chart
-// percentiles next to the radar: season (white tick) vs last 3 weeks (bar)
-document.getElementById('pl').innerHTML = radar.map(([k,s,l]) => `<div class="r2"><span>${k}</span><div class="tr"><i style="width:${l}%;opacity:${.35+l/160}"></i><u style="left:calc(${s}% - 1px)"></u><span class="mid"></span></div><b>${l}<span style="color:#5c6577;font-weight:600"> · ${s}</span></b></div>`).join('')
-  + `<div style="font-size:11px;color:#5c6577;margin-top:4px">bar = last 3 weeks · white tick = season · dashed = NHL median</div>`;
 // sticky bar: identity appears once the hero is gone; chapter link follows the scroll
 new IntersectionObserver(([e]) => document.getElementById('bar').classList.toggle('stuck', !e.isIntersecting), { rootMargin: '-128px 0px 0px 0px' }).observe(document.getElementById('top'));
 const tabs = document.querySelectorAll('.bar nav a');
