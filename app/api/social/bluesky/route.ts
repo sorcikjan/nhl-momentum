@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireIngestAuth } from '@/lib/ingest-auth';
+import { getStore } from '@netlify/blobs';
 import { kindsFor, lastPostAt, postWithImage } from '@/lib/bluesky';
 import { todayET } from '@/lib/home';
 import { blueskyPost, SHARE_KINDS, type ShareKind } from '@/lib/share-cards';
@@ -29,6 +30,10 @@ export async function POST(req: NextRequest) {
     if (last && Date.now() - last.getTime() < 12 * 3_600_000) {
       return NextResponse.json({ skipped: `already posted at ${last.toISOString()}` });
     }
+    // Two calls seconds apart both passed the check above (the first was still
+    // making its card) and posted 2–3 times a day (Nov 2026). One claim per day,
+    // taken atomically, decides which call posts.
+    if (!(await claimToday())) return NextResponse.json({ skipped: 'another call is posting today' });
   }
 
   const d = await fetchShareData();
@@ -57,4 +62,16 @@ export async function POST(req: NextRequest) {
     }
   }
   return NextResponse.json({ skipped: 'no card has data today', tried: kinds });
+}
+
+// True for the first call of the day (ET), false for any other. If the store
+// can't be reached, posting goes ahead: a missed post is worse than a rare double.
+async function claimToday(): Promise<boolean> {
+  try {
+    const store = getStore({ name: 'social', consistency: 'strong' });
+    const res = await store.set(`bluesky/claim/${todayET()}`, new Date().toISOString(), { onlyIfNew: true });
+    return res.modified;
+  } catch {
+    return true;
+  }
 }
