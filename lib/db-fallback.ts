@@ -25,9 +25,9 @@ export const FRESH_MS = 30 * 60_000;
 const GENERATION_KEY = 'meta/generation';
 // After a failed read, skip the database for this long: pages render from
 // saved answers in milliseconds instead of waiting out a timeout per query.
-// Netlify bills the waiting: on 2026-11-25 ten hours of outage cost hours of
-// compute in renders waiting on a dead database.
-const DOWN_FOR_MS = 120_000;
+// (2 min with a single probe was tried on 2026-11-25: right after a deploy the
+// busy database looked down and uncached pages without a saved answer 500'd.)
+const DOWN_FOR_MS = 30_000;
 // Requests carrying this header (the health probe) bypass the fallback.
 export const BYPASS_HEADER = 'x-db-direct';
 
