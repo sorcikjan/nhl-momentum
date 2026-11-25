@@ -10,7 +10,7 @@ import { todayET } from '@/lib/home';
 import { assertDatabaseUp } from '@/lib/supabase';
 
 // Free-tier database: each render is several queries; crawlers visit every page.
-export const revalidate = 60;
+export const revalidate = 86400; // backstop: pages change on /api/revalidate (lib/cache-policy.ts)
 
 export const metadata: Metadata = {
   title: 'NHL Schedule & Predictions',

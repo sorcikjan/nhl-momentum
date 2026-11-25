@@ -7,7 +7,7 @@ import { SITE_URL } from '@/lib/site';
 import { assertDatabaseUp } from '@/lib/supabase';
 
 // Free-tier database: each render is several queries; crawlers visit every page.
-export const revalidate = 120;
+export const revalidate = 86400; // backstop: pages change on /api/revalidate (lib/cache-policy.ts)
 
 // Search-facing: people search "who's hot in the NHL", not the brand name.
 const TITLE = "Who's Hot in the NHL Right Now — Heat Rankings & Tonight's Games";

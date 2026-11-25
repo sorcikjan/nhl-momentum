@@ -9,7 +9,7 @@ import { playerUrl } from '@/lib/urls';
 
 // Free-tier database: data changes only when the pipeline runs, and pipeline
 // runs call /api/revalidate — so a longer interval costs no freshness.
-export const revalidate = 600;
+export const revalidate = 86400; // backstop: pages change on /api/revalidate (lib/cache-policy.ts)
 
 export const metadata: Metadata = {
   title: 'NHL Player Rankings 2026–27',

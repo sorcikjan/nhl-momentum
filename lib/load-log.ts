@@ -96,7 +96,27 @@ export function parseMetrics(text: string): Record<string, number> {
 }
 
 type Query = { query: string; calls: number; total_ms: number; disk_blocks_read: number; cache_blocks_hit: number };
-export type Snapshot = { at: number; metrics: Record<string, number> | null; queries: Query[] | null; errors: string[] };
+// app: what the site asked of the database in the hour before (all instances).
+export type Snapshot = { at: number; metrics: Record<string, number> | null; queries: Query[] | null; errors: string[]; app?: { requests: number; sec: number } };
+
+async function hourBucket(s: Store, hour: string): Promise<Bucket> {
+  const app: Bucket = {};
+  const { blobs } = await within(s.list({ prefix: `req/${hour}/` })).catch(() => ({ blobs: [] as { key: string }[] }));
+  for (const b of blobs) {
+    const part = (await within(s.get(b.key, { type: 'json' })).catch(() => null)) as { counts: Bucket } | null;
+    for (const [k, c] of Object.entries(part?.counts ?? {})) {
+      const t = (app[k] ??= { n: 0, ms: 0, bytes: 0, errors: 0, slow: 0 });
+      t.n += c.n; t.ms += c.ms; t.bytes += c.bytes; t.errors += c.errors; t.slow += c.slow;
+    }
+  }
+  return app;
+}
+
+function dbTotals(app: Bucket) {
+  return Object.entries(app).filter(([k]) => k.startsWith('db ')).reduce(
+    (t, [, c]) => ({ requests: t.requests + c.n, sec: t.sec + Math.round(c.ms / 1000), errors: t.errors + c.errors }),
+    { requests: 0, sec: 0, errors: 0 });
+}
 
 export async function takeLoadSnapshot(): Promise<Snapshot> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
@@ -122,8 +142,31 @@ export async function takeLoadSnapshot(): Promise<Snapshot> {
     errors,
   };
   const s = store();
-  if (s) await within(s.setJSON(`snap/${hourKey(snap.at)}`, snap), 10_000).catch(e => errors.push(`save ${e}`));
+  if (s) {
+    const prev = dbTotals(await hourBucket(s, hourKey(snap.at - 3_600_000)));
+    snap.app = { requests: prev.requests, sec: prev.sec };
+    await within(s.setJSON(`snap/${hourKey(snap.at)}`, snap), 10_000).catch(e => errors.push(`save ${e}`));
+  }
   return snap;
+}
+
+// ─── Last 24 hours, for the health check ─────────────────────────────────────
+
+// Database requests the site made in the last 24 hours and the seconds pages
+// waited on them, from the hourly snapshots (24 reads). Each second waited is
+// billed by Netlify, so this is the early warning before credits run out.
+// Null when fewer than 12 hours were recorded.
+export async function lastDayLoad(): Promise<{ requests: number; sec: number; hours: number } | null> {
+  const s = store();
+  if (!s) return null;
+  const now = Date.now();
+  const snaps = await Promise.all(Array.from({ length: 24 }, (_, i) =>
+    within(s.get(`snap/${hourKey(now - i * 3_600_000)}`, { type: 'json' })).catch(() => null) as Promise<Snapshot | null>));
+  const withApp = snaps.filter((x): x is Snapshot & { app: { requests: number; sec: number } } => !!x?.app);
+  if (withApp.length < 12) return null;
+  const sum = withApp.reduce((t, x) => ({ requests: t.requests + x.app.requests, sec: t.sec + x.app.sec }), { requests: 0, sec: 0 });
+  const k = 24 / withApp.length; // scaled to a full day
+  return { requests: Math.round(sum.requests * k), sec: Math.round(sum.sec * k), hours: withApp.length };
 }
 
 // ─── Report ──────────────────────────────────────────────────────────────────
@@ -169,20 +212,10 @@ export async function loadReport(hours: number) {
   let prev: Snapshot | null = null;
   for (const h of keys) {
     const snap = (await within(s.get(`snap/${h}`, { type: 'json' })).catch(() => null)) as Snapshot | null;
-    const { blobs } = await within(s.list({ prefix: `req/${h}/` })).catch(() => ({ blobs: [] as { key: string }[] }));
-    const app: Bucket = {};
-    for (const b of blobs) {
-      const part = (await within(s.get(b.key, { type: 'json' })).catch(() => null)) as { counts: Bucket } | null;
-      for (const [k, c] of Object.entries(part?.counts ?? {})) {
-        const t = (app[k] ??= { n: 0, ms: 0, bytes: 0, errors: 0, slow: 0 });
-        t.n += c.n; t.ms += c.ms; t.bytes += c.bytes; t.errors += c.errors; t.slow += c.slow;
-      }
-    }
+    const app = await hourBucket(s, h);
     const top = Object.entries(app).sort((a, b) => b[1].ms - a[1].ms).slice(0, 15)
       .map(([k, c]) => ({ key: k, n: c.n, sec: Math.round(c.ms / 1000), kB: Math.round(c.bytes / 1024), errors: c.errors, slow: c.slow }));
-    const totals = Object.entries(app).filter(([k]) => k.startsWith('db ')).reduce(
-      (t, [, c]) => ({ requests: t.requests + c.n, sec: t.sec + Math.round(c.ms / 1000), errors: t.errors + c.errors }),
-      { requests: 0, sec: 0, errors: 0 });
+    const totals = dbTotals(app);
     report.push({ hour: h, app: { totals, top }, ...(snap ? snapshotDelta(prev, snap) : { db: null, queries: [] }), snapshotErrors: snap?.errors ?? [] });
     if (snap) prev = snap;
   }

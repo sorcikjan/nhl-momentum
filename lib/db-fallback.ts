@@ -25,7 +25,9 @@ export const FRESH_MS = 30 * 60_000;
 const GENERATION_KEY = 'meta/generation';
 // After a failed read, skip the database for this long: pages render from
 // saved answers in milliseconds instead of waiting out a timeout per query.
-const DOWN_FOR_MS = 30_000;
+// Netlify bills the waiting: on 2026-11-25 ten hours of outage cost hours of
+// compute in renders waiting on a dead database.
+const DOWN_FOR_MS = 120_000;
 // Requests carrying this header (the health probe) bypass the fallback.
 export const BYPASS_HEADER = 'x-db-direct';
 
@@ -75,7 +77,7 @@ function blobs(): Store | null {
   }
 }
 
-function inPageRender(): boolean {
+export function inPageRender(): boolean {
   try {
     const route = workAsyncStorage.getStore()?.route;
     return !!route && !route.startsWith('/api');
@@ -160,7 +162,7 @@ function save(key: string, res: Response): void {
 }
 
 // Pages rendered while the database failed are cached with gaps and the
-// "data delayed" notice — for up to 6 h (player pages). A render that had to
+// "data delayed" notice — until the next revalidation (a week, player pages). A render that had to
 // fall back leaves a mark; once the database answers again, healDegradedPages()
 // revalidates everything through /api/revalidate, as a pipeline run does.
 const DEGRADED_KEY = 'meta/degraded';
@@ -190,7 +192,8 @@ export function healDegradedPages(): void {
     await timed(s.delete(DEGRADED_KEY));
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 15_000);
-    await fetch(`${process.env.URL || SITE_URL}/api/revalidate`, { method: 'POST', headers: { 'x-api-key': key }, signal: ctrl.signal })
+    // Everything: degraded pages can be any page, and they show gaps. Once per outage.
+    await fetch(`${process.env.URL || SITE_URL}/api/revalidate`, { method: 'POST', headers: { 'x-api-key': key, 'Content-Type': 'application/json' }, body: JSON.stringify({ scope: 'full' }), signal: ctrl.signal })
       .finally(() => clearTimeout(timer));
   })().catch(() => {});
   try { after(job); } catch { /* outside a request: let it run */ }

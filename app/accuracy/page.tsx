@@ -6,7 +6,7 @@ import { fetchAccuracy } from '@/lib/data';
 import { assertDatabaseUp } from '@/lib/supabase';
 import { SectionHeading } from '@/components/ds';
 
-export const revalidate = 3600;
+export const revalidate = 86400; // backstop: pages change on /api/revalidate (lib/cache-policy.ts)
 
 export const metadata: Metadata = {
   title: 'Prediction Accuracy',

@@ -1417,7 +1417,8 @@ export function assertGameQuery(error: { message?: string; code?: string } | nul
   if (error && error.code !== 'PGRST116') throw new Error(`Game query failed: ${error.message || error.code}`);
 }
 
-export async function fetchMatch(id: string) {
+// liveTtl: a game not yet over follows the NHL feed this often (lib/cache-policy.ts).
+export async function fetchMatch(id: string, liveTtl?: number | null) {
   // Game record, live NHL data, play-by-play, and model version can all start at once
   const [{ data: game, error: gameError }, liveData, rawPlayByPlay, activeModel] = await Promise.all([
     supabaseAdmin
@@ -1429,8 +1430,8 @@ export async function fetchMatch(id: string) {
       `)
       .eq('id', id)
       .single(),
-    getGameBoxscore(Number(id)).catch(() => null),
-    getGamePlayByPlay(Number(id)).catch(() => null),
+    getGameBoxscore(Number(id), liveTtl).catch(() => null),
+    getGamePlayByPlay(Number(id), liveTtl).catch(() => null),
     latestModelVersion(),
   ]);
 

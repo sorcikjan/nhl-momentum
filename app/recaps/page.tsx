@@ -7,7 +7,7 @@ import { assertDatabaseUp } from '@/lib/supabase';
 import { SectionHeading } from '@/components/ds';
 import { gameStoryCard, groupByWeek, nightCard, nightStories, rankStoryCards, type FinishedGame, type GameStoryCard, type NightCard } from '@/lib/stories';
 
-export const revalidate = 3600;
+export const revalidate = 86400; // backstop: pages change on /api/revalidate (lib/cache-policy.ts)
 
 export const metadata: Metadata = {
   title: 'NHL Stories — Every Game Night, Told Through the Numbers',

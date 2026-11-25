@@ -23,9 +23,9 @@ import { playerUrl } from '@/lib/urls';
 const cachedView = cache((id: string) => buildPlayerView(id));
 
 // Player data changes only when the pipeline runs, and every run (nightly and
-// after each finished game) calls /api/revalidate. 6 h keeps crawlers — 800+
+// after each finished game) calls /api/revalidate. A week keeps crawlers — 800+
 // player pages in the sitemap — off the database without costing freshness.
-export const revalidate = 21600;
+export const revalidate = 604800; // backstop: pages change on /api/revalidate (lib/cache-policy.ts)
 
 // Render on first visit, then serve from the ISR cache for `revalidate` seconds.
 // Without this, a dynamic-segment page is rendered on every request.

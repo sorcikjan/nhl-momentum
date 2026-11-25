@@ -45,9 +45,11 @@ import SpecialTeamsCard from '@/components/games/SpecialTeamsCard';
 import HeadToHeadCard from '@/components/games/HeadToHeadCard';
 import LineupContextCard from '@/components/games/LineupContextCard';
 import { assertDatabaseUp } from '@/lib/supabase';
+import { EXTERNAL_TTL, LIVE_TTL, liveTtl } from '@/lib/cache-policy';
 
-// Free-tier database: each render is several queries; crawlers visit every page.
-export const revalidate = 60;
+// Rendered again when the pipeline writes (/api/revalidate) or, while the game
+// isn't over, as its live feed asks (liveTtl). This is only a backstop.
+export const revalidate = 86400;
 
 // Render on first visit, then serve from the ISR cache for `revalidate` seconds.
 // Without this, a dynamic-segment page is rendered on every request.
@@ -58,8 +60,8 @@ export function generateStaticParams() {
 // Metadata and the page share one fetch per render (it's a few dozen queries).
 // A finished game's data changes only when the pipeline writes, and the pipeline
 // then calls /api/revalidate, which drops the 'pipeline' tag (daily run) or just
-// that game's tag (post-game). So a final game reads the database once per 6 h,
-// not on every 60 s re-render; live and upcoming games read fresh. (The Map
+// that game's tag (post-game). Live and upcoming games read fresh, their page
+// living until puck drop, then LIVE_TTL (lib/cache-policy.ts). (The Map
 // doesn't survive the cache's JSON.)
 const finishedMatch = (id: string) => unstable_cache(
   async () => {
@@ -67,14 +69,14 @@ const finishedMatch = (id: string) => unstable_cache(
     return { ...m, goalieSeasonStats: [...m.goalieSeasonStats] };
   },
   ['match-final-v1', id],
-  { revalidate: 21600, tags: ['pipeline', `game:${id}`] },
+  { revalidate: EXTERNAL_TTL, tags: ['pipeline', `game:${id}`] },
 )();
 const cachedFetchMatch = cache(async (id: string) => {
   const m = await finishedMatch(id);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const state = (m.liveData as any)?.gameState ?? m.game?.game_state;
   if (state === 'FINAL' || state === 'OFF') return { ...m, goalieSeasonStats: new Map(m.goalieSeasonStats) };
-  return fetchMatch(id);
+  return fetchMatch(id, liveTtl(m.game) ?? LIVE_TTL);
 });
 const cachedFetchStory = cache((id: number) => fetchGameStory(id).catch(() => null));
 

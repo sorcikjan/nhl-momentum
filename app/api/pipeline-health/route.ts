@@ -20,6 +20,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { lastDayLoad } from '@/lib/load-log';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -44,6 +45,8 @@ function ago(isoString: string | null | undefined): string {
 }
 
 // ─── route ───────────────────────────────────────────────────────────────────
+
+const LOAD_SEC_PER_DAY = 2 * 3600;
 
 export async function GET(req: NextRequest) {
   // Auth
@@ -518,6 +521,20 @@ export async function GET(req: NextRequest) {
     }
     if (newestAgeH > 48) {
       issues.push(`RECAPS: newest recap is ${Math.round(newestAgeH)}h old — recap pipeline may be broken`);
+    }
+  }
+
+  // ── 8b. SITE LOAD ─────────────────────────────────────────────────────────
+  // Database requests pages made in the last 24 h and the seconds they waited
+  // (lib/load-log.ts). Netlify bills every second a render runs: before pages
+  // changed only on data events (lib/cache-policy.ts), Nov 2026 ran ~24k
+  // requests and ~4 h of waiting a day and used a month of credits in a week.
+  // The limit is a first guess, to tune once a week of the new policy is in.
+  {
+    const load = await lastDayLoad().catch(() => null);
+    checks.siteLoad = load ?? 'not enough hourly snapshots yet';
+    if (load && load.sec > LOAD_SEC_PER_DAY) {
+      issues.push(`SITE LOAD: pages waited ${Math.round(load.sec / 60)} min on the database in 24 h (${load.requests} requests) — above ${LOAD_SEC_PER_DAY / 60} min; Netlify compute credits burn with it`);
     }
   }
 

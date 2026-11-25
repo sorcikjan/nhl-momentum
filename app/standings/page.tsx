@@ -8,7 +8,7 @@ import { SHARE_IMAGE } from '@/lib/seo';
 import { SITE_URL } from '@/lib/site';
 
 // NHL.com updates after every game; the pipeline revalidates after each one too.
-export const revalidate = 600;
+export const revalidate = 86400; // backstop: pages change on /api/revalidate (lib/cache-policy.ts)
 
 const season = () => { const s = currentSeason(); return `${s.slice(0, 4)}–${s.slice(6)}`; };
 

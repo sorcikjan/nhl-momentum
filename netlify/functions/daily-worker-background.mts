@@ -25,6 +25,9 @@ const handler: BackgroundHandler = async (event) => {
   }
 
   const body = event.body ? JSON.parse(event.body) : {};
+  // Which pages to render again afterwards (/api/revalidate): 'full' once a
+  // day (the 08:00 run), otherwise the league-wide pages and recent games.
+  const scope: 'full' | 'summary' = body.revalidate === 'full' ? 'full' : 'summary';
   const phases: string[] = body.phases ?? ['rosters', 'backfill', 'outcomes', 'outcomes-backfill', 'gamelogs', 'metrics', 'snapshots', 'odds', 'energy', 'extras', 'assignments', 'recap', 'game-stories', 'prune'];
   const dateParam: string = body.date ?? '';
   const dateSuffix = dateParam ? `&date=${dateParam}` : '';
@@ -234,13 +237,14 @@ const handler: BackgroundHandler = async (event) => {
     log.push(`prune: ${r.data ? `${r.data.deleted} old snapshots deleted` : `err: ${r.error}`}`);
   }
 
-  // Bust ISR cache so homepage/rankings/accuracy reflect new data immediately.
+  // Pages show the new data from here on (lib/cache-policy.ts).
   try {
-    await fetch(`${base}/api/revalidate`, {
+    const res = await fetch(`${base}/api/revalidate`, {
       method: 'POST',
-      headers: { 'x-api-key': ingestKey },
+      headers: { 'x-api-key': ingestKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scope }),
     });
-    log.push('revalidate: ok');
+    log.push(`revalidate ${scope}: ${res.ok ? 'ok' : `err: HTTP ${res.status}`}`);
   } catch (e) { log.push(`revalidate: exception ${e}`); }
 
   console.log('[daily-worker] complete:', log.join(' | '));

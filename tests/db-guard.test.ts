@@ -19,17 +19,20 @@ describe('assertDatabaseUp', () => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://x.supabase.co';
     process.env.SUPABASE_SERVICE_ROLE_KEY = 'k';
   });
-  it('rides out a transient timeout (one slow probe must not fail a build)', async () => {
-    results.push({ error: { message: 'TimeoutError' } });
-    const { assertDatabaseUp } = await import('@/lib/supabase');
-    await expect(assertDatabaseUp()).resolves.toBeUndefined();
-    expect(calls).toBe(2);
+  it('a build rides out a transient timeout (one slow probe must not fail a deploy)', async () => {
+    process.env.NEXT_PHASE = 'phase-production-build';
+    try {
+      results.push({ error: { message: 'TimeoutError' } });
+      const { assertDatabaseUp } = await import('@/lib/supabase');
+      await expect(assertDatabaseUp()).resolves.toBeUndefined();
+      expect(calls).toBe(2);
+    } finally { delete process.env.NEXT_PHASE; }
   });
-  it('still fails when the database is really down', async () => {
+  it('a page render probes once: no waiting out three timeouts on a dead database', async () => {
     for (let i = 0; i < 5; i++) results.push({ error: { message: 'TimeoutError' } });
     const { assertDatabaseUp } = await import('@/lib/supabase');
     await expect(assertDatabaseUp()).rejects.toThrow(/Database unavailable/);
-    expect(calls).toBe(3);
+    expect(calls).toBe(1);
   });
   it('lets the page render from saved answers when the database is down', async () => {
     for (let i = 0; i < 5; i++) results.push({ error: { message: 'TimeoutError' } });
@@ -39,6 +42,6 @@ describe('assertDatabaseUp', () => {
     expect(databaseDown()).toBe(true);
     // Within the down window: no more probes against a dead database.
     await assertDatabaseUp();
-    expect(calls).toBe(3);
+    expect(calls).toBe(1);
   });
 });

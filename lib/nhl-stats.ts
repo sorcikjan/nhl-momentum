@@ -1,13 +1,14 @@
 // Official NHL standings and stat leaders (api-web.nhle.com), shaped for our
 // tables — the record next to our Heat, so the numbers we invent sit beside
 // the ones everybody knows.
+import { externalCache } from '@/lib/cache-policy';
 import { teamUrl, playerUrl } from '@/lib/urls';
 
 const BASE = 'https://api-web.nhle.com/v1';
 // NHL data changes after each game: Next's data cache keeps a copy for 10 min
 // (a no-store fetch would make every page that shows it dynamic).
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, { next: { revalidate: 600 }, signal: AbortSignal.timeout(8_000) });
+  const res = await fetch(`${BASE}${path}`, { next: externalCache(600), signal: AbortSignal.timeout(8_000) });
   if (!res.ok) throw new Error(`NHL API ${res.status}: ${path}`);
   return res.json() as Promise<T>;
 }

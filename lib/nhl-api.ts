@@ -1,11 +1,16 @@
 // NHL official API client
 // Base: https://api-web.nhle.com/v1
 
+import { externalCache } from '@/lib/cache-policy';
+
 const BASE = 'https://api-web.nhle.com/v1';
 
-async function get<T>(path: string, revalidate = 300): Promise<T> {
+// In API routes (the pipeline) cached for `revalidate` (5 min unless the caller
+// says otherwise); in page renders as long as the page (lib/cache-policy.ts),
+// unless `live` (a game being played).
+async function get<T>(path: string, revalidate = 300, live = false): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
-    next: { revalidate }, // Next.js data cache, 5 min unless the caller says otherwise
+    next: externalCache(revalidate, { live }),
   });
   if (!res.ok) throw new Error(`NHL API ${res.status}: ${path}`);
   return res.json();
@@ -77,8 +82,8 @@ export async function getStandings(date: string) {
 
 // ─── Score / Live Feed ────────────────────────────────────────────────────────
 
-export async function getGameBoxscore(gameId: number) {
-  return get<Record<string, unknown>>(`/gamecenter/${gameId}/boxscore`);
+export async function getGameBoxscore(gameId: number, liveTtl?: number | null) {
+  return get<Record<string, unknown>>(`/gamecenter/${gameId}/boxscore`, liveTtl ?? 300, liveTtl != null);
 }
 
 export async function getGameLanding(gameId: number) {
@@ -89,8 +94,8 @@ export async function getGameRightRail(gameId: number) {
   return get<Record<string, unknown>>(`/gamecenter/${gameId}/right-rail`);
 }
 
-export async function getGamePlayByPlay(gameId: number) {
-  return get<Record<string, unknown>>(`/gamecenter/${gameId}/play-by-play`);
+export async function getGamePlayByPlay(gameId: number, liveTtl?: number | null) {
+  return get<Record<string, unknown>>(`/gamecenter/${gameId}/play-by-play`, liveTtl ?? 300, liveTtl != null);
 }
 
 // ─── Team Info ────────────────────────────────────────────────────────────────

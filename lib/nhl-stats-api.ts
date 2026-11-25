@@ -5,6 +5,8 @@
 // A season has ~800 skaters, so a report is read page by page with `start`,
 // sorted by playerId so the pages don't overlap or skip.
 
+import { externalCache } from '@/lib/cache-policy';
+
 export const STATS_PAGE = 100;
 
 type Opts = { revalidate: number; timeoutMs?: number; headers?: Record<string, string>; concurrency?: number };
@@ -15,7 +17,7 @@ async function page<T>(url: string, start: number, o: Opts): Promise<Page<T> | n
   try {
     const res = await fetch(`${url}${url.includes('?') ? '&' : '?'}limit=${STATS_PAGE}&start=${start}`, {
       headers: o.headers,
-      next: { revalidate: o.revalidate },
+      next: externalCache(o.revalidate),
       signal: AbortSignal.timeout(o.timeoutMs ?? 8_000),
     } as RequestInit);
     if (!res.ok) return null;

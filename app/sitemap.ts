@@ -10,7 +10,7 @@ import { NATIONS } from '@/lib/nations';
 const base = SITE_URL;
 
 // Rebuilt hourly so new games, recaps and roster moves reach crawlers without a deploy.
-export const revalidate = 3600;
+export const revalidate = 86400; // backstop: pages change on /api/revalidate (lib/cache-policy.ts)
 
 const dateOnly = (d: string | null | undefined) => (d ? new Date(d).toISOString() : undefined);
 

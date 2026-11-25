@@ -4,6 +4,7 @@
 // the schedule (tonight). Skater form and Heat come from our own rankings,
 // which every page already shares — so a page adds no database load, and the
 // NHL API sees a few box scores per nation, not a game log per player.
+import { externalCache } from '@/lib/cache-policy';
 import { fetchRankings } from '@/lib/data';
 import { todayET } from '@/lib/home';
 import { gameGoals, withClips, type Moment } from '@/lib/moments';
@@ -26,7 +27,7 @@ const BASE = 'https://api-web.nhle.com/v1';
 async function nhl<T>(path: string, revalidate: number): Promise<T | null> {
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const res = await fetch(`${BASE}${path}`, { next: { revalidate }, signal: AbortSignal.timeout(8_000) });
+      const res = await fetch(`${BASE}${path}`, { next: externalCache(revalidate), signal: AbortSignal.timeout(8_000) });
       if (res.ok) return (await res.json()) as T;
       if (res.status !== 429) return null;
     } catch {

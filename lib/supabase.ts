@@ -1,6 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { recordDbRequest, recordEvent } from './load-log';
-import { BYPASS_HEADER, databaseDown, fallbackReady, fetchWithFallback, healDegradedPages, markDatabaseDown } from './db-fallback';
+import { BYPASS_HEADER, databaseDown, fallbackReady, fetchWithFallback, healDegradedPages, inPageRender, markDatabaseDown } from './db-fallback';
 
 export { databaseDown } from './db-fallback';
 
@@ -11,7 +11,10 @@ let _adminClient: SupabaseClient | null = null;
 // made each page render hang until Netlify's 30s limit and return 502 for the
 // whole site. With it, the render fails fast; page reads then fall back to the
 // last good answer saved in Netlify Blobs (lib/db-fallback.ts).
+// Page renders give up sooner: they have a saved answer to fall back to, and
+// Netlify bills every second a render waits. The pipeline keeps the long one.
 const DB_TIMEOUT_MS = 12_000;
+const PAGE_DB_TIMEOUT_MS = 6_000;
 
 // An explicit timer, not AbortSignal.timeout(): during `next build` prerenders
 // that signal never fired, and a request to a dead database hung past the 60s
@@ -20,12 +23,13 @@ const timedFetch: typeof fetch = (input, init = {}) => {
   const ctrl = new AbortController();
   const signal = init.signal ? AbortSignal.any([init.signal, ctrl.signal]) : ctrl.signal;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  const ms = inPageRender() ? PAGE_DB_TIMEOUT_MS : DB_TIMEOUT_MS;
   const timeout = new Promise<never>((_, reject) => {
     timer = setTimeout(() => {
-      const err = new DOMException(`Database request timed out after ${DB_TIMEOUT_MS / 1000}s`, 'TimeoutError');
+      const err = new DOMException(`Database request timed out after ${ms / 1000}s`, 'TimeoutError');
       ctrl.abort(err);
       reject(err);
-    }, DB_TIMEOUT_MS);
+    }, ms);
   });
   return Promise.race([fetch(input, { ...init, signal }), timeout]).finally(() => clearTimeout(timer));
 };
@@ -84,7 +88,7 @@ export const supabaseAdmin = {
 };
 
 // ISR pages call this first. If the database doesn't answer a 1-row read within
-// 4s (3 tries), page reads switch to the saved answers for 30s and the page
+// 4s, page reads switch to the saved answers for 2 min and the page
 // renders from them. Only when nothing was ever saved does this throw, so
 // Next.js keeps serving the last good cached page instead of caching one full
 // of empty sections (supabase-js returns errors as values, so without this,
@@ -98,9 +102,11 @@ function timeoutSignal(ms: number): AbortSignal {
 export async function assertDatabaseUp(): Promise<void> {
   if (Date.now() < _dbOkUntil) return;
   if (!databaseDown()) {
-    // Up to 3 probes: a single slow response (common on the free tier, and during
-    // builds that prerender many pages at once) must not fail a page or a deploy.
-    for (let attempt = 0; attempt < 3; attempt++) {
+    // One probe in a page render: a false "down" only means rendering from the
+    // saved answers, while three probes made each render wait up to 13 s on a
+    // dead database. Builds (many prerenders at once) keep three tries.
+    const tries = process.env.NEXT_PHASE === 'phase-production-build' ? 3 : 1;
+    for (let attempt = 0; attempt < tries; attempt++) {
       if (attempt) await new Promise(r => setTimeout(r, attempt * 500));
       const { error } = await getAdminClient()
         .from('games')

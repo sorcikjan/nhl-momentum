@@ -5,7 +5,7 @@ import { fallbackImage, heatColor, listImage, OG_SIZE } from '@/lib/og';
 export const size = OG_SIZE;
 export const contentType = 'image/png';
 export const alt = 'Heat Index: the hottest NHL players right now';
-export const revalidate = 1800;
+export const revalidate = 86400; // backstop: pages change on /api/revalidate (lib/cache-policy.ts)
 
 // "Heat Index" — the top five by Heat, ready to post.
 export default async function Image() {

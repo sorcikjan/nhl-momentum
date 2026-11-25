@@ -1,4 +1,5 @@
 // A team's next game from the NHL club schedule (no database).
+import { externalCache } from '@/lib/cache-policy';
 
 type WeekGame = { gameDate: string; gameState: string; homeTeam: { abbrev: string }; awayTeam: { abbrev: string } };
 const UPCOMING = new Set(['FUT', 'PRE', 'LIVE', 'CRIT']);
@@ -14,7 +15,7 @@ export function nextGameFrom(week: { games?: WeekGame[] }, team: string): { date
 export async function nextGame(team: string, today: string): Promise<{ date: string; label: string } | null> {
   if (!team) return null;
   try {
-    const res = await fetch(`https://api-web.nhle.com/v1/club-schedule/${team}/week/${today}`, { next: { revalidate: 3600 }, signal: AbortSignal.timeout(8_000) });
+    const res = await fetch(`https://api-web.nhle.com/v1/club-schedule/${team}/week/${today}`, { next: externalCache(3600), signal: AbortSignal.timeout(8_000) });
     return res.ok ? nextGameFrom(await res.json(), team) : null;
   } catch {
     return null;

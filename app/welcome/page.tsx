@@ -6,7 +6,7 @@ import HeatBadge from '@/components/ui/HeatBadge';
 import { fetchRankings, fetchAccuracy, teamLogoUrl } from '@/lib/data';
 import { ppmToHeat } from '@/lib/heat';
 
-export const revalidate = 300;
+export const revalidate = 86400; // backstop: pages change on /api/revalidate (lib/cache-policy.ts)
 
 export const metadata: Metadata = {
   title: 'Hockey Intelligence, Daily',

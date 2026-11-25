@@ -4,7 +4,7 @@ import { PredictionsPage, predictionsMetadata } from '@/components/predictions/p
 import { parsePredictionDate } from '@/lib/seo';
 
 // Today's page changes through the evening; older days barely change.
-export const revalidate = 600;
+export const revalidate = 86400; // backstop: pages change on /api/revalidate (lib/cache-policy.ts)
 
 // Render on first visit, then serve from the ISR cache for `revalidate` seconds.
 // Without this, a dynamic-segment page is rendered on every request.

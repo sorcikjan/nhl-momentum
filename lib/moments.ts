@@ -2,6 +2,7 @@
 // made it matter (an OT winner, a late equalizer, shorthanded, a hat trick),
 // garbage goals out (empty net, own goals, blowouts). Only goals that clear
 // the bar make it — a quiet night shows fewer, not worse.
+import { externalCache } from '@/lib/cache-policy';
 
 export type Moment = {
   gameId: number;
@@ -145,7 +146,7 @@ export function parseClipPage(html: string, clipId: string | null) {
 export async function withClips(moments: Moment[]): Promise<Moment[]> {
   return Promise.all(moments.map(async m => {
     try {
-      const res = await fetch(m.href, { next: { revalidate: 86400 }, signal: AbortSignal.timeout(5000) });
+      const res = await fetch(m.href, { next: externalCache(86400), signal: AbortSignal.timeout(5000) });
       if (!res.ok) return m;
       return { ...m, ...parseClipPage(await res.text(), m.href.match(/-(\d+)$/)?.[1] ?? null) };
     } catch {

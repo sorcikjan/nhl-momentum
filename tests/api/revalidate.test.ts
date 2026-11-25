@@ -17,7 +17,7 @@ const rows: Record<string, unknown[]> = {
 vi.mock('@/lib/supabase', () => ({
   supabaseAdmin: {
     from: (table: string) => {
-      const q = { select: () => q, in: () => q, limit: () => q, then: (r: (v: unknown) => void) => r({ data: rows[table] }) };
+      const q = { select: () => q, in: () => q, limit: () => q, gte: () => q, lte: () => q, then: (r: (v: unknown) => void) => r({ data: rows[table] }) };
       return q;
     },
   },
@@ -30,13 +30,13 @@ const post = (body?: unknown) => new Request('https://x/api/revalidate', {
 describe('/api/revalidate', () => {
   beforeEach(() => { paths.length = 0; tags.length = 0; bump.mockClear(); process.env.INGEST_API_KEY = 'k'; });
 
-  it('no body: every page and the shared pipeline tag', async () => {
+  it('no body: every page, the shared pipeline tag and the external answers', async () => {
     const { POST } = await import('@/app/api/revalidate/route');
     await POST(post());
     expect(bump).toHaveBeenCalledOnce();
     expect(paths).toContain('/players/[id]/[slug] (page)');
     expect(paths).toContain('/games/[id]/[slug] (page)');
-    expect(tags).toEqual(['pipeline']);
+    expect(tags).toEqual(['pipeline', 'nhl']);
   });
 
   it('after a game: summary pages plus only that game, its teams and players', async () => {
@@ -50,5 +50,15 @@ describe('/api/revalidate', () => {
     expect(paths).not.toContain('/players/[id]/[slug] (page)');
     expect(tags).toEqual(['game:2026020150']);
     expect((await res.json()).targeted).toBe(4);
+  });
+
+  it('summary (the other daily runs): league-wide pages and recent games, no player sweep', async () => {
+    const { POST } = await import('@/app/api/revalidate/route');
+    const res = await POST(post({ scope: 'summary' }));
+    expect(paths).toEqual(expect.arrayContaining(['/', '/hot', '/rankings', '/games/2026020150/bos-at-tor-1103']));
+    expect(paths).not.toContain('/players/[id]/[slug] (page)');
+    expect(paths.some(p => p.startsWith('/players/') || p.startsWith('/teams/'))).toBe(false);
+    expect(tags).toEqual(['game:2026020150']);
+    expect((await res.json()).scope).toBe('summary');
   });
 });

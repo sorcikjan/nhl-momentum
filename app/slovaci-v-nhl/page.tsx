@@ -4,7 +4,7 @@ import { SVK } from '@/lib/nations';
 // NHL API data with its own caches (box scores and rosters a day, goalie logs
 // 30 min); pipeline runs revalidate it too. No database reads beyond the
 // shared rankings.
-export const revalidate = 900;
+export const revalidate = 86400; // backstop: pages change on /api/revalidate (lib/cache-policy.ts)
 
 const page = nationPage(SVK);
 export const generateMetadata = page.generateMetadata;

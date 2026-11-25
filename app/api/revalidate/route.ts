@@ -5,21 +5,36 @@ import { refreshRankings } from '@/lib/data';
 import { supabaseAdmin } from '@/lib/supabase';
 import { gameUrl, playerUrl, teamUrl } from '@/lib/urls';
 import { NATIONS } from '@/lib/nations';
+import { NHL_TAG } from '@/lib/cache-policy';
 
 // Called by pipeline workers (game-finish-worker, daily-worker) after writing
 // to Supabase so the ISR cache is invalidated right away — no stale data
 // waiting for the next visitor to accidentally trigger a refresh.
 //
-// No body: everything (the daily pipeline). With { gameIds, teamIds } (the
-// post-game worker): the pages the league-wide numbers are on, plus only those
-// games, their teams and their players. A full sweep after every finished game
-// had crawlers re-render ~2,500 pages from the database up to 10 times a night.
+// Pages are rendered again only when this is called (lib/cache-policy.ts), so
+// each caller names what it changed:
+// - { gameIds, teamIds } (the post-game worker): the pages the league-wide
+//   numbers are on, plus only those games, their teams and their players;
+// - { scope: 'summary' } (the other daily-worker runs): the league-wide pages
+//   and the games from yesterday to tomorrow (scores, picks);
+// - no body or { scope: 'full' } (the 08:00 daily pipeline, once a day):
+//   everything, so ranks on every player page move once a day.
+// A full sweep on every run had crawlers re-render ~2,500 pages from the
+// database up to 6 times a day.
 
-const SUMMARY_PATHS = ['/', '/games', '/rankings', '/standings', '/stats', '/hot', '/playoffs', '/accuracy', ...Object.values(NATIONS).map(n => n.path)];
+const SUMMARY_PATHS = ['/sitemap.xml', '/', '/games', '/rankings', '/standings', '/stats', '/hot', '/playoffs', '/accuracy', ...Object.values(NATIONS).map(n => n.path)];
 
 const RANKINGS_BUDGET_MS = 15_000;
 
 type Targets = { gameIds: number[]; teamIds: number[] };
+
+// Games from yesterday to tomorrow: their pages show the scores and picks the
+// daily runs write.
+async function recentGames(): Promise<Targets> {
+  const day = (k: number) => new Date(Date.now() + k * 86_400_000).toISOString().slice(0, 10);
+  const { data } = await supabaseAdmin.from('games').select('id').gte('game_date', day(-1)).lte('game_date', day(1));
+  return { gameIds: (data ?? []).map(g => g.id as number), teamIds: [] };
+}
 
 function parseTargets(body: unknown): Targets | null {
   const b = body as Partial<Targets> | null;
@@ -69,7 +84,9 @@ export async function POST(request: Request) {
     new Promise<string>(resolve => { timer = setTimeout(() => resolve('timed out'), RANKINGS_BUDGET_MS); }),
   ]).finally(() => clearTimeout(timer));
 
-  const targets = parseTargets(await request.json().catch(() => null));
+  const body = await request.json().catch(() => null) as { scope?: string } | null;
+  const summary = body?.scope === 'summary';
+  const targets = summary ? await recentGames().catch(() => null) : parseTargets(body);
   for (const p of SUMMARY_PATHS) revalidatePath(p);
   revalidatePath('/recaps', 'layout');
 
@@ -78,14 +95,17 @@ export async function POST(request: Request) {
     for (const p of paths) revalidatePath(p);
     // A finished game's own data cache (game pages); other games keep theirs.
     for (const id of targets.gameIds) revalidateTag(`game:${id}`, { expire: 0 });
-    return NextResponse.json({ revalidated: true, targeted: paths.length, generation, rankings, ts: new Date().toISOString() });
+    return NextResponse.json({ revalidated: true, scope: summary ? 'summary' : 'targeted', targeted: paths.length, generation, rankings, ts: new Date().toISOString() });
   }
+  if (summary) return NextResponse.json({ revalidated: true, scope: 'summary', targeted: 0, generation, rankings, ts: new Date().toISOString() });
 
   revalidatePath('/players/[id]/[slug]', 'page');
   revalidatePath('/teams/[id]/[slug]', 'page');
   revalidatePath('/games/[id]/[slug]', 'page');
   // Data cached across renders (finished game pages) — expire it now, not stale-while-revalidate.
   revalidateTag('pipeline', { expire: 0 });
+  // External answers pages were rendered from (lib/cache-policy.ts): once a day.
+  revalidateTag(NHL_TAG, { expire: 0 });
 
-  return NextResponse.json({ revalidated: true, generation, rankings, ts: new Date().toISOString() });
+  return NextResponse.json({ revalidated: true, scope: 'full', generation, rankings, ts: new Date().toISOString() });
 }
