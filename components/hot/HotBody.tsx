@@ -79,7 +79,7 @@ export function HotBody({ view, updated }: { view: HotView; updated: string }) {
 
       {teams.length > 0 && (
         <section data-section="teams">
-          <SectionHeading kicker="ALL 32 TEAMS" title="Who's hot on every team." sub="Each team's hottest skater right now." right={<SectionLink href="/standings">Standings</SectionLink>} />
+          <SectionHeading kicker="ALL 32 TEAMS" title="Who's hot on every team." sub="Each team's hottest skater right now." right={<SectionLink href="/hot/teams">Hottest teams</SectionLink>} />
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {teams.map(t => (
               <Link key={t.team} href={t.row.href} className="flex min-h-[52px] items-center gap-2.5 rounded-xl border px-3 py-2 transition-colors hover:bg-[var(--bg-hover)]" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}>

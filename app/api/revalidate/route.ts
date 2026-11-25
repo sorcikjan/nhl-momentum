@@ -22,7 +22,7 @@ import { NHL_TAG } from '@/lib/cache-policy';
 // A full sweep on every run had crawlers re-render ~2,500 pages from the
 // database up to 6 times a day.
 
-const SUMMARY_PATHS = ['/sitemap.xml', '/', '/games', '/rankings', '/standings', '/stats', '/hot', '/playoffs', '/accuracy', ...Object.values(NATIONS).map(n => n.path)];
+const SUMMARY_PATHS = ['/sitemap.xml', '/', '/games', '/rankings', '/standings', '/stats', '/hot', '/hot/teams', '/playoffs', '/accuracy', ...Object.values(NATIONS).map(n => n.path)];
 
 const RANKINGS_BUDGET_MS = 15_000;
 
