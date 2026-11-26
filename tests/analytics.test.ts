@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { GA_ID, gtagBootstrap, needsConsentBanner, pageType, track } from '@/lib/analytics';
+import { GA_ID, aiSource, gtagBootstrap, needsConsentBanner, pageType, track } from '@/lib/analytics';
 
 describe('pageType', () => {
   it.each([
@@ -47,5 +47,28 @@ describe('gtagBootstrap', () => {
 describe('track', () => {
   it('is a no-op without gtag', () => {
     expect(() => track('page_view')).not.toThrow();
+  });
+});
+
+describe('aiSource', () => {
+  it.each([
+    ['https://chatgpt.com/', '', 'chatgpt'],
+    ['', '?utm_source=chatgpt.com', 'chatgpt'],
+    ['https://www.perplexity.ai/search/abc', '', 'perplexity'],
+    ['https://gemini.google.com/app', '', 'gemini'],
+    ['https://copilot.microsoft.com/', '', 'copilot'],
+    ['https://claude.ai/chat/1', '', 'claude'],
+    ['', '?utm_source=perplexity', 'perplexity'],
+  ])('%s %s → %s', (ref, search, src) => {
+    expect(aiSource(ref, search)).toBe(src);
+  });
+
+  it('ignores search engines, social and unknown sources', () => {
+    expect(aiSource('https://www.google.com/', '')).toBeNull();
+    expect(aiSource('https://www.bing.com/search?q=x', '')).toBeNull();
+    expect(aiSource('https://www.reddit.com/r/hockey', '')).toBeNull();
+    expect(aiSource('', '?utm_source=newsletter')).toBeNull();
+    expect(aiSource('not a url', '')).toBeNull();
+    expect(aiSource('https://notchatgpt.com/', '')).toBeNull();
   });
 });

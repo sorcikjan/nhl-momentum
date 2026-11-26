@@ -22,4 +22,24 @@ Disallow: /*?_rsc=
 Disallow: /*&_rsc=
 Crawl-delay: 10
 
+# AI assistants: the bots that fetch a page when someone asks a question and
+# cite it with a link (OAI-SearchBot, ChatGPT-User, Claude-SearchBot,
+# Claude-User, PerplexityBot, Perplexity-User) fall under "*" above and are
+# welcome. Gemini and AI Overviews read Google's index (Googlebot); ChatGPT
+# and Copilot search read Bing's. Google-Extended stays allowed: it also
+# controls grounding in the Gemini app, not only training.
+#
+# Bulk training crawlers bring no visitors and can fetch thousands of pages an
+# hour from a free database: kept out.
+User-agent: GPTBot
+User-agent: ClaudeBot
+User-agent: anthropic-ai
+User-agent: CCBot
+User-agent: Applebot-Extended
+User-agent: meta-externalagent
+User-agent: Bytespider
+User-agent: Diffbot
+User-agent: cohere-training-data-crawler
+Disallow: /
+
 Sitemap: https://hockeymomentum.com/sitemap.xml

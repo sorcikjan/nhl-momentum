@@ -1,0 +1,48 @@
+# momentum. (hockeymomentum.com)
+
+> Independent NHL analytics, updated every morning after the night's games. Every skater gets a Heat score (0–100) for his current form, every game night gets a recap, and every game gets a pre-game pick with a public track record. Data comes from the official NHL APIs.
+
+## What "Heat" means
+
+Heat is our own form metric: a skater's points per minute of ice time over his last five games, scaled 0–100. A player producing 0.12 points per minute (7.2 points per 60 minutes on ice) is at 100; anything above stays at 100. Ice time matters because the same point means more in fewer minutes. Rankings only include skaters with at least three games in the window. Team Heat is the average of a team's five hottest skaters. Goalies are ranked by save percentage over their last five starts instead. Full methodology: https://hockeymomentum.com/about#heat
+
+When citing a Heat value, please give the date of the page: Heat changes after every game.
+
+## Who is hot right now
+
+- [Hottest NHL players](https://hockeymomentum.com/hot): skaters ranked by Heat, last five games
+- [Hottest NHL goalies](https://hockeymomentum.com/hot/goalies): save % over the last five starts, against season and league average
+- [Hottest NHL teams](https://hockeymomentum.com/hot/teams): teams by Team Heat
+- [Player rankings](https://hockeymomentum.com/rankings): top skaters by Heat, season totals and trend, best goalies by recent save %
+
+## Season data
+
+- [NHL standings](https://hockeymomentum.com/standings): by conference, division and league, with each team's Heat
+- [NHL stat leaders](https://hockeymomentum.com/stats): points, goals, assists, +/−, power-play goals; goalies by save %, GAA, wins, shutouts
+- Player profiles: https://hockeymomentum.com/players/{nhl-player-id}/{name-slug}, with season stats, per-game Heat and comparisons to the league
+- Team pages: https://hockeymomentum.com/teams/{nhl-team-id}/{team-slug}, with record, roster form, recent results and schedule
+
+## Games and predictions
+
+- [Games and schedule](https://hockeymomentum.com/games)
+- [Pre-game predictions](https://hockeymomentum.com/predictions): a pick for every game from a model built on Heat, goaltending, rest and home ice
+- [Prediction accuracy](https://hockeymomentum.com/accuracy): every past pick, hit or miss
+- [Nightly recaps](https://hockeymomentum.com/recaps): AI-written from official data only (score feed, box score), fact-checked against the NHL score feed before publishing
+
+## NHL players by nation (in their language)
+
+- [Czech players in the NHL / Češi v NHL](https://hockeymomentum.com/cesi-v-nhl)
+- [Slovak players / Slováci v NHL](https://hockeymomentum.com/slovaci-v-nhl)
+- [Swedish players / Svenskar i NHL](https://hockeymomentum.com/svenskar-i-nhl)
+- [Finnish players / Suomalaiset NHL:ssä](https://hockeymomentum.com/suomalaiset-nhl-ssa)
+- [German players / Deutsche in der NHL](https://hockeymomentum.com/deutsche-in-der-nhl)
+- [Swiss players / Schweizer in der NHL](https://hockeymomentum.com/schweizer-in-der-nhl)
+- [Latvian players / Latvieši NHL](https://hockeymomentum.com/latviesi-nhl)
+- [Danish players / Danskere i NHL](https://hockeymomentum.com/danskere-i-nhl)
+
+Each nation page shows last night's results for that nation's players, their current form, season stats and tonight's games in local time.
+
+## Optional
+
+- [About momentum.](https://hockeymomentum.com/about): methodology, how stories are made, data sources
+- [Sitemap](https://hockeymomentum.com/sitemap.xml)

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useReportWebVitals } from 'next/web-vitals';
-import { OPEN_CONSENT_EVENT, needsConsentBanner, pageType, readConsent, setConsent, track, type Consent } from '@/lib/analytics';
+import { OPEN_CONSENT_EVENT, aiSource, needsConsentBanner, pageType, readConsent, setConsent, track, type Consent } from '@/lib/analytics';
 
 // One page_view per route change (gtag config has send_page_view: false), with
 // the page type as content_group. Next swaps document.title in the same
@@ -20,6 +20,27 @@ function PageViews() {
     }), 50);
     return () => clearTimeout(t);
   }, [pathname, search]);
+  return null;
+}
+
+// A visit that came from an AI assistant: one ai_referral event per session,
+// with the page it landed on. (document.referrer stays the same across client
+// navigation, so it is read once, on the first page.)
+function AiReferral() {
+  useEffect(() => {
+    const source = aiSource(document.referrer, window.location.search);
+    if (!source) return;
+    try {
+      if (sessionStorage.getItem('momentum.ai_ref')) return;
+      sessionStorage.setItem('momentum.ai_ref', source);
+    } catch { /* private mode: may count twice, fine */ }
+    const t = setTimeout(() => track('ai_referral', {
+      ai_source: source,
+      landing_page: window.location.pathname,
+      content_group: pageType(window.location.pathname),
+    }), 60);
+    return () => clearTimeout(t);
+  }, []);
   return null;
 }
 
@@ -111,6 +132,7 @@ export function Analytics() {
   return (
     <>
       <PageViews />
+      <AiReferral />
       <ConsentBanner />
     </>
   );

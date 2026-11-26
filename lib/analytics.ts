@@ -49,6 +49,38 @@ export function pageType(pathname: string): string {
   }
 }
 
+// AI assistants that link to us: by referrer host, or by utm_source (ChatGPT
+// tags its links with utm_source=chatgpt.com, and some apps send no referrer).
+// GA4 shows these as ordinary referrals; one ai_referral event per visit makes
+// them a report of their own.
+const AI_SOURCES: [RegExp, string][] = [
+  [/(^|\.)(chatgpt\.com|chat\.openai\.com|openai\.com)$/, 'chatgpt'],
+  [/(^|\.)perplexity\.ai$/, 'perplexity'],
+  [/^(gemini|bard)\.google\.com$/, 'gemini'],
+  [/^(copilot\.microsoft\.com|edgeservices\.bing\.com)$/, 'copilot'],
+  [/(^|\.)claude\.ai$/, 'claude'],
+  [/(^|\.)deepseek\.com$/, 'deepseek'],
+  [/(^|\.)(grok\.com|x\.ai)$/, 'grok'],
+  [/(^|\.)you\.com$/, 'you'],
+  [/(^|\.)meta\.ai$/, 'meta_ai'],
+  [/(^|\.)(mistral\.ai)$/, 'mistral'],
+];
+
+function matchAi(host: string): string | null {
+  const h = host.toLowerCase().replace(/^www\./, '');
+  return AI_SOURCES.find(([re]) => re.test(h))?.[1] ?? null;
+}
+
+export function aiSource(referrer: string, search: string): string | null {
+  const utm = new URLSearchParams(search).get('utm_source');
+  if (utm) {
+    const fromUtm = matchAi(utm.replace(/^https?:\/\//, '').split('/')[0]) ?? (AI_SOURCES.some(([, n]) => n === utm.toLowerCase()) ? utm.toLowerCase() : null);
+    if (fromUtm) return fromUtm;
+  }
+  if (!referrer) return null;
+  try { return matchAi(new URL(referrer).hostname); } catch { return null; }
+}
+
 export function readConsent(): Consent | null {
   try {
     const v = localStorage.getItem(CONSENT_KEY);
