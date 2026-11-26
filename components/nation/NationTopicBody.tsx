@@ -4,7 +4,7 @@ import { Flag } from '@/components/nation/Flag';
 import { Note, TonightCard } from '@/components/nation/NationBody';
 import { TopicNav } from '@/components/nation/TopicNav';
 import type { NationData, SeasonGoalieLine, SeasonLine } from '@/lib/nation-data';
-import type { Topic } from '@/lib/nation-topics';
+import { topicLabels, type Labels, type Topic } from '@/lib/nation-topics';
 import { pct, type Nation } from '@/lib/nations';
 
 const MONO = { fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' } as const;
@@ -20,13 +20,12 @@ function Td({ children, strong, left }: { children: React.ReactNode; strong?: bo
   return <td className={`px-2 py-2 tabular-nums ${left ? 'text-left' : 'text-right'} ${strong ? 'font-extrabold' : ''}`} style={{ color: strong ? 'var(--text-bright)' : 'var(--text)' }}>{children}</td>;
 }
 
-// Czech table headings: the page is Czech-only for now (lib/nation-topics.ts).
-function SkaterTable({ rows }: { rows: SeasonLine[] }) {
+function SkaterTable({ rows, l }: { rows: SeasonLine[]; l: Labels }) {
   return (
     <div className="overflow-x-auto rounded-xl border" style={CARD}>
       <table className="w-full min-w-[560px] text-sm">
         <thead><tr className="border-b" style={{ borderColor: 'var(--border-soft)' }}>
-          <Th left>#</Th><Th left>HRÁČ</Th><Th>Z</Th><Th>G</Th><Th>A</Th><Th>B</Th><Th>+/−</Th><Th>ČAS/Z</Th><Th>V LIZE</Th>
+          <Th left>#</Th><Th left>{l.player}</Th><Th>{l.gp}</Th><Th>{l.g}</Th><Th>{l.a}</Th><Th>{l.p}</Th><Th>+/−</Th><Th>{l.toi}</Th><Th>{l.league}</Th>
         </tr></thead>
         <tbody>
           {rows.map((r, i) => (
@@ -46,12 +45,12 @@ function SkaterTable({ rows }: { rows: SeasonLine[] }) {
   );
 }
 
-function GoalieTable({ rows, n }: { rows: SeasonGoalieLine[]; n: Nation }) {
+function GoalieTable({ rows, n, l }: { rows: SeasonGoalieLine[]; n: Nation; l: Labels }) {
   return (
     <div className="overflow-x-auto rounded-xl border" style={CARD}>
       <table className="w-full min-w-[520px] text-sm">
         <thead><tr className="border-b" style={{ borderColor: 'var(--border-soft)' }}>
-          <Th left>BRANKÁŘ</Th><Th>Z</Th><Th>V</Th><Th>ÚSPĚŠNOST</Th><Th>PRŮMĚR</Th><Th>NULY</Th><Th>V LIZE</Th>
+          <Th left>{l.goalie}</Th><Th>{l.gp}</Th><Th>{l.w}</Th><Th>{l.sv}</Th><Th>{l.gaa}</Th><Th>{l.so}</Th><Th>{l.league}</Th>
         </tr></thead>
         <tbody>
           {rows.map(r => (
@@ -61,7 +60,7 @@ function GoalieTable({ rows, n }: { rows: SeasonGoalieLine[]; n: Nation }) {
                 <span className="ml-2 text-[11px]" style={{ ...MONO, color: 'var(--text-muted)' }}>{r.team}</span>
               </td>
               <Td>{r.games}</Td><Td>{r.wins}</Td><Td strong>{pct(r.svPct, n)}</Td>
-              <Td>{r.gaa == null ? '–' : r.gaa.toFixed(2).replace('.', ',')}</Td><Td>{r.shutouts}</Td>
+              <Td>{r.gaa == null ? '–' : r.gaa.toLocaleString(n.locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td><Td>{r.shutouts}</Td>
               <Td>{r.svRank == null ? '–' : `${r.svRank}.`}</Td>
             </tr>
           ))}
@@ -71,10 +70,10 @@ function GoalieTable({ rows, n }: { rows: SeasonGoalieLine[]; n: Nation }) {
   );
 }
 
-function Faq({ faq }: { faq: Topic['faq'] }) {
+function Faq({ faq, l }: { faq: Topic['faq']; l: Labels }) {
   return (
     <section data-section="faq">
-      <SectionHeading kicker="OTÁZKY" title="Časté otázky." />
+      <SectionHeading kicker={l.faqKicker} title={l.faqTitle} />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         {faq.map(f => (
           <div key={f.q} className="rounded-xl border px-5 py-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
@@ -91,6 +90,7 @@ function Faq({ faq }: { faq: Topic['faq'] }) {
 // nation's data, links to the rest, a short FAQ. One column, as on mobile.
 export function NationTopicBody({ n, topic, topics, data, updated }: { n: Nation; topic: Topic; topics: Topic[]; data: NationData; updated: string }) {
   const ui = n.t.ui;
+  const l = topicLabels(n);
   const { league } = data;
   return (
     <div lang={n.lang} className="flex flex-col gap-10 pb-20 lg:pb-0">
@@ -114,9 +114,15 @@ export function NationTopicBody({ n, topic, topics, data, updated }: { n: Nation
       {topic.key === 'statistiky' && (
         <section data-section="nation-season">
           {data.season.skaters.length
-            ? <SkaterTable rows={data.season.skaters} />
+            ? <SkaterTable rows={data.season.skaters} l={l} />
             : <Note>{ui.empty}</Note>}
-          <div className="mt-3"><Note>Z = zápasy, G = góly, A = asistence, B = body, ČAS/Z = průměrný čas na ledě, V LIZE = pořadí podle bodů mezi všemi hráči NHL.</Note></div>
+          <div className="mt-3"><Note>{l.legend}</Note></div>
+        </section>
+      )}
+      {topic.key === 'statistiky' && data.season.goalies.length > 0 && (
+        <section data-section="nation-goalie-season">
+          <SectionHeading kicker={l.goalieSeasonKicker} title={l.goalieSeasonTitle} size="feature" />
+          <GoalieTable rows={data.season.goalies} n={n} l={l} />
         </section>
       )}
 
@@ -129,8 +135,8 @@ export function NationTopicBody({ n, topic, topics, data, updated }: { n: Nation
           </section>
           {data.season.goalies.length > 0 && (
             <section data-section="nation-goalie-season">
-              <SectionHeading kicker="CELÁ SEZONA" title="Sezona v číslech." size="feature" />
-              <GoalieTable rows={data.season.goalies} n={n} />
+              <SectionHeading kicker={l.goalieSeasonKicker} title={l.goalieSeasonTitle} size="feature" />
+              <GoalieTable rows={data.season.goalies} n={n} l={l} />
             </section>
           )}
         </>
@@ -145,11 +151,11 @@ export function NationTopicBody({ n, topic, topics, data, updated }: { n: Nation
                 {data.tonight.games.map(g => <TonightCard key={g.href} g={g} n={n} />)}
               </div>
             </>
-          ) : <Note>Tento týden žádný zápas s českými hráči nenacházíme.</Note>}
+          ) : <Note>{l.noTonight}</Note>}
         </section>
       )}
 
-      <Faq faq={topic.faq} />
+      <Faq faq={topic.faq} l={l} />
 
       <div className="flex flex-wrap gap-5 border-t pt-5" style={{ borderColor: 'var(--border-soft)' }}>
         <SectionLink href={n.path}>{ui.name}</SectionLink>
