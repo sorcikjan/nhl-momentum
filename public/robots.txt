@@ -1,0 +1,25 @@
+# Static on purpose: served by the CDN, never by a function, so it answers
+# even when the database or the functions don't (Google stopped crawling the
+# whole site after robots.txt failed on 17 Nov 2026).
+#
+# ?_rsc= is Next.js client-navigation data: the same content as the HTML page.
+# It was 75% of Googlebot's requests in Nov 2026, each one a function render.
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /share
+Disallow: /*?_rsc=
+Disallow: /*&_rsc=
+
+# Bing honours Crawl-delay (Google ignores it and paces itself by response
+# time). A full recrawl of ~1,200 pages drained the free database's Disk IO.
+User-agent: bingbot
+Allow: /
+Disallow: /api/
+Disallow: /share
+Disallow: /*?_rsc=
+Disallow: /*&_rsc=
+Crawl-delay: 10
+
+Sitemap: https://hockeymomentum.com/sitemap.xml
