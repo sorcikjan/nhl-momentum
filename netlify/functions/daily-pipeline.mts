@@ -1,6 +1,7 @@
 import type { Config } from '@netlify/functions';
 
-// Scheduled trigger — fires at 08:00 UTC daily.
+// Scheduled trigger — fires at 08:00 UTC daily. The day's one full run: the only
+// scheduled job that recalculates every player's metrics (see postgame-sync.mts).
 // Just POSTs to the background worker which has a 15-minute timeout.
 // This function completes in <1 second, well within Netlify's 26s sync limit.
 

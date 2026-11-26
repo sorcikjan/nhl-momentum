@@ -9,6 +9,9 @@ import type { Config } from '@netlify/functions';
 
 import { call, alert } from '../lib/pipeline';
 
+// A probe slower than this means the database is struggling.
+const SLOW_DB_MS = 1500;
+
 export default async function handler() {
   const base      = process.env.INTERNAL_URL ?? 'https://nhl-momentum.netlify.app';
   const ingestKey = process.env.INGEST_API_KEY ?? '';
@@ -49,9 +52,12 @@ export default async function handler() {
     recaps:      (checks.recaps     as Record<string, unknown>)?.newest,
   }));
 
-  if (issues.some(i => i.startsWith('DATABASE'))) {
-    // Nothing to self-heal against a dead database — just alert.
-    await alert('health check', issues);
+  // Nothing to self-heal against a dead or struggling database: a repair run
+  // on top of it is what keeps it down (2026-11-19, 2026-11-26). Just alert;
+  // the next check repairs once it answers quickly again.
+  const probeMs = Number((checks.database as Record<string, unknown> | undefined)?.probeMs ?? 0);
+  if (issues.some(i => i.startsWith('DATABASE')) || probeMs > SLOW_DB_MS) {
+    await alert('health check', [...issues, ...(probeMs > SLOW_DB_MS ? [`database slow (${probeMs} ms): no auto-fix`] : [])]);
     return;
   }
 
@@ -59,7 +65,9 @@ export default async function handler() {
   // them in one background invocation (rosters first — everything keys off team_id).
   const heal = new Set<string>();
   if (issues.some(i => /^(ROSTERS|GAMELOGS|GOALIE DATA)/.test(i))) ['rosters', 'gamelogs', 'metrics', 'energy'].forEach(p => heal.add(p));
-  if (issues.some(i => i.startsWith('SNAPSHOTS'))) heal.add('metrics');
+  // Not SNAPSHOTS: "stale snapshots" are mostly players whose team didn't play
+  // (unchanged snapshots aren't rewritten), and healing it re-ran the full
+  // metrics recalculation twice a day for nothing.
   if (issues.some(i => i.startsWith('ENERGY'))) heal.add('energy');
   if (issues.some(i => i.startsWith('PREDICTIONS'))) heal.add('snapshots');
   if (issues.some(i => i.startsWith('OUTCOMES'))) heal.add('outcomes-backfill');
