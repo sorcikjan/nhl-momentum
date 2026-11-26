@@ -30,7 +30,15 @@ export function nationPage(n: Nation) {
   }
 
   async function Page() {
-    const data = await nationData();
+    let data = await nationData();
+    // Some NHL calls failed (usually a burst of 429s): try once more after a
+    // pause before rendering. A partial page is cached until the next
+    // revalidation (a day), so it's worth the wait. Answers that did arrive are
+    // in the fetch cache: the second try only repeats the failed calls.
+    if (data.partial) {
+      await new Promise(r => setTimeout(r, 3000));
+      data = await fetchNationData(n).catch(() => data);
+    }
     const updated = new Date().toLocaleDateString(n.locale, { day: 'numeric', month: 'numeric', year: 'numeric', timeZone: n.timeZone });
     return (
       <>
@@ -39,7 +47,10 @@ export function nationPage(n: Nation) {
           inLanguage: n.lang, description,
           mainEntity: { '@type': 'ItemList', itemListElement: data.skaters.slice(0, 20).map((r, i) => ({ '@type': 'ListItem', position: i + 1, name: r.name, url: `${SITE_URL}${r.href}` })) },
         }} />
-        <NationBody n={n} data={data} updated={updated} />
+        {/* The site is English (<html lang="en">): the nation's language is set on its content. */}
+        <div lang={n.lang}>
+          <NationBody n={n} data={data} updated={updated} />
+        </div>
       </>
     );
   }
