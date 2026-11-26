@@ -7,7 +7,7 @@ export function MoreRankings({ goalies, rookies }: { goalies: PlayerRowData[]; r
   return (
     <section data-section="rankings" className="grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-6">
       <div>
-        <SectionHeading kicker="GOALIES · LAST 5 STARTS" title="Best in net." sub="Ranked by save percentage." right={<SectionLink href="/rankings?pos=G">All goalies</SectionLink>} />
+        <SectionHeading kicker="GOALIES · LAST 5 STARTS" title="Best in net." sub="Ranked by save percentage." right={<SectionLink href="/hot/goalies">All goalies</SectionLink>} />
         <PlayerList rows={goalies} />
       </div>
       <div>

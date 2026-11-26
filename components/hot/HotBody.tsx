@@ -112,7 +112,7 @@ export function HotBody({ view, updated }: { view: HotView; updated: string }) {
       )}
 
       <section data-section="faq">
-        <SectionHeading kicker="ABOUT HEAT" title="Questions, answered." />
+        <SectionHeading kicker="ABOUT HEAT" title="Questions, answered." right={<SectionLink href="/hot/goalies">Hottest goalies</SectionLink>} />
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
           {HEAT_FAQ.map(f => (
             <div key={f.q} className="rounded-xl border px-5 py-4" style={{ background: 'var(--bg-card)', borderColor: 'var(--border)' }}>
