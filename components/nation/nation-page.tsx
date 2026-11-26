@@ -47,10 +47,7 @@ export function nationPage(n: Nation) {
           inLanguage: n.lang, description,
           mainEntity: { '@type': 'ItemList', itemListElement: data.skaters.slice(0, 20).map((r, i) => ({ '@type': 'ListItem', position: i + 1, name: r.name, url: `${SITE_URL}${r.href}` })) },
         }} />
-        {/* The site is English (<html lang="en">): the nation's language is set on its content. */}
-        <div lang={n.lang}>
-          <NationBody n={n} data={data} updated={updated} />
-        </div>
+        <NationBody n={n} data={data} updated={updated} />
       </>
     );
   }
