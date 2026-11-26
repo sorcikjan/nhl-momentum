@@ -66,14 +66,28 @@ export type NationData = {
   notPlayed: string[];
   league: { leader: { name: string; heat: number } | null; medianHeat: number | null; skaters: number; goalieAvg: number | null };
   tonight: { label: string; games: TonightGame[] } | null;
+  season: { skaters: SeasonLine[]; goalies: SeasonGoalieLine[] };
 };
 
 const MAX_GOALS = 9;
 
 // Season totals for the whole league (NHL stats API): where each of them
 // stands among everyone, not just among themselves.
-type SeasonSkater = { playerId: number; points: number; gamesPlayed: number };
-type SeasonGoalie = { playerId: number; gamesPlayed: number; saves: number; shotsAgainst: number; savePct: number };
+type SeasonSkater = { playerId: number; points: number; gamesPlayed: number; goals?: number; assists?: number; plusMinus?: number; timeOnIcePerGame?: number };
+type SeasonGoalie = { playerId: number; gamesPlayed: number; saves: number; shotsAgainst: number; savePct: number; wins?: number; goalsAgainstAverage?: number; shutouts?: number };
+
+// Their season totals (/cesi-v-nhl/statistiky): one line per player who has
+// played, with his rank in the league by points (skaters) or save % (goalies).
+export type SeasonLine = {
+  name: string; href: string; team: string; pos: string;
+  games: number; goals: number; assists: number; points: number; plusMinus: number; toiPerGame: number | null;
+  pointsRank: number;
+};
+export type SeasonGoalieLine = {
+  name: string; href: string; team: string;
+  games: number; wins: number; svPct: number; gaa: number | null; shutouts: number;
+  svRank: number | null;
+};
 async function seasonTable<T>(kind: 'skater' | 'goalie', season: string): Promise<T[]> {
   return statsRows<T>(`https://api.nhle.com/stats/rest/en/${kind}/summary?cayenneExp=seasonId=${season}%20and%20gameTypeId=2`, { revalidate: 1800 });
 }
@@ -234,6 +248,25 @@ export async function fetchNationData(n: Nation): Promise<NationData> {
       goalieAvg: shots > 0 ? seasonGoalies.reduce((s, g) => s + g.saves, 0) / shots : null,
     },
     tonight: await tonightGames(n, players),
+    season: {
+      skaters: players.filter(p => !p.goalie && pointsBy.has(p.id)).map(p => {
+        const r = seasonSkaters.find(x => x.playerId === p.id)!;
+        return {
+          name: p.name, href: hrefOf(p), team: p.team, pos: p.pos,
+          games: r.gamesPlayed, goals: r.goals ?? 0, assists: r.assists ?? 0, points: r.points,
+          plusMinus: r.plusMinus ?? 0, toiPerGame: r.timeOnIcePerGame ?? null,
+          pointsRank: rankOf(points, r.points),
+        };
+      }).sort((a, b) => b.points - a.points || b.goals - a.goals || a.games - b.games),
+      goalies: goalies.filter(p => goalieBy.has(p.id)).map(p => {
+        const g = goalieBy.get(p.id)!;
+        return {
+          name: p.name, href: hrefOf(p), team: p.team,
+          games: g.gamesPlayed, wins: g.wins ?? 0, svPct: g.savePct, gaa: g.goalsAgainstAverage ?? null, shutouts: g.shutouts ?? 0,
+          svRank: g.gamesPlayed >= GOALIE_MIN_GP ? rankOf(qualified.map(x => x.savePct), g.savePct) : null,
+        };
+      }).sort((a, b) => b.games - a.games),
+    },
   };
 }
 

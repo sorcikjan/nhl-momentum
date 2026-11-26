@@ -2,6 +2,9 @@ import Link from 'next/link';
 import { PlayerList, SectionHeading, SectionLink, TeamChip } from '@/components/ds';
 import { GoalButtons, GoalStrip } from '@/components/home/BestGoals';
 import { Flag } from '@/components/nation/Flag';
+import { TopicNav } from '@/components/nation/TopicNav';
+import { nationTopics } from '@/lib/nation-topics';
+import { currentSeason } from '@/lib/nhl-api';
 import type { NationData, NightGame, TonightGame } from '@/lib/nation-data';
 import { pct, type Nation } from '@/lib/nations';
 
@@ -48,7 +51,7 @@ function NightCard({ g, n }: { g: NightGame; n: Nation }) {
   );
 }
 
-function TonightCard({ g, n }: { g: TonightGame; n: Nation }) {
+export function TonightCard({ g, n }: { g: TonightGame; n: Nation }) {
   const names = (list: string[]) => list.length ? list.join(', ') : '—';
   return (
     <Link href={g.href} className="flex flex-col gap-2.5 rounded-xl border px-4 py-3.5 transition-colors hover:bg-[var(--bg-hover)]"
@@ -64,7 +67,7 @@ function TonightCard({ g, n }: { g: TonightGame; n: Nation }) {
   );
 }
 
-const Note = ({ children }: { children: React.ReactNode }) =>
+export const Note = ({ children }: { children: React.ReactNode }) =>
   <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{children}</p>;
 
 // A nation's page body ("Češi v NHL", "Svenskar i NHL"): the homepage's
@@ -85,6 +88,7 @@ export function NationBody({ n, data, updated }: { n: Nation; data: NationData; 
       <SectionHeading as="h1" size="page"
         kicker={<span className="inline-flex items-center gap-2"><Flag code={n.code} width={18} />{ui.name.toUpperCase()} · {updated}</span>}
         title={`${ui.name}.`} sub={ui.sub(data.count)} />
+      <TopicNav n={n} topics={nationTopics(n, currentSeason())} />
       {data.partial && <Note>{ui.partial}</Note>}
 
       {night && night.games.length > 0 && (

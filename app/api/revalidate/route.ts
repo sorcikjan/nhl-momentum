@@ -5,6 +5,8 @@ import { refreshRankings } from '@/lib/data';
 import { supabaseAdmin } from '@/lib/supabase';
 import { gameUrl, playerUrl, teamUrl } from '@/lib/urls';
 import { NATIONS } from '@/lib/nations';
+import { topicPaths } from '@/lib/nation-topics';
+import { currentSeason } from '@/lib/nhl-api';
 import { NHL_TAG } from '@/lib/cache-policy';
 
 // Called by pipeline workers (game-finish-worker, daily-worker) after writing
@@ -22,7 +24,7 @@ import { NHL_TAG } from '@/lib/cache-policy';
 // A full sweep on every run had crawlers re-render ~2,500 pages from the
 // database up to 6 times a day.
 
-const SUMMARY_PATHS = ['/sitemap.xml', '/', '/games', '/rankings', '/standings', '/stats', '/hot', '/hot/teams', '/hot/goalies', '/playoffs', '/accuracy', ...Object.values(NATIONS).map(n => n.path)];
+const SUMMARY_PATHS = ['/sitemap.xml', '/', '/games', '/rankings', '/standings', '/stats', '/hot', '/hot/teams', '/hot/goalies', '/playoffs', '/accuracy', ...Object.values(NATIONS).flatMap(n => [n.path, ...topicPaths(n, currentSeason())])];
 
 const RANKINGS_BUDGET_MS = 15_000;
 

@@ -6,6 +6,8 @@ import { SITE_URL } from '@/lib/site';
 import { todayET } from '@/lib/home';
 import { predictionSitemapDates } from '@/lib/seo';
 import { NATIONS } from '@/lib/nations';
+import { topicPaths } from '@/lib/nation-topics';
+import { currentSeason } from '@/lib/nhl-api';
 
 const base = SITE_URL;
 
@@ -31,6 +33,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${base}/predictions`,  lastModified: now, changeFrequency: 'hourly',  priority: 0.9 },
     { url: `${base}/recaps`,       lastModified: now, changeFrequency: 'daily',   priority: 0.8 },
     ...Object.values(NATIONS).map(n => ({ url: `${base}${n.path}`, lastModified: now, changeFrequency: 'hourly' as const, priority: 0.8 })),
+    ...Object.values(NATIONS).flatMap(n => topicPaths(n, currentSeason())).map(path => ({ url: `${base}${path}`, lastModified: now, changeFrequency: 'daily' as const, priority: 0.7 })),
     { url: `${base}/welcome`,      changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/about`,        changeFrequency: 'monthly', priority: 0.6 },
     { url: `${base}/accuracy`,     lastModified: now, changeFrequency: 'daily',   priority: 0.5 },
