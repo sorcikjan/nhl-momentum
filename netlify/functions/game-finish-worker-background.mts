@@ -18,7 +18,7 @@ import type { BackgroundHandler } from '@netlify/functions';
 //   4. energy           — update energy bars
 //   5. extras           — three stars + highlights for the just-finished games
 
-import { call, paginate, alert, syncMissingStats } from '../lib/pipeline';
+import { call, paginate, alert, syncMissingStats, waitForDb } from '../lib/pipeline';
 
 const handler: BackgroundHandler = async (event) => {
   const base = process.env.INTERNAL_URL ?? 'https://nhl-momentum.netlify.app';
@@ -97,7 +97,7 @@ const handler: BackgroundHandler = async (event) => {
     const teamFilter = teamIds.length ? `&teamIds=${teamIds.join(',')}` : '';
     const res = await paginate(
       offset => call(`${base}/api/ingest/metrics?offset=${offset}&limit=100${teamFilter}`, h),
-      { pageSize: 100, maxOffset: 2000, done: p => (p.data?.playersProcessed ?? 0) < 100 },
+      { pageSize: 100, maxOffset: 2000, done: p => (p.data?.playersProcessed ?? 0) < 100, beforePage: () => waitForDb({ maxWaitMs: 60_000 }) },
     );
     const snaps = res.pages.reduce((n, p) => n + (p.data?.snapshotsInserted ?? 0), 0);
     log.push(`metrics: ${snaps} snapshots${res.failedOffsets.length ? ` err: failed offsets ${res.failedOffsets.join(',')}` : ''}`);

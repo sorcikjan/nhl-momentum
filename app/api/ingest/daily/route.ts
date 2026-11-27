@@ -526,8 +526,9 @@ export async function GET(req: NextRequest) {
           }
         }
 
-        // 50 concurrent updates — only changed values, typically ~60-120 players who played recently
-        const CONCURRENT = 50;
+        // Only changed values. 10 at a time: 50 concurrent updates on the free
+        // instance, on top of page traffic, were part of the 05:00 outages (Nov 2026).
+        const CONCURRENT = 10;
         for (let i = 0; i < eUpdates.length; i += CONCURRENT) {
           const results = await Promise.all(
             eUpdates.slice(i, i + CONCURRENT).map(({ id, energy_bar }) =>

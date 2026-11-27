@@ -48,12 +48,20 @@ export async function call(
 // retries) is recorded and skipped; we only give up after 3 failures in a row.
 export async function paginate(
   fetchPage: (offset: number) => Promise<Json>,
-  opts: { pageSize: number; done: (r: Json) => boolean; maxOffset: number },
-): Promise<{ pages: Json[]; failedOffsets: number[] }> {
+  opts: {
+    pageSize: number; done: (r: Json) => boolean; maxOffset: number;
+    // Backpressure: asked before every page; false stops the loop (see waitForDb).
+    beforePage?: () => Promise<boolean>;
+    // Breathing room for the database between pages.
+    pauseMs?: number;
+  },
+): Promise<{ pages: Json[]; failedOffsets: number[]; stoppedAt: number | null }> {
   const pages: Json[] = [];
   const failedOffsets: number[] = [];
   let consecutiveFailures = 0;
   for (let offset = 0; offset <= opts.maxOffset; offset += opts.pageSize) {
+    if (offset > 0 && opts.pauseMs) await sleep(opts.pauseMs);
+    if (opts.beforePage && !(await opts.beforePage())) return { pages, failedOffsets, stoppedAt: offset };
     const r = await fetchPage(offset);
     if (r.data == null) {
       failedOffsets.push(offset);
@@ -64,7 +72,74 @@ export async function paginate(
     pages.push(r);
     if (opts.done(r)) break;
   }
-  return { pages, failedOffsets };
+  return { pages, failedOffsets, stoppedAt: null };
+}
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+// ─── Backpressure ────────────────────────────────────────────────────────────
+// The free Supabase instance falls over when a burst of pipeline work meets the
+// steady page traffic: on 26 and 27 Nov 2026 it died about 50 minutes into the
+// 05:00 full recalculation, both on nights with nothing new to compute. Heavy
+// phases now ask before each batch and wait while the database is slow; if it
+// stays slow they stop, and the next run or the health check picks up the rest.
+// Better a late number than a dead site.
+export const SLOW_DB_MS = 1500;
+
+// One row from a tiny table: how long the database takes to answer anything.
+// null = no answer (down or timed out).
+export async function dbProbeMs(timeoutMs = 10_000): Promise<number | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return 0; // can't measure: don't block the pipeline
+  const t = Date.now();
+  try {
+    const res = await fetch(`${url}/rest/v1/teams?select=id&limit=1`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    await res.text();
+    return res.ok ? Date.now() - t : null;
+  } catch {
+    return null;
+  }
+}
+
+// True once the database answers faster than slowMs; false if it hasn't within
+// maxWaitMs (the background function has 15 minutes in all).
+export async function waitForDb(opts: { maxWaitMs?: number; slowMs?: number; pollMs?: number } = {}): Promise<boolean> {
+  const { maxWaitMs = 120_000, slowMs = SLOW_DB_MS, pollMs = 20_000 } = opts;
+  const until = Date.now() + maxWaitMs;
+  for (;;) {
+    const ms = await dbProbeMs();
+    if (ms != null && ms < slowMs) return true;
+    if (Date.now() + pollMs > until) return false;
+    await sleep(pollMs);
+  }
+}
+
+// Teams that played on a given ET date (the NHL schedule, no database).
+// null when the schedule can't be read.
+export async function teamsThatPlayed(etDate: string): Promise<number[] | null> {
+  try {
+    const res = await fetch(`https://api-web.nhle.com/v1/schedule/${etDate}`, { signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) return null;
+    const day = (await res.json())?.gameWeek?.find((d: { date?: string }) => d.date === etDate);
+    if (!day) return [];
+    const ids = new Set<number>();
+    for (const g of day.games ?? []) {
+      if (g.homeTeam?.id) ids.add(g.homeTeam.id);
+      if (g.awayTeam?.id) ids.add(g.awayTeam.id);
+    }
+    return [...ids];
+  } catch {
+    return null;
+  }
+}
+
+// The ET calendar date `daysAgo` days before now (NHL game dates are ET).
+export function etDate(daysAgo: number, now = Date.now()): string {
+  return new Date(now - daysAgo * 86_400_000).toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 }
 
 // Optional alerting: set ALERT_WEBHOOK_URL (Slack or Discord incoming webhook) in

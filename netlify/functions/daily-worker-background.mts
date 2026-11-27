@@ -5,7 +5,7 @@ import type { BackgroundHandler } from '@netlify/functions';
 // POST body JSON: { phases?: string[], date?: string }
 // If no phases, runs the full daily pipeline.
 
-import { call, paginate, alert, syncMissingStats } from '../lib/pipeline';
+import { call, paginate, alert, syncMissingStats, waitForDb, teamsThatPlayed, etDate } from '../lib/pipeline';
 
 // Recap generation: fetchRecapData (~3s) + Gemini generation (30-120s) + retries
 // on 503/429 = can easily exceed 55s. The recap route has maxDuration=300,
@@ -36,6 +36,23 @@ const handler: BackgroundHandler = async (event) => {
   // Anything here is sent to ALERT_WEBHOOK_URL at the end of the run.
   const problems: string[] = [];
   console.log('[daily-worker] start — phases:', phases.join(', '));
+
+  // Backpressure (netlify/lib/pipeline.ts): never start piling work onto a
+  // database that is already struggling. The health check and the next run
+  // catch up once it recovers.
+  if (!(await waitForDb({ maxWaitMs: 180_000 }))) {
+    const msg = 'database slow or down for 3 min: run skipped, nothing written';
+    console.error('[daily-worker]', msg);
+    await alert('daily worker', [msg, `phases: ${phases.join(', ')}`]);
+    return;
+  }
+  // Before each heavy phase: wait up to 2 min for the database, else skip it.
+  const gate = async (phase: string): Promise<boolean> => {
+    if (await waitForDb()) return true;
+    log.push(`${phase}: skipped, database slow`);
+    problems.push(`${phase} skipped: database slow`);
+    return false;
+  };
 
   // 0a. Rosters — sync team membership from NHL rosters before anything reads
   // players.team_id (trades/signings/call-ups; scratch detection depends on it)
@@ -108,19 +125,35 @@ const handler: BackgroundHandler = async (event) => {
     if (sweep.failedOffsets.length) problems.push(`gamelogs-full failed at offsets ${sweep.failedOffsets.join(',')}`);
   }
 
-  // 3. Metrics — paginated, all players
-  if (phases.includes('metrics')) {
-    const res = await paginate(
-      offset => call(`${base}/api/ingest/metrics?offset=${offset}&limit=100`, h),
-      { pageSize: 100, maxOffset: 2000, done: p => (p.data?.playersProcessed ?? 0) < 100 },
-    );
-    const snaps = res.pages.reduce((n, p) => n + (p.data?.snapshotsInserted ?? 0), 0);
-    log.push(`metrics: ${snaps} snapshots${res.failedOffsets.length ? `, failed offsets ${res.failedOffsets.join(',')}` : ''}`);
-    if (res.failedOffsets.length) problems.push(`metrics failed at offsets ${res.failedOffsets.join(',')}`);
+  // 3. Metrics — only the teams that played last night (ET). A player's numbers
+  //    change only when he plays: recalculating all ~900 every morning took the
+  //    database down on nights with no games at all (26–27 Nov 2026). The
+  //    game-finish worker already recalculates each team as its game ends; this
+  //    is the safety net for any it missed. { fullMetrics: true } (or an
+  //    unreadable schedule) recalculates everyone, paced.
+  if (phases.includes('metrics') && await gate('metrics')) {
+    const teams = body.fullMetrics ? null : await teamsThatPlayed(etDate(1));
+    if (teams && teams.length === 0) {
+      log.push(`metrics: no games on ${etDate(1)}, nothing to recalculate`);
+    } else {
+      const filter = teams ? `&teamIds=${teams.join(',')}` : '';
+      const res = await paginate(
+        offset => call(`${base}/api/ingest/metrics?offset=${offset}&limit=100${filter}`, h),
+        {
+          pageSize: 100, maxOffset: 2000, done: p => (p.data?.playersProcessed ?? 0) < 100,
+          pauseMs: 2_000,
+          beforePage: () => waitForDb(),
+        },
+      );
+      const snaps = res.pages.reduce((n, p) => n + (p.data?.snapshotsInserted ?? 0), 0);
+      log.push(`metrics (${teams ? `${teams.length} teams` : 'all players'}): ${snaps} snapshots${res.failedOffsets.length ? `, failed offsets ${res.failedOffsets.join(',')}` : ''}${res.stoppedAt != null ? `, stopped at offset ${res.stoppedAt}: database slow` : ''}`);
+      if (res.failedOffsets.length) problems.push(`metrics failed at offsets ${res.failedOffsets.join(',')}`);
+      if (res.stoppedAt != null) problems.push(`metrics stopped at offset ${res.stoppedAt}: database slow`);
+    }
   }
 
   // 4. Snapshots + predictions — today (and tomorrow look-ahead)
-  if (phases.includes('snapshots')) {
+  if (phases.includes('snapshots') && await gate('snapshots')) {
     try {
       // Today
       let offset = 0, snaps = 0, preds = 0;
@@ -160,7 +193,7 @@ const handler: BackgroundHandler = async (event) => {
   }
 
   // 6. Energy — full sweep
-  if (phases.includes('energy')) {
+  if (phases.includes('energy') && await gate('energy')) {
     try {
       const r = await call(`${base}/api/ingest/daily?phase=energy`, h);
       log.push(`energy: ${r.data?.energy_updated ?? `err: ${r.error}`} updated`);
