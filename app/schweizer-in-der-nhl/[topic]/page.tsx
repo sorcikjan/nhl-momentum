@@ -4,8 +4,8 @@ import { CHE } from '@/lib/nations';
 // Topic pages under /schweizer-in-der-nhl (lib/nation-topics.ts): NHL API data only.
 export const revalidate = 86400; // backstop: pages change on /api/revalidate (lib/cache-policy.ts)
 
-// No `dynamicParams = false`: on Netlify it turned every topic page into a 404
-// (27 Nov 2026). Unknown slugs get notFound() from the page itself.
+// No `dynamicParams = false` and no prerendering: on Netlify both left every
+// topic page a 404 (27 Nov 2026). Unknown slugs get notFound() from the page.
 const page = nationTopicPage(CHE);
 export const generateStaticParams = page.generateStaticParams;
 export const generateMetadata = page.generateMetadata;

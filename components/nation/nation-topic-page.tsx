@@ -17,8 +17,12 @@ export function nationTopicPage(n: Nation) {
   const topicOf = (slug: string) => topics().find(t => t.slug === slug);
   const nationData = cache(() => fetchNationData(n));
 
+  // Empty, as on player and game pages: each topic page renders on its first
+  // request and is cached from then on. Prerendered at build time (with or
+  // without dynamicParams = false) they all answered 404 on Netlify while
+  // working locally (27 Nov 2026). Unknown slugs get notFound() below.
   function generateStaticParams() {
-    return topics().map(t => ({ topic: t.slug }));
+    return [];
   }
 
   async function generateMetadata({ params }: { params: Promise<{ topic: string }> }): Promise<Metadata> {
